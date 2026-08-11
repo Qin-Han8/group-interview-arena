@@ -1,95 +1,215 @@
-# 技术架构骨架
+# P0 技术架构基线
 
-- Status: Skeleton / Baseline
+- Status: P0 Architecture Baseline
 - Current phase: P0
+- Architecture baseline established by: P0-2 — DONE
 - Target version: V0.1 Internal Validation
-- Detailed design: Not started
-- Architecture decisions: Not accepted in P0-1
+- Business architecture detail: Incremental from P1
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
 
-本文件未来记录系统上下文、模块边界、运行拓扑、依赖方向和正式 ADR。当前只整理总纲级架构分层和推荐方向，不代表技术选型或部署方案已冻结。
+本文件记录 P0-2 已批准的技术架构基线、系统边界、规划目录、开发拓扑和演进约束。它不是完整业务架构；P1 以后的题目、角色、会话、编排和评分模块仍须在进入对应任务时逐步设计。
 
-## Confirmed by PROJECT_MASTER_PLAN
+正式技术决策及其上下文以 [`DECISIONS.md`](DECISIONS.md) 中 `ADR-001`～`ADR-014` 为准。本文件只整理这些决策对实现的直接约束。
 
-### 总纲架构分层
+## Accepted architecture baseline
+
+### Repository and application boundaries
+
+- 使用 simple monorepo；
+- 规划 Web 应用位于 `apps/web`；
+- 规划 API 应用位于 `apps/api`；
+- 当前不使用 multi-repo、Nx 或 Turborepo；
+- `apps/` 将由 P0-3 创建，本轮仍不存在应用代码。
+
+重新评估 monorepo 工具的触发器：出现多个独立 JS package/application、CI 构建依赖明显复杂，或普通 workspace scripts 已无法合理维护。
+
+### Planned repository layout
+
+以下结构是规划，不表示已经创建：
 
 ```text
-Web 客户端
-  -> API 网关 / 认证
-  -> 训练会话服务
-      -> 讨论编排器
-      -> AI 角色服务
-      -> 语音服务
-      -> 结构化记忆服务
-  -> 评分与报告服务
-  -> 题目内容服务
-  -> 订单与权益服务
-  -> 管理后台
-  -> PostgreSQL / Redis / 对象存储
+group-interview-arena/
+├── apps/
+│   ├── web/                     # P0-3: Next.js application
+│   └── api/                     # P0-3: FastAPI application
+├── infra/
+│   └── compose.yaml             # P0-4: PostgreSQL service
+├── docs/
+├── package.json                 # P0-3: JS workspace commands
+├── pnpm-workspace.yaml          # P0-3
+└── pnpm-lock.yaml               # P0-3
 ```
 
-这是一份总纲层面的逻辑分层，不表示当前已有服务、部署单元或基础设施。
+不提前创建 `packages/`、worker、Redis adapter、未来业务 module 或没有调用方的 infrastructure 目录。
 
-### 系统模块边界
+### Runtime and toolchain policy
 
-- 用户与身份：注册登录、设置、隐私同意、删除账号和设备会话；
-- 题目内容：查询、版本、难度标签、发布状态和 AI 变体；
-- 训练会话：创建、状态、发言、时间、恢复和未来权益扣减；
-- 讨论编排：阶段、发言人、角色决策、记忆、冲突和收敛；
-- 语音：音频流、ASR、分句、TTS 和生命周期；
-- 评分报告：特征、证据、聚合、报告和用户反馈；
-- 商品权益：商品、订单、支付回调、场次、有效期、退款和补偿。
+- JavaScript runtime：Node.js 24 LTS；P0-3 选用当时最新兼容的 24.x，不以当前机器的 Node 26 Current 作为项目基线；
+- JavaScript package manager：pnpm；`packageManager` 记录实际精确版本，只提交 `pnpm-lock.yaml`；
+- Python runtime：CPython 3.14；`.python-version` 和 `pyproject.toml` 在 P0-3 表达 3.14 policy；
+- Python environment/package manager：uv；后续提交 `uv.lock`；
+- 只有项目必需依赖明确不兼容 Python 3.14 时，才能提出降至 3.13 的 Proposed ADR；
+- Windows PowerShell 是正式支持的本地开发环境，不要求 WSL。
 
-模块是领域责任边界，不要求早期拆成微服务。
+### Frontend boundary
 
-## 当前版本范围
+- Next.js App Router、React、TypeScript strict、Tailwind CSS；
+- `app` 负责 routing/layout；
+- `features` 只存放已经进入当前范围的真实用户能力；
+- `components` 只存放真正共享的 UI；
+- `lib/api` 存放 API transport 和生成契约；
+- `lib/realtime` 仅在 P1 真正建立实时通道时创建；
+- UI primitives/component library 保持 Deferred。
 
-- 当前 P0-1：只建立文档和决策治理。
-- P0-2：确认技术选择、仓库组织、模块边界和 ADR。
-- V0.1：只支持内部文字版验证，不需要语音、支付、完整成长或行业题包。
-- 不得因总纲展示完整长期架构就在 P0 一次性实现所有模块。
+Next.js Server Actions/Route Handlers 可以处理 Web 专属能力，但不得复制 domain logic、session state machine、scoring、agent orchestration 或 persistence authority。FastAPI 始终是主要业务后端。
 
-## Implementation guidance
+### Backend boundary
 
-总纲推荐但尚未正式决定的方向：
+- FastAPI；
+- Pydantic v2；
+- 在外部 I/O 边界适当使用 Python async I/O；
+- 纯领域规则不因 FastAPI 是 async 就被强制写成 async；
+- API schema、ORM model 和领域对象保持分离。
 
-- 前端：Next.js/React、TypeScript、Tailwind CSS 或成熟组件库、Web Audio API、WebSocket/SSE、PWA；
-- 后端：Python FastAPI、Pydantic、SQLAlchemy 或等价 ORM、PostgreSQL、Redis、异步任务队列；
-- AI/语音：供应商抽象层、流式 ASR、流式或分段 TTS、自定义状态机；LangGraph 可选；
-- 基础设施：Docker Compose、本地环境、对象存储、CDN、Sentry/OpenTelemetry 和产品分析工具。
+后端采用 lightweight domain-oriented hybrid，规划职责为：
 
-所有上述内容当前状态均为 `Proposed / Recommended`。核心讨论调度逻辑即使采用工作流框架，也必须由项目代码掌控。
+```text
+api/          transport adapters
+core/         configuration, errors, logging and cross-cutting infrastructure
+db/           persistence infrastructure, created when P0-4 needs it
+modules/      real business domains, created only when their phase begins
+providers/    provider adapters that have actual callers
+```
 
-## TBD
+禁止 full DDD ceremony、repository/service/controller 多层空壳、global giant `services.py`，以及提前创建未来全部 module。
 
-以下均留给 P0-2 或后续 ADR，当前不是 Accepted：
+## Local development model
 
-- TBD：仓库结构和 monorepo 工具；
-- TBD：Node.js 与 Python 包管理工具；
-- TBD：WebSocket 或 SSE 的具体使用边界；
-- TBD：正式认证方案；
-- TBD：LLM/ASR/TTS Provider 接口及供应商；
-- TBD：异步任务队列产品；
-- TBD：部署、云平台、CDN 和对象存储；
-- TBD：本地开发编排方式；
-- TBD：日志、追踪和产品分析工具；
-- TBD：模块是进程内模块还是独立服务的演进条件。
+```text
+developer
+  ├── Node.js 24 LTS + pnpm -> Next.js web
+  └── CPython 3.14 + uv     -> FastAPI api
+                                      |
+                                      +-> PostgreSQL 18.x via Docker Compose (P0-4)
+```
 
-这些是派生 TBD，不是总纲原始 D-xxx。
+### P0-3
+
+只建立：
+
+- Web skeleton；
+- API skeleton；
+- approved toolchain；
+- health endpoints；
+- Web → API connectivity；
+- basic configuration；
+- structured logging baseline；
+- backend unit/API tests；
+- frontend unit/component smoke tests；
+- 当前阶段需要的 lint、typecheck 和 build。
+
+P0-3 不需要数据库容器，不创建 Redis、task queue、WebSocket 业务代码或 Provider 实现。
+
+### P0-4
+
+加入：
+
+- Docker Compose；
+- PostgreSQL 18.x，禁止 `postgres:latest`；
+- SQLAlchemy 2.x；
+- Alembic；
+- PostgreSQL integration tests 和 migration tests。
+
+Redis 继续不运行。
+
+## Communication and contract boundaries
+
+- REST：resource CRUD、question fetch、session create、session snapshot/load、reports、settings 及未来 admin/orders；
+- WebSocket：active session commands、state changes、participant events、timer、floor control、interruption、AI streamed text 及未来 speech-related session events；
+- SSE 不作为活动 session 主协议；
+- P1 第一个文字讨论 vertical slice 即建立 WebSocket session channel，不先做完整 HTTP 讨论后再重写；
+- 服务端 session state 是权威；client command 有 action identity；session event 有顺序；重连基于 server snapshot + sequence。
+
+FastAPI OpenAPI 是 REST contract 的 Source of Truth，前端从 OpenAPI 生成 TypeScript types/client。具体 generator package 保持 Deferred。
+
+WebSocket 使用独立版本化事件契约，至少表达 event type、schema version、session identity、ordering sequence、occurrence timestamp 和 action identity。完整 P1 事件 Schema 由 P1 API design 冻结，不在 P0-2 假装已经完成。
+
+## Configuration, secrets and error boundaries
+
+- 配置采用类型化、启动时校验的方式；
+- `.env.example` 只提供安全占位符，私有环境文件不得提交；
+- 服务端密钥不得进入浏览器 bundle、公开构建产物或日志；
+- 生产环境不得接受不安全开发身份默认值；
+- REST 使用标准 HTTP status、稳定 machine-readable error code、安全 message、request correlation 和可选安全 details；
+- WebSocket error event 与 REST error semantics 对齐；
+- 不向用户暴露 stack trace、SQL、filesystem path、secret、prompt 或 provider credential。
+
+## Testing and quality layers
+
+按阶段安装当前验收真正需要的工具：
+
+- Python quality：Ruff lint、Ruff format、Pyright；不同时启用 mypy；
+- Backend tests：pytest，只有异步测试需要时使用 pytest-asyncio；
+- Frontend quality：ESLint、TypeScript `tsc`、Prettier；
+- Frontend tests：Vitest、Testing Library；
+- P0-4：真实 PostgreSQL integration/migration tests，不使用 SQLite 代替；
+- P1：WebSocket tests、fake provider tests、deterministic session/orchestrator regression；
+- 有真实跨应用用户流后再加入 Playwright；
+- 真实 LLM tests 必须显式执行，不进入默认 CI。
+
+## Logging and observability
+
+- 从 P0-3 应用骨架开始使用 structured logging；
+- 通用请求使用 `request_id`；
+- `session_id`、`connection_id`、provider invocation id、`job_id` 只在相关能力实际出现后增加；
+- 不为未来字段生成虚假 ID；
+- 敏感 prompt、secret 和不必要的完整输入默认不写日志；
+- OpenTelemetry 延后到 P0-6；
+- Sentry 或其他 SaaS exporter 保持 Deferred。
+
+## Provider neutrality and orchestration
+
+- 业务领域不得直接绑定厂商 SDK；
+- LLM Provider、ASR Provider、TTS Provider、可选 Embedding Provider 是按需建立的概念边界；
+- LLMProvider 在 P1 首次真正调用 LLM 时建立；
+- ASRProvider/TTSProvider 在 P2 首次接入时建立；
+- Embedding Provider 只有实际需求时建立；
+- Provider SDK object 不得穿透 domain layer；
+- structured output 必须经过 Schema validation；
+- V0.1 不使用 LangGraph；核心 discussion orchestrator 是自定义、确定性、可测试的状态机。
+
+不得为尚未使用的 Provider、Redis 或 task queue 创建空 interface、adapter、factory、worker 或目录。
+
+## Deferred infrastructure and decisions
+
+- Redis runtime、implementation 和产品；
+- 独立 task queue 及其具体产品；
+- UI primitives/component library；
+- OpenAPI generator 和 WebSocket schema generator；
+- OpenTelemetry exporter、Sentry/SaaS、analytics；
+- 具体 LLM/model、ASR、TTS 和 Embedding 实现；
+- 正式认证、支付、云平台、中国生产部署、对象存储、CDN 和 PWA production strategy。
+
+Redis 只在多 API workers、横向扩容、跨进程 WebSocket broadcast、distributed lock、centralized rate limiting 或 durable task queue 出现时重新评估。
+
+独立后台任务队列只在 reliable retry、delayed jobs、scheduling、independent workers 或 cross-process execution 出现时重新评估。当前能够合理完成的任务同步执行。
 
 ## Future work
 
-- P0-2：比较候选方案并形成必要的 Accepted ADR。
-- P0-3：依据 ADR 建立最小前后端骨架。
-- P0-4～P0-6：逐步补齐数据库、身份、CI、日志和可观测性。
-- P1 以后：按当前版本需求演进业务模块，避免提前微服务化。
+- P0-3：创建最小 Web/API 骨架，不实现业务模块；
+- P0-4：创建 PostgreSQL 数据与 migration 基础；
+- P0-5：落实内部 V0.1 最小身份边界；
+- P0-6：建立 CI 和基础可观测性；
+- P1：逐步设计题目、角色、会话、状态机、调度、记忆和基础报告，并建立第一个 WebSocket vertical slice；
+- P2 以后：只在对应阶段获批后增加语音、评分训练和商业化能力。
 
 ## 与其他文档关系
 
-- 技术决策状态：[`DECISIONS.md`](DECISIONS.md)
+- 技术决策：[`DECISIONS.md`](DECISIONS.md)
 - 数据边界：[`DATABASE.md`](DATABASE.md)
 - API 与事件：[`API.md`](API.md)
+- 会话与编排：[`AGENT_BEHAVIOR.md`](AGENT_BEHAVIOR.md)
 - 安全约束：[`PRIVACY_AND_SAFETY.md`](PRIVACY_AND_SAFETY.md)
 - 当前执行顺序：[`ROADMAP.md`](ROADMAP.md) 和 [`TASKS.md`](TASKS.md)

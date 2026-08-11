@@ -3,7 +3,7 @@
 - Status: Active governance baseline
 - Current phase: P0
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md)，高于领域文档和代码实现
-- Last established by task: P0-1
+- Last established by task: P0-2 — DONE
 
 ## 1. 文档规则
 
@@ -67,28 +67,237 @@
 | D-014 | Accepted | 公共题目采用人工审核加 AI 变体 | 不允许模型无约束即时生成全部正式题目 | PROJECT_MASTER_PLAN V1.0 |
 | D-015 | Accepted | 商业模式以场次包和冲刺包为主 | 不以长期月度订阅作为首要收入方式 | PROJECT_MASTER_PLAN V1.0 |
 
-## 3. 技术建议登记（非 Accepted 决策）
+## 3. 已确认技术决策
 
-总纲提出了 Next.js/React、TypeScript、FastAPI、Pydantic、PostgreSQL、Redis、WebSocket/SSE、Docker Compose、对象存储、可观测性工具及可选 LangGraph 等方向。这些当前统一为：
+以下技术决策由用户在 P0-2 明确批准，均处于总纲授权范围内。它们约束后续实现，但不改变 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 的产品方向。
 
-- Status: `Proposed / Recommended`
-- Source: `PROJECT_MASTER_PLAN V1.0 §21`
-- Decision stage: `P0-2 技术架构决策`
+### ADR-001 — 采用简单 Monorepo
 
-它们不得在 P0-1 中被表述为已经冻结的技术选型。
+- ID: `ADR-001`
+- Title: 采用简单 Monorepo
+- Date: 2026-08-11
+- Status: Accepted
+- Type: Architecture
+- Source: 用户批准的 P0-2 技术架构决策
+- Context: 项目近期只有一个 Web 应用和一个 API 应用，需要共同演进文档、契约和实现。
+- Decision: 使用简单 monorepo，规划 `apps/web` 与 `apps/api`；当前不采用 multi-repo、Nx 或 Turborepo。
+- Rationale: 普通 workspace scripts 足以维护当前规模，能以最低工具成本提供原子变更和统一审查。
+- Consequences: P0-3 只创建实际需要的应用目录；出现多个独立 JS package/application、CI 依赖明显复杂或普通 scripts 无法维护时重新评估。
+- Alternatives: multi-repo；Nx；Turborepo。
+- Related documents: [`ARCHITECTURE.md`](ARCHITECTURE.md)、[`TASKS.md`](TASKS.md)
 
-## 4. 待决策技术事项
+### ADR-002 — Next.js 前端基线
+
+- ID: `ADR-002`
+- Title: Next.js 前端基线
+- Date: 2026-08-11
+- Status: Accepted
+- Type: Architecture
+- Source: 用户批准的 P0-2 技术架构决策；PROJECT_MASTER_PLAN V1.0 §21
+- Context: V0.1 需要桌面 Web，后续公开产品需要稳定的路由和 Web 能力。
+- Decision: 前端采用 Next.js App Router、React、TypeScript strict 和 Tailwind CSS。FastAPI 是业务权威；Next.js Server Actions/Route Handlers 只能处理 Web 专属能力，不得复制领域逻辑、会话状态机、评分、Agent 编排或持久化权威。
+- Rationale: 与总纲推荐方向一致，并保留公开 Web 产品的演进空间。
+- Consequences: UI primitives/component library 保持 Deferred；不在 P0-2 选择 shadcn、Radix、React Aria 或大型 UI suite。
+- Alternatives: Vite SPA；当前冻结完整组件库。
+- Related documents: [`ARCHITECTURE.md`](ARCHITECTURE.md)、[`API.md`](API.md)
+
+### ADR-003 — FastAPI 作为主要业务后端
+
+- ID: `ADR-003`
+- Title: FastAPI 作为主要业务后端
+- Date: 2026-08-11
+- Status: Accepted
+- Type: Architecture
+- Source: 用户批准的 P0-2 技术架构决策；PROJECT_MASTER_PLAN V1.0 §21
+- Context: AI、讨论编排、结构化输出和评分将主要使用 Python 生态。
+- Decision: 后端采用 FastAPI、Pydantic v2，并在合适的 I/O 边界使用 Python async I/O。API schema、ORM model 和领域对象不得永久绑定；纯领域规则不因框架异步而被强制写成 async。
+- Rationale: 提供明确的 Schema 校验、OpenAPI 和实时通信基础，同时让领域逻辑保持可测试。
+- Consequences: Pydantic v1 不进入新项目；前后端契约按 ADR-007 治理。
+- Alternatives: Node/Next.js 业务后端；Django；Pydantic v1。
+- Related documents: [`ARCHITECTURE.md`](ARCHITECTURE.md)、[`API.md`](API.md)
+
+### ADR-004 — 运行时与包管理工具链
+
+- ID: `ADR-004`
+- Title: 运行时与包管理工具链
+- Date: 2026-08-11
+- Status: Accepted
+- Type: Architecture
+- Source: 用户批准并经外部审核修订的 P0-2 技术架构决策
+- Context: Windows 本地开发和未来 CI 需要可复现且单一的 JavaScript/Python 工具链。
+- Decision: JavaScript 使用 Node.js 24 LTS 和 pnpm；Python 使用 CPython 3.14 和 uv。ADR 冻结 Node 24 LTS major policy，不锁 patch；P0-3 选择当时最新兼容的 24.x。`packageManager` 记录实际 pnpm 精确版本并提交唯一的 `pnpm-lock.yaml`；`.python-version` 使用 3.14，`pyproject.toml` 声明 Python 3.14 policy，并提交 `uv.lock`。
+- Rationale: 新项目采用受支持的 LTS/runtime 和可复现锁文件，不以当前机器的 Node 26 Current 反向决定项目基线。
+- Consequences: 只有项目必需依赖明确不兼容 Python 3.14 时，才能提出降至 3.13 的 Proposed ADR；不得自行降版或同时维护多套 lockfile。
+- Alternatives: Node 26 Current；npm；Yarn；pip+venv；Poetry；CPython 3.13。
+- Related documents: [`ARCHITECTURE.md`](ARCHITECTURE.md)、[`TASKS.md`](TASKS.md)
+
+### ADR-005 — PostgreSQL、SQLAlchemy 与 Alembic 数据基线
+
+- ID: `ADR-005`
+- Title: PostgreSQL、SQLAlchemy 与 Alembic 数据基线
+- Date: 2026-08-11
+- Status: Accepted
+- Type: Data
+- Source: 用户批准的 P0-2 技术架构决策；PROJECT_MASTER_PLAN V1.0 §21、§24
+- Context: 会话、事件、版本和证据需要关系型事务、可追溯 migration 和明确模型边界。
+- Decision: 从 P0-4 首次建立数据层时直接使用 PostgreSQL、SQLAlchemy 2.x 和 Alembic，并分离 ORM model、Pydantic API schema 与领域对象。架构只冻结 PostgreSQL；P0-4 实施基线为 PostgreSQL 18.x，镜像不得使用 `postgres:latest`。
+- Rationale: 避免 SQLite 过渡路径造成类型、并发和 migration 差异。
+- Consequences: P0-4 使用真实 PostgreSQL integration/migration tests；数据库 major 升级需要独立评估。
+- Alternatives: SQLite 临时正式开发路径；MySQL；SQLModel 作为 API/ORM 永久统一模型。
+- Related documents: [`DATABASE.md`](DATABASE.md)、[`ARCHITECTURE.md`](ARCHITECTURE.md)
+
+### ADR-006 — REST 与 WebSocket 通信边界
+
+- ID: `ADR-006`
+- Title: REST 与 WebSocket 通信边界
+- Date: 2026-08-11
+- Status: Accepted
+- Type: Architecture
+- Source: 用户批准的 P0-2 技术架构决策；PROJECT_MASTER_PLAN V1.0 §25
+- Context: 资源访问与活动群面会话具有不同通信特征。
+- Decision: REST 负责资源 CRUD、题目获取、会话创建和快照/加载、报告、设置及未来管理/订单能力；WebSocket 负责活动会话命令、状态变化、参与者事件、计时、发言权、打断、AI 流式文字及未来语音会话事件。SSE 不作为活动 session 主协议。
+- Rationale: 活动讨论需要双向、有序且可恢复的通道。
+- Consequences: P1 的第一个文字讨论 vertical slice 建立 WebSocket session channel；服务端状态权威，client command 有 action identity，事件有顺序，重连使用 snapshot + sequence。
+- Alternatives: REST-only 完整讨论后再重写；SSE 作为主通道。
+- Related documents: [`API.md`](API.md)、[`AGENT_BEHAVIOR.md`](AGENT_BEHAVIOR.md)
+
+### ADR-007 — API 契约生成策略
+
+- ID: `ADR-007`
+- Title: API 契约生成策略
+- Date: 2026-08-11
+- Status: Accepted
+- Type: Architecture
+- Source: 用户批准的 P0-2 技术架构决策
+- Context: FastAPI 与 TypeScript 前端之间需要避免手写重复 DTO 和契约漂移。
+- Decision: FastAPI OpenAPI 是 REST contract 的 Source of Truth，前端由其生成 TypeScript types/client。WebSocket 使用独立、版本化事件契约，至少表达 event type、schema version、session identity、ordering sequence、occurrence timestamp 和 client action identity；服务端错误与 REST error semantics 对齐。
+- Rationale: 单一权威契约便于验证和演进。
+- Consequences: OpenAPI generator package 与 WebSocket schema generator package 保持 Deferred；完整 P1 WebSocket event schema 不在 P0-2 冻结。
+- Alternatives: 前后端手写两套同名 DTO；把 WebSocket 强行纳入 REST OpenAPI。
+- Related documents: [`API.md`](API.md)、[`ARCHITECTURE.md`](ARCHITECTURE.md)
+
+### ADR-008 — Redis 延后运行
+
+- ID: `ADR-008`
+- Title: Redis 延后运行
+- Date: 2026-08-11
+- Status: Accepted
+- Type: Architecture
+- Source: 用户批准并经外部审核修订的 P0-2 技术架构决策
+- Context: Redis 可能用于未来跨进程广播、锁和限流，但 V0.1 初期没有该运行需求。
+- Decision: 采用 Deferred runtime strategy。V0.1 初期不运行 Redis，不将 Redis 放入 P0-4 默认 Compose，领域业务不得直接依赖 Redis SDK。只在架构文档记录替换边界。
+- Rationale: 避免没有实际需求的运行和维护成本。
+- Consequences: 多 API workers、横向扩容、跨进程 WebSocket broadcast、distributed lock、centralized rate limiting 或 durable task queue 出现时重新评估。**不为了 deferred technology 创建无实际调用方的空 abstraction、adapter、factory 或目录。**
+- Alternatives: 从 P0-4 起默认运行 Redis；完全忽略未来跨进程边界。
+- Related documents: [`ARCHITECTURE.md`](ARCHITECTURE.md)、[`TASKS.md`](TASKS.md)
+
+### ADR-009 — 独立后台任务队列延后
+
+- ID: `ADR-009`
+- Title: 独立后台任务队列延后
+- Date: 2026-08-11
+- Status: Accepted
+- Type: Architecture
+- Source: 用户批准并经外部审核修订的 P0-2 技术架构决策
+- Context: 当前没有需要可靠异步执行的已实现任务或已验证负载。
+- Decision: 当前不引入 Celery、RQ、Dramatiq、distributed worker 或其他独立 task queue；能够合理完成的任务同步执行。
+- Rationale: 在需求出现前避免任务基础设施、重试和运维复杂度。
+- Consequences: 出现 reliable retry、delayed jobs、scheduling、independent workers 或 cross-process execution 时重新评估。**不为了 deferred technology 创建无实际调用方的 JobRunner、Queue abstraction、worker 空目录或其他空 abstraction。**
+- Alternatives: P0-3 即引入独立队列；先创建无实现的任务抽象。
+- Related documents: [`ARCHITECTURE.md`](ARCHITECTURE.md)、[`TASKS.md`](TASKS.md)
+
+### ADR-010 — 本地应用原生运行、基础服务使用 Docker Compose
+
+- ID: `ADR-010`
+- Title: 本地应用原生运行、基础服务使用 Docker Compose
+- Date: 2026-08-11
+- Status: Accepted
+- Type: Operations
+- Source: 用户批准的 P0-2 技术架构决策
+- Context: Windows 开发需要兼顾热更新体验与有状态服务一致性。
+- Decision: Next.js 通过 Node/pnpm 原生运行，FastAPI 通过 uv/Python 原生运行；基础服务使用 Docker Compose。P0-3 不需要数据库容器；P0-4 才加入 PostgreSQL 18.x、SQLAlchemy、Alembic 和数据库 integration tests。Redis 不运行。
+- Rationale: 避免全容器开发摩擦，同时标准化有状态基础服务。
+- Consequences: Windows PowerShell 是正式支持环境，不要求 WSL；P0-3 只建立 Web/API skeleton、toolchain、health、连接、配置、日志和基础测试。
+- Alternatives: 全栈容器化；全部服务原生安装；强制 WSL。
+- Related documents: [`ARCHITECTURE.md`](ARCHITECTURE.md)、[`TASKS.md`](TASKS.md)
+
+### ADR-011 — 轻量领域导向混合模块架构
+
+- ID: `ADR-011`
+- Title: 轻量领域导向混合模块架构
+- Date: 2026-08-11
+- Status: Accepted
+- Type: Architecture
+- Source: 用户批准的 P0-2 技术架构决策
+- Context: 项目需要保护讨论编排等领域逻辑，但当前不适合完整 DDD 或微服务化。
+- Decision: 后端规划 `api/`、`core/`、`db/`、`modules/`、`providers/`；`api` 是 transport adapter，`core` 是横切基础设施，`db` 是 persistence infrastructure，`modules` 按真实业务领域组织，`providers` 只容纳已经存在的外部 adapter。前端使用 feature-based 结构：`app`、`features`、共享 `components`、`lib/api`，并只在实时功能出现时建立 `lib/realtime`。
+- Rationale: 以最少层次保持业务边界和可测试性。
+- Consequences: 不采用 full DDD ceremony、repository/service/controller 空壳、global giant services.py，也不提前创建未来 module 或 feature 目录。
+- Alternatives: 全局技术分层；完整 DDD；提前生成长期 roadmap 的所有目录。
+- Related documents: [`ARCHITECTURE.md`](ARCHITECTURE.md)
+
+### ADR-012 — 分阶段测试与质量工具策略
+
+- ID: `ADR-012`
+- Title: 分阶段测试与质量工具策略
+- Date: 2026-08-11
+- Status: Accepted
+- Type: Architecture
+- Source: 用户批准的 P0-2 技术架构决策
+- Context: 前后端、数据库、实时会话和模型行为需要不同层级的验证，但工具应按实际阶段安装。
+- Decision: 后端采用 pytest、按需 pytest-asyncio、Ruff lint/format、Pyright；前端采用 Vitest、Testing Library、ESLint、`tsc`、Prettier；有真实跨应用用户流时采用 Playwright。P0-3 建立 backend unit/API tests、frontend unit/component smoke tests 及 lint/type/build；P0-4 使用真实 PostgreSQL integration/migration tests；P1 增加 WebSocket、deterministic simulation/orchestrator regression 和 fake provider tests。真实 LLM tests 不进入默认 CI。
+- Rationale: 分层验证核心行为，同时避免在 P0-3 一次安装所有未来工具。
+- Consequences: 不同时启用 mypy + Pyright，也不引入重复 formatter/linter；各阶段只安装当前验收需要的工具。
+- Alternatives: 只做 E2E；只做单元测试；P0-3 安装全部未来测试栈。
+- Related documents: [`ARCHITECTURE.md`](ARCHITECTURE.md)、[`RELEASE_CHECKLIST.md`](RELEASE_CHECKLIST.md)
+
+### ADR-013 — 配置、错误与结构化日志基线
+
+- ID: `ADR-013`
+- Title: 配置、错误与结构化日志基线
+- Date: 2026-08-11
+- Status: Accepted
+- Type: Security
+- Source: 用户批准的 P0-2 技术架构决策
+- Context: 应用从骨架开始就需要安全配置、可关联诊断和一致错误语义。
+- Decision: 使用类型化、启动时校验的配置；服务端密钥不得进入前端或日志。应用从 P0-3 使用 structured logging 和 `request_id`，在相关功能出现后再增加 `session_id`、`connection_id`、provider invocation id、`job_id`。REST 使用标准 HTTP status、稳定 machine-readable code、安全 message、request correlation 和可选安全 details；WebSocket error event 与其语义一致。
+- Rationale: 在不提前引入完整追踪平台的前提下建立安全、稳定的诊断契约。
+- Consequences: 不生成虚假的未来 correlation 字段；stack trace、SQL、filesystem path、secret、prompt 和 provider credential 不得暴露。OpenTelemetry 延后到 P0-6，Sentry/SaaS exporter 保持 Deferred。
+- Alternatives: 非结构化日志；P0-3 即引入完整 OTel/SaaS；使用框架默认错误格式作为长期契约。
+- Related documents: [`ARCHITECTURE.md`](ARCHITECTURE.md)、[`API.md`](API.md)、[`PRIVACY_AND_SAFETY.md`](PRIVACY_AND_SAFETY.md)
+
+### ADR-014 — Provider-neutral AI 与自定义讨论编排
+
+- ID: `ADR-014`
+- Title: Provider-neutral AI 与自定义讨论编排
+- Date: 2026-08-11
+- Status: Accepted
+- Type: Architecture
+- Source: 用户批准并经外部审核修订的 P0-2 技术架构决策；PROJECT_MASTER_PLAN V1.0 §22
+- Context: 供应商尚未决定，核心讨论状态必须由项目代码掌控。
+- Decision: 业务领域不得直接绑定厂商 SDK；概念边界包括 LLM Provider、ASR Provider、TTS Provider 和可选 Embedding Provider，SDK object 不得穿透 domain layer，structured output 必须 Schema validate。V0.1 不使用 LangGraph，核心 discussion orchestrator 使用自定义、确定性、可测试状态机。
+- Rationale: 降低厂商锁定并保持核心状态和行为可验证。
+- Consequences: LLMProvider 在 P1 首次真实 LLM 调用时建立，ASRProvider/TTSProvider 在 P2 首次接入时建立，Embedding 仅在实际需要时建立。**不为了 deferred technology 创建无实际调用方的空 interface、adapter、factory 或目录。** 局部离线报告或复杂 retry workflow 达到明显复杂度后，可单独重新评估 LangGraph。
+- Alternatives: 领域代码直接依赖厂商 SDK；P0-3 创建所有 Provider 空接口；让 LangGraph 控制完整群面状态机。
+- Related documents: [`ARCHITECTURE.md`](ARCHITECTURE.md)、[`AGENT_BEHAVIOR.md`](AGENT_BEHAVIOR.md)
+
+## 4. 仍保持 TBD 的技术事项
 
 以下都是派生 TBD，不是总纲原始 D-xxx：
 
-- TBD：Node.js 包管理工具；
-- TBD：Python 包与环境管理工具；
-- TBD：仓库组织和 monorepo 工具；
-- TBD：正式身份认证方案；
-- TBD：ASR、TTS 和 LLM 供应商；
-- TBD：支付供应商；
-- TBD：云平台、部署和对象存储方案；
-- TBD：异步队列具体产品；
+- TBD：具体 LLM provider 和 model；
+- TBD：ASR provider；
+- TBD：TTS provider；
+- TBD：支付供应商与正式价格；
+- TBD：V0.5 正式身份认证供应商；
+- TBD：云平台、中国正式生产部署、CDN 和对象存储产品；
+- TBD：analytics 产品与 Sentry/SaaS exporter；
+- TBD：Redis implementation/product；
+- TBD：task queue implementation；
+- TBD：UI primitives/component library；
+- TBD：OpenAPI generator package；
+- TBD：WebSocket schema generator package 和 P1 完整事件 Schema；
+- TBD：PWA production strategy；
 - TBD：V0.1 四种基础角色的具体组合。
 
 ## 5. 决策变更流程

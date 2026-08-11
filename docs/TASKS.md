@@ -2,7 +2,7 @@
 
 - Status: Active
 - Managed scope: P0 only
-- Current task: None — awaiting explicit approval for P0-2
+- Current task: None — awaiting explicit approval for P0-3
 - Allowed status values: `TODO` / `IN_PROGRESS` / `BLOCKED` / `DONE`
 - Related roadmap: [`ROADMAP.md`](ROADMAP.md)
 
@@ -65,12 +65,20 @@
 
 - ID: `P0-2`
 - 名称：技术架构决策
-- Status: `TODO`
+- Status: `DONE`
 - 目标：在总纲推荐方向内确认技术栈、仓库组织、模块边界和必要 ADR。
-- In scope：前后端技术、包管理、通信方式、开发环境边界、部署候选方案及 ADR。
+- In scope：前后端技术、运行时与包管理、REST/WebSocket 边界、本地开发方式、数据技术基线、模块边界、测试/日志/Provider 原则及正式 ADR。
 - Out of scope：创建应用、实现业务功能、数据库业务 Schema、正式认证和供应商接入。
 - Dependencies：P0-1 审核完成。
-- Acceptance criteria：关键技术选择有批准记录，建议与 Accepted 决策明确区分，P0-3 可据此实施。
+- Acceptance criteria：关键技术选择有批准记录，建议与 Accepted 决策明确区分，P0-3 可据此实施，并完成最终 diff 审核。
+
+### Completion note
+
+- 14 architecture ADRs accepted；
+- External diff review passed；
+- Runtime/toolchain baseline established；
+- P0-3/P0-4 boundary established；
+- No application code introduced。
 
 ## P0-3 — 前后端项目骨架
 
@@ -78,22 +86,22 @@
 - 名称：前后端项目骨架
 - Status: `TODO`
 - 目标：依据 P0-2 的 Accepted 决策建立最小 Web/API 及本地开发骨架。
-- In scope：项目结构、基础配置、健康检查和经批准的本地运行方式。
-- Out of scope：群面页面、AI、状态机、评分、语音、支付及完整账号产品。
+- In scope：`apps/web` 与 `apps/api` skeleton、Node.js 24 LTS/pnpm、CPython 3.14/uv、健康检查、Web → API connectivity、基础配置、structured logging baseline、backend unit/API tests、frontend unit/component smoke tests 及 lint/type/build。
+- Out of scope：PostgreSQL、Docker Compose、SQLAlchemy、Alembic、Redis、WebSocket 业务通道、Provider 实现、群面页面、AI、状态机、评分、语音、支付及完整账号产品。
 - Dependencies：P0-2 完成并批准。
-- Acceptance criteria：前后端骨架可按文档启动、构建和执行基础检查，无业务范围扩张。
+- Acceptance criteria：前后端骨架可按文档启动、构建和执行获批的基础检查，Web 可验证访问 API 健康端点，无数据库或业务范围扩张。
 
 ## P0-4 — 数据库与迁移基础
 
 - ID: `P0-4`
 - 名称：数据库与迁移基础
 - Status: `TODO`
-- 目标：依据 P0-2 已批准的技术决策，建立 V0.1 所需的关系型数据库、数据访问层和 migration 基础。
-- In scope：经批准的数据连接配置、安全占位、数据访问层、迁移工具、最小基础模型及迁移验证。
+- 目标：依据 P0-2 已批准的技术决策，建立 V0.1 所需的 PostgreSQL 数据库、数据访问层和 migration 基础。
+- In scope：Docker Compose、PostgreSQL 18.x、安全连接配置、SQLAlchemy 2.x、Alembic、最小基础模型、PostgreSQL integration tests 及 migration checks。
 - Out of scope：一次性实现总纲所有未来业务实体或完整会话数据模型。
 - Dependencies：P0-2、P0-3。
-- Implementation guidance：`PROJECT_MASTER_PLAN.md` 当前推荐 PostgreSQL + SQLAlchemy 或等价方案，但在 P0-2 正式决策前不视为 `Accepted` 技术选型。
-- Acceptance criteria：依据 P0-2 已批准的方案完成可重复验证的迁移基础，环境变量与密钥安全，范围符合 V0.1/P0。
+- Implementation guidance：使用明确的 PostgreSQL 18.x 镜像版本，不得使用 `postgres:latest`；不使用 SQLite 替代正式开发/集成路径；Redis 不进入默认 Compose。
+- Acceptance criteria：依据 P0-2 已批准的 PostgreSQL 18.x、SQLAlchemy 2.x 和 Alembic 方案完成可重复验证的迁移基础，真实 PostgreSQL integration/migration checks 通过，环境变量与密钥安全，范围符合 V0.1/P0。
 
 ## P0-5 — 最小身份边界
 

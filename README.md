@@ -11,13 +11,15 @@ AI 群面训练场让用户无需临时召集真人，即可与具有不同性�
 ## 当前状态
 
 - 当前开发阶段：`P0 — 项目基础`
-- 已完成任务：`P0-1 — 仓库与文档治理`
-- 下一候选任务：`P0-2 — 技术架构决策`
-- P0-2 状态：`尚未开始 / awaiting explicit approval`
+- 已完成任务：
+  - `P0-1 — 仓库与文档治理`
+  - `P0-2 — 技术架构决策`
+- 当前任务：`None — awaiting explicit approval for P0-3`
+- 下一候选任务：`P0-3 — 前后端项目骨架（TODO / awaiting explicit approval）`
 - 当前目标版本：`V0.1 — Internal Validation / 内部技术验证版`
 - 当前实现状态：尚无业务代码或可运行应用
 
-> 当前仍无可运行应用；P0-2 尚未获准开始。
+> P0-2 已通过最终 diff 审核并完成；P0-3 尚未开始，当前仍无可运行应用。
 
 ## 核心原则摘要
 
@@ -27,6 +29,20 @@ AI 群面训练场让用户无需临时召集真人，即可与具有不同性�
 - 评分面向可观察行为，重要评价必须尽量关联时间戳和原话证据。
 - 所有评分只用于训练，不给出录取概率或岗位适配结论。
 - 产品是考前训练工具，不开发正式面试实时提词或其他作弊辅助。
+
+## P0 已批准技术基线
+
+- 简单 monorepo，后续规划 `apps/web` 和 `apps/api`，当前不使用 Nx/Turborepo；
+- Web：Next.js App Router、React、TypeScript strict、Tailwind CSS；
+- API：FastAPI、Pydantic v2；业务权威不放入 Next.js；
+- 工具链：Node.js 24 LTS + pnpm，CPython 3.14 + uv；
+- 数据：P0-4 使用 PostgreSQL 18.x、SQLAlchemy 2.x、Alembic；
+- 通信：REST + WebSocket；FastAPI OpenAPI 是 REST contract 权威；
+- 本地开发：应用原生运行，P0-4 起基础服务使用 Docker Compose；
+- Redis、独立 task queue、OpenTelemetry、具体 AI/语音供应商和 UI component library 仍为 Deferred/TBD；
+- V0.1 使用自定义确定性讨论状态机，不使用 LangGraph。
+
+完整决策、替代方案和重新评估条件见 [`docs/DECISIONS.md`](docs/DECISIONS.md)。
 
 ## 仓库结构
 
@@ -74,7 +90,7 @@ AI 群面训练场让用户无需临时召集真人，即可与具有不同性�
 
 当前没有应用代码、依赖清单或启动命令。
 
-> 当前仍无可运行应用；下一候选任务 P0-2 需要用户明确批准后才能开始。
+> 当前仍无可运行应用；P0-3 必须获得用户明确批准后才能开始。
 
 后续只有在项目骨架任务完成后，才能在这里记录经过验证的安装和运行方式。
 

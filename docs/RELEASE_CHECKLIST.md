@@ -17,7 +17,7 @@
 
 ## 当前版本范围
 
-当前只执行 P0-1 文档治理；P0 尚未完成，V0.1 业务能力尚未开始实现。所有复选框当前都保持未勾选。
+P0-2 技术架构决策已完成；当前没有 active implementation task，P0-3 仍为 `TODO` 并等待明确批准。P0 尚未完成，V0.1 业务能力尚未实现。所有复选框当前都保持未勾选。
 
 ## Implementation guidance
 
@@ -39,7 +39,7 @@
 - [ ] P0-1～P0-6 均满足各自验收条件；
 - [ ] 已完成 P0-7 独立验收并获得进入 P1 的明确批准。
 
-`PROJECT_MASTER_PLAN.md` 当前推荐 PostgreSQL + SQLAlchemy 或等价方案，但 P0 exit 清单不在 P0-2 正式决策前将其视为 `Accepted`。完整公开认证方案也不是 P0-5 的硬前置条件。
+P0-2 已 Accepted PostgreSQL、SQLAlchemy 2.x 和 Alembic，P0-4 实施基线为 PostgreSQL 18.x，并要求真实 PostgreSQL integration/migration checks。完整公开认证方案仍不是 P0-5 的硬前置条件。
 
 ## V0.1 internal validation
 
