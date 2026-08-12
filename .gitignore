@@ -18,6 +18,8 @@ dist/
 build/
 .turbo/
 .cache/
+.pnpm-store/
+*.tsbuildinfo
 
 # Python virtual environments and caches
 .venv/

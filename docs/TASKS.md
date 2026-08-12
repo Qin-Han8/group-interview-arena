@@ -2,7 +2,8 @@
 
 - Status: Active
 - Managed scope: P0 only
-- Current task: None — awaiting explicit approval for P0-3
+- Current task: P0-3 — IN_PROGRESS
+- Current substep: P0-3C completed; P0-3D awaiting explicit approval
 - Allowed status values: `TODO` / `IN_PROGRESS` / `BLOCKED` / `DONE`
 - Related roadmap: [`ROADMAP.md`](ROADMAP.md)
 
@@ -84,12 +85,29 @@
 
 - ID: `P0-3`
 - 名称：前后端项目骨架
-- Status: `TODO`
+- Status: `IN_PROGRESS`
 - 目标：依据 P0-2 的 Accepted 决策建立最小 Web/API 及本地开发骨架。
 - In scope：`apps/web` 与 `apps/api` skeleton、Node.js 24 LTS/pnpm、CPython 3.14/uv、健康检查、Web → API connectivity、基础配置、structured logging baseline、backend unit/API tests、frontend unit/component smoke tests 及 lint/type/build。
 - Out of scope：PostgreSQL、Docker Compose、SQLAlchemy、Alembic、Redis、WebSocket 业务通道、Provider 实现、群面页面、AI、状态机、评分、语音、支付及完整账号产品。
 - Dependencies：P0-2 完成并批准。
 - Acceptance criteria：前后端骨架可按文档启动、构建和执行获批的基础检查，Web 可验证访问 API 健康端点，无数据库或业务范围扩张。
+
+### Substep progress
+
+- `P0-3A — Environment preflight`：completed；
+- `P0-3B — Environment normalization verification`：completed；
+- `P0-3C — Root workspace + Web skeleton`：completed；
+- `P0-3D — API skeleton`：awaiting explicit approval；
+- `P0-3E — Connectivity + quality gates + docs`：planned after P0-3D；
+- `P0-3F — Independent final review`：planned。
+
+### P0-3C completion note
+
+- 已建立仅包含 `apps/web` 的根 pnpm workspace 和唯一根 `pnpm-lock.yaml`；
+- 已建立 Next.js `16.3.0` App Router、TypeScript strict、Tailwind CSS 最小 Web 骨架；
+- 已建立并实际通过 Web lint、typecheck、Vitest/Testing Library 测试、Prettier check、production build 与本地 HTTP 200 smoke；
+- 未创建 API、数据库、业务模块或任何 P0-3D 及后续能力；
+- P0-3 整体保持 `IN_PROGRESS`。
 
 ## P0-4 — 数据库与迁移基础
 

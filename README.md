@@ -14,12 +14,13 @@ AI 群面训练场让用户无需临时召集真人，即可与具有不同性�
 - 已完成任务：
   - `P0-1 — 仓库与文档治理`
   - `P0-2 — 技术架构决策`
-- 当前任务：`None — awaiting explicit approval for P0-3`
-- 下一候选任务：`P0-3 — 前后端项目骨架（TODO / awaiting explicit approval）`
+- 当前任务：`P0-3 — 前后端项目骨架（IN_PROGRESS）`
+- 已完成子步骤：`P0-3C — Root workspace + Web skeleton`
+- 下一子步骤：`P0-3D — API skeleton（awaiting explicit approval）`
 - 当前目标版本：`V0.1 — Internal Validation / 内部技术验证版`
-- 当前实现状态：尚无业务代码或可运行应用
+- 当前实现状态：Web 技术骨架可运行；API、数据库和群面业务尚未实现
 
-> P0-2 已通过最终 diff 审核并完成；P0-3 尚未开始，当前仍无可运行应用。
+> P0-3C 的 Web 技术骨架已完成本地检查；P0-3 整体仍在进行中，不得在未获明确批准时进入 P0-3D。
 
 ## 核心原则摘要
 
@@ -32,7 +33,7 @@ AI 群面训练场让用户无需临时召集真人，即可与具有不同性�
 
 ## P0 已批准技术基线
 
-- 简单 monorepo，后续规划 `apps/web` 和 `apps/api`，当前不使用 Nx/Turborepo；
+- 简单 monorepo，`apps/web` 已建立，`apps/api` 仍待 P0-3D；当前不使用 Nx/Turborepo；
 - Web：Next.js App Router、React、TypeScript strict、Tailwind CSS；
 - API：FastAPI、Pydantic v2；业务权威不放入 Next.js；
 - 工具链：Node.js 24 LTS + pnpm，CPython 3.14 + uv；
@@ -54,6 +55,17 @@ AI 群面训练场让用户无需临时召集真人，即可与具有不同性�
 ├── .gitattributes               # 跨平台文本统一使用 LF
 ├── .env.example                 # 环境变量安全说明；当前无业务变量
 ├── .gitignore                   # 本地文件和敏感文件忽略规则
+├── package.json                 # 根 pnpm workspace 身份与 Web 委托命令
+├── pnpm-workspace.yaml          # 当前仅包含 apps/web
+├── pnpm-lock.yaml               # JavaScript workspace 唯一 lockfile
+├── apps/
+│   └── web/                     # Next.js App Router 技术骨架
+│       ├── src/app/             # 最小首页、layout、全局样式和组件测试
+│       ├── package.json         # Web 命令与依赖
+│       ├── eslint.config.mjs    # ESLint 配置
+│       ├── prettier.config.mjs  # Prettier 配置
+│       ├── vitest.config.mts    # Vitest + jsdom 配置
+│       └── tsconfig.json        # TypeScript strict 配置
 └── docs/
     ├── PROJECT_MASTER_PLAN.md   # 最高层产品设计基线
     ├── DECISIONS.md             # 产品与技术决策记录
@@ -71,7 +83,7 @@ AI 群面训练场让用户无需临时召集真人，即可与具有不同性�
     └── exec-plans/              # 复杂任务执行计划约定
 ```
 
-业务代码目录将在对应任务获得批准并实际创建后再写入本节；不得把 planned 结构描述为已经实现。
+`apps/api`、数据库、基础设施和业务模块尚不存在；它们只会在对应任务获得明确批准后创建。
 
 ## 文档阅读顺序
 
@@ -88,11 +100,24 @@ AI 群面训练场让用户无需临时召集真人，即可与具有不同性�
 
 ## 如何运行
 
-当前没有应用代码、依赖清单或启动命令。
+要求 Node.js 24 LTS 与 pnpm 11。Windows PowerShell 使用 `.cmd` 入口：
 
-> 当前仍无可运行应用；P0-3 必须获得用户明确批准后才能开始。
+```powershell
+pnpm.cmd install
+pnpm.cmd web:dev
+```
 
-后续只有在项目骨架任务完成后，才能在这里记录经过验证的安装和运行方式。
+Web 开发服务器默认运行于 `http://localhost:3000`。以下命令已经在 P0-3C 实际验证：
+
+```powershell
+pnpm.cmd web:lint
+pnpm.cmd web:typecheck
+pnpm.cmd web:test
+pnpm.cmd web:format:check
+pnpm.cmd web:build
+```
+
+FastAPI API、数据库和群面业务功能尚未建立，因此当前没有 API、migration 或跨应用启动命令。
 
 ## 贡献规则
 

@@ -17,7 +17,7 @@
 
 ## 当前版本范围
 
-P0-2 技术架构决策已完成；当前没有 active implementation task，P0-3 仍为 `TODO` 并等待明确批准。P0 尚未完成，V0.1 业务能力尚未实现。所有复选框当前都保持未勾选。
+P0-2 技术架构决策已完成；P0-3 当前为 `IN_PROGRESS`。P0-3C Web 技术骨架已完成，P0-3D API 骨架仍等待明确批准。P0 尚未完成，V0.1 业务能力尚未实现。下方 P0 exit 与产品版本复选框仍表示完整阶段/版本验收，不能由单个子步骤替代。
 
 ## Implementation guidance
 
@@ -25,6 +25,18 @@ P0-2 技术架构决策已完成；当前没有 active implementation task，P0-
 - 不得因功能存在就跳过隐私、安全、恢复和证据质量检查。
 - 版本范围变化必须先形成正式决策。
 - 具体命令、负责人和发布流程在相关技术任务中补充，不在 P0-1 虚构。
+
+### P0-3C Web foundation verification — 2026-08-12
+
+- [x] `pnpm.cmd install`
+- [x] `pnpm.cmd web:lint`
+- [x] `pnpm.cmd web:typecheck`
+- [x] `pnpm.cmd web:test`
+- [x] `pnpm.cmd web:format:check`
+- [x] `pnpm.cmd web:build`
+- [x] `pnpm.cmd web:dev` 后访问 `http://localhost:3000` 返回 HTTP 200，验证后已停止服务。
+
+这些证据只覆盖 P0-3C Web 技术骨架；不代表 API、数据库、migration、CI 或 P0 exit 已通过。
 
 ## P0 exit
 
@@ -135,7 +147,7 @@ P0-2 已 Accepted PostgreSQL、SQLAlchemy 2.x 和 Alembic，P0-4 实施基线为
 ## TBD
 
 - TBD：每层检查的负责人、证据链接和签字流程；
-- TBD：具体 lint、typecheck、test、build 和 migration 命令；
+- TBD：后端、migration、跨应用及后续阶段的具体检查命令；
 - TBD：性能、可靠性和成本阈值的正式基线；
 - TBD：公开发布的合规、备案和邀请测试路径；
 - TBD：版本回滚、数据迁移和事故响应流程。

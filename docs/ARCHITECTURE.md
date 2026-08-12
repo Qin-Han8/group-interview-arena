@@ -18,28 +18,28 @@
 ### Repository and application boundaries
 
 - 使用 simple monorepo；
-- 规划 Web 应用位于 `apps/web`；
-- 规划 API 应用位于 `apps/api`；
+- Web 应用位于 `apps/web`，P0-3C 已建立最小技术骨架；
+- API 应用规划位于 `apps/api`，P0-3D 尚未获准且目录尚未创建；
 - 当前不使用 multi-repo、Nx 或 Turborepo；
-- `apps/` 将由 P0-3 创建，本轮仍不存在应用代码。
+- 根 pnpm workspace 当前只包含 `apps/web`。
 
 重新评估 monorepo 工具的触发器：出现多个独立 JS package/application、CI 构建依赖明显复杂，或普通 workspace scripts 已无法合理维护。
 
-### Planned repository layout
+### Current and planned repository layout
 
-以下结构是规划，不表示已经创建：
+下列结构明确区分已实现与规划项：
 
 ```text
 group-interview-arena/
 ├── apps/
-│   ├── web/                     # P0-3: Next.js application
-│   └── api/                     # P0-3: FastAPI application
+│   ├── web/                     # Implemented in P0-3C: Next.js skeleton
+│   └── api/                     # Planned for P0-3D; not created
 ├── infra/
-│   └── compose.yaml             # P0-4: PostgreSQL service
+│   └── compose.yaml             # Planned for P0-4; not created
 ├── docs/
-├── package.json                 # P0-3: JS workspace commands
-├── pnpm-workspace.yaml          # P0-3
-└── pnpm-lock.yaml               # P0-3
+├── package.json                 # Implemented: JS workspace and Web delegates
+├── pnpm-workspace.yaml          # Implemented: apps/web only
+└── pnpm-lock.yaml               # Implemented: sole JS lockfile
 ```
 
 不提前创建 `packages/`、worker、Redis adapter、未来业务 module 或没有调用方的 infrastructure 目录。
@@ -64,6 +64,8 @@ group-interview-arena/
 - UI primitives/component library 保持 Deferred。
 
 Next.js Server Actions/Route Handlers 可以处理 Web 专属能力，但不得复制 domain logic、session state machine、scoring、agent orchestration 或 persistence authority。FastAPI 始终是主要业务后端。
+
+P0-3C 已实现的 Web 技术基础为：Next.js `16.3.0`、React `19.2.8`、TypeScript `5.9.3` strict、Tailwind CSS `4.3.3` 和 App Router。根 workspace 使用 pnpm `11.21.0`；前端质量栈使用 ESLint `9.39.5`、Prettier `3.9.6`、Vitest `4.1.10`、Testing Library React `16.3.2`、jest-dom `7.0.1` 与 jsdom `30.0.1`。当前首页只证明技术骨架，不是群面业务 UI。
 
 ### Backend boundary
 
