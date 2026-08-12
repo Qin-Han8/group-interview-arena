@@ -19,7 +19,7 @@
 
 - 使用 simple monorepo；
 - Web 应用位于 `apps/web`，P0-3C 已建立最小技术骨架；
-- API 应用规划位于 `apps/api`，P0-3D 尚未获准且目录尚未创建；
+- API 应用位于 `apps/api`，P0-3D 已建立最小技术骨架；
 - 当前不使用 multi-repo、Nx 或 Turborepo；
 - 根 pnpm workspace 当前只包含 `apps/web`。
 
@@ -33,7 +33,7 @@
 group-interview-arena/
 ├── apps/
 │   ├── web/                     # Implemented in P0-3C: Next.js skeleton
-│   └── api/                     # Planned for P0-3D; not created
+│   └── api/                     # Implemented in P0-3D: FastAPI skeleton
 ├── infra/
 │   └── compose.yaml             # Planned for P0-4; not created
 ├── docs/
@@ -49,7 +49,7 @@ group-interview-arena/
 - JavaScript runtime：Node.js 24 LTS；P0-3 选用当时最新兼容的 24.x，不以当前机器的 Node 26 Current 作为项目基线；
 - JavaScript package manager：pnpm；`packageManager` 记录实际精确版本，只提交 `pnpm-lock.yaml`；
 - Python runtime：CPython 3.14；`.python-version` 和 `pyproject.toml` 在 P0-3 表达 3.14 policy；
-- Python environment/package manager：uv；后续提交 `uv.lock`；
+- Python environment/package manager：uv；`apps/api/uv.lock` 是已提交边界内的 Python lockfile；
 - 只有项目必需依赖明确不兼容 Python 3.14 时，才能提出降至 3.13 的 Proposed ADR；
 - Windows PowerShell 是正式支持的本地开发环境，不要求 WSL。
 
@@ -86,6 +86,8 @@ providers/    provider adapters that have actual callers
 ```
 
 禁止 full DDD ceremony、repository/service/controller 多层空壳、global giant `services.py`，以及提前创建未来全部 module。
+
+P0-3D 已实现的 API 技术基础使用 CPython `3.14.7`、uv `0.12.3`、FastAPI `0.141.1`、Pydantic `2.13.4`、pydantic-settings `2.15.0` 与 Uvicorn `0.52.1`。项目采用 packaged `src/group_interview_arena_api` layout；`api/` 当前只有 health transport，`core/` 只包含 typed settings、安全错误语义、标准库 JSON logging 与 UUIDv4 `request_id`。数据库、业务 `modules/`、`providers/` 与 WebSocket 目录均未创建。
 
 ## Local development model
 

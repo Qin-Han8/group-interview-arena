@@ -17,7 +17,7 @@
 
 ## 当前版本范围
 
-P0-2 技术架构决策已完成；P0-3 当前为 `IN_PROGRESS`。P0-3C Web 技术骨架已完成，P0-3D API 骨架仍等待明确批准。P0 尚未完成，V0.1 业务能力尚未实现。下方 P0 exit 与产品版本复选框仍表示完整阶段/版本验收，不能由单个子步骤替代。
+P0-2 技术架构决策已完成；P0-3 当前为 `IN_PROGRESS`。P0-3C Web 与 P0-3D API 技术骨架已完成，P0-3E connectivity 仍等待明确批准。P0 尚未完成，V0.1 业务能力尚未实现。下方 P0 exit 与产品版本复选框仍表示完整阶段/版本验收，不能由单个子步骤替代。
 
 ## Implementation guidance
 
@@ -37,6 +37,20 @@ P0-2 技术架构决策已完成；P0-3 当前为 `IN_PROGRESS`。P0-3C Web 技�
 - [x] `pnpm.cmd web:dev` 后访问 `http://localhost:3000` 返回 HTTP 200，验证后已停止服务。
 
 这些证据只覆盖 P0-3C Web 技术骨架；不代表 API、数据库、migration、CI 或 P0 exit 已通过。
+
+### P0-3D API foundation verification — 2026-08-13
+
+- [x] `uv sync --frozen`
+- [x] `uv lock --check`
+- [x] `uv run ruff check .`
+- [x] `uv run ruff format --check .`
+- [x] `uv run pyright`
+- [x] `uv run pytest`
+- [x] package 与 FastAPI app import；
+- [x] Uvicorn 下 `GET /health` 返回 `200`、精确 JSON 和 `X-Request-ID`；
+- [x] Uvicorn 下 `GET /openapi.json` 返回 `200` 并包含 `/health`，验证后已停止服务。
+
+这些证据只覆盖 P0-3D API 技术骨架；不代表 Web/API browser connectivity、CORS、数据库、migration、CI、WebSocket 或 P0 exit 已通过。
 
 ## P0 exit
 
@@ -147,7 +161,7 @@ P0-2 已 Accepted PostgreSQL、SQLAlchemy 2.x 和 Alembic，P0-4 实施基线为
 ## TBD
 
 - TBD：每层检查的负责人、证据链接和签字流程；
-- TBD：后端、migration、跨应用及后续阶段的具体检查命令；
+- TBD：migration、跨应用及后续阶段的具体检查命令；
 - TBD：性能、可靠性和成本阈值的正式基线；
 - TBD：公开发布的合规、备案和邀请测试路径；
 - TBD：版本回滚、数据迁移和事故响应流程。

@@ -4,13 +4,13 @@
 - Current phase: P0
 - API architecture baseline established by: P0-2 — DONE
 - Target version: V0.1 Internal Validation
-- Implemented contracts: None
+- Implemented contracts: `GET /health`
 - Detailed P1 WebSocket schema: Not started
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
 
-本文件记录 P0-2 已批准的 REST、WebSocket、契约生成、恢复和错误语义基线。它不表示任何 API 已实现，也不冻结完整 P1 事件集合。
+本文件记录 P0-2 已批准的 REST、WebSocket、契约生成、恢复和错误语义基线，并同步 P0-3D 已实现的最小 REST 技术契约。它不冻结完整 P1 事件集合。
 
 正式决策见 [`DECISIONS.md`](DECISIONS.md) `ADR-006`、`ADR-007`、`ADR-013`。
 
@@ -29,6 +29,17 @@ REST 用于：
 - future admin/orders。
 
 总纲中的 endpoint 只是跨版本示例。P0-3 只建立获批的最小健康/基础 API；V0.1、V0.5 的业务接口必须在对应任务进入范围后才设计和实现。
+
+### P0-3D implemented REST contract
+
+`GET /health`
+
+- 成功状态：`200`；
+- response body：`{"status":"ok"}`；
+- response header：`X-Request-ID`，值为服务端为每个请求生成的 UUIDv4；
+- response model：`HealthResponse`。
+
+当前不实现 `/ready`，因为 P0-3D 没有数据库或其他依赖型 readiness 检查。
 
 ### WebSocket
 
@@ -64,6 +75,8 @@ P0-3 不实现 WebSocket 业务代码。P1 实施时遵守：
 - 不允许前后端手写两套同名 DTO；
 - 具体 OpenAPI generator package 延后到 P0-3 选择；
 - generator 选择不得改变 OpenAPI-as-source-of-truth 的 Accepted decision。
+
+P0-3D 已验证 FastAPI `/openapi.json` 可生成并包含 `/health`。它是当前 REST schema 的 Source of Truth；TypeScript client 生成和 generator 选择尚未进入范围。
 
 ## Versioned WebSocket contract
 
@@ -112,6 +125,22 @@ WebSocket 使用语义一致的 error event，并在实际 Schema 中增加必�
 
 具体 error field schema 按 P0-3/P1 实际接口逐步冻结，不以框架默认错误载荷作为未经决策的长期契约。
 
+P0-3D 已实现的最小错误 envelope 为：
+
+```json
+{
+  "error": {
+    "code": "NOT_FOUND",
+    "message": "Resource not found.",
+    "request_id": "00000000-0000-4000-8000-000000000000"
+  }
+}
+```
+
+当前基础 code 仅为 `NOT_FOUND`、`VALIDATION_ERROR` 和 `INTERNAL_ERROR`。404、FastAPI request validation 与 unexpected exception 均映射为安全 envelope；unexpected exception 在服务端记录，客户端不接收 stack trace、source path 或原始异常消息。
+
+每个 HTTP request 的完成日志使用 JSON structured logging，包含 `request_id`、`method`、不含 query 的 `path`、`status_code` 与 `duration_ms`。本阶段不记录 request body、完整 headers、Authorization 或 Cookie。
+
 ## Security and authority boundaries
 
 - FastAPI 是领域、会话状态和持久化的业务权威；
@@ -131,6 +160,8 @@ WebSocket 使用语义一致的 error event，并在实际 Schema 中增加必�
 - OpenAPI contract authority 落地；
 - 基础 config、request correlation、structured logging 和 error semantics；
 - 不实现 session WebSocket、Provider、数据库或业务端点。
+
+P0-3D 已完成其中最小 API、OpenAPI authority、typed config、request correlation、structured logging 和 error semantics。CORS、Web → API connectivity 与 generated TypeScript client 留待获得明确批准的 P0-3E；WebSocket 仍留在 P1。
 
 ### P1
 

@@ -3,7 +3,7 @@
 - Status: Active
 - Managed scope: P0 only
 - Current task: P0-3 — IN_PROGRESS
-- Current substep: P0-3C completed; P0-3D awaiting explicit approval
+- Current substep: P0-3D completed; P0-3E awaiting explicit approval
 - Allowed status values: `TODO` / `IN_PROGRESS` / `BLOCKED` / `DONE`
 - Related roadmap: [`ROADMAP.md`](ROADMAP.md)
 
@@ -97,8 +97,8 @@
 - `P0-3A — Environment preflight`：completed；
 - `P0-3B — Environment normalization verification`：completed；
 - `P0-3C — Root workspace + Web skeleton`：completed；
-- `P0-3D — API skeleton`：awaiting explicit approval；
-- `P0-3E — Connectivity + quality gates + docs`：planned after P0-3D；
+- `P0-3D — API skeleton`：completed；
+- `P0-3E — Connectivity + quality gates + docs`：awaiting explicit approval；
 - `P0-3F — Independent final review`：planned。
 
 ### P0-3C completion note
@@ -108,6 +108,14 @@
 - 已建立并实际通过 Web lint、typecheck、Vitest/Testing Library 测试、Prettier check、production build 与本地 HTTP 200 smoke；
 - 未创建 API、数据库、业务模块或任何 P0-3D 及后续能力；
 - P0-3 整体保持 `IN_PROGRESS`。
+
+### P0-3D completion note
+
+- 已建立 CPython 3.14、uv、FastAPI、Pydantic v2 的 packaged `src` layout API skeleton 与唯一 `uv.lock`；
+- 已实现 `create_app()`、`GET /health`、typed settings、UUIDv4 `request_id`、标准库 JSON structured logging 和统一安全 error envelope；
+- 已实际通过 frozen sync、lock check、Ruff lint/format、Pyright strict、9 项 pytest、package/app import、health 与 OpenAPI smoke；
+- 未修改 `apps/web`，未建立 CORS、Web → API connectivity、数据库、WebSocket、Provider 或业务 endpoint；
+- P0-3 整体保持 `IN_PROGRESS`，P0-3E 等待明确批准。
 
 ## P0-4 — 数据库与迁移基础
 
