@@ -10,7 +10,7 @@
 
 ## 文档目的
 
-本文件记录 P0-2 已批准的 REST、WebSocket、契约生成、恢复和错误语义基线，并同步 P0-3D 已实现的最小 REST 技术契约。它不冻结完整 P1 事件集合。
+本文件记录 P0-2 已批准的 REST、WebSocket、契约生成、恢复和错误语义基线，并同步 P0-3D/P0-3E 已实现的最小 REST 技术契约与连通方式。它不冻结完整 P1 事件集合。
 
 正式决策见 [`DECISIONS.md`](DECISIONS.md) `ADR-006`、`ADR-007`、`ADR-013`。
 
@@ -73,10 +73,18 @@ P0-3 不实现 WebSocket 业务代码。P1 实施时遵守：
 - FastAPI OpenAPI 是 REST contract 的 Source of Truth；
 - Frontend 从 OpenAPI 生成 TypeScript types/client；
 - 不允许前后端手写两套同名 DTO；
-- 具体 OpenAPI generator package 延后到 P0-3 选择；
+- P0-3E 的 scoped implementation 使用 `openapi-typescript` 生成 TypeScript contract，并使用 `openapi-fetch` 建立 typed client；
 - generator 选择不得改变 OpenAPI-as-source-of-truth 的 Accepted decision。
 
-P0-3D 已验证 FastAPI `/openapi.json` 可生成并包含 `/health`。它是当前 REST schema 的 Source of Truth；TypeScript client 生成和 generator 选择尚未进入范围。
+P0-3E 的实际流程为：FastAPI `/openapi.json` → `openapi-typescript` → `apps/web/src/lib/api/generated/schema.d.ts` → `openapi-fetch` typed client。生成文件不得手改；API 运行时使用 `web:api:generate` 更新，使用 `web:api:check` 检查漂移。
+
+## P0-3E local CORS semantics
+
+- CORS allowlist 由 `GIA_API_CORS_ORIGINS` 以 JSON array 显式配置；缺省为空；
+- 本地示例只允许 `http://localhost:3000`，不使用 wildcard 或任意 localhost port；
+- 当前 `allow_credentials=false`、允许方法仅 `GET`、不预先放宽 request headers；
+- response 暴露 `X-Request-ID`；未批准 origin 不获得 `Access-Control-Allow-Origin`；
+- `NEXT_PUBLIC_API_BASE_URL` 是浏览器可见的公开 base URL，不是 secret；当前 Web 从浏览器直接请求 FastAPI，不经过 Next.js proxy。
 
 ## Versioned WebSocket contract
 
@@ -161,7 +169,7 @@ P0-3D 已实现的最小错误 envelope 为：
 - 基础 config、request correlation、structured logging 和 error semantics；
 - 不实现 session WebSocket、Provider、数据库或业务端点。
 
-P0-3D 已完成其中最小 API、OpenAPI authority、typed config、request correlation、structured logging 和 error semantics。CORS、Web → API connectivity 与 generated TypeScript client 留待获得明确批准的 P0-3E；WebSocket 仍留在 P1。
+P0-3D 已完成最小 API、OpenAPI authority、typed config、request correlation、structured logging 和 error semantics。P0-3E 已完成 CORS allowlist、generated TypeScript contract、typed client、自动化跨应用 HTTP/CORS 验证与真实浏览器手工验收。WebSocket 仍留在 P1。
 
 ### P1
 
@@ -178,7 +186,6 @@ P0-3D 已完成其中最小 API、OpenAPI authority、typed config、request cor
 
 ## TBD
 
-- TBD：具体 OpenAPI generator package；
 - TBD：WebSocket schema generator package；
 - TBD：P1 最小 REST endpoint 和 WebSocket event 集合；
 - TBD：事件投递、重放、幂等窗口和兼容策略；

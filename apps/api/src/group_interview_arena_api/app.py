@@ -3,6 +3,7 @@ from time import perf_counter
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.base import RequestResponseEndpoint
 from starlette.responses import Response
@@ -66,6 +67,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             reset_request_id(token)
 
     application.middleware("http")(_request_context)
+    application.add_middleware(
+        CORSMiddleware,
+        allow_origins=list(resolved_settings.cors_origins),
+        allow_credentials=False,
+        allow_methods=["GET"],
+        allow_headers=[],
+        expose_headers=["X-Request-ID"],
+    )
 
     return application
 

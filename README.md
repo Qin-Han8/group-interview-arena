@@ -15,12 +15,12 @@ AI 群面训练场让用户无需临时召集真人，即可与具有不同性�
   - `P0-1 — 仓库与文档治理`
   - `P0-2 — 技术架构决策`
 - 当前任务：`P0-3 — 前后端项目骨架（IN_PROGRESS）`
-- 已完成子步骤：`P0-3C — Root workspace + Web skeleton`、`P0-3D — API skeleton`
-- 下一子步骤：`P0-3E — Connectivity + quality gates + docs（awaiting explicit approval）`
+- 已完成子步骤：`P0-3C — Root workspace + Web skeleton`、`P0-3D — API skeleton`、`P0-3E — Connectivity + quality gates + docs`
+- 后续子步骤：`P0-3F — Independent final review（awaiting explicit approval）`
 - 当前目标版本：`V0.1 — Internal Validation / 内部技术验证版`
-- 当前实现状态：Web 与 API 技术骨架可运行；Web → API 连通、CORS、数据库和群面业务尚未实现
+- 当前实现状态：Web 与 API 技术骨架、类型化 CORS、OpenAPI 生成契约及 Web → API 健康检查已实现并通过真实浏览器手工验收；数据库和群面业务尚未实现
 
-> P0-3C Web 与 P0-3D API 技术骨架均已完成本地检查；P0-3 整体仍在进行中，不得在未获明确批准时进入 P0-3E。
+> P0-3E 已完成并通过真实浏览器手工验收；P0-3 整体仍在进行中，P0-3F 等待明确批准。
 
 ## 核心原则摘要
 
@@ -108,14 +108,33 @@ AI 群面训练场让用户无需临时召集真人，即可与具有不同性�
 
 ## 如何运行
 
-要求 Node.js 24 LTS 与 pnpm 11。Windows PowerShell 使用 `.cmd` 入口：
+要求 Node.js 24 LTS 与 pnpm 11。Windows PowerShell 使用 `.cmd` 入口。先在 API 终端启动 FastAPI：
 
 ```powershell
-pnpm.cmd install
+cd apps/api
+uv sync --frozen
+$env:GIA_API_CORS_ORIGINS='["http://localhost:3000"]'
+uv run uvicorn group_interview_arena_api.app:app --host localhost --port 8000
+```
+
+再从仓库根目录启动 Web：
+
+```powershell
+pnpm.cmd install --frozen-lockfile
+$env:NEXT_PUBLIC_API_BASE_URL='http://localhost:8000'
 pnpm.cmd web:dev
 ```
 
-Web 开发服务器默认运行于 `http://localhost:3000`。以下命令已经在 P0-3C 实际验证：
+Web 在浏览器中直接请求 FastAPI，不使用 Next.js API proxy。Web 默认运行于 `http://localhost:3000`，API 默认运行于 `http://localhost:8000`。
+
+API 运行后可生成并检查受版本控制的 OpenAPI TypeScript 契约：
+
+```powershell
+pnpm.cmd web:api:generate
+pnpm.cmd web:api:check
+```
+
+Web 质量命令：
 
 ```powershell
 pnpm.cmd web:lint
@@ -125,15 +144,7 @@ pnpm.cmd web:format:check
 pnpm.cmd web:build
 ```
 
-API 要求 CPython 3.14 与 uv `>=0.12.2,<0.13`。从 API 项目目录安装并启动：
-
-```powershell
-cd apps/api
-uv sync --frozen
-uv run uvicorn group_interview_arena_api.app:app --reload --host 127.0.0.1 --port 8000
-```
-
-API 默认运行于 `http://127.0.0.1:8000`。以下命令已经在 P0-3D 实际验证：
+API 要求 CPython 3.14 与 uv `>=0.12.2,<0.13`。API 质量命令：
 
 ```powershell
 uv lock --check
@@ -143,7 +154,7 @@ uv run pyright
 uv run pytest
 ```
 
-当前仅实现 API 技术基础和 `GET /health`。Web → API connectivity、CORS、数据库、migration 和群面业务功能尚未建立。
+当前只实现技术基础和 `GET /health` 连通。数据库、migration 和群面业务功能尚未建立。
 
 ## 贡献规则
 

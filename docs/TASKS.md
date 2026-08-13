@@ -3,7 +3,7 @@
 - Status: Active
 - Managed scope: P0 only
 - Current task: P0-3 — IN_PROGRESS
-- Current substep: P0-3D completed; P0-3E awaiting explicit approval
+- Current substep: P0-3F awaiting explicit approval
 - Allowed status values: `TODO` / `IN_PROGRESS` / `BLOCKED` / `DONE`
 - Related roadmap: [`ROADMAP.md`](ROADMAP.md)
 
@@ -98,8 +98,8 @@
 - `P0-3B — Environment normalization verification`：completed；
 - `P0-3C — Root workspace + Web skeleton`：completed；
 - `P0-3D — API skeleton`：completed；
-- `P0-3E — Connectivity + quality gates + docs`：awaiting explicit approval；
-- `P0-3F — Independent final review`：planned。
+- `P0-3E — Connectivity + quality gates + docs`：completed；
+- `P0-3F — Independent final review`：awaiting explicit approval。
 
 ### P0-3C completion note
 
@@ -115,7 +115,16 @@
 - 已实现 `create_app()`、`GET /health`、typed settings、UUIDv4 `request_id`、标准库 JSON structured logging 和统一安全 error envelope；
 - 已实际通过 frozen sync、lock check、Ruff lint/format、Pyright strict、9 项 pytest、package/app import、health 与 OpenAPI smoke；
 - 未修改 `apps/web`，未建立 CORS、Web → API connectivity、数据库、WebSocket、Provider 或业务 endpoint；
-- P0-3 整体保持 `IN_PROGRESS`，P0-3E 等待明确批准。
+- P0-3 整体保持 `IN_PROGRESS`；P0-3D 完成当时，P0-3E 尚待明确批准。
+
+### P0-3E completion note
+
+- 已实现显式 typed CORS allowlist，默认不允许 browser cross-origin，并保留现有 request_id、结构化日志和安全错误语义；
+- 已从运行中的 FastAPI `/openapi.json` 使用 `openapi-typescript` 生成受版本控制的 TypeScript contract，并由 `openapi-fetch` 建立 `/health` typed client；
+- 已实现 Web public base URL 校验与一次性 `HealthStatus` 连通状态，未建立 Next.js proxy、轮询或业务 UI；
+- 已通过 API/Web 全部质量检查、contract drift check、真实 CORS headers 与双服务 HTTP 200 smoke；
+- 用户已在真实浏览器确认首页显示“API 状态：已连接”、直接访问 `/health` 返回 `200` 与精确 JSON、CORS 和 `X-Request-ID` 正常，且 Console 无相关运行时或 CORS 错误；该手工验收为 PASS，未执行 Playwright、E2E 或其他浏览器自动化；
+- P0-3E 已完成；P0-3 整体仍为 `IN_PROGRESS`，P0-3F 等待明确批准，不得自动进入。
 
 ## P0-4 — 数据库与迁移基础
 

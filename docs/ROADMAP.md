@@ -3,7 +3,7 @@
 - Status: Active baseline
 - Current development phase: P0 — 项目基础
 - Current task: P0-3 — IN_PROGRESS
-- Current substep: P0-3D completed; P0-3E awaiting explicit approval
+- Current substep: P0-3F awaiting explicit approval
 - Target product version: V0.1 — Internal Validation
 - Source: [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) §30–31
 
@@ -44,7 +44,7 @@
 | P0-6 CI、日志与基础可观测性 | 建立自动检查、日志和基础监控能力 | TODO |
 | P0-7 P0 独立验收 | 独立确认 P0 是否满足进入 P1 的条件 | TODO |
 
-任务细节及验收条件见 [`TASKS.md`](TASKS.md)。P0-2 已完成；P0-3C Web skeleton 与 P0-3D API skeleton 均已完成并通过本地质量检查。P0-3 整体保持 `IN_PROGRESS`，P0-3E connectivity 仍等待用户明确批准，不得自动开始。
+任务细节及验收条件见 [`TASKS.md`](TASKS.md)。P0-3C Web skeleton、P0-3D API skeleton 与 P0-3E connectivity 已完成，P0-3E 真实浏览器手工验收为 PASS；P0-3 整体保持 `IN_PROGRESS`，P0-3F 仍等待明确批准。
 
 P0-2 已 Accepted PostgreSQL、SQLAlchemy 2.x 和 Alembic；P0-4 实施基线为 PostgreSQL 18.x，且 Redis 不进入默认 Compose。完整决策和重新评估条件见 [`DECISIONS.md`](DECISIONS.md)。
 

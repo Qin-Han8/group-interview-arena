@@ -65,7 +65,7 @@ group-interview-arena/
 
 Next.js Server Actions/Route Handlers 可以处理 Web 专属能力，但不得复制 domain logic、session state machine、scoring、agent orchestration 或 persistence authority。FastAPI 始终是主要业务后端。
 
-P0-3C 已实现的 Web 技术基础为：Next.js `16.3.0`、React `19.2.8`、TypeScript `5.9.3` strict、Tailwind CSS `4.3.3` 和 App Router。根 workspace 使用 pnpm `11.21.0`；前端质量栈使用 ESLint `9.39.5`、Prettier `3.9.6`、Vitest `4.1.10`、Testing Library React `16.3.2`、jest-dom `7.0.1` 与 jsdom `30.0.1`。当前首页只证明技术骨架，不是群面业务 UI。
+P0-3C 已实现的 Web 技术基础为：Next.js `16.3.0`、React `19.2.8`、TypeScript `5.9.3` strict、Tailwind CSS `4.3.3` 和 App Router。根 workspace 使用 pnpm `11.21.0`；前端质量栈使用 ESLint `9.39.5`、Prettier `3.9.6`、Vitest `4.1.10`、Testing Library React `16.3.2`、jest-dom `7.0.1` 与 jsdom `30.0.1`。P0-3E 加入 `openapi-typescript 7.13.0` 与 `openapi-fetch 0.17.0`，只服务于当前真实 `/health` caller。当前首页只证明技术骨架，不是群面业务 UI。
 
 ### Backend boundary
 
@@ -93,11 +93,17 @@ P0-3D 已实现的 API 技术基础使用 CPython `3.14.7`、uv `0.12.3`、FastA
 
 ```text
 developer
-  ├── Node.js 24 LTS + pnpm -> Next.js web
-  └── CPython 3.14 + uv     -> FastAPI api
-                                      |
-                                      +-> PostgreSQL 18.x via Docker Compose (P0-4)
+  ├── browser
+  │     -> Next.js web :3000
+  │          -> REST GET /health
+  │               -> FastAPI api :8000
+  ├── Node.js 24 LTS + pnpm
+  └── CPython 3.14 + uv
+
+PostgreSQL 18.x via Docker Compose remains planned for P0-4.
 ```
+
+本地 browser origin 必须通过 `GIA_API_CORS_ORIGINS` 显式加入 allowlist；缺省为空，不允许跨源。`NEXT_PUBLIC_API_BASE_URL` 是公开浏览器 base URL，不是 secret。Web 直接请求 FastAPI，不建立 Next.js Route Handler proxy。
 
 ### P0-3
 
@@ -136,7 +142,7 @@ Redis 继续不运行。
 - P1 第一个文字讨论 vertical slice 即建立 WebSocket session channel，不先做完整 HTTP 讨论后再重写；
 - 服务端 session state 是权威；client command 有 action identity；session event 有顺序；重连基于 server snapshot + sequence。
 
-FastAPI OpenAPI 是 REST contract 的 Source of Truth，前端从 OpenAPI 生成 TypeScript types/client。具体 generator package 保持 Deferred。
+FastAPI OpenAPI 是 REST contract 的 Source of Truth。P0-3E 从运行中的 `/openapi.json` 使用 `openapi-typescript` 生成 `apps/web/src/lib/api/generated/schema.d.ts`，再由 `openapi-fetch` 提供 typed fetch client；生成文件受版本控制且不得手改，`api:check` 验证漂移。
 
 WebSocket 使用独立版本化事件契约，至少表达 event type、schema version、session identity、ordering sequence、occurrence timestamp 和 action identity。完整 P1 事件 Schema 由 P1 API design 冻结，不在 P0-2 假装已经完成。
 
@@ -191,7 +197,7 @@ WebSocket 使用独立版本化事件契约，至少表达 event type、schema v
 - Redis runtime、implementation 和产品；
 - 独立 task queue 及其具体产品；
 - UI primitives/component library；
-- OpenAPI generator 和 WebSocket schema generator；
+- WebSocket schema generator；
 - OpenTelemetry exporter、Sentry/SaaS、analytics；
 - 具体 LLM/model、ASR、TTS 和 Embedding 实现；
 - 正式认证、支付、云平台、中国生产部署、对象存储、CDN 和 PWA production strategy。
@@ -202,7 +208,7 @@ Redis 只在多 API workers、横向扩容、跨进程 WebSocket broadcast、dis
 
 ## Future work
 
-- P0-3：创建最小 Web/API 骨架，不实现业务模块；
+- P0-3F：执行 P0-3 独立最终审查，不新增业务能力；
 - P0-4：创建 PostgreSQL 数据与 migration 基础；
 - P0-5：落实内部 V0.1 最小身份边界；
 - P0-6：建立 CI 和基础可观测性；

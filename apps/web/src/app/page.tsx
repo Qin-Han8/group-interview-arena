@@ -1,3 +1,5 @@
+import HealthStatus from "./health-status";
+
 export default function Home() {
   return (
     <main className="min-h-screen bg-[#f7f7f5] px-6 py-16 text-neutral-950 sm:px-10 sm:py-24">
@@ -21,6 +23,7 @@ export default function Home() {
         <div className="space-y-2 text-sm leading-6 text-neutral-600">
           <p>AI candidates are virtual characters.</p>
           <p>Business simulation has not been implemented yet.</p>
+          <HealthStatus />
         </div>
       </section>
     </main>

@@ -8,7 +8,9 @@
     "web:typecheck": "pnpm --filter @group-interview-arena/web typecheck",
     "web:test": "pnpm --filter @group-interview-arena/web test",
     "web:format": "pnpm --filter @group-interview-arena/web format",
-    "web:format:check": "pnpm --filter @group-interview-arena/web format:check"
+    "web:format:check": "pnpm --filter @group-interview-arena/web format:check",
+    "web:api:generate": "pnpm --filter @group-interview-arena/web api:generate",
+    "web:api:check": "pnpm --filter @group-interview-arena/web api:check"
   },
   "engines": {
     "node": "24.x"

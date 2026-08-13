@@ -3,3 +3,4 @@ coverage/
 next-env.d.ts
 AGENTS.md
 CLAUDE.md
+src/lib/api/generated/

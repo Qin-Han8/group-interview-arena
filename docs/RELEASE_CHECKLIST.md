@@ -17,7 +17,7 @@
 
 ## 当前版本范围
 
-P0-2 技术架构决策已完成；P0-3 当前为 `IN_PROGRESS`。P0-3C Web 与 P0-3D API 技术骨架已完成，P0-3E connectivity 仍等待明确批准。P0 尚未完成，V0.1 业务能力尚未实现。下方 P0 exit 与产品版本复选框仍表示完整阶段/版本验收，不能由单个子步骤替代。
+P0-2 技术架构决策已完成；P0-3 当前为 `IN_PROGRESS`。P0-3C Web、P0-3D API 技术骨架与 P0-3E connectivity 已完成；P0-3F 独立最终审查等待明确批准。P0 尚未完成，V0.1 业务能力尚未实现。下方 P0 exit 与产品版本复选框仍表示完整阶段/版本验收，不能由单个子步骤替代。
 
 ## Implementation guidance
 
@@ -51,6 +51,39 @@ P0-2 技术架构决策已完成；P0-3 当前为 `IN_PROGRESS`。P0-3C Web 与 
 - [x] Uvicorn 下 `GET /openapi.json` 返回 `200` 并包含 `/health`，验证后已停止服务。
 
 这些证据只覆盖 P0-3D API 技术骨架；不代表 Web/API browser connectivity、CORS、数据库、migration、CI、WebSocket 或 P0 exit 已通过。
+
+### P0-3E connectivity verification — 2026-08-13
+
+API：
+
+- [x] `uv sync --frozen`；
+- [x] `uv lock --check`；
+- [x] `uv run ruff check .`；
+- [x] `uv run ruff format --check .`；
+- [x] `uv run pyright`；
+- [x] `uv run pytest`，17 项通过；
+- [x] 真实 `GET /health` 与 `/openapi.json` 均返回 `200`；
+- [x] allowed origin 获得明确 CORS allow origin 与 exposed `X-Request-ID`；
+- [x] disallowed origin 未获得 `Access-Control-Allow-Origin`；
+- [x] `GET` preflight 通过。
+
+Web 与 contract：
+
+- [x] `pnpm.cmd install --frozen-lockfile`；
+- [x] `pnpm.cmd web:lint`；
+- [x] `pnpm.cmd web:typecheck`；
+- [x] `pnpm.cmd web:test`，8 项通过；
+- [x] `pnpm.cmd web:format:check`；
+- [x] `pnpm.cmd web:build`；
+- [x] `pnpm.cmd web:api:generate` 生成只包含 `/health` 的契约；
+- [x] `pnpm.cmd web:api:check` 无漂移；
+- [x] Web `:3000` 与 API `:8000` 同时返回 HTTP `200`，验证后服务均已停止；
+- [x] 用户在真实浏览器打开 `http://localhost:3000`，页面正常显示“API 状态：已连接”；
+- [x] 用户在同一真实浏览器直接请求 `http://localhost:8000/health`，获得 HTTP `200` 与 `{"status":"ok"}`；
+- [x] 真实浏览器请求中的 CORS 与 `X-Request-ID` 表现正常；
+- [x] 浏览器 Console 未发现与本次功能相关的运行时或 CORS 错误。
+
+P0-3E 已完成，真实浏览器手工验收为 PASS。本项未执行 Playwright、E2E 或其他浏览器自动化；这些证据不代表数据库、WebSocket、业务能力、CI、P0-3F 或 P0 exit 已通过。
 
 ## P0 exit
 
