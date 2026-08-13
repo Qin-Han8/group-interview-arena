@@ -176,6 +176,17 @@
 - Alternatives: 前后端手写两套同名 DTO；把 WebSocket 强行纳入 REST OpenAPI。
 - Related documents: [`API.md`](API.md)、[`ARCHITECTURE.md`](ARCHITECTURE.md)
 
+#### P0-3E 后续实施决议 — 2026-08-13
+
+ADR-007 在 P0-2 建立时将具体 OpenAPI generator package 保持 Deferred；上述记录保留为当时的真实历史状态。P0-3E 已在不改变本 ADR 契约权威原则的前提下解决 REST OpenAPI tooling 选择：
+
+- 当前 P0-3E / V0.1 实现基线使用 `openapi-typescript 7.13.0`，从 FastAPI `/openapi.json` 生成 TypeScript contract；
+- 使用 `openapi-fetch 0.17.0` 消费生成的 `paths`，建立类型安全的 Fetch client；
+- 生成物 `apps/web/src/lib/api/generated/schema.d.ts` 是由 generator 生成、纳入版本控制的派生 contract artifact，不是新的 Source of Truth，也不得作为手工维护的 REST DTO；
+- contract drift check 用于验证生成物与 FastAPI OpenAPI 保持一致。
+
+该后续决议只解决 REST OpenAPI tooling。WebSocket schema format、WebSocket schema generator 与 realtime protocol tooling 仍 Deferred 到 P1。上述工具及版本是当前 P0-3E / V0.1 实现基线，不是永久不可替换的架构锁定；未来替换必须继续保证 FastAPI OpenAPI 是 REST contract 的 Source of Truth，且 generated client/types 不形成独立权威。
+
 ### ADR-008 — Redis 延后运行
 
 - ID: `ADR-008`
@@ -295,7 +306,6 @@
 - TBD：Redis implementation/product；
 - TBD：task queue implementation；
 - TBD：UI primitives/component library；
-- TBD：OpenAPI generator package；
 - TBD：WebSocket schema generator package 和 P1 完整事件 Schema；
 - TBD：PWA production strategy；
 - TBD：V0.1 四种基础角色的具体组合。
