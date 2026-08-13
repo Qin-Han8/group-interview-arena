@@ -17,7 +17,7 @@
 
 ## 当前版本范围
 
-P0-2 技术架构决策与 P0-3 前后端项目骨架已完成。P0-4A preflight/scope freeze 与 P0-4B PostgreSQL local infrastructure 已完成；P0-4C 等待明确批准。P0 尚未完成，V0.1 业务能力尚未实现。下方 P0 exit 与产品版本复选框仍表示完整阶段/版本验收，不能由单个子任务替代。
+P0-2 技术架构决策与 P0-3 前后端项目骨架已完成。P0-4A preflight/scope freeze、P0-4B PostgreSQL local infrastructure 与 P0-4C SQLAlchemy async foundation 已完成；P0-4D 等待明确批准。P0 尚未完成，V0.1 业务能力尚未实现。下方 P0 exit 与产品版本复选框仍表示完整阶段/版本验收，不能由单个子任务替代。
 
 ## Implementation guidance
 
@@ -111,7 +111,21 @@ P0-3 已通过第二次独立最终验收并转为 `DONE`。P0 整体仍为 `IN_
 - [x] restart 后重新 `healthy` 且 `SELECT 1` 成功；
 - [x] `.env` 保持 Git ignored，tracked 配置和文档没有真实 credential。
 
-这些证据只覆盖已完成的 P0-4B 本地 PostgreSQL infrastructure。SQLAlchemy、Alembic、driver、migration、数据库 integration tests 与业务 Schema 尚未建立；P0-4 保持 `IN_PROGRESS`，P0-4C 等待明确批准。
+这些证据只覆盖已完成的 P0-4B 本地 PostgreSQL infrastructure；在该子步骤验收时，SQLAlchemy、driver、Alembic、migration、数据库 integration tests 与业务 Schema 均尚未建立。当前后续状态见下方 P0-4C verification。
+
+### P0-4C SQLAlchemy async foundation verification — 2026-08-13
+
+- [x] `uv sync --frozen`；
+- [x] `uv lock --check`；
+- [x] SQLAlchemy `2.0.52` 与 psycopg/psycopg-binary `3.3.4` import，psycopg binary implementation 已确认；
+- [x] `uv run ruff check .`；
+- [x] `uv run ruff format --check .`；
+- [x] `uv run pyright`；
+- [x] `uv run pytest`，31 项通过，其中 14 项为新增 DB foundation unit tests；
+- [x] `GIA_API_DATABASE_URL` lazy/server-only SecretStr、driver boundary、URL redaction、DeclarativeBase/naming、空 metadata、async engine/session 与 dispose behavior 已验证；
+- [x] 现有 app startup 与 `GET /health` 在无数据库 URL 时保持不变。
+
+这些证据只覆盖已完成的 P0-4C SQLAlchemy async foundation，且测试未连接 PostgreSQL，不是 integration tests。当前没有 Alembic、migration、业务 table/model、FastAPI DB dependency 或 app DB lifecycle；P0-4D 等待明确批准。
 
 ## P0 exit
 

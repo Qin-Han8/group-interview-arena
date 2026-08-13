@@ -5,8 +5,8 @@
 - Architecture baseline established by: P0-2 — DONE
 - P0-3 foundation status: DONE
 - Current task: P0-4 — IN_PROGRESS
-- Current substep: P0-4B completed
-- Next substep: P0-4C awaiting explicit approval
+- Current substep: P0-4C completed
+- Next substep: P0-4D awaiting explicit approval
 - Target version: V0.1 Internal Validation
 - Business architecture detail: Incremental from P1
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
@@ -91,7 +91,7 @@ providers/    provider adapters that have actual callers
 
 禁止 full DDD ceremony、repository/service/controller 多层空壳、global giant `services.py`，以及提前创建未来全部 module。
 
-P0-3D 已实现的 API 技术基础使用 CPython `3.14.7`、uv `0.12.3`、FastAPI `0.141.1`、Pydantic `2.13.4`、pydantic-settings `2.15.0` 与 Uvicorn `0.52.1`。项目采用 packaged `src/group_interview_arena_api` layout；`api/` 当前只有 health transport，`core/` 只包含 typed settings、安全错误语义、标准库 JSON logging 与 UUIDv4 `request_id`。数据库、业务 `modules/`、`providers/` 与 WebSocket 目录均未创建。
+P0-3D 已实现的 API 技术基础使用 CPython `3.14.7`、uv `0.12.3`、FastAPI `0.141.1`、Pydantic `2.13.4`、pydantic-settings `2.15.0` 与 Uvicorn `0.52.1`。项目采用 packaged `src/group_interview_arena_api` layout；`api/` 当前只有 health transport，`core/` 包含 typed settings、安全错误语义、标准库 JSON logging 与 UUIDv4 `request_id`。P0-4C 已建立 `db/` persistence infrastructure，使用 SQLAlchemy `2.0.52`、psycopg/psycopg-binary `3.3.4`、`postgresql+psycopg://`、`DeclarativeBase`、async engine/session factory 与显式 dispose helper；业务 `modules/`、`providers/` 与 WebSocket 目录仍未创建。
 
 ## Local development model
 
@@ -138,7 +138,21 @@ P0-4A/P0-4B 已完成：
 - `pg_isready` healthcheck 使用实际 `POSTGRES_USER`/`POSTGRES_DB`；
 - 真实容器已验证 PostgreSQL 18.4、开发数据库、`SELECT 1` 与 restart 后恢复。
 
-SQLAlchemy 2.x、Alembic、migration environment 和 PostgreSQL integration/migration tests 仍待 P0-4C～P0-4E。PostgreSQL async driver 尚未决定。Redis 继续不运行，业务 Schema 尚未创建。
+P0-4C 已建立以下尚未接入 app runtime 的技术层：
+
+```text
+API（当前无 DB caller）
+  ↓
+DB infrastructure factories
+  ↓
+SQLAlchemy async 2.0.52
+  ↓
+psycopg 3.3.4
+  ↓
+PostgreSQL 18.4
+```
+
+`GIA_API_DATABASE_URL` 是通过 `SecretStr` 按需加载的 server-only 配置；只有 DB factory 的调用方需要提供。当前没有 global engine、FastAPI DB dependency、app DB lifecycle、启动连接、SQL echo 或 pool tuning。`Base.metadata.tables` 为空。Alembic 与 migration environment 仍待 P0-4D，真实 PostgreSQL integration/migration tests 仍待 P0-4E。Redis 继续不运行，业务 Schema 尚未创建。
 
 ## Communication and contract boundaries
 
@@ -214,7 +228,7 @@ Redis 只在多 API workers、横向扩容、跨进程 WebSocket broadcast、dis
 
 ## Future work
 
-- P0-4C～P0-4F：建立 SQLAlchemy、Alembic、真实 PostgreSQL integration/migration checks 并完成独立审查；
+- P0-4D～P0-4F：建立 Alembic、真实 PostgreSQL integration/migration checks 并完成独立审查；
 - P0-5：落实内部 V0.1 最小身份边界；
 - P0-6：建立 CI 和基础可观测性；
 - P1：逐步设计题目、角色、会话、状态机、调度、记忆和基础报告，并建立第一个 WebSocket vertical slice；

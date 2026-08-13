@@ -1,7 +1,7 @@
 from enum import StrEnum
 from urllib.parse import urlsplit
 
-from pydantic import field_validator
+from pydantic import SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -17,6 +17,12 @@ class LogLevel(StrEnum):
     WARNING = "WARNING"
     ERROR = "ERROR"
     CRITICAL = "CRITICAL"
+
+
+class DatabaseSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="GIA_API_", extra="ignore")
+
+    database_url: SecretStr
 
 
 class Settings(BaseSettings):

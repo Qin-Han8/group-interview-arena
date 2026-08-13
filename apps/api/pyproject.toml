@@ -5,7 +5,9 @@ description = "Internal FastAPI foundation for Group Interview Arena"
 requires-python = ">=3.14,<3.15"
 dependencies = [
     "fastapi>=0.141.1",
+    "psycopg[binary]>=3.3.4,<3.4",
     "pydantic-settings>=2.15.0",
+    "sqlalchemy>=2.0.51,<2.1",
     "uvicorn>=0.52.1",
 ]
 

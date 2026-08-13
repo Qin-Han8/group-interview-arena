@@ -4,13 +4,14 @@
 - Current phase: P0
 - Data architecture baseline established by: P0-2 — DONE
 - Local PostgreSQL infrastructure: P0-4B — completed
+- SQLAlchemy async foundation: P0-4C — completed
 - Target version: V0.1 Internal Validation
 - Business schema and migrations: Not started
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
 
-本文件记录 P0-2 已批准的数据技术基线、数据边界和 P0-4 实施状态。P0-4B 已建立本地 PostgreSQL infrastructure；当前仍不建立业务表、不冻结 V0.1 实体集合，SQLAlchemy、Alembic 与 migration 尚未创建。
+本文件记录 P0-2 已批准的数据技术基线、数据边界和 P0-4 实施状态。P0-4B 已建立本地 PostgreSQL infrastructure；P0-4C 已建立 SQLAlchemy async/psycopg 3 底层 factory。当前仍不建立业务表、不冻结 V0.1 实体集合，Alembic 与 migration 尚未创建。
 
 正式决策见 [`DECISIONS.md`](DECISIONS.md) `ADR-005`、`ADR-010`、`ADR-013`。
 
@@ -42,7 +43,19 @@
 - configuration：Compose 显式 interpolation `POSTGRES_DB`、`POSTGRES_USER`、`POSTGRES_PASSWORD`，真实值只存在于被 Git ignore 的本地 `.env`；
 - verified：Compose config、image pull、healthy、开发数据库、`SELECT 1`、mount inspection 与 restart smoke。
 
-当前没有 Redis、SQLAlchemy、Alembic、PostgreSQL Python driver、migration 或业务 Schema。PostgreSQL async driver 仍待 P0-4C 前确认。
+当前没有 Redis、Alembic、migration 或业务 Schema。
+
+## P0-4C implemented async foundation
+
+- direct dependencies：SQLAlchemy `2.0.52`、psycopg/psycopg-binary `3.3.4`；binary package 是本地开发 runtime baseline；
+- SQLAlchemy URL dialect：只接受 `postgresql+psycopg://`；sqlite、asyncpg、psycopg2 与 malformed URL fail fast；
+- configuration：`GIA_API_DATABASE_URL` 通过 `DatabaseSettings`/`SecretStr` 按需加载，是 server-only secret，不进入 `NEXT_PUBLIC_*`；现有 app startup 与 `/health` 不加载该配置；
+- metadata：`DeclarativeBase` 使用 `ix`、`uq`、`ck`、`fk`、`pk` 稳定 naming convention，当前 `Base.metadata.tables` 为空；
+- runtime：无 global engine；factory 使用 `create_async_engine()`，SQL echo disabled，pool 保持 SQLAlchemy defaults；session factory 使用 `async_sessionmaker[AsyncSession]` 与 `expire_on_commit=False`；caller 负责显式 transaction boundary；
+- lifecycle：仅提供显式 `await engine.dispose()` 的薄 helper；尚无 FastAPI DB dependency、app lifespan 或启动连接；
+- verification：14 项新增 DB foundation unit tests 不连接 PostgreSQL；真实 integration/migration tests 尚未执行。
+
+Alembic 与 migration foundation 仍待 P0-4D，隔离的真实 PostgreSQL integration/migration tests 仍待 P0-4E。
 
 ## Rejected paths
 
@@ -111,7 +124,7 @@ P0-4 不运行 Redis，不创建未来完整业务 Schema，也不提前实现�
 
 ## Future work
 
-- P0-4C～P0-4F：建立 SQLAlchemy/Alembic、migration 与真实 PostgreSQL integration/migration checks；
+- P0-4D～P0-4F：建立 Alembic/migration 与真实 PostgreSQL integration/migration checks；
 - P1：按文字讨论闭环实现最小题目、角色、会话、事件、记忆和报告数据；
 - P2～P4：仅随获批范围增加音频、评分训练和商业化数据。
 

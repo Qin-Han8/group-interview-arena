@@ -3,8 +3,8 @@
 - Status: Active
 - Managed scope: P0 only
 - Current task: P0-4 — IN_PROGRESS
-- Current substep: P0-4B completed
-- Next substep: P0-4C awaiting explicit approval
+- Current substep: P0-4C completed
+- Next substep: P0-4D awaiting explicit approval
 - Allowed status values: `TODO` / `IN_PROGRESS` / `BLOCKED` / `DONE`
 - Related roadmap: [`ROADMAP.md`](ROADMAP.md)
 
@@ -139,7 +139,7 @@
 - ID: `P0-4`
 - 名称：数据库与迁移基础
 - Status: `IN_PROGRESS`
-- Approval state：P0-4A/P0-4B completed；P0-4C awaiting explicit approval。
+- Approval state：P0-4A/P0-4B/P0-4C completed；P0-4D awaiting explicit approval。
 - 目标：依据 P0-2 已批准的技术决策，建立 V0.1 所需的 PostgreSQL 数据库、数据访问层和 migration 基础。
 - In scope：Docker Compose、PostgreSQL 18.x、安全连接配置、SQLAlchemy 2.x、Alembic、最小基础模型、PostgreSQL integration tests 及 migration checks。
 - Out of scope：一次性实现总纲所有未来业务实体或完整会话数据模型。
@@ -151,8 +151,8 @@
 
 - `P0-4A — Database implementation preflight and scope freeze`：completed；
 - `P0-4B — Docker Compose + PostgreSQL local infrastructure`：completed；
-- `P0-4C — SQLAlchemy async foundation + typed DB config`：awaiting explicit approval；
-- `P0-4D — Alembic migration foundation + initial schema strategy`：not started；
+- `P0-4C — SQLAlchemy async foundation + typed DB config`：completed；
+- `P0-4D — Alembic migration foundation + initial schema strategy`：awaiting explicit approval；
 - `P0-4E — PostgreSQL integration tests + migration validation + docs`：not started；
 - `P0-4F — Independent final review`：not started。
 
@@ -163,7 +163,16 @@
 - Compose config、official image pull、container health、PostgreSQL `18.4`、开发数据库、`SELECT 1`、named volume 与 restart smoke 均通过；
 - `.env` 保持 Git ignored，Compose 和文档未提交真实 credential；
 - 未创建 SQLAlchemy、Alembic、driver、migration、业务 Schema、Redis 或应用 container；
-- P0-4 保持 `IN_PROGRESS`，P0-4C 等待明确批准，PostgreSQL async driver 尚未决定。
+- P0-4 保持 `IN_PROGRESS`；P0-4C 已采用 scoped `psycopg[binary]` 3.3.x async driver baseline 并完成最终审核。
+
+### P0-4C implementation note
+
+- 已加入 SQLAlchemy `2.0.52` 与 psycopg/psycopg-binary `3.3.4`，使用 `postgresql+psycopg://`、`create_async_engine()` 与 `async_sessionmaker()`；
+- 已建立 lazy、server-only `GIA_API_DATABASE_URL`/`SecretStr` 配置，现有 app startup 与 `GET /health` 不要求数据库 URL；
+- 已建立 `DeclarativeBase`、稳定 naming convention、async engine/session factory 与显式 dispose helper；没有 global engine 或 app lifecycle 接入；
+- 31 项 API 测试通过，其中 14 项为新增 DB foundation unit tests；这些测试不连接 PostgreSQL，不是 integration tests；
+- 当前 metadata table count 为 0；未加入 Alembic、migration、业务 ORM model、FastAPI DB dependency 或业务 Schema；
+- P0-4C 已完成；P0-4D 等待明确批准。
 
 ## P0-5 — 最小身份边界
 
