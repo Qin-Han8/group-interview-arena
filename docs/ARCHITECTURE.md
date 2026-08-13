@@ -4,7 +4,9 @@
 - Current phase: P0
 - Architecture baseline established by: P0-2 — DONE
 - P0-3 foundation status: DONE
-- Next task: P0-4 awaiting explicit approval
+- Current task: P0-4 — IN_PROGRESS
+- Current substep: P0-4B completed
+- Next substep: P0-4C awaiting explicit approval
 - Target version: V0.1 Internal Validation
 - Business architecture detail: Incremental from P1
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
@@ -37,7 +39,7 @@ group-interview-arena/
 │   ├── web/                     # Implemented in P0-3C: Next.js skeleton
 │   └── api/                     # Implemented in P0-3D: FastAPI skeleton
 ├── infra/
-│   └── compose.yaml             # Planned for P0-4; not created
+│   └── compose.yaml             # Implemented in P0-4B: PostgreSQL only
 ├── docs/
 ├── package.json                 # Implemented: JS workspace and Web delegates
 ├── pnpm-workspace.yaml          # Implemented: apps/web only
@@ -100,9 +102,11 @@ developer
   │          -> REST GET /health
   │               -> FastAPI api :8000
   ├── Node.js 24 LTS + pnpm
-  └── CPython 3.14 + uv
+  ├── CPython 3.14 + uv
+  └── Docker Compose
+        -> PostgreSQL 18.4 127.0.0.1:5432
 
-PostgreSQL 18.x via Docker Compose remains planned for P0-4.
+Web 与 API 继续作为 Windows native process。Docker Compose 当前只运行 PostgreSQL，不包含 Web、API、Redis、worker 或管理 UI。
 ```
 
 本地 browser origin 必须通过 `GIA_API_CORS_ORIGINS` 显式加入 allowlist；缺省为空，不允许跨源。`NEXT_PUBLIC_API_BASE_URL` 是公开浏览器 base URL，不是 secret。Web 直接请求 FastAPI，不建立 Next.js Route Handler proxy。
@@ -126,15 +130,15 @@ P0-3 不需要数据库容器，不创建 Redis、task queue、WebSocket 业务�
 
 ### P0-4
 
-加入：
+P0-4A/P0-4B 已完成：
 
-- Docker Compose；
-- PostgreSQL 18.x，禁止 `postgres:latest`；
-- SQLAlchemy 2.x；
-- Alembic；
-- PostgreSQL integration tests 和 migration tests。
+- `infra/compose.yaml` 使用 `postgres:18.4-trixie`；
+- service 为 `postgres`，host binding 为 `127.0.0.1:5432`；
+- Docker local named volume 挂载至 PostgreSQL 18 的 `/var/lib/postgresql`；
+- `pg_isready` healthcheck 使用实际 `POSTGRES_USER`/`POSTGRES_DB`；
+- 真实容器已验证 PostgreSQL 18.4、开发数据库、`SELECT 1` 与 restart 后恢复。
 
-Redis 继续不运行。
+SQLAlchemy 2.x、Alembic、migration environment 和 PostgreSQL integration/migration tests 仍待 P0-4C～P0-4E。PostgreSQL async driver 尚未决定。Redis 继续不运行，业务 Schema 尚未创建。
 
 ## Communication and contract boundaries
 
@@ -210,7 +214,7 @@ Redis 只在多 API workers、横向扩容、跨进程 WebSocket broadcast、dis
 
 ## Future work
 
-- P0-4：创建 PostgreSQL 数据与 migration 基础；
+- P0-4C～P0-4F：建立 SQLAlchemy、Alembic、真实 PostgreSQL integration/migration checks 并完成独立审查；
 - P0-5：落实内部 V0.1 最小身份边界；
 - P0-6：建立 CI 和基础可观测性；
 - P1：逐步设计题目、角色、会话、状态机、调度、记忆和基础报告，并建立第一个 WebSocket vertical slice；

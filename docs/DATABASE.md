@@ -3,13 +3,14 @@
 - Status: P0 Data Architecture Baseline
 - Current phase: P0
 - Data architecture baseline established by: P0-2 — DONE
+- Local PostgreSQL infrastructure: P0-4B — completed
 - Target version: V0.1 Internal Validation
 - Business schema and migrations: Not started
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
 
-本文件记录 P0-2 已批准的数据技术基线、数据边界和后续 P0-4 约束。它不建立完整业务表，不冻结 V0.1 实体集合，也不表示数据库或 migration 已创建。
+本文件记录 P0-2 已批准的数据技术基线、数据边界和 P0-4 实施状态。P0-4B 已建立本地 PostgreSQL infrastructure；当前仍不建立业务表、不冻结 V0.1 实体集合，SQLAlchemy、Alembic 与 migration 尚未创建。
 
 正式决策见 [`DECISIONS.md`](DECISIONS.md) `ADR-005`、`ADR-010`、`ADR-013`。
 
@@ -27,6 +28,21 @@
 - Integration/migration tests：使用真实 PostgreSQL。
 
 架构 ADR 冻结 PostgreSQL，不永久冻结数据库 major。P0-4 使用明确的 PostgreSQL 18.x 镜像版本，不得使用 `postgres:latest`；未来升级 major 需要独立评估。
+
+## P0-4B implemented local infrastructure
+
+- Compose：`infra/compose.yaml`；
+- service：`postgres`，且 Compose 中没有其他 service；
+- exact image：`postgres:18.4-trixie`（Docker Official Image）；
+- verified server：PostgreSQL `18.4 (Debian 18.4-1.pgdg13+1)`；
+- host binding：`127.0.0.1:5432`，container port：`5432`；
+- persistence：Docker local named volume `postgres_data`；
+- PostgreSQL 18 mount target：`/var/lib/postgresql`；
+- healthcheck：`pg_isready`，使用容器内实际 `POSTGRES_USER` 和 `POSTGRES_DB`；
+- configuration：Compose 显式 interpolation `POSTGRES_DB`、`POSTGRES_USER`、`POSTGRES_PASSWORD`，真实值只存在于被 Git ignore 的本地 `.env`；
+- verified：Compose config、image pull、healthy、开发数据库、`SELECT 1`、mount inspection 与 restart smoke。
+
+当前没有 Redis、SQLAlchemy、Alembic、PostgreSQL Python driver、migration 或业务 Schema。PostgreSQL async driver 仍待 P0-4C 前确认。
 
 ## Rejected paths
 
@@ -95,7 +111,7 @@ P0-4 不运行 Redis，不创建未来完整业务 Schema，也不提前实现�
 
 ## Future work
 
-- P0-4：建立 PostgreSQL/SQLAlchemy/Alembic 和 migration 验证基础；
+- P0-4C～P0-4F：建立 SQLAlchemy/Alembic、migration 与真实 PostgreSQL integration/migration checks；
 - P1：按文字讨论闭环实现最小题目、角色、会话、事件、记忆和报告数据；
 - P2～P4：仅随获批范围增加音频、评分训练和商业化数据。
 

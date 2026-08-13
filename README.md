@@ -15,12 +15,13 @@ AI 群面训练场让用户无需临时召集真人，即可与具有不同性�
   - `P0-1 — 仓库与文档治理`
   - `P0-2 — 技术架构决策`
   - `P0-3 — 前后端项目骨架`
-- 已完成子步骤：`P0-3C — Root workspace + Web skeleton`、`P0-3D — API skeleton`、`P0-3E — Connectivity + quality gates + docs`、`P0-3F — Independent final review`
-- 下一任务：`P0-4 — 数据库与迁移基础（awaiting explicit approval）`
+- 当前任务：`P0-4 — 数据库与迁移基础（IN_PROGRESS）`
+- 已完成子步骤：`P0-4A — Preflight + scope freeze`、`P0-4B — Docker Compose + PostgreSQL local infrastructure`
+- 下一子步骤：`P0-4C — SQLAlchemy async foundation + typed DB config（awaiting explicit approval）`
 - 当前目标版本：`V0.1 — Internal Validation / 内部技术验证版`
-- 当前实现状态：Web 与 API 技术骨架、类型化 CORS、OpenAPI 生成契约及 Web → API 健康检查已实现并通过真实浏览器手工验收；数据库和群面业务尚未实现
+- 当前实现状态：Web/API 技术骨架、类型化 CORS、OpenAPI 生成契约与 Web → API 健康检查已完成；本地 PostgreSQL 18.4 Compose 基础设施已验证，SQLAlchemy、Alembic、migration 和业务 Schema 尚未建立
 
-> P0-3 已通过第二次独立最终验收并完成；P0 仍在进行中，P0-4 等待明确批准。
+> P0-3、P0-4A 与 P0-4B 已完成；P0 仍在进行中。进入 P0-4C 前需要明确批准 PostgreSQL async driver 与该子步骤。
 
 ## 核心原则摘要
 
@@ -53,7 +54,7 @@ AI 群面训练场让用户无需临时召集真人，即可与具有不同性�
 ├── README.md                    # 仓库入口
 ├── .editorconfig                # 基础文本格式约定
 ├── .gitattributes               # 跨平台文本统一使用 LF
-├── .env.example                 # 环境变量安全说明；当前无业务变量
+├── .env.example                 # 安全的本地环境变量占位说明
 ├── .gitignore                   # 本地文件和敏感文件忽略规则
 ├── package.json                 # 根 pnpm workspace 身份与 Web 委托命令
 ├── pnpm-workspace.yaml          # 当前仅包含 apps/web
@@ -74,6 +75,8 @@ AI 群面训练场让用户无需临时召集真人，即可与具有不同性�
 │       ├── tests/               # 本地确定性后端测试
 │       ├── pyproject.toml        # Python policy、依赖与质量配置
 │       └── uv.lock              # Python 唯一 lockfile
+├── infra/
+│   └── compose.yaml             # PostgreSQL 18.4 本地基础设施
 └── docs/
     ├── PROJECT_MASTER_PLAN.md   # 最高层产品设计基线
     ├── DECISIONS.md             # 产品与技术决策记录
@@ -91,7 +94,7 @@ AI 群面训练场让用户无需临时召集真人，即可与具有不同性�
     └── exec-plans/              # 复杂任务执行计划约定
 ```
 
-数据库、基础设施和业务模块尚不存在；它们只会在对应任务获得明确批准后创建。
+当前基础设施只包含 PostgreSQL。SQLAlchemy、Alembic、数据库 migration 与业务模块只会在对应子步骤获得明确批准后创建。
 
 ## 文档阅读顺序
 
@@ -107,6 +110,27 @@ AI 群面训练场让用户无需临时召集真人，即可与具有不同性�
 如果下层文档或代码与上层依据冲突，先报告冲突并确认决策，不得静默改变产品方向。
 
 ## 如何运行
+
+### 本地 PostgreSQL
+
+先启动 Docker Desktop，在仓库根目录创建被 Git 忽略的 `.env`，只填写 `.env.example` 中的 `POSTGRES_DB`、`POSTGRES_USER` 和本地开发密码。不要提交 `.env`。
+
+启动 PostgreSQL：
+
+```powershell
+docker compose --env-file .env -f infra/compose.yaml up -d postgres
+docker compose --env-file .env -f infra/compose.yaml ps
+```
+
+停止 PostgreSQL 但保留 named volume：
+
+```powershell
+docker compose --env-file .env -f infra/compose.yaml stop postgres
+```
+
+不要使用 `docker compose down -v`；P0-4B 不建立 SQLAlchemy、Alembic 或业务 Schema。
+
+### Web 与 API
 
 要求 Node.js 24 LTS 与 pnpm 11。Windows PowerShell 使用 `.cmd` 入口。先在 API 终端启动 FastAPI：
 
@@ -154,7 +178,7 @@ uv run pyright
 uv run pytest
 ```
 
-当前只实现技术基础和 `GET /health` 连通。数据库、migration 和群面业务功能尚未建立。
+当前实现技术基础、`GET /health` 连通和本地 PostgreSQL Compose。SQLAlchemy、migration 与群面业务功能尚未建立。
 
 ## 贡献规则
 

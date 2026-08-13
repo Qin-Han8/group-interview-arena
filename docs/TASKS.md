@@ -2,9 +2,9 @@
 
 - Status: Active
 - Managed scope: P0 only
-- Current task: P0-3 — DONE
-- Current substep: P0-3F completed
-- Next task: P0-4 awaiting explicit approval
+- Current task: P0-4 — IN_PROGRESS
+- Current substep: P0-4B completed
+- Next substep: P0-4C awaiting explicit approval
 - Allowed status values: `TODO` / `IN_PROGRESS` / `BLOCKED` / `DONE`
 - Related roadmap: [`ROADMAP.md`](ROADMAP.md)
 
@@ -138,14 +138,32 @@
 
 - ID: `P0-4`
 - 名称：数据库与迁移基础
-- Status: `TODO`
-- Approval state：awaiting explicit approval。
+- Status: `IN_PROGRESS`
+- Approval state：P0-4A/P0-4B completed；P0-4C awaiting explicit approval。
 - 目标：依据 P0-2 已批准的技术决策，建立 V0.1 所需的 PostgreSQL 数据库、数据访问层和 migration 基础。
 - In scope：Docker Compose、PostgreSQL 18.x、安全连接配置、SQLAlchemy 2.x、Alembic、最小基础模型、PostgreSQL integration tests 及 migration checks。
 - Out of scope：一次性实现总纲所有未来业务实体或完整会话数据模型。
 - Dependencies：P0-2、P0-3。
 - Implementation guidance：使用明确的 PostgreSQL 18.x 镜像版本，不得使用 `postgres:latest`；不使用 SQLite 替代正式开发/集成路径；Redis 不进入默认 Compose。
 - Acceptance criteria：依据 P0-2 已批准的 PostgreSQL 18.x、SQLAlchemy 2.x 和 Alembic 方案完成可重复验证的迁移基础，真实 PostgreSQL integration/migration checks 通过，环境变量与密钥安全，范围符合 V0.1/P0。
+
+### Substep progress
+
+- `P0-4A — Database implementation preflight and scope freeze`：completed；
+- `P0-4B — Docker Compose + PostgreSQL local infrastructure`：completed；
+- `P0-4C — SQLAlchemy async foundation + typed DB config`：awaiting explicit approval；
+- `P0-4D — Alembic migration foundation + initial schema strategy`：not started；
+- `P0-4E — PostgreSQL integration tests + migration validation + docs`：not started；
+- `P0-4F — Independent final review`：not started。
+
+### P0-4B completion note
+
+- 已建立 `infra/compose.yaml`，唯一 service 为 `postgres`，使用 `postgres:18.4-trixie`；
+- PostgreSQL 18 named volume 挂载至 `/var/lib/postgresql`，host binding 为 `127.0.0.1:5432`；
+- Compose config、official image pull、container health、PostgreSQL `18.4`、开发数据库、`SELECT 1`、named volume 与 restart smoke 均通过；
+- `.env` 保持 Git ignored，Compose 和文档未提交真实 credential；
+- 未创建 SQLAlchemy、Alembic、driver、migration、业务 Schema、Redis 或应用 container；
+- P0-4 保持 `IN_PROGRESS`，P0-4C 等待明确批准，PostgreSQL async driver 尚未决定。
 
 ## P0-5 — 最小身份边界
 

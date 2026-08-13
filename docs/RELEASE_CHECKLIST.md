@@ -17,7 +17,7 @@
 
 ## 当前版本范围
 
-P0-2 技术架构决策与 P0-3 前后端项目骨架已完成。P0-3C Web、P0-3D API、P0-3E connectivity 与 P0-3F independent final review 均为 completed；P0-4 等待明确批准。P0 尚未完成，V0.1 业务能力尚未实现。下方 P0 exit 与产品版本复选框仍表示完整阶段/版本验收，不能由单个子任务替代。
+P0-2 技术架构决策与 P0-3 前后端项目骨架已完成。P0-4A preflight/scope freeze 与 P0-4B PostgreSQL local infrastructure 已完成；P0-4C 等待明确批准。P0 尚未完成，V0.1 业务能力尚未实现。下方 P0 exit 与产品版本复选框仍表示完整阶段/版本验收，不能由单个子任务替代。
 
 ## Implementation guidance
 
@@ -94,7 +94,24 @@ P0-3E 已完成，真实浏览器手工验收为 PASS。本项未执行 Playwrig
 - [x] 真实 `/health`、`/openapi.json`、allowed/disallowed CORS、preflight、OpenAPI drift 与 Web `:3000` HTTP smoke 通过，服务已清理；
 - [x] 文档、scope、public env/secret 与 generated/ignored files 审计通过。
 
-P0-3 已通过第二次独立最终验收并转为 `DONE`。P0 整体仍为 `IN_PROGRESS`；P0-4 仍为 `TODO`，等待明确批准。本项不代表 P0 exit 或 V0.1 业务能力已完成。
+P0-3 已通过第二次独立最终验收并转为 `DONE`。P0 整体仍为 `IN_PROGRESS`；P0-4 当前为 `IN_PROGRESS`，P0-4B 已完成。本项不代表 P0-4、P0 exit 或 V0.1 业务能力已完成。
+
+### P0-4B PostgreSQL local infrastructure verification — 2026-08-13
+
+- [x] Docker Engine/CLI `29.6.2`、Docker Compose `v5.3.1`、`desktop-linux` context 与 Linux daemon 可用；
+- [x] localhost `5432` 在启动前无 listener；
+- [x] PostgreSQL 官方 release 与 Docker Official Image tag 核验为 `18.4` / `postgres:18.4-trixie`；
+- [x] `docker compose --env-file .env -f infra/compose.yaml config` 通过，且只包含 `postgres`；
+- [x] official image pull 成功；
+- [x] container 达到 `healthy`；
+- [x] `SHOW server_version` 返回 PostgreSQL `18.4`；
+- [x] development database 存在且 `SELECT 1` 成功；
+- [x] published port 只绑定 IPv4 loopback `127.0.0.1:5432`；
+- [x] persistence 使用 Docker local named volume，挂载至 `/var/lib/postgresql`；
+- [x] restart 后重新 `healthy` 且 `SELECT 1` 成功；
+- [x] `.env` 保持 Git ignored，tracked 配置和文档没有真实 credential。
+
+这些证据只覆盖已完成的 P0-4B 本地 PostgreSQL infrastructure。SQLAlchemy、Alembic、driver、migration、数据库 integration tests 与业务 Schema 尚未建立；P0-4 保持 `IN_PROGRESS`，P0-4C 等待明确批准。
 
 ## P0 exit
 
