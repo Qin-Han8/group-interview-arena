@@ -17,11 +17,12 @@ AI 群面训练场让用户无需临时召集真人，即可与具有不同性�
   - `P0-3 — 前后端项目骨架`
 - 当前任务：`P0-4 — 数据库与迁移基础（IN_PROGRESS）`
 - 已完成子步骤：`P0-4A — Preflight + scope freeze`、`P0-4B — Docker Compose + PostgreSQL local infrastructure`、`P0-4C — SQLAlchemy async foundation + typed DB config`
-- 下一子步骤：`P0-4D — Alembic migration foundation + initial schema strategy（awaiting explicit approval）`
+- 已完成子步骤：`P0-4D — Alembic migration foundation + zero-op baseline revision（completed）`
+- 下一子步骤：`P0-4E — PostgreSQL integration tests + migration validation + docs（awaiting explicit approval）`
 - 当前目标版本：`V0.1 — Internal Validation / 内部技术验证版`
-- 当前实现状态：Web/API 技术骨架、类型化 CORS、OpenAPI 生成契约与 Web → API 健康检查已完成；本地 PostgreSQL 18.4 Compose 基础设施及 SQLAlchemy async/psycopg 3 底层 factory 已建立，Alembic、migration、业务 Schema 与 FastAPI DB caller 尚未建立
+- 当前实现状态：Web/API 技术骨架、本地 PostgreSQL 18.4、SQLAlchemy async/psycopg 3 底层 factory 与 Alembic async migration foundation 已建立；当前唯一 revision 是不创建业务表的 zero-op baseline，业务 Schema、FastAPI DB caller 与 P0-4E reusable integration test suite 尚未建立
 
-> P0-3、P0-4A、P0-4B 与 P0-4C 已完成。P0 仍在进行中，P0-4D 等待明确批准。
+> P0-3、P0-4A、P0-4B、P0-4C 与 P0-4D 已完成。P0 仍在进行中；P0-4E 等待明确批准。
 
 ## 核心原则摘要
 
@@ -73,7 +74,9 @@ AI 群面训练场让用户无需临时召集真人，即可与具有不同性�
 │       │   ├── core/            # 配置、错误、日志与 request_id
 │       │   ├── db/              # SQLAlchemy Base 与 async engine/session factory
 │       │   └── app.py           # application factory 与模块级 app
+│       ├── migrations/          # Alembic async environment 与 zero-op baseline revision
 │       ├── tests/               # 本地确定性后端测试
+│       ├── alembic.ini          # 不含 credential 的 Alembic 配置
 │       ├── pyproject.toml        # Python policy、依赖与质量配置
 │       └── uv.lock              # Python 唯一 lockfile
 ├── infra/
@@ -95,7 +98,7 @@ AI 群面训练场让用户无需临时召集真人，即可与具有不同性�
     └── exec-plans/              # 复杂任务执行计划约定
 ```
 
-当前数据基础包括 PostgreSQL 18.4、SQLAlchemy 2.0 与 psycopg 3 async runtime primitives；尚无 FastAPI DB caller、Alembic、database migration、业务 table 或业务模块。
+当前数据基础包括 PostgreSQL 18.4、SQLAlchemy 2.0、psycopg 3 async runtime primitives，以及 Alembic 1.18.5 async migration environment 与 zero-op baseline revision；尚无 FastAPI DB caller、业务 table 或业务模块。
 
 ## 文档阅读顺序
 
@@ -132,6 +135,16 @@ docker compose --env-file .env -f infra/compose.yaml stop postgres
 不要使用 `docker compose down -v`；P0-4B 不建立 SQLAlchemy、Alembic 或业务 Schema。
 
 只有代码实际调用 P0-4C DB infrastructure factory 时才需要 server-only `GIA_API_DATABASE_URL`。格式参考 `.env.example` 中的 `postgresql+psycopg://` placeholder；普通 API 启动与 `GET /health` 不加载该配置。
+
+Alembic 命令从 `apps/api` 执行，并与应用共用 server-only `GIA_API_DATABASE_URL`：
+
+```powershell
+uv run alembic heads
+uv run alembic current
+uv run alembic check
+```
+
+`upgrade` 或 `downgrade` 前必须显式配置目标数据库的 `GIA_API_DATABASE_URL` 并核对数据库；不要把 credential 写入 `alembic.ini` 或文档，也不要对开发数据库随意执行 `downgrade`。API 启动不会自动运行 migration。
 
 ### Web 与 API
 
@@ -181,7 +194,7 @@ uv run pyright
 uv run pytest
 ```
 
-当前实现技术基础、`GET /health` 连通、本地 PostgreSQL Compose，以及尚未接入 app runtime 的 SQLAlchemy async/psycopg 3 factory。Alembic、migration、业务 Schema 与群面业务功能尚未建立。
+当前实现技术基础、`GET /health` 连通、本地 PostgreSQL Compose、尚未接入 app runtime 的 SQLAlchemy async/psycopg 3 factory，以及 Alembic zero-op migration baseline。业务 Schema 与群面业务功能尚未建立。
 
 ## 贡献规则
 

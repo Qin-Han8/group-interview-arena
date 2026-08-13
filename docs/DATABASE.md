@@ -5,13 +5,14 @@
 - Data architecture baseline established by: P0-2 — DONE
 - Local PostgreSQL infrastructure: P0-4B — completed
 - SQLAlchemy async foundation: P0-4C — completed
+- Alembic migration foundation: P0-4D — completed
 - Target version: V0.1 Internal Validation
-- Business schema and migrations: Not started
+- Business schema: Not started
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
 
-本文件记录 P0-2 已批准的数据技术基线、数据边界和 P0-4 实施状态。P0-4B 已建立本地 PostgreSQL infrastructure；P0-4C 已建立 SQLAlchemy async/psycopg 3 底层 factory。当前仍不建立业务表、不冻结 V0.1 实体集合，Alembic 与 migration 尚未创建。
+本文件记录 P0-2 已批准的数据技术基线、数据边界和 P0-4 实施状态。P0-4B 已建立本地 PostgreSQL infrastructure；P0-4C 已建立 SQLAlchemy async/psycopg 3 底层 factory；P0-4D 已建立 Alembic async migration foundation 与 zero-op baseline revision。当前仍不建立业务表，也不冻结 V0.1 实体集合。
 
 正式决策见 [`DECISIONS.md`](DECISIONS.md) `ADR-005`、`ADR-010`、`ADR-013`。
 
@@ -43,7 +44,7 @@
 - configuration：Compose 显式 interpolation `POSTGRES_DB`、`POSTGRES_USER`、`POSTGRES_PASSWORD`，真实值只存在于被 Git ignore 的本地 `.env`；
 - verified：Compose config、image pull、healthy、开发数据库、`SELECT 1`、mount inspection 与 restart smoke。
 
-当前没有 Redis、Alembic、migration 或业务 Schema。
+当前没有 Redis 或业务 Schema；Alembic migration history 只包含 zero-op baseline。
 
 ## P0-4C implemented async foundation
 
@@ -55,7 +56,20 @@
 - lifecycle：仅提供显式 `await engine.dispose()` 的薄 helper；尚无 FastAPI DB dependency、app lifespan 或启动连接；
 - verification：14 项新增 DB foundation unit tests 不连接 PostgreSQL；真实 integration/migration tests 尚未执行。
 
-Alembic 与 migration foundation 仍待 P0-4D，隔离的真实 PostgreSQL integration/migration tests 仍待 P0-4E。
+P0-4E reusable PostgreSQL integration test suite 等待明确批准。
+
+## P0-4D implemented migration foundation
+
+- dependency：Alembic `1.18.5`，constraint 为 `>=1.18.5,<1.19`，只位于 development dependency group；
+- configuration：`apps/api/alembic.ini` 不保存 database URL 或 credential；`apps/api/migrations/env.py` 通过现有 `DatabaseSettings` 读取 server-only `GIA_API_DATABASE_URL`；
+- runtime：只接受 `postgresql+psycopg`，使用 migration-specific `AsyncEngine`、`connection.run_sync(...)` 与 `NullPool`；Windows 使用 selector event loop 以兼容 psycopg async；
+- metadata：`target_metadata = Base.metadata`，当前 business table count 为 `0`；
+- history：唯一 head `7c6ccd86b3c5`（`establish database baseline`），`down_revision = None`，`upgrade()`/`downgrade()` 均为 zero-op，不含业务 DDL；
+- runtime smoke：只在随机 `gia_p04d_*` 临时 PostgreSQL database 上执行 fresh upgrade、重复 upgrade、`current --check-heads`、`alembic check`、downgrade base 与 re-upgrade，均通过；head 状态下只产生 Alembic 自身的 `alembic_version` table，business table count 为 `0`；
+- isolation：未迁移 development database；临时数据库已精确删除，development database `SELECT 1` 回归通过；
+- lifecycle：API startup 不自动执行 migration，现有 `/health` 仍不加载数据库配置。
+
+上述真实 PostgreSQL 操作是 P0-4D migration runtime smoke，不是 P0-4E reusable integration test suite。
 
 ## Rejected paths
 
@@ -124,7 +138,7 @@ P0-4 不运行 Redis，不创建未来完整业务 Schema，也不提前实现�
 
 ## Future work
 
-- P0-4D～P0-4F：建立 Alembic/migration 与真实 PostgreSQL integration/migration checks；
+- P0-4E～P0-4F：建立 reusable PostgreSQL integration tests 并完成独立审查；
 - P1：按文字讨论闭环实现最小题目、角色、会话、事件、记忆和报告数据；
 - P2～P4：仅随获批范围增加音频、评分训练和商业化数据。
 

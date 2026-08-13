@@ -1,0 +1,4 @@
+Async single-database migrations for Group Interview Arena.
+
+The migration environment reads the server-only GIA_API_DATABASE_URL through
+the API's DatabaseSettings. No database credentials belong in alembic.ini.

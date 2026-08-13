@@ -17,7 +17,7 @@
 
 ## 当前版本范围
 
-P0-2 技术架构决策与 P0-3 前后端项目骨架已完成。P0-4A preflight/scope freeze、P0-4B PostgreSQL local infrastructure 与 P0-4C SQLAlchemy async foundation 已完成；P0-4D 等待明确批准。P0 尚未完成，V0.1 业务能力尚未实现。下方 P0 exit 与产品版本复选框仍表示完整阶段/版本验收，不能由单个子任务替代。
+P0-2 技术架构决策与 P0-3 前后端项目骨架已完成。P0-4A preflight/scope freeze、P0-4B PostgreSQL local infrastructure、P0-4C SQLAlchemy async foundation 与 P0-4D Alembic migration foundation 已完成；P0-4E 等待明确批准。P0 尚未完成，V0.1 业务能力尚未实现。下方 P0 exit 与产品版本复选框仍表示完整阶段/版本验收，不能由单个子任务替代。
 
 ## Implementation guidance
 
@@ -125,7 +125,22 @@ P0-3 已通过第二次独立最终验收并转为 `DONE`。P0 整体仍为 `IN_
 - [x] `GIA_API_DATABASE_URL` lazy/server-only SecretStr、driver boundary、URL redaction、DeclarativeBase/naming、空 metadata、async engine/session 与 dispose behavior 已验证；
 - [x] 现有 app startup 与 `GET /health` 在无数据库 URL 时保持不变。
 
-这些证据只覆盖已完成的 P0-4C SQLAlchemy async foundation，且测试未连接 PostgreSQL，不是 integration tests。当前没有 Alembic、migration、业务 table/model、FastAPI DB dependency 或 app DB lifecycle；P0-4D 等待明确批准。
+这些证据只覆盖已完成的 P0-4C SQLAlchemy async foundation，且测试未连接 PostgreSQL，不是 integration tests。当时尚无 Alembic/migration；当前后续状态见下方 P0-4D verification。业务 table/model、FastAPI DB dependency 与 app DB lifecycle 仍未建立。
+
+### P0-4D Alembic migration foundation verification — 2026-08-13
+
+- [x] Alembic `1.18.5` 只加入 development dependency group，frozen sync 与 lock check 通过；
+- [x] `alembic.ini`、async `migrations/env.py`、template、README 与 versions 目录已建立，配置不保存 credential；
+- [x] migration runtime 与 application DB config 共用 server-only `GIA_API_DATABASE_URL`，只接受 `postgresql+psycopg`；
+- [x] `target_metadata` 使用 `Base.metadata`，migration engine 使用 `AsyncEngine`、`connection.run_sync(...)` 与 `NullPool`；
+- [x] 唯一 head `7c6ccd86b3c5` 是 zero-op baseline，upgrade/downgrade 均无业务 DDL；
+- [x] fresh 隔离临时 PostgreSQL database upgrade 到 head、重复 upgrade、`current --check-heads` 与 `alembic check` 通过；
+- [x] downgrade base、re-upgrade 与最终 `alembic check` 通过；
+- [x] head 状态只存在 Alembic 自身的 `alembic_version`，business table count 为 `0`；
+- [x] 临时数据库已精确删除；development database 未迁移、仍存在且 `SELECT 1` 通过；
+- [x] Ruff、format check、Pyright 与 35 项 pytest 通过，其中 4 项为 migration static/unit tests。
+
+这些证据是 P0-4D migration runtime smoke，不是 P0-4E reusable PostgreSQL integration test suite。P0-4D 已完成；P0-4E 等待明确批准。
 
 ## P0 exit
 

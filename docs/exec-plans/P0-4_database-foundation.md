@@ -11,7 +11,8 @@
 - Source of Truth：[`../PROJECT_MASTER_PLAN.md`](../PROJECT_MASTER_PLAN.md)、[`../DECISIONS.md`](../DECISIONS.md)、[`../TASKS.md`](../TASKS.md)、[`../DATABASE.md`](../DATABASE.md)。
 - 当前已完成子步骤：`P0-4B — Docker Compose + PostgreSQL local infrastructure`。
 - 当前已完成子步骤：`P0-4C — SQLAlchemy async foundation + typed DB config`。
-- 下一子步骤：`P0-4D — Alembic migration foundation + initial schema strategy`，awaiting explicit approval。
+- 当前已完成子步骤：`P0-4D — Alembic migration foundation + zero-op baseline revision`。
+- 下一子步骤：`P0-4E — PostgreSQL integration tests + migration validation + docs`，awaiting explicit approval。
 
 ## Scope
 
@@ -58,7 +59,7 @@
 1. `P0-4A`：完成 Git、总纲、文档、Docker 与端口预检，冻结范围。
 2. `P0-4B`：建立只含 PostgreSQL 的 Compose，验证 image、health、版本、数据库、named volume 与 restart smoke。
 3. `P0-4C`：使用 scoped psycopg 3 driver decision 建立 SQLAlchemy async 与 typed DB config；已完成。
-4. `P0-4D`：建立 Alembic async environment 与不创建业务表的 migration baseline。
+4. `P0-4D`：建立 Alembic async environment 与不创建业务表的 migration baseline；已完成。
 5. `P0-4E`：在隔离的真实 PostgreSQL test DB 完成 integration/migration checks，并同步文档。
 6. `P0-4F`：独立复核范围、实现、迁移、安全、测试证据与文档一致性。
 
@@ -75,7 +76,7 @@ P0-4B 要求：
 - restart 后重新 healthy 且 `SELECT 1` 成功；
 - `git diff --check`、scope audit、secret audit 与总纲 hash 检查。
 
-P0-4D～P0-4E 的 Alembic 与 integration/migration checks 只在对应子步骤获批后执行。
+P0-4D 的隔离 migration runtime smoke 已完成；P0-4E reusable integration/migration test suite 仍只在获得明确批准后执行。
 
 ## Decisions
 
@@ -96,7 +97,8 @@ P0-4D～P0-4E 的 Alembic 与 integration/migration checks 只在对应子步骤
 - 2026-08-13：`P0-4A` completed，预检与范围冻结通过。
 - 2026-08-13：`P0-4B` completed；PostgreSQL-only Compose、official image pull、healthy、18.4 server、开发数据库、`SELECT 1`、named volume、restart smoke 与 IPv4 loopback binding 已验证，最终 diff 审核通过。
 - 2026-08-13：`P0-4C` completed；resolved SQLAlchemy `2.0.52`、psycopg/psycopg-binary `3.3.4`，已创建 `db/__init__.py`、`db/base.py`、`db/runtime.py`，31 项 API 测试通过（14 项新增 DB foundation unit tests），最终源码/diff 审核通过。
-- 当前下一步：P0-4D 等待明确批准。
+- 2026-08-13：`P0-4D` completed；resolved Alembic `1.18.5`，建立 async migration environment 与唯一 zero-op baseline head `7c6ccd86b3c5`。隔离临时 PostgreSQL database 的 upgrade/repeat/check/downgrade/re-upgrade smoke 通过，business table count 为 `0`，临时数据库已清理，development database 未迁移且回归通过，最终源码与 migration foundation 审核通过。
+- 当前下一步：P0-4E awaiting explicit approval。
 
 ## Deviations
 
@@ -104,10 +106,12 @@ P0-4D～P0-4E 的 Alembic 与 integration/migration checks 只在对应子步骤
 - 首次组合只读 SQL 命令因 PowerShell 到容器的引号传递失败，未执行 DDL；改用参数化的 `psql -c` 调用后，所有查询通过。
 - P0-4C 首次 `uv add` 在 workspace sandbox 中因网络访问限制失败；经用户批准仅放行 `uv add` 访问 PyPI 后成功，未扩大文件系统权限。
 - P0-4C 首轮质量检查发现 import order、Pyright 对环境注入必填 field 的静态建模和显式 `echo=False` 断言问题；均已最小修正，最终全门通过。
+- P0-4D 首次 `uv add` 在 sandbox 中因 network restriction 失败；按已批准的 scoped `uv add --dev` 权限访问 PyPI 后成功，未扩大文件系统权限。
+- P0-4D 前两次 migration smoke 在运行 Alembic 前分别暴露 PowerShell URL scalar 解析问题与 Windows Proactor event loop 不兼容；相应临时数据库均由精确 `finally` cleanup 删除。migration environment 最小改用 selector event loop 后，第三次 Alembic upgrade 已通过；随后修正仅用于验证的 catalog scalar 解析并用新临时数据库完成全部闭环。没有迁移 development database。
 
 ## Verification evidence
 
-- Git baseline：`main`、clean、HEAD `261e6930c2fd87cc49968ca5a7f32a1ffb78b6c6`；
+- P0-4D Git baseline：`main`、clean、HEAD `bd534f1`；
 - `PROJECT_MASTER_PLAN.md` SHA-256：`2388A9660320406CB35D5354126AD71C6849A98DB7C4A356796CA951BF372F26`；
 - Docker Engine/CLI：`29.6.2`；Compose：`v5.3.1`；context：`desktop-linux`；
 - P0-4B 开始前 localhost `5432` 无 listener；
@@ -120,3 +124,8 @@ P0-4D～P0-4E 的 Alembic 与 integration/migration checks 只在对应子步骤
 - P0-4C dependency resolution：SQLAlchemy `2.0.52`、psycopg/psycopg-binary `3.3.4`，无 prerelease；
 - P0-4C quality：`uv sync --frozen`、`uv lock --check`、Ruff lint/format、Pyright 与 31 项 pytest 全部通过；
 - P0-4C security/scope：数据库 URL 由 SecretStr 保护，未记录 credential；metadata table count 为 0；无 Alembic、migration、业务 model、FastAPI DB caller 或真实 PostgreSQL integration test。
+- P0-4D dependency/config：Alembic `1.18.5` 仅在 dev dependency group；`alembic.ini` 不含 URL/credential；runtime 由 `DatabaseSettings` 读取 `GIA_API_DATABASE_URL`。
+- P0-4D revision：唯一 head `7c6ccd86b3c5`，`down_revision = None`，upgrade/downgrade zero-op，business DDL count 为 `0`。
+- P0-4D runtime：随机 `gia_p04d_*` 临时 PostgreSQL database 上 fresh upgrade、repeat upgrade、`current --check-heads`、两次 `alembic check`、downgrade base 与 re-upgrade 全部通过；business table count 始终为 `0`。
+- P0-4D cleanup/regression：临时数据库不存在；development database 存在、未迁移且 `SELECT 1` 通过；PostgreSQL container 与 named volume 保留。
+- P0-4D quality：`uv sync --frozen`、`uv lock --check`、Ruff lint/format、Pyright 与 35 项 pytest 全部通过（4 项新增 migration static/unit tests）。
