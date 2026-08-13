@@ -3,6 +3,8 @@
 - Status: P0 Architecture Baseline
 - Current phase: P0
 - Architecture baseline established by: P0-2 — DONE
+- P0-3 foundation status: DONE
+- Next task: P0-4 awaiting explicit approval
 - Target version: V0.1 Internal Validation
 - Business architecture detail: Incremental from P1
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
@@ -105,9 +107,9 @@ PostgreSQL 18.x via Docker Compose remains planned for P0-4.
 
 本地 browser origin 必须通过 `GIA_API_CORS_ORIGINS` 显式加入 allowlist；缺省为空，不允许跨源。`NEXT_PUBLIC_API_BASE_URL` 是公开浏览器 base URL，不是 secret。Web 直接请求 FastAPI，不建立 Next.js Route Handler proxy。
 
-### P0-3
+### P0-3 — completed
 
-只建立：
+已建立并通过独立最终验收：
 
 - Web skeleton；
 - API skeleton；
@@ -208,7 +210,6 @@ Redis 只在多 API workers、横向扩容、跨进程 WebSocket broadcast、dis
 
 ## Future work
 
-- P0-3F：执行 P0-3 独立最终审查，不新增业务能力；
 - P0-4：创建 PostgreSQL 数据与 migration 基础；
 - P0-5：落实内部 V0.1 最小身份边界；
 - P0-6：建立 CI 和基础可观测性；

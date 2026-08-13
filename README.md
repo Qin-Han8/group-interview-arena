@@ -14,13 +14,13 @@ AI 群面训练场让用户无需临时召集真人，即可与具有不同性�
 - 已完成任务：
   - `P0-1 — 仓库与文档治理`
   - `P0-2 — 技术架构决策`
-- 当前任务：`P0-3 — 前后端项目骨架（IN_PROGRESS）`
-- 已完成子步骤：`P0-3C — Root workspace + Web skeleton`、`P0-3D — API skeleton`、`P0-3E — Connectivity + quality gates + docs`
-- 后续子步骤：`P0-3F — Independent final review（awaiting explicit approval）`
+  - `P0-3 — 前后端项目骨架`
+- 已完成子步骤：`P0-3C — Root workspace + Web skeleton`、`P0-3D — API skeleton`、`P0-3E — Connectivity + quality gates + docs`、`P0-3F — Independent final review`
+- 下一任务：`P0-4 — 数据库与迁移基础（awaiting explicit approval）`
 - 当前目标版本：`V0.1 — Internal Validation / 内部技术验证版`
 - 当前实现状态：Web 与 API 技术骨架、类型化 CORS、OpenAPI 生成契约及 Web → API 健康检查已实现并通过真实浏览器手工验收；数据库和群面业务尚未实现
 
-> P0-3E 已完成并通过真实浏览器手工验收；P0-3 整体仍在进行中，P0-3F 等待明确批准。
+> P0-3 已通过第二次独立最终验收并完成；P0 仍在进行中，P0-4 等待明确批准。
 
 ## 核心原则摘要
 

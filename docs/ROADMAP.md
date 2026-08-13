@@ -2,8 +2,9 @@
 
 - Status: Active baseline
 - Current development phase: P0 — 项目基础
-- Current task: P0-3 — IN_PROGRESS
-- Current substep: P0-3F awaiting explicit approval
+- Current task: P0-3 — DONE
+- Current substep: P0-3F completed
+- Next task: P0-4 awaiting explicit approval
 - Target product version: V0.1 — Internal Validation
 - Source: [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) §30–31
 
@@ -38,13 +39,13 @@
 |---|---|---|
 | P0-1 仓库与文档治理 | 建立 Source of Truth、长期上下文、任务和决策治理 | DONE |
 | P0-2 技术架构决策 | 确认技术选择、模块边界和必要 ADR | DONE |
-| P0-3 前后端项目骨架 | 创建最小 Web/API skeleton、工具链、健康检查、基础配置与日志、基础测试及 Web → API 连通；不包含数据库 | IN_PROGRESS |
+| P0-3 前后端项目骨架 | 创建最小 Web/API skeleton、工具链、健康检查、基础配置与日志、基础测试及 Web → API 连通；不包含数据库 | DONE |
 | P0-4 数据库与迁移基础 | 使用 Docker Compose、PostgreSQL 18.x、SQLAlchemy 2.x 和 Alembic 建立数据与 migration 基础及数据库集成验证 | TODO |
 | P0-5 最小身份边界 | 建立 V0.1 所需身份边界，不做完整公开账号产品 | TODO |
 | P0-6 CI、日志与基础可观测性 | 建立自动检查、日志和基础监控能力 | TODO |
 | P0-7 P0 独立验收 | 独立确认 P0 是否满足进入 P1 的条件 | TODO |
 
-任务细节及验收条件见 [`TASKS.md`](TASKS.md)。P0-3C Web skeleton、P0-3D API skeleton 与 P0-3E connectivity 已完成，P0-3E 真实浏览器手工验收为 PASS；P0-3 整体保持 `IN_PROGRESS`，P0-3F 仍等待明确批准。
+任务细节及验收条件见 [`TASKS.md`](TASKS.md)。P0-3C Web skeleton、P0-3D API skeleton、P0-3E connectivity 与 P0-3F independent final review 均已完成；P0-3 已通过第二次独立最终验收并转为 `DONE`。P0 整体保持 `IN_PROGRESS`，P0-4 仍为 `TODO` 并等待明确批准。
 
 P0-2 已 Accepted PostgreSQL、SQLAlchemy 2.x 和 Alembic；P0-4 实施基线为 PostgreSQL 18.x，且 Redis 不进入默认 Compose。完整决策和重新评估条件见 [`DECISIONS.md`](DECISIONS.md)。
 

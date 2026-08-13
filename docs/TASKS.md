@@ -2,8 +2,9 @@
 
 - Status: Active
 - Managed scope: P0 only
-- Current task: P0-3 — IN_PROGRESS
-- Current substep: P0-3F awaiting explicit approval
+- Current task: P0-3 — DONE
+- Current substep: P0-3F completed
+- Next task: P0-4 awaiting explicit approval
 - Allowed status values: `TODO` / `IN_PROGRESS` / `BLOCKED` / `DONE`
 - Related roadmap: [`ROADMAP.md`](ROADMAP.md)
 
@@ -85,7 +86,7 @@
 
 - ID: `P0-3`
 - 名称：前后端项目骨架
-- Status: `IN_PROGRESS`
+- Status: `DONE`
 - 目标：依据 P0-2 的 Accepted 决策建立最小 Web/API 及本地开发骨架。
 - In scope：`apps/web` 与 `apps/api` skeleton、Node.js 24 LTS/pnpm、CPython 3.14/uv、健康检查、Web → API connectivity、基础配置、structured logging baseline、backend unit/API tests、frontend unit/component smoke tests 及 lint/type/build。
 - Out of scope：PostgreSQL、Docker Compose、SQLAlchemy、Alembic、Redis、WebSocket 业务通道、Provider 实现、群面页面、AI、状态机、评分、语音、支付及完整账号产品。
@@ -99,7 +100,7 @@
 - `P0-3C — Root workspace + Web skeleton`：completed；
 - `P0-3D — API skeleton`：completed；
 - `P0-3E — Connectivity + quality gates + docs`：completed；
-- `P0-3F — Independent final review`：awaiting explicit approval。
+- `P0-3F — Independent final review`：completed。
 
 ### P0-3C completion note
 
@@ -124,13 +125,21 @@
 - 已实现 Web public base URL 校验与一次性 `HealthStatus` 连通状态，未建立 Next.js proxy、轮询或业务 UI；
 - 已通过 API/Web 全部质量检查、contract drift check、真实 CORS headers 与双服务 HTTP 200 smoke；
 - 用户已在真实浏览器确认首页显示“API 状态：已连接”、直接访问 `/health` 返回 `200` 与精确 JSON、CORS 和 `X-Request-ID` 正常，且 Console 无相关运行时或 CORS 错误；该手工验收为 PASS，未执行 Playwright、E2E 或其他浏览器自动化；
-- P0-3E 已完成；P0-3 整体仍为 `IN_PROGRESS`，P0-3F 等待明确批准，不得自动进入。
+- P0-3E 完成当时，P0-3 整体仍为 `IN_PROGRESS`，P0-3F 等待明确批准，不得自动进入。
+
+### P0-3F completion note
+
+- 第二次独立最终验收已从 clean HEAD 重新执行完整 Git、治理、工具链、结构、依赖、Web/API 质量门、真实 HTTP/CORS/OpenAPI smoke、契约漂移、范围、安全与生成物检查；
+- ADR-007 的 OpenAPI tooling 治理 blocker 已确认解决，FastAPI OpenAPI 仍是 REST contract 的 Source of Truth，WebSocket schema tooling 仍 Deferred 到 P1；
+- Web 8 项测试与 API 17 项测试通过，双服务验证后端口已清理，最终实现基线保持 clean；
+- P0-3 已完成并转为 `DONE`；P0 整体仍为 `IN_PROGRESS`，P0-4 保持 `TODO` 并等待明确批准。
 
 ## P0-4 — 数据库与迁移基础
 
 - ID: `P0-4`
 - 名称：数据库与迁移基础
 - Status: `TODO`
+- Approval state：awaiting explicit approval。
 - 目标：依据 P0-2 已批准的技术决策，建立 V0.1 所需的 PostgreSQL 数据库、数据访问层和 migration 基础。
 - In scope：Docker Compose、PostgreSQL 18.x、安全连接配置、SQLAlchemy 2.x、Alembic、最小基础模型、PostgreSQL integration tests 及 migration checks。
 - Out of scope：一次性实现总纲所有未来业务实体或完整会话数据模型。

@@ -17,7 +17,7 @@
 
 ## 当前版本范围
 
-P0-2 技术架构决策已完成；P0-3 当前为 `IN_PROGRESS`。P0-3C Web、P0-3D API 技术骨架与 P0-3E connectivity 已完成；P0-3F 独立最终审查等待明确批准。P0 尚未完成，V0.1 业务能力尚未实现。下方 P0 exit 与产品版本复选框仍表示完整阶段/版本验收，不能由单个子步骤替代。
+P0-2 技术架构决策与 P0-3 前后端项目骨架已完成。P0-3C Web、P0-3D API、P0-3E connectivity 与 P0-3F independent final review 均为 completed；P0-4 等待明确批准。P0 尚未完成，V0.1 业务能力尚未实现。下方 P0 exit 与产品版本复选框仍表示完整阶段/版本验收，不能由单个子任务替代。
 
 ## Implementation guidance
 
@@ -84,6 +84,17 @@ Web 与 contract：
 - [x] 浏览器 Console 未发现与本次功能相关的运行时或 CORS 错误。
 
 P0-3E 已完成，真实浏览器手工验收为 PASS。本项未执行 Playwright、E2E 或其他浏览器自动化；这些证据不代表数据库、WebSocket、业务能力、CI、P0-3F 或 P0 exit 已通过。
+
+### P0-3F independent final verification — 2026-08-13
+
+- [x] 从当前 clean `main` HEAD 重新验证 Git、总纲 hash、工具链、仓库结构、lockfile、依赖范围及 Web/API 静态架构；
+- [x] ADR-007 OpenAPI tooling blocker 已解决，REST Source of Truth、派生 contract 与 WebSocket Deferred 边界一致；
+- [x] Web frozen install、lint、typecheck、8 项测试、format check 与 production build 通过；
+- [x] API frozen sync、lock check、Ruff lint/format、Pyright、17 项 pytest、package/app import 通过；
+- [x] 真实 `/health`、`/openapi.json`、allowed/disallowed CORS、preflight、OpenAPI drift 与 Web `:3000` HTTP smoke 通过，服务已清理；
+- [x] 文档、scope、public env/secret 与 generated/ignored files 审计通过。
+
+P0-3 已通过第二次独立最终验收并转为 `DONE`。P0 整体仍为 `IN_PROGRESS`；P0-4 仍为 `TODO`，等待明确批准。本项不代表 P0 exit 或 V0.1 业务能力已完成。
 
 ## P0 exit
 
