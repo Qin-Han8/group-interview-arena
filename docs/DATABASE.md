@@ -7,13 +7,15 @@
 - SQLAlchemy async foundation: P0-4C — completed
 - Alembic migration foundation: P0-4D — completed
 - PostgreSQL integration test foundation: P0-4E — completed
+- Independent final review: P0-4F — completed
+- P0-4 database foundation: DONE
 - Target version: V0.1 Internal Validation
 - Business schema: Not started
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
 
-本文件记录 P0-2 已批准的数据技术基线、数据边界和 P0-4 实施状态。P0-4B 已建立本地 PostgreSQL infrastructure；P0-4C 已建立 SQLAlchemy async/psycopg 3 底层 factory；P0-4D 已建立 Alembic async migration foundation 与 zero-op baseline revision。当前仍不建立业务表，也不冻结 V0.1 实体集合。
+本文件记录 P0-2 已批准的数据技术基线、数据边界和 P0-4 完成状态。P0-4B 已建立本地 PostgreSQL infrastructure；P0-4C 已建立 SQLAlchemy async/psycopg 3 底层 factory；P0-4D 已建立 Alembic async migration foundation 与 zero-op baseline revision；P0-4E 已建立隔离的真实 PostgreSQL integration/migration test foundation；P0-4F 已完成独立最终验收。当前仍未建立业务表，也未冻结 V0.1 实体集合。
 
 正式决策见 [`DECISIONS.md`](DECISIONS.md) `ADR-005`、`ADR-010`、`ADR-013`。
 
@@ -93,9 +95,9 @@ P0-4E reusable PostgreSQL integration test suite 已完成。
 
 只有未来测量结果证明 UUIDv7 或双 ID 体系有实际收益时，才能提出新的技术决策。
 
-## P0-4 implementation scope
+## P0-4 completed implementation scope
 
-P0-4 将依据 Accepted ADR 建立：
+P0-4 已依据 Accepted ADR 建立：
 
 - Docker Compose；
 - PostgreSQL 18.x service；
@@ -106,7 +108,7 @@ P0-4 将依据 Accepted ADR 建立：
 - PostgreSQL integration tests；
 - migration checks。
 
-P0-4 不运行 Redis，不创建未来完整业务 Schema，也不提前实现支付、语音、成长或 V0.5/V1.0 实体。
+P0-4F 已独立确认上述基础的实现、运行态与质量门均通过。P0-4 不运行 Redis，不创建未来完整业务 Schema，也不提前实现支付、语音、成长或 V0.5/V1.0 实体。
 
 ## Confirmed data principles from master plan
 
@@ -150,7 +152,6 @@ P0-4 不运行 Redis，不创建未来完整业务 Schema，也不提前实现�
 
 ## Future work
 
-- P0-4F：独立审查 P0-4 database foundation；
 - P1：按文字讨论闭环实现最小题目、角色、会话、事件、记忆和报告数据；
 - P2～P4：仅随获批范围增加音频、评分训练和商业化数据。
 

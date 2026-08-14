@@ -15,15 +15,13 @@ AI 群面训练场让用户无需临时召集真人，即可与具有不同性�
   - `P0-1 — 仓库与文档治理`
   - `P0-2 — 技术架构决策`
   - `P0-3 — 前后端项目骨架`
-- 当前任务：`P0-4 — 数据库与迁移基础（IN_PROGRESS）`
-- 已完成子步骤：`P0-4A — Preflight + scope freeze`、`P0-4B — Docker Compose + PostgreSQL local infrastructure`、`P0-4C — SQLAlchemy async foundation + typed DB config`
-- 已完成子步骤：`P0-4D — Alembic migration foundation + zero-op baseline revision（completed）`
-- 当前子步骤：`P0-4E — PostgreSQL integration tests + migration validation + docs（completed）`
-- 下一子步骤：`P0-4F — Independent final review（awaiting explicit approval）`
+  - `P0-4 — 数据库与迁移基础`
+- 已完成子步骤：`P0-4A`、`P0-4B`、`P0-4C`、`P0-4D`、`P0-4E`、`P0-4F`
+- 下一任务：`P0-5 — 最小身份边界（awaiting explicit approval）`
 - 当前目标版本：`V0.1 — Internal Validation / 内部技术验证版`
 - 当前实现状态：Web/API 技术骨架、本地 PostgreSQL 18.4、SQLAlchemy async/psycopg 3 底层 factory、Alembic async migration foundation 与逐测试隔离的 reusable PostgreSQL integration test harness 已建立；当前唯一 revision 是不创建业务表的 zero-op baseline，业务 Schema 与 FastAPI DB caller 尚未建立
 
-> P0-3、P0-4A、P0-4B、P0-4C、P0-4D 与 P0-4E 已完成。P0 仍在进行中；P0-4F 等待明确批准。
+> P0-4 已通过独立最终验收并转为 `DONE`。P0 仍在进行中；P0-5 等待明确批准。
 
 ## 核心原则摘要
 

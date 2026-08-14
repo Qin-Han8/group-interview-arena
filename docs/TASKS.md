@@ -2,9 +2,9 @@
 
 - Status: Active
 - Managed scope: P0 only
-- Current task: P0-4 — IN_PROGRESS
-- Current substep: P0-4E completed
-- Next substep: P0-4F awaiting explicit approval
+- Current task: P0-4 — DONE
+- Current substep: P0-4F completed
+- Next task: P0-5 awaiting explicit approval
 - Allowed status values: `TODO` / `IN_PROGRESS` / `BLOCKED` / `DONE`
 - Related roadmap: [`ROADMAP.md`](ROADMAP.md)
 
@@ -138,8 +138,8 @@
 
 - ID: `P0-4`
 - 名称：数据库与迁移基础
-- Status: `IN_PROGRESS`
-- Approval state：P0-4A/P0-4B/P0-4C/P0-4D/P0-4E completed；P0-4F awaiting explicit approval。
+- Status: `DONE`
+- Approval state：P0-4A/P0-4B/P0-4C/P0-4D/P0-4E/P0-4F completed。
 - 目标：依据 P0-2 已批准的技术决策，建立 V0.1 所需的 PostgreSQL 数据库、数据访问层和 migration 基础。
 - In scope：Docker Compose、PostgreSQL 18.x、安全连接配置、SQLAlchemy 2.x、Alembic、最小基础模型、PostgreSQL integration tests 及 migration checks。
 - Out of scope：一次性实现总纲所有未来业务实体或完整会话数据模型。
@@ -154,7 +154,7 @@
 - `P0-4C — SQLAlchemy async foundation + typed DB config`：completed；
 - `P0-4D — Alembic migration foundation + zero-op baseline revision`：completed；
 - `P0-4E — PostgreSQL integration tests + migration validation + docs`：completed；
-- `P0-4F — Independent final review`：awaiting explicit approval。
+- `P0-4F — Independent final review`：completed。
 
 ### P0-4B completion note
 
@@ -172,7 +172,7 @@
 - 已建立 `DeclarativeBase`、稳定 naming convention、async engine/session factory 与显式 dispose helper；没有 global engine 或 app lifecycle 接入；
 - 31 项 API 测试通过，其中 14 项为新增 DB foundation unit tests；这些测试不连接 PostgreSQL，不是 integration tests；
 - 当前 metadata table count 为 0；未加入 Alembic、migration、业务 ORM model、FastAPI DB dependency 或业务 Schema；
-- P0-4C、P0-4D 与 P0-4E 已完成；P0-4F 等待明确批准。
+- P0-4C、P0-4D、P0-4E 与 P0-4F 均已完成。
 
 ### P0-4D implementation note
 
@@ -189,13 +189,22 @@
 - 真实验证 AsyncEngine、AsyncSession、PostgreSQL major 18、commit 与 rollback；test-only probe table 不属于 product schema；
 - programmatic Alembic tests 覆盖 fresh → head、repeat upgrade、drift check、downgrade base、re-upgrade 与 final check，business table count 始终为 `0`；
 - unit suite 35 项、integration suite 11 项（skipped 0）、full suite 46 项全部通过；development database 未迁移，`SELECT 1` 通过且无 `alembic_version`；临时数据库残留为 0；
-- 未新增 dependency，`uv.lock` 与 baseline revision 均未改变；P0-4E 已完成，P0-4F 等待明确批准。
+- 未新增 dependency，`uv.lock` 与 baseline revision 均未改变；本段只记录 P0-4E 证据，P0-4F 的独立验收结果见下方 completion note。
+
+### P0-4F completion note
+
+- 从 clean `main` HEAD `622170f9f1cae0d6ad7492d4134564001b030713` 独立复核 P0-4，不沿用此前子步骤 PASS 作为替代证据；
+- 总纲 SHA-256、Git history、Docker/PostgreSQL/Compose runtime、loopback binding、named volume、secret/dependency 边界、SQLAlchemy/Alembic 静态架构、单一 zero-op revision 与 integration harness safety 全部通过；
+- unit suite 35 项、integration suite 11 项（skipped 0）、full suite 46 项通过；frozen sync、lock check、Ruff、format、Pyright 与 Alembic heads 通过；
+- development database 保持未迁移、无 `alembic_version`、public table count 为 `0` 且 `SELECT 1` 通过；`gia_p04e_%` 残留为 `0`；
+- 未修改被审计实现、测试、依赖、Compose 或 migration；P0-4 已转为 `DONE`，P0-5 等待明确批准。
 
 ## P0-5 — 最小身份边界
 
 - ID: `P0-5`
 - 名称：最小身份边界
 - Status: `TODO`
+- Approval state：awaiting explicit approval。
 - 目标：建立内部 V0.1 所需的最小身份及数据隔离边界。
 - In scope：V0.1 内部环境所需的最小身份策略、数据隔离边界，以及防止不安全开发身份在生产环境误启的保护要求；具体实现由后续获批任务确定。
 - Out of scope：完整公开账号体系、短信验证码、邮箱验证码、OAuth 矩阵、付费会员和企业权限系统。

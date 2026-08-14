@@ -12,8 +12,9 @@
 - 当前已完成子步骤：`P0-4B — Docker Compose + PostgreSQL local infrastructure`。
 - 当前已完成子步骤：`P0-4C — SQLAlchemy async foundation + typed DB config`。
 - 当前已完成子步骤：`P0-4D — Alembic migration foundation + zero-op baseline revision`。
-- 当前子步骤：`P0-4E — PostgreSQL integration tests + migration validation + docs`，completed。
-- 下一子步骤：`P0-4F — Independent final review`，awaiting explicit approval。
+- `P0-4E — PostgreSQL integration tests + migration validation + docs`：completed。
+- `P0-4F — Independent final review`：completed。
+- P0-4 status：`DONE`；P0-5 awaiting explicit approval。
 
 ## Scope
 
@@ -77,7 +78,7 @@ P0-4B 要求：
 - restart 后重新 healthy 且 `SELECT 1` 成功；
 - `git diff --check`、scope audit、secret audit 与总纲 hash 检查。
 
-P0-4D 的隔离 migration runtime smoke 与 P0-4E reusable integration/migration test suite 均已完成；P0-4F 等待明确批准。
+P0-4D 的隔离 migration runtime smoke、P0-4E reusable integration/migration test suite 与 P0-4F independent final review 均已完成并通过。
 
 ## Decisions
 
@@ -100,7 +101,8 @@ P0-4D 的隔离 migration runtime smoke 与 P0-4E reusable integration/migration
 - 2026-08-13：`P0-4C` completed；resolved SQLAlchemy `2.0.52`、psycopg/psycopg-binary `3.3.4`，已创建 `db/__init__.py`、`db/base.py`、`db/runtime.py`，31 项 API 测试通过（14 项新增 DB foundation unit tests），最终源码/diff 审核通过。
 - 2026-08-13：`P0-4D` completed；resolved Alembic `1.18.5`，建立 async migration environment 与唯一 zero-op baseline head `7c6ccd86b3c5`。隔离临时 PostgreSQL database 的 upgrade/repeat/check/downgrade/re-upgrade smoke 通过，business table count 为 `0`，临时数据库已清理，development database 未迁移且回归通过，最终源码与 migration foundation 审核通过。
 - 2026-08-14：`P0-4E` completed；新增 `tests/integration/conftest.py`、`test_database.py`、`test_migrations.py` 与 pytest marker/importlib mode。Unit 35、integration 11、full 46 项通过；逐测试 `gia_p04e_*` database 均精确清理，development database 未迁移且回归通过。
-- 当前下一步：P0-4F awaiting explicit approval。
+- 2026-08-14：`P0-4F` completed；从 clean HEAD 独立重跑全部技术与治理 gate，unit 35、integration 11（skipped 0）、full 46 项及全部质量门通过；development database 未迁移、业务表为 0、临时数据库残留为 0，P0-4 转为 `DONE`。
+- 当前下一步：P0-5 awaiting explicit approval。
 
 ## Deviations
 
@@ -141,3 +143,4 @@ P0-4D 的隔离 migration runtime smoke 与 P0-4E reusable integration/migration
 - P0-4E test totals：unit 35 passed、integration 11 passed/0 skipped、full 46 passed；Ruff、format、Pyright、frozen sync 与 lock check 通过；
 - P0-4E cleanup/regression：run-created temp database 最终均不存在，`gia_p04e_%` residual count 为 `0`；development database 存在、未迁移、无 `alembic_version` 且 `SELECT 1` 通过；
 - P0-4E dependency/schema：无新增 dependency，`uv.lock` 未变；`Base.metadata.tables = 0`，baseline revision 未改且无新 revision。
+- P0-4F independent review：Git/总纲 hash、Docker/PostgreSQL runtime、Compose storage/network、secret/dependency scope、SQLAlchemy/FastAPI/Alembic boundary、migration history/template、integration harness、unit/integration/full suites、质量门、development DB regression、residual/schema/scope 与文档一致性全部通过；未修改被审计实现。

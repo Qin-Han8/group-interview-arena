@@ -4,9 +4,9 @@
 - Current phase: P0
 - Architecture baseline established by: P0-2 — DONE
 - P0-3 foundation status: DONE
-- Current task: P0-4 — IN_PROGRESS
-- Current substep: P0-4E completed
-- Next substep: P0-4F awaiting explicit approval
+- P0-4 database foundation status: DONE
+- Current substep: P0-4F completed
+- Next task: P0-5 awaiting explicit approval
 - Target version: V0.1 Internal Validation
 - Business architecture detail: Incremental from P1
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
@@ -178,6 +178,8 @@ drop exact temporary database
 
 Test-only sync psycopg 只管理临时 database lifecycle，application DB runtime 仍为 async。Development database 受 guard 保护，integration suite 从不对其执行 migration。Redis 继续不运行，业务 Schema 尚未创建。
 
+P0-4F 已从 clean `main` HEAD 独立复核 Git、总纲 hash、Docker/PostgreSQL runtime、Compose、secret/dependency 边界、SQLAlchemy/Alembic 架构、migration history、integration harness、unit/integration/full suites、质量门、development database 保护、临时数据库残留与范围。所有 gate 通过，P0-4 已转为 `DONE`；这不表示业务 Schema、FastAPI DB caller 或 readiness 已实现。
+
 ## Communication and contract boundaries
 
 - REST：resource CRUD、question fetch、session create、session snapshot/load、reports、settings 及未来 admin/orders；
@@ -252,8 +254,7 @@ Redis 只在多 API workers、横向扩容、跨进程 WebSocket broadcast、dis
 
 ## Future work
 
-- P0-4F：独立审查 P0-4 database foundation，不新增业务能力；
-- P0-5：落实内部 V0.1 最小身份边界；
+- P0-5：等待明确批准后落实内部 V0.1 最小身份边界；
 - P0-6：建立 CI 和基础可观测性；
 - P1：逐步设计题目、角色、会话、状态机、调度、记忆和基础报告，并建立第一个 WebSocket vertical slice；
 - P2 以后：只在对应阶段获批后增加语音、评分训练和商业化能力。

@@ -17,7 +17,7 @@
 
 ## 当前版本范围
 
-P0-2 技术架构决策与 P0-3 前后端项目骨架已完成。P0-4A preflight/scope freeze、P0-4B PostgreSQL local infrastructure、P0-4C SQLAlchemy async foundation、P0-4D Alembic migration foundation 与 P0-4E PostgreSQL integration test foundation 已完成；P0-4F 等待明确批准。P0 尚未完成，V0.1 业务能力尚未实现。下方 P0 exit 与产品版本复选框仍表示完整阶段/版本验收，不能由单个子任务替代。
+P0-2 技术架构决策、P0-3 前后端项目骨架与 P0-4 数据库及迁移基础已完成。P0-4A～P0-4F 均已完成，P0-4 已通过独立最终验收并转为 `DONE`；P0-5 等待明确批准。P0 尚未完成，V0.1 业务能力尚未实现。下方 P0 exit 与产品版本复选框仍表示完整阶段/版本验收，不能由单个子任务替代。
 
 ## Implementation guidance
 
@@ -156,7 +156,19 @@ P0-3 已通过第二次独立最终验收并转为 `DONE`。P0 整体仍为 `IN_
 - [x] development database 未执行 migration、没有 `alembic_version`、`SELECT 1` 通过；本轮临时 database residual count 为 `0`；
 - [x] 未新增 dependency，`uv.lock`、baseline revision、Web、Compose 与业务 schema 均未改变。
 
-这些证据只覆盖 P0-4E reusable PostgreSQL integration/migration test foundation，不代表 P0-4 独立最终审查已完成。P0-4E 已完成；P0-4F 等待明确批准。
+这些证据只覆盖 P0-4E reusable PostgreSQL integration/migration test foundation；P0-4F 的独立最终验收证据见下方记录。
+
+### P0-4F independent final verification — 2026-08-14
+
+- [x] clean `main`、HEAD `622170f9f1cae0d6ad7492d4134564001b030713`，P0-4B/C/D/E commits 均存在；
+- [x] `PROJECT_MASTER_PLAN.md` SHA-256 精确匹配批准值；
+- [x] Docker/Compose、唯一 PostgreSQL `18.4` service、IPv4 loopback binding、healthy 与 local named volume 通过；
+- [x] secret、direct dependency、SQLAlchemy、FastAPI、Alembic、Windows asyncio、migration history/template 与 integration harness safety 审计通过；
+- [x] unit 35、integration 11（skipped 0）、full 46 项通过；frozen sync、lock check、Ruff、format、Pyright 与唯一 Alembic head 通过；
+- [x] development database `SELECT 1` 通过、无 `alembic_version`、public product table 为 `0`；`gia_p04e_%` residual 为 `0`；
+- [x] 未修改被审计实现或运行资源，PostgreSQL container、named volume 与 development database 均保留。
+
+P0-4 已通过独立最终验收并转为 `DONE`。这不代表 P0 exit 或 V0.1 业务能力已完成；P0-5 仍需明确批准。
 
 ## P0 exit
 
@@ -165,7 +177,7 @@ P0-3 已通过第二次独立最终验收并转为 `DONE`。P0 整体仍为 `IN_
 - [ ] 项目仓库和开发规范可供后续任务使用；
 - [ ] 环境配置方式已由正式技术决策确定并验证；
 - [ ] V0.1 所需的最小身份边界已验证，且生产环境不会误启不安全的开发身份；
-- [ ] 已依据 P0-2 批准的技术决策验证 V0.1 所需的关系型数据库、数据访问层和 migration 基础；
+- [x] 已依据 P0-2 批准的技术决策验证 V0.1 所需的关系型数据库、数据访问层和 migration 基础；
 - [ ] 自动检查、日志和基础监控已验证；
 - [ ] 产品及技术决策记录完整可追溯；
 - [ ] P0-1～P0-6 均满足各自验收条件；
