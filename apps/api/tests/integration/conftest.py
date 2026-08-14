@@ -1,6 +1,7 @@
 import os
 import re
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Generator, Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from unittest.mock import patch
@@ -21,7 +22,8 @@ API_ROOT = Path(__file__).resolve().parents[2]
 REPOSITORY_ROOT = API_ROOT.parents[1]
 ROOT_ENV_FILE = REPOSITORY_ROOT / ".env"
 TEMPORARY_DATABASE_PREFIX = "gia_p04e_"
-TEMPORARY_DATABASE_PATTERN = re.compile(r"^gia_p04e_[0-9a-f]{12}$")
+BROWSER_DATABASE_PREFIX = "gia_p05d_"
+TEMPORARY_DATABASE_PATTERN = re.compile(r"^gia_p0(?:4e|5d)_[0-9a-f]{12}$")
 SYSTEM_DATABASES = frozenset({"postgres", "template0", "template1"})
 
 
@@ -151,11 +153,12 @@ def temporary_database_name_guard() -> Callable[[str, str], None]:
     return validate_temporary_database_name
 
 
-@pytest.fixture
-def temporary_database(
+@contextmanager
+def temporary_database_context(
     integration_database_settings: IntegrationDatabaseSettings,
-) -> Iterator[TemporaryDatabase]:
-    database_name = f"{TEMPORARY_DATABASE_PREFIX}{uuid4().hex[:12]}"
+    prefix: str,
+) -> Generator[TemporaryDatabase]:
+    database_name = f"{prefix}{uuid4().hex[:12]}"
     validate_temporary_database_name(
         database_name,
         integration_database_settings.development_database,
@@ -180,7 +183,28 @@ def temporary_database(
 
 
 @pytest.fixture
-def migrated_database(temporary_database: TemporaryDatabase) -> TemporaryDatabase:
+def temporary_database(
+    integration_database_settings: IntegrationDatabaseSettings,
+) -> Iterator[TemporaryDatabase]:
+    with temporary_database_context(
+        integration_database_settings,
+        TEMPORARY_DATABASE_PREFIX,
+    ) as database:
+        yield database
+
+
+@pytest.fixture
+def browser_temporary_database(
+    integration_database_settings: IntegrationDatabaseSettings,
+) -> Iterator[TemporaryDatabase]:
+    with temporary_database_context(
+        integration_database_settings,
+        BROWSER_DATABASE_PREFIX,
+    ) as database:
+        yield database
+
+
+def migrate_database(temporary_database: TemporaryDatabase) -> None:
     config = Config()
     config.set_main_option("script_location", str(API_ROOT / "migrations"))
     database_url = temporary_database.database_settings().database_url
@@ -191,4 +215,16 @@ def migrated_database(temporary_database: TemporaryDatabase) -> TemporaryDatabas
     ):
         command.upgrade(config, "head")
 
+
+@pytest.fixture
+def migrated_database(temporary_database: TemporaryDatabase) -> TemporaryDatabase:
+    migrate_database(temporary_database)
     return temporary_database
+
+
+@pytest.fixture
+def browser_migrated_database(
+    browser_temporary_database: TemporaryDatabase,
+) -> TemporaryDatabase:
+    migrate_database(browser_temporary_database)
+    return browser_temporary_database

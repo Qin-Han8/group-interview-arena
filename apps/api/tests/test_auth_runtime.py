@@ -43,6 +43,8 @@ TEST_DATABASE_URL = (
     "not_connected_by_unit_tests"
 )
 PLAINTEXT_PASSWORD = "unit-only password phrase"
+TRUSTED_ORIGIN = "http://localhost:3000"
+AUTH_POST_HEADERS = {"Origin": TRUSTED_ORIGIN, "X-GIA-CSRF": "1"}
 
 
 def test_authentication_result_repr_redacts_raw_session_token() -> None:
@@ -73,12 +75,13 @@ async def _request(
     path: str,
     *,
     json: dict[str, object] | None = None,
+    headers: dict[str, str] | None = None,
 ) -> HttpxResponse:
     async with AsyncClient(
         transport=ASGITransport(app=application),
         base_url="http://testserver",
     ) as client:
-        return await client.request(method, path, json=json)
+        return await client.request(method, path, json=json, headers=headers)
 
 
 def test_auth_request_schema_repr_and_json_redact_password() -> None:
@@ -98,7 +101,12 @@ def test_auth_request_schema_repr_and_json_redact_password() -> None:
 
 
 def test_validation_error_response_does_not_echo_password() -> None:
-    application = create_app(Settings(environment=Environment.TEST))
+    application = create_app(
+        Settings(
+            environment=Environment.TEST,
+            cors_origins=(TRUSTED_ORIGIN,),
+        )
+    )
 
     async def unused_session() -> AsyncIterator[object]:
         yield object()
@@ -111,6 +119,7 @@ def test_validation_error_response_does_not_echo_password() -> None:
             "POST",
             "/auth/register",
             json={"password": PLAINTEXT_PASSWORD},
+            headers=AUTH_POST_HEADERS,
         )
     )
 

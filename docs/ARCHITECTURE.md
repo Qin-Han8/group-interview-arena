@@ -6,8 +6,8 @@
 - P0-3 foundation status: DONE
 - P0-4 database foundation status: DONE
 - P0-5 identity boundary status: IN_PROGRESS
-- Current substep: P0-5C completed
-- Next substep: P0-5D awaiting explicit approval
+- Most recently completed substep: P0-5D completed
+- Next substep: P0-5E awaiting explicit approval / independent final review not started
 - Target version: V0.1 Internal Validation
 - Business architecture detail: Incremental from P1
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
@@ -108,6 +108,8 @@ developer
         -> PostgreSQL 18.4 127.0.0.1:5432
 
 Web 与 API 继续作为 Windows native process。Docker Compose 当前只运行 PostgreSQL，不包含 Web、API、Redis、worker 或管理 UI。
+
+Windows API runtime 必须通过 Uvicorn custom loop factory `group_interview_arena_api.core.event_loop:create_runtime_event_loop` 使用 Psycopg-compatible `SelectorEventLoop`；P0-5D 的独立进程浏览器验证发现默认 Proactor loop 会导致真实 PostgreSQL auth request 失败。非 Windows 平台继续使用标准 asyncio loop，无新增 runtime dependency。
 ```
 
 本地 browser origin 必须通过 `GIA_API_CORS_ORIGINS` 显式加入 allowlist；缺省为空，不允许跨源。该 typed normalized origin set 已批准作为 P0-5 CORS 与 CSRF exact Origin validation 共用的 browser trusted-origin Source of Truth，不新增第二套 CSRF origins 配置。`NEXT_PUBLIC_API_BASE_URL` 是公开浏览器 base URL，不是 secret。Web 直接请求 FastAPI，不建立 Next.js Route Handler proxy。
@@ -181,7 +183,7 @@ Test-only sync psycopg 只管理临时 database lifecycle，application DB runti
 
 P0-4F 已从 clean `main` HEAD 独立复核 Git、总纲 hash、Docker/PostgreSQL runtime、Compose、secret/dependency 边界、SQLAlchemy/Alembic 架构、migration history、integration harness、unit/integration/full suites、质量门、development database 保护、临时数据库残留与范围。所有 gate 通过，P0-4 已转为 `DONE`；P0-4F 当时未建立业务 Schema、FastAPI DB caller 或 readiness，P0-5B 后的 identity schema 现状见下节。
 
-### P0-5 identity boundary — P0-5C backend runtime implemented
+### P0-5 identity boundary — P0-5D browser closure implemented
 
 `ADR-015` 已批准以下长期边界：
 
@@ -192,7 +194,7 @@ P0-4F 已从 clean `main` HEAD 独立复核 Git、总纲 hash、Docker/PostgreSQ
 - browser security 使用 credentialed explicit CORS、exact Origin validation、required custom CSRF header 与 SameSite defense-in-depth；CORS/CSRF 共用 `GIA_API_CORS_ORIGINS` normalized set；
 - V0.1 self-service account/password recovery Deferred；公开测试前必须重新设计 verified recovery identity/flow。
 
-P0-5B 已建立 `users`、`auth_sessions`、identity migration 与 password/session security primitives，metadata 以 `db` package 的显式 model registration 精确包含两张 product table。P0-5C 已把现有 DB factory 接入 FastAPI lifespan/app state/request-scoped `AsyncSession`，并实现最小 register/login/logout/me、server-side session validation 与 `gia_session` Cookie issue/clear。P0-5D 才建立 Web、credentialed CORS/CSRF 与真实浏览器闭环；当前仍没有 Web auth UI 或 browser auth closure。
+P0-5B 已建立 `users`、`auth_sessions`、identity migration 与 password/session security primitives，metadata 以 `db` package 的显式 model registration 精确包含两张 product table。P0-5C 已把现有 DB factory 接入 FastAPI lifespan/app state/request-scoped `AsyncSession`，并实现最小 register/login/logout/me、server-side session validation 与 `gia_session` Cookie issue/clear。P0-5D 已完成 shared-origin credentialed CORS/CSRF、最小 Web auth UI、raw/canonical username browser/backend closure 与真实 Chromium browser closure；P0-5E awaiting explicit approval，独立最终审核尚未开始。
 
 已实现的 DB application lifecycle 为：
 
@@ -238,7 +240,7 @@ WebSocket 使用独立版本化事件契约，至少表达 event type、schema v
 - Frontend tests：Vitest、Testing Library；
 - P0-4：真实 PostgreSQL integration/migration tests，不使用 SQLite 代替；
 - P1：WebSocket tests、fake provider tests、deterministic session/orchestrator regression；
-- 有真实跨应用用户流后再加入 Playwright；
+- P0-5D 已因真实跨应用 auth flow 加入 `@playwright/test 1.62.1`，只运行 Chromium，并由 test-only 编排器使用迁移后的隔离 `gia_p05d_*` PostgreSQL database；
 - 真实 LLM tests 必须显式执行，不进入默认 CI。
 
 ## Logging and observability
@@ -281,7 +283,8 @@ Redis 只在多 API workers、横向扩容、跨进程 WebSocket broadcast、dis
 ## Future work
 
 - P0-5C：completed；
-- P0-5D：awaiting explicit approval；获批后方可建立真实 browser Cookie/CORS/CSRF 闭环；
+- P0-5D：completed；真实 browser Cookie/CORS/CSRF 闭环已通过 Chromium 验证；
+- P0-5E：awaiting explicit approval；independent final review not started，获批后独立复核完整 P0-5 actual source 与全部门禁；
 - P0-6：建立 CI 和基础可观测性；
 - P1：逐步设计题目、角色、会话、状态机、调度、记忆和基础报告，并建立第一个 WebSocket vertical slice；
 - P2 以后：只在对应阶段获批后增加语音、评分训练和商业化能力。

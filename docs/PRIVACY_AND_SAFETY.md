@@ -70,9 +70,9 @@
 - P0：建立安全边界、密钥规则、数据隔离原则和后续检查责任。
 - V0.1：即使是内部文字版，也必须遵守 AI 标识、训练用途、数据最小化、密钥和隔离规则。
 - V0.5：公开 MVP 必须提供删除数据和隐私设置，并对语音生命周期完成明确实现。
-- P0-2 只记录了获批的信任边界、配置、错误和日志原则；P0-5B 已实现 identity persistence/security primitives，P0-5C 已实现 backend auth runtime，但 browser CORS/CSRF/Web closure、内容审核和其他安全能力仍未实现。
+- P0-2 只记录了获批的信任边界、配置、错误和日志原则；P0-5B 已实现 identity persistence/security primitives，P0-5C 已实现 backend auth runtime，P0-5D 已实现 browser CORS/CSRF/Web closure；内容审核和其他后续安全能力仍未实现。
 
-## P0-5 identity security boundary — P0-5C backend runtime implemented
+## P0-5 identity security boundary — P0-5D browser closure implemented
 
 - Initial credential 是 username/password；password 使用 application 显式拥有参数的 Argon2id，只持久化 password hash；
 - small application-owned offline password blocklist 已在 P0-5B 实施，只做 full-password match，并覆盖 context-specific obvious passwords；不做 substring 禁止；
@@ -83,7 +83,7 @@
 - 当前 username/password 没有 verified email、verified phone 或 WeChat identity，因此 V0.1 self-service password/account recovery Deferred；不得加入 security questions、plaintext recovery secret、generic admin reset endpoint 或虚假 email recovery；
 - 公开测试前必须形成 verified recovery identity/flow，并重新审查账号删除、数据保留和用户所有业务数据的处置边界。
 
-P0-5B 已实现显式参数的 Argon2id hash/verify/verify-and-update、username/password policy、`users`/`auth_sessions` persistence、SHA-256 session digest 与 7-day absolute-expiry primitives。P0-5C 已实现 backend register/login/logout/me、固定 dummy Argon2 unknown-user path、server-side session validation 与 host-only HttpOnly `gia_session` Cookie issue/clear；raw session token 不进入普通 result repr，production + insecure Cookie 配置会 fail closed，safe response tests 与 structured-log field audit 确认不回显 password、hash、raw token 或 digest。Credentialed CORS、CSRF、Web auth 与真实浏览器 closure 仍未实现，P0-5D 是 browser exposure 前的必要 gate；recovery 继续 Deferred。
+P0-5B 已实现显式参数的 Argon2id hash/verify/verify-and-update、username/password policy、`users`/`auth_sessions` persistence、SHA-256 session digest 与 7-day absolute-expiry primitives。P0-5C 已实现 backend register/login/logout/me、固定 dummy Argon2 unknown-user path、server-side session validation 与 host-only HttpOnly `gia_session` Cookie issue/clear；raw session token 不进入普通 result repr，production + insecure Cookie 配置会 fail closed，safe response tests 与 structured-log field audit 确认不回显 password、hash、raw token 或 digest。P0-5D 已实现 shared exact-origin credentialed CORS、unsafe auth POST 的 Origin/custom-header CSRF、`credentials: "include"` Web client 与真实 Chromium closure；浏览器验证确认 `document.cookie` 不暴露 `gia_session`，local/session storage 不保存认证 secret，logout 后服务端 session 与 Cookie 均失效。recovery 继续 Deferred。
 
 ## Implementation guidance
 
@@ -110,7 +110,7 @@ P0-5B 已实现显式参数的 Argon2id hash/verify/verify-and-update、username
 ## Future work
 
 - P0-2：在架构决策中记录基础信任边界；完整威胁建模随实际接口、数据和 Provider 逐步细化。
-- P0-5C～P0-5D：在 P0-5B persistence/primitives 基础上依次落实 backend/browser authentication、Cookie/CORS/CSRF 与最小日志边界。
+- P0-5C～P0-5D：backend/browser authentication、Cookie/CORS/CSRF 与最小日志边界已实现，P0-5D completed；P0-5E awaiting explicit approval，独立最终审核尚未开始。
 - P0-6：建立不泄露敏感信息的日志、安全检查和基础监控。
 - P2：完成语音同意、上传、保存和删除设计。
 - P4/P5：完成支付审计、公开隐私设置、投诉和发布合规检查。

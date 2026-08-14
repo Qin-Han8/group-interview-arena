@@ -1,6 +1,6 @@
 # P0-5 Identity Boundary Execution Plan
 
-Status: `P0-5 IN_PROGRESS`; `P0-5A completed`; `P0-5B completed`; `P0-5C completed`; `P0-5D awaiting explicit approval`; `P0-5E not started`
+Status: `P0-5 IN_PROGRESS`; `P0-5A completed`; `P0-5B completed`; `P0-5C completed`; `P0-5D completed`; `P0-5E awaiting explicit approval / independent final review not started`
 
 Target version: `V0.1 Internal Validation`
 
@@ -19,7 +19,7 @@ Product baseline: [`PROJECT_MASTER_PLAN.md`](../PROJECT_MASTER_PLAN.md)
 - P0-4 已完成 PostgreSQL、SQLAlchemy async、Alembic 和 integration test foundation。
 - Alembic baseline revision 为 `7c6ccd86b3c5`，必须保持不可变且 migration graph 保持 single head。
 - P0-5B 前 development database 为 public product tables = 0 且不存在 `alembic_version`；通过全部 isolated gates 后，现已首次迁移至 identity head `4fe43b42641b`。
-- 当前应用已具有 `users`、`auth_sessions`、password/session security primitives、FastAPI DB lifecycle、backend auth API 与 `gia_session` Cookie runtime；仍没有 credentialed CORS、CSRF runtime 或 Web auth flow。
+- 当前应用已具有 `users`、`auth_sessions`、password/session security primitives、FastAPI DB lifecycle、backend auth API、`gia_session` Cookie runtime、credentialed CORS/CSRF 与最小 Web auth flow；P0-5D actual-source final review 已通过，P0-5E awaiting explicit approval，独立最终审核尚未开始。
 - 现有 typed `GIA_API_CORS_ORIGINS` 是已批准的 browser trusted-origin Source of Truth；P0-5 不建立第二套 CSRF trusted-origin 配置。
 
 ## Five-stage decomposition
@@ -27,8 +27,8 @@ Product baseline: [`PROJECT_MASTER_PLAN.md`](../PROJECT_MASTER_PLAN.md)
 1. **P0-5A — Identity preflight / security & scope freeze**：`completed`。批准 ADR-015、范围、风险与本执行计划；不实施认证代码。
 2. **P0-5B — Identity persistence + migration + security primitives**：`completed`。已实现 identity schema、migration、显式 Argon2id 配置和 session token primitives，并通过最终源码审核。
 3. **P0-5C — Backend auth runtime + FastAPI DB lifecycle + API**：`completed`。已接入 request-scoped database session、最小 auth API 与 backend Cookie runtime；不包含 browser security closure。
-4. **P0-5D — Web auth round trip + CORS/CSRF + cross-layer validation**：`awaiting explicit approval`。获批后完成 Web 技术闭环和浏览器安全验证。
-5. **P0-5E — Independent final review**：`not started`。独立复核完整 P0-5 diff、质量门、迁移安全和范围一致性，不新增业务能力。
+4. **P0-5D — Web auth round trip + CORS/CSRF + cross-layer validation**：`completed`。Web 技术闭环、浏览器安全验证与 P0-5D actual-source final review 均已完成。
+5. **P0-5E — Independent final review**：`awaiting explicit approval / not started`。获批后独立复核完整 P0-5 diff、质量门、迁移安全和范围一致性，不新增业务能力。
 
 不得机械增加第六阶段，也不得在未获明确批准时进入下一阶段。
 
@@ -173,7 +173,19 @@ P0-5C 已实现最小 API contract：
 
 Password、password hash 和 raw token 不出现在 JSON response 或 structured request log。FastAPI OpenAPI 使用 `SessionCookie` Cookie security scheme，Web generated derivative 已同步；无 Bearer/JWT scheme。
 
-P0-5D Web 只实现 register、login、current-user status、logout 的技术闭环。不实现 profile、account center、settings、phone、WeChat、password reset、avatar 或 marketing auth UI。
+P0-5D Web 已只实现 register、login、current-user status、logout 的技术闭环；没有实现 profile、account center、settings、phone、WeChat、password reset、avatar 或 marketing auth UI。
+
+P0-5D 的跨层实现与证据：
+
+- CORS 与 CSRF 共同消费 `Settings.cors_origins`，credentialed CORS 只允许 `GET`/`POST` 与 `Content-Type`/`X-GIA-CSRF`；
+- unsafe auth POST 要求单一 exact trusted Origin 与单一 `X-GIA-CSRF: 1`，`GET /auth/me` 豁免；
+- Web `openapi-fetch` client 统一使用 `credentials: "include"`，unsafe POST 自动发送 CSRF marker；
+- 最小 UI 覆盖 loading、register、login、authenticated username、initial restore 与 logout；
+- Web 保留 uppercase-capable raw ASCII username，backend canonical lowercase username 在 register response、authenticated UI 与 reload restore 中一致；
+- `@playwright/test 1.62.1` 是唯一新增 direct Web dev dependency，只运行 Chromium；
+- test-only 编排器创建、迁移并精确删除 `gia_p05d_*` PostgreSQL database，成功/失败路径均停止 API/Web；
+- Chromium register/restore/negative-CSRF/logout flow selected 1、skipped 0、passed 1；development DB 未被 E2E 写入；
+- Windows Uvicorn 使用 custom loop factory 建立 Psycopg-compatible `SelectorEventLoop`，无新增 API dependency。
 
 ## Migration policy and safety
 
@@ -256,5 +268,5 @@ P0-5D Web 只实现 register、login、current-user status、logout 的技术闭
 - [x] P0-5A approved preflight, ADR-015 and scope freeze
 - [x] P0-5B identity persistence, migration and security primitives — completed
 - [x] P0-5C backend auth runtime, DB lifecycle and API — completed
-- [ ] P0-5D Web round trip, CORS/CSRF and cross-layer validation — awaiting explicit approval
-- [ ] P0-5E independent final review
+- [x] P0-5D Web round trip, CORS/CSRF and cross-layer validation — completed
+- [ ] P0-5E independent final review — awaiting explicit approval / not started

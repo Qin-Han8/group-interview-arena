@@ -16,14 +16,14 @@ AI 群面训练场让用户无需临时召集真人，即可与具有不同性�
   - `P0-2 — 技术架构决策`
   - `P0-3 — 前后端项目骨架`
   - `P0-4 — 数据库与迁移基础`
-- 已完成子步骤：`P0-4A`、`P0-4B`、`P0-4C`、`P0-4D`、`P0-4E`、`P0-4F`、`P0-5A`、`P0-5B`
+- 已完成子步骤：`P0-4A`、`P0-4B`、`P0-4C`、`P0-4D`、`P0-4E`、`P0-4F`、`P0-5A`、`P0-5B`、`P0-5C`、`P0-5D`
 - 当前任务：`P0-5 — 最小身份边界（IN_PROGRESS）`
-- 当前子步骤：`P0-5C — Backend auth runtime + FastAPI DB lifecycle + API（completed）`
-- 下一子步骤：`P0-5D — Web auth round trip + CORS/CSRF + cross-layer validation（awaiting explicit approval）`
+- 最近完成子步骤：`P0-5D — Web auth round trip + CORS/CSRF + cross-layer validation（completed）`
+- 下一子步骤：`P0-5E — Independent final review（awaiting explicit approval / not started）`
 - 当前目标版本：`V0.1 — Internal Validation / 内部技术验证版`
-- 当前实现状态：Web/API 技术骨架、本地 PostgreSQL 18.4、SQLAlchemy async/psycopg 3、Alembic 与 reusable PostgreSQL integration harness 已建立；P0-5B 已实现 identity persistence/security primitives，P0-5C 已实现 FastAPI DB lifespan、request-scoped `AsyncSession`、backend register/login/logout/me、opaque Cookie issue/clear 与真实 PostgreSQL auth integration。Credentialed CORS、CSRF、Web auth UI 与真实浏览器 auth round trip 仍未实现
+- 当前实现状态：Web/API 技术骨架、本地 PostgreSQL 18.4、SQLAlchemy async/psycopg 3、Alembic 与 reusable PostgreSQL integration harness 已建立；P0-5D 已完成 credentialed exact-origin CORS、Origin/custom-header CSRF、最小 Web auth UI、raw/canonical username browser/backend 闭环与隔离 PostgreSQL 上的真实 Chromium register/restore/logout 验证。P0-5E awaiting explicit approval，独立最终审核尚未开始
 
-> P0-4 已通过独立最终验收并转为 `DONE`。P0 仍在进行中；P0-5A、P0-5B 与 P0-5C 已完成，P0-5D 等待明确批准。
+> P0-4 已通过独立最终验收并转为 `DONE`。P0 仍在进行中；P0-5D completed，P0-5E awaiting explicit approval / not started。
 
 ## 核心原则摘要
 
@@ -46,7 +46,7 @@ AI 群面训练场让用户无需临时召集真人，即可与具有不同性�
 - Redis、独立 task queue、OpenTelemetry、具体 AI/语音供应商和 UI component library 仍为 Deferred/TBD；
 - V0.1 使用自定义确定性讨论状态机，不使用 LangGraph。
 
-P0-5 已批准的初始身份边界为 username/password、Argon2id、稳定 UUIDv4 `user_id` 与 PostgreSQL-backed opaque server-side session。P0-5B 已实现 identity persistence 及 password/session security primitives；P0-5C 已让 raw token 仅通过 host-only HttpOnly `gia_session` Cookie 传输，数据库仍只保存 cryptographic digest。当前不采用 JWT；CORS 与 CSRF exact Origin validation 将在 P0-5D 共用现有 typed browser trusted-origin 配置。实施顺序与门禁见 [`docs/exec-plans/P0-5_identity-boundary.md`](docs/exec-plans/P0-5_identity-boundary.md)。
+P0-5 已批准的初始身份边界为 username/password、Argon2id、稳定 UUIDv4 `user_id` 与 PostgreSQL-backed opaque server-side session。P0-5D 已让 CORS 与 CSRF exact Origin validation 共用现有 typed browser trusted-origin 配置，并由 Web 的正式 `openapi-fetch` client 以 `credentials: "include"` 和 unsafe POST `X-GIA-CSRF: 1` 完成真实浏览器闭环。raw token 只通过 host-only HttpOnly `gia_session` Cookie 传输，数据库仍只保存 cryptographic digest；当前不采用 JWT。实施顺序与门禁见 [`docs/exec-plans/P0-5_identity-boundary.md`](docs/exec-plans/P0-5_identity-boundary.md)。
 
 完整决策、替代方案和重新评估条件见 [`docs/DECISIONS.md`](docs/DECISIONS.md)。
 
@@ -160,7 +160,7 @@ uv sync --frozen
 $env:GIA_API_CORS_ORIGINS='["http://localhost:3000"]'
 $env:GIA_API_DATABASE_URL='postgresql+psycopg://group_interview_arena:<local-development-password>@127.0.0.1:5432/group_interview_arena'
 $env:GIA_API_SESSION_COOKIE_SECURE='false'
-uv run uvicorn group_interview_arena_api.app:app --host localhost --port 8000
+uv run uvicorn group_interview_arena_api.app:app --host localhost --port 8000 --loop group_interview_arena_api.core.event_loop:create_runtime_event_loop
 ```
 
 再从仓库根目录启动 Web：
@@ -188,6 +188,7 @@ pnpm.cmd web:typecheck
 pnpm.cmd web:test
 pnpm.cmd web:format:check
 pnpm.cmd web:build
+pnpm.cmd web:test:e2e
 ```
 
 API 要求 CPython 3.14 与 uv `>=0.12.2,<0.13`。API 质量命令：
@@ -210,7 +211,7 @@ uv run pytest
 
 `integration` 与完整 suite 需要 Docker Desktop、healthy 的 PostgreSQL Compose service，以及仓库根目录中被 Git ignore 的本地 `.env`；unit-only 命令不读取这些本地数据库配置。Integration fixture 为每个需要数据库状态的测试创建并精确删除独立 `gia_p04e_*` database，不迁移 development database。
 
-当前已实现 `GET /health`、本地 PostgreSQL Compose、FastAPI lifespan/request-scoped SQLAlchemy async runtime、baseline → identity head 的线性 Alembic history，以及 backend register/login/logout/me 和 Cookie session validation。Credentialed CORS、CSRF、Web auth/真实浏览器闭环与群面业务功能尚未建立。
+当前已实现 `GET /health`、本地 PostgreSQL Compose、FastAPI lifespan/request-scoped SQLAlchemy async runtime、baseline → identity head 的线性 Alembic history、backend register/login/logout/me、credentialed CORS/CSRF 与最小 Web auth。`pnpm.cmd web:test:e2e` 会创建并迁移精确的 `gia_p05d_*` 临时数据库，启动本地 API/Web，运行 Chromium auth flow，并在成功或失败后停止服务、精确删除临时库；它绝不使用 development database。群面业务功能尚未建立。
 
 ## 贡献规则
 

@@ -12,6 +12,10 @@ from group_interview_arena_api.identity.cookies import (
     clear_session_cookie,
     set_session_cookie,
 )
+from group_interview_arena_api.identity.csrf import (
+    CSRF_OPENAPI_EXTRA,
+    create_browser_csrf_guard,
+)
 from group_interview_arena_api.identity.schemas import (
     CurrentUserResponse,
     LoginRequest,
@@ -50,15 +54,19 @@ def _internal_auth_error() -> ApiError:
 
 def create_auth_router(settings: Settings) -> APIRouter:
     router = APIRouter(prefix="/auth", tags=["auth"])
+    require_browser_csrf = create_browser_csrf_guard(settings.cors_origins)
 
     @router.post(
         "/register",
         response_model=CurrentUserResponse,
         status_code=status.HTTP_201_CREATED,
         responses={
+            403: {"model": ErrorResponse},
             409: {"model": ErrorResponse},
             422: {"model": ErrorResponse},
         },
+        dependencies=[Depends(require_browser_csrf)],
+        openapi_extra=CSRF_OPENAPI_EXTRA,
     )
     async def register(  # pyright: ignore[reportUnusedFunction]
         payload: RegisterRequest,
@@ -99,9 +107,12 @@ def create_auth_router(settings: Settings) -> APIRouter:
         "/login",
         response_model=CurrentUserResponse,
         responses={
+            403: {"model": ErrorResponse},
             401: {"model": ErrorResponse},
             422: {"model": ErrorResponse},
         },
+        dependencies=[Depends(require_browser_csrf)],
+        openapi_extra=CSRF_OPENAPI_EXTRA,
     )
     async def login(  # pyright: ignore[reportUnusedFunction]
         payload: LoginRequest,
@@ -150,7 +161,13 @@ def create_auth_router(settings: Settings) -> APIRouter:
     @router.post(
         "/logout",
         status_code=status.HTTP_204_NO_CONTENT,
-        responses={204: {"description": "Session invalidated and Cookie cleared."}},
+        responses={
+            204: {"description": "Session invalidated and Cookie cleared."},
+            403: {"model": ErrorResponse},
+            422: {"model": ErrorResponse},
+        },
+        dependencies=[Depends(require_browser_csrf)],
+        openapi_extra=CSRF_OPENAPI_EXTRA,
     )
     async def logout(  # pyright: ignore[reportUnusedFunction]
         session: DatabaseSession,

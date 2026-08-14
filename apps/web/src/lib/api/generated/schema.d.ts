@@ -107,7 +107,7 @@ export interface components {
          * ErrorCode
          * @enum {string}
          */
-        ErrorCode: "NOT_FOUND" | "VALIDATION_ERROR" | "INTERNAL_ERROR" | "INVALID_USERNAME" | "INVALID_PASSWORD" | "USERNAME_UNAVAILABLE" | "INVALID_CREDENTIALS" | "AUTHENTICATION_REQUIRED";
+        ErrorCode: "NOT_FOUND" | "VALIDATION_ERROR" | "INTERNAL_ERROR" | "INVALID_USERNAME" | "INVALID_PASSWORD" | "USERNAME_UNAVAILABLE" | "INVALID_CREDENTIALS" | "AUTHENTICATION_REQUIRED" | "CSRF_REJECTED";
         /** ErrorDetail */
         ErrorDetail: {
             code: components["schemas"]["ErrorCode"];
@@ -180,7 +180,10 @@ export interface operations {
     register_auth_register_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description Required first-party browser request marker. */
+                "X-GIA-CSRF": "1";
+            };
             path?: never;
             cookie?: never;
         };
@@ -197,6 +200,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CurrentUserResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Conflict */
@@ -222,7 +234,10 @@ export interface operations {
     login_auth_login_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description Required first-party browser request marker. */
+                "X-GIA-CSRF": "1";
+            };
             path?: never;
             cookie?: never;
         };
@@ -243,6 +258,15 @@ export interface operations {
             };
             /** @description Unauthorized */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -293,7 +317,10 @@ export interface operations {
     logout_auth_logout_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description Required first-party browser request marker. */
+                "X-GIA-CSRF": "1";
+            };
             path?: never;
             cookie?: never;
         };
@@ -305,6 +332,24 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
             };
         };
     };

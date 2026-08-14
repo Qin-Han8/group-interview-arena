@@ -1,3 +1,4 @@
+import AuthPanel from "./auth-panel";
 import HealthStatus from "./health-status";
 
 export default function Home() {
@@ -25,6 +26,8 @@ export default function Home() {
           <p>Business simulation has not been implemented yet.</p>
           <HealthStatus />
         </div>
+
+        <AuthPanel />
       </section>
     </main>
   );

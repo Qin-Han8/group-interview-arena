@@ -3,8 +3,8 @@
 - Status: Active
 - Managed scope: P0 only
 - Current task: P0-5 — IN_PROGRESS
-- Current substep: P0-5C completed
-- Next substep: P0-5D awaiting explicit approval
+- Most recently completed substep: P0-5D completed
+- Next substep: P0-5E awaiting explicit approval / independent final review not started
 - Allowed status values: `TODO` / `IN_PROGRESS` / `BLOCKED` / `DONE`
 - Related roadmap: [`ROADMAP.md`](ROADMAP.md)
 
@@ -204,7 +204,7 @@
 - ID: `P0-5`
 - 名称：最小身份边界
 - Status: `IN_PROGRESS`
-- Approval state：P0-5A/P0-5B/P0-5C completed；P0-5D awaiting explicit approval；P0-5E not started。
+- Approval state：P0-5A/P0-5B/P0-5C/P0-5D completed；P0-5E awaiting explicit approval，independent final review not started。
 - 目标：建立内部 V0.1 的 username/password identity、稳定 UUIDv4 `user_id`、PostgreSQL-backed opaque Cookie session 与 authenticated current-user boundary。
 - In scope：Argon2id password security、`users`/`auth_sessions` persistence、第一批真实 identity migration、FastAPI DB lifecycle、register/login/logout/me、host-only HttpOnly Cookie、credentialed explicit CORS、Origin/custom-header CSRF、最小 Web auth round trip 与分层安全测试。
 - Out of scope：email/phone/SMS/WeChat/OAuth、JWT/refresh token、MFA、V0.1 self-service recovery、profile/account center、RBAC/permissions、payment、Redis session、训练业务 persistence 及其他 P1+ 能力。
@@ -216,8 +216,8 @@
 - `P0-5A — Identity preflight / security & scope freeze`：completed；
 - `P0-5B — Identity persistence + migration + security primitives`：completed；
 - `P0-5C — Backend auth runtime + FastAPI DB lifecycle + API`：completed；
-- `P0-5D — Web auth round trip + CORS/CSRF + cross-layer validation`：awaiting explicit approval；
-- `P0-5E — Independent final review`：not started。
+- `P0-5D — Web auth round trip + CORS/CSRF + cross-layer validation`：completed；
+- `P0-5E — Independent final review`：awaiting explicit approval / not started。
 
 ### P0-5A completion note
 
@@ -237,7 +237,7 @@
 - 已建立 `users`、`auth_sessions` ORM models，`Base.metadata` 精确包含两张 product table；session primitive 与 integration persistence 验证 32-byte SHA-256 digest，无 Deferred field、relationship 或额外 product table；
 - 已新增 identity revision `4fe43b42641b`，线性承接 immutable baseline `7c6ccd86b3c5`，fresh PostgreSQL migration/downgrade/re-upgrade/check 与 exact schema tests 全部通过；
 - development database 已在 exact-name/read-only/schema preflight 后首次迁移至 identity head，重复 upgrade 为 no-op，未 downgrade、未写入测试 user/session；
-- FastAPI DB lifecycle、auth routes 与 Cookie runtime 当时尚未开始；现已由 P0-5C 实现。Credentialed CORS/CSRF 与 Web auth 仍未开始，属于 P0-5D。
+- FastAPI DB lifecycle、auth routes 与 Cookie runtime 在 P0-5B closeout 时尚未开始，现已由 P0-5C 实现；credentialed CORS/CSRF 与 Web auth 当时也尚未开始，现已由 P0-5D 完成。
 
 ### P0-5C implementation note
 
@@ -248,7 +248,17 @@
 - unknown user 与 wrong password 共用 generic 401，unknown path 执行固定非 secret Argon2id dummy verification；successful register/login 始终创建 fresh token，login rehash 与新 session 原子提交；
 - unit 102、integration 18（skipped 0）、full 120 项通过；真实 auth integration 使用 Alembic head 上的隔离 `gia_p04e_*` PostgreSQL database；无新 dependency、lockfile、migration 或 schema change；
 - FastAPI OpenAPI 与 Web generated derivative 已同步，`/auth/me` 使用 Cookie security scheme，无 Bearer/JWT；
-- P0-5C 明确保持 `allow_credentials=false`，没有 CSRF、Web auth UI 或真实 browser auth acceptance；P0-5D 仍为必要 browser security gate。
+- P0-5C 当时明确保持 `allow_credentials=false`，没有 CSRF、Web auth UI 或真实 browser auth acceptance；这些必要 browser security gates 现已由 P0-5D 完成。
+
+### P0-5D implementation note
+
+- Credentialed CORS 精确复用 `GIA_API_CORS_ORIGINS`，只允许 `GET`/`POST`、`Content-Type`/`X-GIA-CSRF`，并继续只暴露 `X-Request-ID`；无 wildcard 或第二套 trusted-origin 配置；
+- `POST /auth/register`、`POST /auth/login`、`POST /auth/logout` 统一要求单一 exact trusted `Origin` 与单一 `X-GIA-CSRF: 1`，缺失、`null`、不受信任、重复或错误 header 均使用现有安全 error envelope 返回 `403 CSRF_REJECTED`；`GET /auth/me` 保持豁免；
+- Web 正式 `openapi-fetch` client 统一使用 `credentials: "include"`，仅 unsafe auth POST 自动发送 CSRF marker；最小 UI 覆盖 loading、unauthenticated register/login、authenticated username、initial `/auth/me` restore 与 logout；
+- Web 不对 raw ASCII username 做 lowercase mutation；backend canonical lowercase username 在 register response、authenticated UI 与 reload restore 中保持一致；
+- 新增唯一获批 Web direct dev dependency `@playwright/test 1.62.1`，只运行 Chromium；隔离编排器创建并迁移精确 `gia_p05d_*` PostgreSQL database，启动 API/Web，运行浏览器测试后在成功/失败路径停止服务并精确删除临时库；
+- 真实 Chromium 已验证 register、HttpOnly/host-only/SameSite=Lax/Path=/ Cookie、`document.cookie` 不可见、reload restore、browser storage 无 auth secret、missing-CSRF `403`、logout、后续 `/auth/me` `401` 与 Cookie 清除；selected 1、skipped 0、passed 1；
+- Windows Uvicorn runtime 现通过 custom loop factory 显式使用 Psycopg-compatible `SelectorEventLoop`；未新增 API dependency，development DB 保持 head `4fe43b42641b` 且 `users`/`auth_sessions` 均为 0；P0-5D actual-source final review 已通过并转为 completed；P0-5E awaiting explicit approval，independent final review not started。
 
 ## P0-6 — CI、日志与基础可观测性
 

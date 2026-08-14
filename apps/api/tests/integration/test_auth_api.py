@@ -44,6 +44,8 @@ from group_interview_arena_api.identity.sessions import (
 pytestmark = pytest.mark.integration
 
 VALID_PASSWORD = "integration-only password phrase"
+TRUSTED_ORIGIN = "http://localhost:3000"
+AUTH_POST_HEADERS = {"Origin": TRUSTED_ORIGIN, "X-GIA-CSRF": "1"}
 
 
 class TemporaryDatabaseContext(Protocol):
@@ -73,13 +75,18 @@ async def _auth_client(
     settings: Settings | None = None,
 ) -> AsyncGenerator[tuple[FastAPI, AsyncClient]]:
     application = create_app(
-        settings or Settings(environment=Environment.TEST),
+        settings
+        or Settings(
+            environment=Environment.TEST,
+            cors_origins=(TRUSTED_ORIGIN,),
+        ),
         temporary_database.database_settings(),
     )
     async with application.router.lifespan_context(application):
         async with AsyncClient(
             transport=ASGITransport(app=application),
             base_url="http://testserver",
+            headers=AUTH_POST_HEADERS,
         ) as client:
             yield application, client
 
@@ -502,6 +509,7 @@ async def _exercise_logout_contract(
         async with AsyncClient(
             transport=ASGITransport(app=application),
             base_url="http://testserver",
+            headers=AUTH_POST_HEADERS,
         ) as old_session_client:
             old_session_client.cookies.set(SESSION_COOKIE_NAME, old_token)
             old_me = await old_session_client.get("/auth/me")
@@ -511,6 +519,7 @@ async def _exercise_logout_contract(
         async with AsyncClient(
             transport=ASGITransport(app=application),
             base_url="http://testserver",
+            headers=AUTH_POST_HEADERS,
         ) as idempotent_client:
             missing = await idempotent_client.post("/auth/logout")
             assert missing.status_code == 204

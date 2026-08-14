@@ -5,13 +5,13 @@
 - API architecture baseline established by: P0-2 — DONE
 - Target version: V0.1 Internal Validation
 - Implemented contracts: `GET /health`, `POST /auth/register`, `POST /auth/login`, `POST /auth/logout`, `GET /auth/me`
-- P0-5 browser CORS/CSRF/Web closure: Not started (`P0-5D awaiting explicit approval`)
+- P0-5 browser CORS/CSRF/Web closure: P0-5D completed
 - Detailed P1 WebSocket schema: Not started
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
 
-本文件记录 P0-2 已批准的 REST、WebSocket、契约生成、恢复和错误语义基线，并同步 P0-3D/P0-3E 与 P0-5C 已实现的 REST 技术契约。P0-5C 只完成 backend auth runtime；本文件不冻结完整 P1 事件集合，也不把 P0-5D browser closure 描述为已实现。
+本文件记录 P0-2 已批准的 REST、WebSocket、契约生成、恢复和错误语义基线，并同步 P0-3D/P0-3E、P0-5C 与 P0-5D 已实现的 REST/browser 技术契约。本文件不冻结完整 P1 事件集合；P0-5E awaiting explicit approval，独立最终审核尚未开始。
 
 正式决策见 [`DECISIONS.md`](DECISIONS.md) `ADR-006`、`ADR-007`、`ADR-013`、`ADR-015`。
 
@@ -87,7 +87,7 @@ P0-3E 的实际流程为：FastAPI `/openapi.json` → `openapi-typescript` → 
 - response 暴露 `X-Request-ID`；未批准 origin 不获得 `Access-Control-Allow-Origin`；
 - `NEXT_PUBLIC_API_BASE_URL` 是浏览器可见的公开 base URL，不是 secret；当前 Web 从浏览器直接请求 FastAPI，不经过 Next.js proxy。
 
-这些是当前已实现行为。P0-5D 计划在保持 explicit origin allowlist 和 wildcard rejection 的前提下启用 credentialed Cookie requests；未到 P0-5D 前不得把 `allow_credentials=true` 描述为已实现。
+以上是 P0-3E 当时的历史行为。P0-5D 已在继续保持 explicit origin allowlist 与 wildcard rejection 的前提下，将当前 CORS contract 更新为 `allow_credentials=true`、methods 精确为 `GET`/`POST`、request headers 精确为 `Content-Type`/`X-GIA-CSRF`，并继续只 expose `X-Request-ID`。
 
 ## P0-5C implemented REST identity contract
 
@@ -102,7 +102,7 @@ Password、password hash 与 raw session token 永不进入 JSON response。P0-5
 
 Cookie session 在 OpenAPI 中使用名为 `SessionCookie` 的 `apiKey`/Cookie security scheme，不引入 JWT bearer scheme。FastAPI OpenAPI 继续是 REST contract Source of Truth；P0-5C 已重新生成并验证 Web TypeScript derivative，未添加手写平行 auth DTO。
 
-## P0-5 browser security boundary — planned
+## P0-5 browser security boundary — P0-5D implemented
 
 - Raw session token 只存在于 host-only HttpOnly Cookie；database 只保存 digest；
 - local development baseline：`Secure=false`、`SameSite=Lax`、`Path=/`、省略 Domain；
@@ -110,7 +110,7 @@ Cookie session 在 OpenAPI 中使用名为 `SessionCookie` 的 `apiKey`/Cookie s
 - P0-5C scoped Cookie name 为 `gia_session`；
 - P0-5 implementation-scoped default 为 7-day absolute expiry，无 sliding refresh、无 refresh token。
 
-P0-5C 已实现 Cookie issue/clear，但明确保持 `allow_credentials=false`，未实现 CSRF runtime。P0-5D 必须让所有 browser state-changing auth POST（`POST /auth/register`、`POST /auth/login`、`POST /auth/logout`）统一要求 exact Origin validation 和 required custom browser CSRF/request header；Origin 必须存在于与 CORS 共用的 `GIA_API_CORS_ORIGINS` normalized trusted-origin set，并使用 credentialed explicit CORS。`GET /auth/me` 不要求 CSRF header。不得新增会漂移的 `GIA_API_CSRF_TRUSTED_ORIGINS`；SameSite=Lax 只作为 defense-in-depth，不是唯一 CSRF 控制。在 P0-5D 完成前不得声称 browser authentication closure 已完成。
+P0-5D 已让所有 browser state-changing auth POST（`POST /auth/register`、`POST /auth/login`、`POST /auth/logout`）统一要求单一 exact `Origin` 与单一 `X-GIA-CSRF: 1`；Origin 必须存在于与 CORS 共用的 `GIA_API_CORS_ORIGINS` normalized trusted-origin set。缺失、`null`、不受信任、重复或错误值统一返回现有 error envelope 下的 `403 CSRF_REJECTED`。`GET /auth/me` 不要求 CSRF header。没有新增 `GIA_API_CSRF_TRUSTED_ORIGINS`；SameSite=Lax 继续只作为 defense-in-depth。Web 保留 raw ASCII username 并由 backend 返回 canonical lowercase username；真实 Chromium 已验证该 canonical restore、Cookie flags、reload restore、missing-header rejection、logout invalidation 与 Cookie 清除。
 
 ## Versioned WebSocket contract
 
@@ -180,7 +180,7 @@ P0-3D 已实现的最小错误 envelope 为：
 - FastAPI 是领域、会话状态和持久化的业务权威；
 - Next.js server-side 能力不得复制领域规则、状态机、评分、Agent 编排或持久化权威；
 - 服务端密钥不得进入浏览器；
-- P0/V0.1 initial username/password 与 opaque Cookie session boundary 已由 `ADR-015` 批准；P0-5B 已实现 persistence/security primitives，P0-5C 已实现 backend Cookie/auth HTTP runtime，但 credentialed CORS/CSRF/Web browser closure 仍未实现；
+- P0/V0.1 initial username/password 与 opaque Cookie session boundary 已由 `ADR-015` 批准；P0-5B 已实现 persistence/security primitives，P0-5C 已实现 backend Cookie/auth HTTP runtime，P0-5D 已实现 credentialed CORS/CSRF/Web browser closure；
 - production 环境不得误启不安全的开发身份；
 - structured output 和关键事件 payload 在对应实现阶段使用 Schema validation；
 - prompt、角色私有信息和评分规则不得因 API 错误或日志泄露。

@@ -17,7 +17,7 @@
 
 ## 当前版本范围
 
-P0-2 技术架构决策、P0-3 前后端项目骨架与 P0-4 数据库及迁移基础已完成。P0-4A～P0-4F 均已完成，P0-4 已通过独立最终验收并转为 `DONE`。P0-5 已进入 `IN_PROGRESS`：P0-5A/P0-5B/P0-5C completed，P0-5D awaiting explicit approval，P0-5E not started。P0 尚未完成；backend auth runtime 已实现，但 browser CORS/CSRF/Web closure 与 V0.1 业务能力尚未实现。下方 P0 exit 与产品版本复选框仍表示完整阶段/版本验收，不能由单个子任务替代。
+P0-2 技术架构决策、P0-3 前后端项目骨架与 P0-4 数据库及迁移基础已完成。P0-4A～P0-4F 均已完成，P0-4 已通过独立最终验收并转为 `DONE`。P0-5 已进入 `IN_PROGRESS`：P0-5A/P0-5B/P0-5C/P0-5D completed，P0-5E awaiting explicit approval，independent final review not started。P0 尚未完成；browser CORS/CSRF/Web closure 已实现，但 P0-5E 与 V0.1 业务能力尚未完成。下方 P0 exit 与产品版本复选框仍表示完整阶段/版本验收，不能由单个子任务替代。
 
 ## Implementation guidance
 
@@ -207,7 +207,22 @@ P0-5B 最终源码审核已 PASS 并转为 completed；其后的 P0-5C 当前状
 - [x] 无新 dependency、lockfile change、migration、schema change 或 development DB mutation；development DB 仍为 identity head 且 `users`/`auth_sessions` 均 0 rows；
 - [ ] Credentialed CORS、CSRF、Web auth UI 与真实 browser auth round trip 留给 P0-5D，P0-5C 不构成 browser authentication closure。
 
-P0-5C final review 已 PASS 并转为 completed；P0-5D awaiting explicit approval；P0-5E 保持 not started。
+P0-5C final review 已 PASS 并转为 completed；P0-5D 证据见下节，P0-5E awaiting explicit approval / not started。
+
+### P0-5D browser authentication closure — 2026-08-14
+
+- [x] Credentialed explicit CORS 共用 `GIA_API_CORS_ORIGINS`，methods 精确为 `GET`/`POST`，headers 精确为 `Content-Type`/`X-GIA-CSRF`，只 expose `X-Request-ID`；
+- [x] register/login/logout 统一要求 exact trusted Origin 与 `X-GIA-CSRF: 1`；missing/null/untrusted/duplicate/wrong boundary 返回 `403 CSRF_REJECTED`，`GET /auth/me` 豁免；
+- [x] Web `openapi-fetch` client 使用 `credentials: "include"`，只为 unsafe auth POST 添加 CSRF marker；
+- [x] 最小 UI 覆盖 loading、unauthenticated register/login、authenticated username、initial `/auth/me` restore 与 logout；
+- [x] Web 保留 uppercase-capable raw ASCII username，API caller 接收 raw value，backend canonical lowercase username 在注册结果与 reload restore 中一致显示；
+- [x] Web unit suite 16 项通过；API unit 132、integration 18（skipped 0）、full 150 项通过；lint、format、typecheck、build、Alembic head 与 OpenAPI drift 通过；
+- [x] 唯一新增 direct Web dev dependency 为 `@playwright/test 1.62.1`；Chromium only；
+- [x] Browser E2E 使用 fresh migrated `gia_p05d_*` PostgreSQL database，成功/失败路径均精确 drop；development DB 未被写入；
+- [x] 真实 Chromium 验证 register、Cookie flags、`document.cookie` 隔离、reload restore、storage 无 secret、missing-CSRF `403`、logout、后续 `/auth/me` `401` 与 Cookie 清除；selected 1、skipped 0、passed 1；
+- [x] Windows Uvicorn runtime 使用 Psycopg-compatible `SelectorEventLoop`；E2E 后 3000/8000 listener 与 `gia_p05d_*` residual 均为 0。
+
+P0-5D actual-source final review 已 PASS 并转为 completed；P0-5E awaiting explicit approval，independent final review not started，因此 P0-5 尚不能转为 `DONE`。
 
 ## P0 exit
 
@@ -327,7 +342,7 @@ P0-2 已 Accepted PostgreSQL、SQLAlchemy 2.x 和 Alembic，P0-4 实施基线为
 
 ## Future work
 
-- P0-5C：completed；P0-5D awaiting explicit approval；P0-5E 保持 not started。
+- P0-5D：completed；P0-5E awaiting explicit approval，independent final review not started。
 - P0-6：补充实际自动检查和基础可观测性项目。
 - P0-7：执行并记录 P0 exit 验收。
 - 各版本发布任务：补充负责人、环境、命令、证据和发布/回滚步骤。

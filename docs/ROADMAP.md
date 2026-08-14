@@ -3,8 +3,8 @@
 - Status: Active baseline
 - Current development phase: P0 — 项目基础
 - Current task: P0-5 — IN_PROGRESS
-- Current substep: P0-5C completed
-- Next substep: P0-5D awaiting explicit approval
+- Most recently completed substep: P0-5D completed
+- Next substep: P0-5E awaiting explicit approval / independent final review not started
 - Target product version: V0.1 — Internal Validation
 - Source: [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) §30–31
 
@@ -45,9 +45,9 @@
 | P0-6 CI、日志与基础可观测性 | 建立自动检查、日志和基础监控能力 | TODO |
 | P0-7 P0 独立验收 | 独立确认 P0 是否满足进入 P1 的条件 | TODO |
 
-任务细节及验收条件见 [`TASKS.md`](TASKS.md)。P0-3 与 P0-4 均已通过独立最终验收并转为 `DONE`。P0-5A/P0-5B/P0-5C completed；P0-5D awaiting explicit approval；P0-5E not started。P0-5 与 P0 整体仍为 `IN_PROGRESS`。
+任务细节及验收条件见 [`TASKS.md`](TASKS.md)。P0-3 与 P0-4 均已通过独立最终验收并转为 `DONE`。P0-5A/P0-5B/P0-5C/P0-5D completed；P0-5E awaiting explicit approval，independent final review not started。P0-5 与 P0 整体仍为 `IN_PROGRESS`。
 
-P0-5 固定采用五阶段执行：P0-5A identity preflight（completed）、P0-5B identity persistence/migration/security primitives（completed）、P0-5C backend auth runtime/API（completed）、P0-5D Web/CORS/CSRF cross-layer validation（awaiting explicit approval）、P0-5E independent final review（not started）。
+P0-5 固定采用五阶段执行：P0-5A identity preflight（completed）、P0-5B identity persistence/migration/security primitives（completed）、P0-5C backend auth runtime/API（completed）、P0-5D Web/CORS/CSRF cross-layer validation（completed）、P0-5E independent final review（awaiting explicit approval / not started）。
 
 P0-2 已 Accepted PostgreSQL、SQLAlchemy 2.x 和 Alembic；P0-4 实施基线为 PostgreSQL 18.x，且 Redis 不进入默认 Compose。完整决策和重新评估条件见 [`DECISIONS.md`](DECISIONS.md)。
 

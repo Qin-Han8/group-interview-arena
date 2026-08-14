@@ -42,7 +42,7 @@ def test_allowed_origin_receives_cors_headers() -> None:
     assert response.status_code == 200
     assert response.headers["Access-Control-Allow-Origin"] == ALLOWED_ORIGIN
     assert "X-Request-ID" in response.headers["Access-Control-Expose-Headers"]
-    assert "Access-Control-Allow-Credentials" not in response.headers
+    assert response.headers["Access-Control-Allow-Credentials"] == "true"
 
 
 def test_disallowed_origin_is_not_authorized() -> None:
@@ -65,3 +65,64 @@ def test_allowed_get_preflight_succeeds() -> None:
     assert response.status_code == 200
     assert response.headers["Access-Control-Allow-Origin"] == ALLOWED_ORIGIN
     assert "GET" in response.headers["Access-Control-Allow-Methods"]
+
+
+def test_allowed_auth_post_preflight_has_exact_browser_contract() -> None:
+    response = asyncio.run(
+        _request(
+            _application(),
+            "OPTIONS",
+            origin=ALLOWED_ORIGIN,
+            headers={
+                "Access-Control-Request-Method": "POST",
+                "Access-Control-Request-Headers": "content-type,x-gia-csrf",
+            },
+        )
+    )
+
+    assert response.status_code == 200
+    assert response.headers["Access-Control-Allow-Origin"] == ALLOWED_ORIGIN
+    assert response.headers["Access-Control-Allow-Credentials"] == "true"
+    assert set(response.headers["Access-Control-Allow-Methods"].split(", ")) == {
+        "GET",
+        "POST",
+    }
+    allowed_headers = {
+        value.strip().lower()
+        for value in response.headers["Access-Control-Allow-Headers"].split(",")
+    }
+    assert {"content-type", "x-gia-csrf"} <= allowed_headers
+    assert "authorization" not in allowed_headers
+
+
+def test_unapproved_request_header_preflight_is_rejected() -> None:
+    response = asyncio.run(
+        _request(
+            _application(),
+            "OPTIONS",
+            origin=ALLOWED_ORIGIN,
+            headers={
+                "Access-Control-Request-Method": "POST",
+                "Access-Control-Request-Headers": "authorization",
+            },
+        )
+    )
+
+    assert response.status_code == 400
+
+
+def test_disallowed_auth_post_preflight_is_rejected() -> None:
+    response = asyncio.run(
+        _request(
+            _application(),
+            "OPTIONS",
+            origin=DISALLOWED_ORIGIN,
+            headers={
+                "Access-Control-Request-Method": "POST",
+                "Access-Control-Request-Headers": "content-type,x-gia-csrf",
+            },
+        )
+    )
+
+    assert response.status_code == 400
+    assert "Access-Control-Allow-Origin" not in response.headers
