@@ -9,6 +9,7 @@ from group_interview_arena_api.db.base import Base
 API_ROOT = Path(__file__).resolve().parents[1]
 ALEMBIC_CONFIG_PATH = API_ROOT / "alembic.ini"
 BASELINE_REVISION = "7c6ccd86b3c5"
+IDENTITY_REVISION = "4fe43b42641b"
 
 
 def _alembic_config() -> Config:
@@ -25,15 +26,24 @@ def test_alembic_config_uses_project_migration_directory_without_url() -> None:
     assert config.get_main_option("sqlalchemy.url") is None
 
 
-def test_migration_history_has_single_baseline_head() -> None:
+def test_migration_history_is_linear_with_single_identity_head() -> None:
     script = ScriptDirectory.from_config(_alembic_config())
-    revision = script.get_revision(BASELINE_REVISION)
+    baseline = script.get_revision(BASELINE_REVISION)
+    identity = script.get_revision(IDENTITY_REVISION)
 
-    assert script.get_heads() == [BASELINE_REVISION]
-    assert revision.revision == BASELINE_REVISION
-    assert revision.down_revision is None
-    assert revision.branch_labels == set()
-    assert revision.dependencies is None
+    assert script.get_heads() == [IDENTITY_REVISION]
+    assert [revision.revision for revision in script.walk_revisions()] == [
+        IDENTITY_REVISION,
+        BASELINE_REVISION,
+    ]
+    assert baseline.revision == BASELINE_REVISION
+    assert baseline.down_revision is None
+    assert baseline.branch_labels == set()
+    assert baseline.dependencies is None
+    assert identity.revision == IDENTITY_REVISION
+    assert identity.down_revision == BASELINE_REVISION
+    assert identity.branch_labels == set()
+    assert identity.dependencies is None
 
 
 def test_baseline_upgrade_and_downgrade_are_zero_op() -> None:
@@ -55,5 +65,5 @@ def test_baseline_upgrade_and_downgrade_are_zero_op() -> None:
         assert isinstance(function.body[1], ast.Pass)
 
 
-def test_migration_target_metadata_has_no_business_tables() -> None:
-    assert len(Base.metadata.tables) == 0
+def test_migration_target_metadata_has_exact_identity_tables() -> None:
+    assert set(Base.metadata.tables) == {"auth_sessions", "users"}

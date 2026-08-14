@@ -11,7 +11,7 @@
 
 ## 文档目的
 
-本文件记录 P0-2 已批准的 REST、WebSocket、契约生成、恢复和错误语义基线，并同步 P0-3D/P0-3E 已实现的最小 REST 技术契约与连通方式。它不冻结完整 P1 事件集合。
+本文件记录 P0-2 已批准的 REST、WebSocket、契约生成、恢复和错误语义基线，并同步 P0-3D/P0-3E 已实现的最小 REST 技术契约与连通方式。P0-5B 只实现 identity persistence/security primitives，没有新增 HTTP contract；本文件不冻结完整 P1 事件集合。
 
 正式决策见 [`DECISIONS.md`](DECISIONS.md) `ADR-006`、`ADR-007`、`ADR-013`、`ADR-015`。
 
@@ -180,7 +180,7 @@ P0-3D 已实现的最小错误 envelope 为：
 - FastAPI 是领域、会话状态和持久化的业务权威；
 - Next.js server-side 能力不得复制领域规则、状态机、评分、Agent 编排或持久化权威；
 - 服务端密钥不得进入浏览器；
-- P0/V0.1 initial username/password 与 opaque Cookie session boundary 已由 `ADR-015` 批准，但尚未实现；
+- P0/V0.1 initial username/password 与 opaque Cookie session boundary 已由 `ADR-015` 批准；P0-5B 已实现 persistence/security primitives，但 Cookie/auth HTTP runtime 仍未实现；
 - production 环境不得误启不安全的开发身份；
 - structured output 和关键事件 payload 在对应实现阶段使用 Schema validation；
 - prompt、角色私有信息和评分规则不得因 API 错误或日志泄露。

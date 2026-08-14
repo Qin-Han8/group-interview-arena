@@ -17,7 +17,7 @@
 
 ## 当前版本范围
 
-P0-2 技术架构决策、P0-3 前后端项目骨架与 P0-4 数据库及迁移基础已完成。P0-4A～P0-4F 均已完成，P0-4 已通过独立最终验收并转为 `DONE`。P0-5 已进入 `IN_PROGRESS`：P0-5A identity/security/scope decision closeout completed，P0-5B awaiting explicit approval，P0-5C/P0-5D/P0-5E not started。P0 尚未完成，identity implementation 与 V0.1 业务能力尚未实现。下方 P0 exit 与产品版本复选框仍表示完整阶段/版本验收，不能由单个子任务替代。
+P0-2 技术架构决策、P0-3 前后端项目骨架与 P0-4 数据库及迁移基础已完成。P0-4A～P0-4F 均已完成，P0-4 已通过独立最终验收并转为 `DONE`。P0-5 已进入 `IN_PROGRESS`：P0-5A/P0-5B completed，P0-5C awaiting explicit approval，P0-5D/P0-5E not started。P0 尚未完成；identity persistence/security primitives 已实现，但 backend/browser auth runtime 与 V0.1 业务能力尚未实现。下方 P0 exit 与产品版本复选框仍表示完整阶段/版本验收，不能由单个子任务替代。
 
 ## Implementation guidance
 
@@ -136,8 +136,8 @@ P0-3 已通过第二次独立最终验收并转为 `DONE`。P0 整体仍为 `IN_
 - [x] 唯一 head `7c6ccd86b3c5` 是 zero-op baseline，upgrade/downgrade 均无业务 DDL；
 - [x] fresh 隔离临时 PostgreSQL database upgrade 到 head、重复 upgrade、`current --check-heads` 与 `alembic check` 通过；
 - [x] downgrade base、re-upgrade 与最终 `alembic check` 通过；
-- [x] head 状态只存在 Alembic 自身的 `alembic_version`，business table count 为 `0`；
-- [x] 临时数据库已精确删除；development database 未迁移、仍存在且 `SELECT 1` 通过；
+- [x] P0-4D 临时数据库在 zero-op head 时只存在 Alembic 自身的 `alembic_version`，当时 business table count 为 `0`；
+- [x] 临时数据库已精确删除；P0-4D 验收时 development database 未迁移、仍存在且 `SELECT 1` 通过；P0-5B 后的当前状态见 identity 验证记录；
 - [x] Ruff、format check、Pyright 与 35 项 pytest 通过，其中 4 项为 migration static/unit tests。
 
 这些证据是 P0-4D migration runtime smoke，不是 P0-4E reusable PostgreSQL integration test suite。P0-4D 已完成；当前 P0-4E 证据见下方 verification。
@@ -150,10 +150,10 @@ P0-3 已通过第二次独立最终验收并转为 `DONE`。P0 整体仍为 `IN_
 - [x] 现有 AsyncEngine 与 AsyncSession 真实连接 PostgreSQL major 18；
 - [x] test-only probe table 上的 commit 与 explicit rollback 均通过；
 - [x] fresh database → unique migration head、repeat upgrade、`alembic check`、downgrade base、re-upgrade 与 final check 通过；
-- [x] migration business table count 与 `Base.metadata` table count 均为 `0`；probe table 未进入 product schema；
+- [x] P0-4E 验收时 migration business table count 与 `Base.metadata` table count 均为 `0`；probe table 未进入 product schema；
 - [x] unit suite 35 项、integration suite 11 项（skipped 0）、full suite 46 项通过；
 - [x] `uv sync --frozen`、`uv lock --check`、Ruff、format check 与 Pyright 通过；
-- [x] development database 未执行 migration、没有 `alembic_version`、`SELECT 1` 通过；本轮临时 database residual count 为 `0`；
+- [x] P0-4E 验收时 development database 未执行 migration、没有 `alembic_version`、`SELECT 1` 通过；P0-5B 后的当前状态见 identity 验证记录；本轮临时 database residual count 为 `0`；
 - [x] 未新增 dependency，`uv.lock`、baseline revision、Web、Compose 与业务 schema 均未改变。
 
 这些证据只覆盖 P0-4E reusable PostgreSQL integration/migration test foundation；P0-4F 的独立最终验收证据见下方记录。
@@ -165,7 +165,7 @@ P0-3 已通过第二次独立最终验收并转为 `DONE`。P0 整体仍为 `IN_
 - [x] Docker/Compose、唯一 PostgreSQL `18.4` service、IPv4 loopback binding、healthy 与 local named volume 通过；
 - [x] secret、direct dependency、SQLAlchemy、FastAPI、Alembic、Windows asyncio、migration history/template 与 integration harness safety 审计通过；
 - [x] unit 35、integration 11（skipped 0）、full 46 项通过；frozen sync、lock check、Ruff、format、Pyright 与唯一 Alembic head 通过；
-- [x] development database `SELECT 1` 通过、无 `alembic_version`、public product table 为 `0`；`gia_p04e_%` residual 为 `0`；
+- [x] P0-4F 验收时 development database `SELECT 1` 通过、无 `alembic_version`、public product table 为 `0`；P0-5B 后已安全迁移至 identity head；`gia_p04e_%` residual 为 `0`；
 - [x] 未修改被审计实现或运行资源，PostgreSQL container、named volume 与 development database 均保留。
 
 P0-4 已通过独立最终验收并转为 `DONE`。该验收时 P0-5 尚未获批；当前 P0-5A 已完成，实施状态见下方记录。这不代表 P0 exit 或 V0.1 业务能力已完成。
@@ -179,7 +179,22 @@ P0-4 已通过独立最终验收并转为 `DONE`。该验收时 P0-5 尚未获�
 - [x] P0-5 five-stage execution plan、migration safety、security risks 与 public-exposure gates 已建立；
 - [x] 文档明确区分 approved architecture、planned implementation 与 actually implemented capability。
 
-这些证据只覆盖 P0-5A 决策和范围收尾。当前没有 `users`/`auth_sessions`、identity migration、password hashing、FastAPI DB lifecycle/auth endpoint、Cookie session、credentialed CORS/CSRF 或 Web auth implementation；P0 identity exit item 仍不得勾选。
+这些证据只覆盖 P0-5A 决策和范围收尾；后续 P0-5B implementation evidence 见下节。P0 identity exit item 仍不得勾选。
+
+### P0-5B identity persistence and security primitives — 2026-08-14
+
+- [x] `pwdlib[argon2]>=0.3.0,<0.4` 是唯一新增 direct runtime dependency；解析 `pwdlib 0.3.1`、`argon2-cffi 25.1.0`，CPython 3.14.7 import/API 验证通过；
+- [x] Argon2id 参数由 application 显式拥有：memory 65536 KiB、time 3、parallelism 4、hash 32、salt 16；未使用 `PasswordHash.recommended()`；
+- [x] 5 个本机样本的 hash median 约 54.3 ms、verify median 约 51.6 ms，未出现不合理秒级成本；该证据不是跨机器性能保证；
+- [x] canonical username 先校验 raw ASCII，Unicode lowercase bypass regression 通过；15–128 password、NFC/no-trim/no-silent-change、small offline full-match blocklist、hash/verify/verify-and-update、policy drift 与 malformed hash safe-failure 测试通过；
+- [x] `users`、`auth_sessions` models 与 exact PK/unique/FK `ON DELETE CASCADE`/expiry index schema 已实现，session primitive 与 integration persistence 验证 32-byte SHA-256 digest，metadata product table count 精确为 2；
+- [x] identity revision `4fe43b42641b` 线性承接 immutable baseline `7c6ccd86b3c5`；single head、revision count 2；
+- [x] fresh temporary PostgreSQL upgrade/repeat/check、downgrade 至 baseline、identity table removal、re-upgrade/final check 与 exact schema validation 通过；
+- [x] unit 83、integration 12（skipped 0）、full 95 项通过；frozen sync、lock check、Ruff、format 与 Pyright 通过；
+- [x] development database preflight 确认 product table count 0、`alembic_version` absent 后首次迁移至 identity head；repeat upgrade no-op，两张表 row count 0，未 downgrade；
+- [x] `gia_p05b_%` 与 `gia_p04e_%` residual 均为 0；无 wildcard cleanup；无 auth route、FastAPI DB lifecycle、Cookie/CORS/CSRF 或 Web auth scope expansion。
+
+P0-5B 最终源码审核已 PASS 并转为 completed；P0-5C 等待明确批准。
 
 ## P0 exit
 
@@ -299,7 +314,7 @@ P0-2 已 Accepted PostgreSQL、SQLAlchemy 2.x 和 Alembic，P0-4 实施基线为
 
 ## Future work
 
-- P0-5B～P0-5E：按 approved five-stage plan 实施、跨层验证并独立验收身份边界。
+- P0-5C：等待明确批准；P0-5D/P0-5E 保持 not started。
 - P0-6：补充实际自动检查和基础可观测性项目。
 - P0-7：执行并记录 P0 exit 验收。
 - 各版本发布任务：补充负责人、环境、命令、证据和发布/回滚步骤。

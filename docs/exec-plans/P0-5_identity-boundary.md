@@ -1,6 +1,6 @@
 # P0-5 Identity Boundary Execution Plan
 
-Status: `P0-5 IN_PROGRESS`; `P0-5A completed`; `P0-5B awaiting explicit approval`; `P0-5C`～`P0-5E` not started
+Status: `P0-5 IN_PROGRESS`; `P0-5A completed`; `P0-5B completed`; `P0-5C awaiting explicit approval`; `P0-5D`～`P0-5E` not started
 
 Target version: `V0.1 Internal Validation`
 
@@ -18,15 +18,15 @@ Product baseline: [`PROJECT_MASTER_PLAN.md`](../PROJECT_MASTER_PLAN.md)
 
 - P0-4 已完成 PostgreSQL、SQLAlchemy async、Alembic 和 integration test foundation。
 - Alembic baseline revision 为 `7c6ccd86b3c5`，必须保持不可变且 migration graph 保持 single head。
-- 当前 development database 预期为 public product tables = 0，且不存在 `alembic_version`。
-- 当前应用没有 `users`、`auth_sessions`、password hashing、session Cookie、认证 API 或 Web auth flow。
+- P0-5B 前 development database 为 public product tables = 0 且不存在 `alembic_version`；通过全部 isolated gates 后，现已首次迁移至 identity head `4fe43b42641b`。
+- 当前应用已具有 `users`、`auth_sessions`、password/session security primitives；仍没有 session Cookie、认证 API、FastAPI DB lifecycle 或 Web auth flow。
 - 现有 typed `GIA_API_CORS_ORIGINS` 是已批准的 browser trusted-origin Source of Truth；P0-5 不建立第二套 CSRF trusted-origin 配置。
 
 ## Five-stage decomposition
 
 1. **P0-5A — Identity preflight / security & scope freeze**：`completed`。批准 ADR-015、范围、风险与本执行计划；不实施认证代码。
-2. **P0-5B — Identity persistence + migration + security primitives**：`awaiting explicit approval`。实现 identity schema、migration、显式 Argon2id 配置和 session token primitives。
-3. **P0-5C — Backend auth runtime + FastAPI DB lifecycle + API**：`not started`。接入 request-scoped database session 和最小 auth API。
+2. **P0-5B — Identity persistence + migration + security primitives**：`completed`。已实现 identity schema、migration、显式 Argon2id 配置和 session token primitives，并通过最终源码审核。
+3. **P0-5C — Backend auth runtime + FastAPI DB lifecycle + API**：`awaiting explicit approval`。获批后接入 request-scoped database session 和最小 auth API。
 4. **P0-5D — Web auth round trip + CORS/CSRF + cross-layer validation**：`not started`。完成 Web 技术闭环和浏览器安全验证。
 5. **P0-5E — Independent final review**：`not started`。独立复核完整 P0-5 diff、质量门、迁移安全和范围一致性，不新增业务能力。
 
@@ -60,22 +60,22 @@ ADR-015 确认：
 
 ### Password and Argon2id
 
-- P0-5B 预计仅新增 `pwdlib[argon2]` runtime dependency，但实施前必须验证当前 stable version、Python 3.14 compatibility、dependency graph 和实际 API，再 pin compatible constraint。
+- P0-5B 唯一新增 direct runtime dependency 为 `pwdlib[argon2]>=0.3.0,<0.4`；实际解析 `pwdlib 0.3.1` 与 `argon2-cffi 25.1.0`，并已在 CPython 3.14.7 验证 API 与 dependency graph。
 - Password scoped baseline：15–128 Unicode code points；以一致的 NFC 规范化进行验证和处理，不 trim、不改变大小写、不拼接额外内容、不静默截断。
 - Application 必须显式配置并拥有 Argon2id 参数，不能只调用 `PasswordHash.recommended()` 后声称参数永久固定。
-- 以下仅为 P0-5B implementation-scoped candidate，而不是当前已冻结的长期参数：
+- 以下值已通过本机 benchmark，冻结为 P0-5B implementation values，但不是长期 ADR contract：
   - `memory_cost = 65536 KiB`
   - `time_cost = 3`
   - `parallelism = 4`
   - `hash_len = 32`
   - `salt_len = 16`
-- P0-5B 必须先验证 pwdlib/Argon2 实际 API、显式配置这些候选值、在目标环境 benchmark，再冻结最终实现值。
+- 实际使用显式 `PasswordHash((Argon2Hasher(...),))`，未使用 `PasswordHash.recommended()`；5 个本机样本的 hash median 约 54.3 ms、verify median 约 51.6 ms，该观察不构成跨机器性能保证。
 - NOW：small application-owned offline password blocklist、context-specific obvious passwords、normalized full-password exact match。
 - 不做 substring 禁止，不调用 external breach API，不引入 massive leaked-password dataset、Redis 或 production distributed rate limiter，也不声称完整 NIST compliance。
 
-### `users` candidate schema
+### `users` implemented schema
 
-P0-5A 已批准以下 scoped schema baseline；P0-5B 获得明确批准后方可实施：
+P0-5B 已按 P0-5A 批准的 scoped schema baseline 实现：
 
 - `id`: UUIDv4 primary key
 - `username`: `VARCHAR(32) UNIQUE NOT NULL`
@@ -85,9 +85,9 @@ P0-5A 已批准以下 scoped schema baseline；P0-5B 获得明确批准后方可
 
 DEFER：email、phone、display_name、role、status、is_active、deleted_at、last_login_at、verification timestamps。除非 P0-5B 实施前发现真实 blocker，否则不得扩展字段。
 
-### `auth_sessions` candidate schema
+### `auth_sessions` implemented schema
 
-P0-5A 已批准以下 scoped schema baseline；P0-5B 获得明确批准后方可实施：
+P0-5B 已按 P0-5A 批准的 scoped schema baseline 实现：
 
 - `id`: UUIDv4 primary key
 - `user_id`: UUID foreign key → `users.id`, `ON DELETE CASCADE`
@@ -156,12 +156,11 @@ FastAPI lifespan
 
 ## Dependency proposal
 
-- P0-5 唯一新 runtime dependency 候选是 direct dependency `pwdlib[argon2]`。
-- P0-5B 实施前必须查询 current stable release、验证 Python 3.14 compatibility、审查 dependency graph 与实际 password-hash API，再 pin compatible version constraint。
+- P0-5 唯一新 direct runtime dependency 是 `pwdlib[argon2]>=0.3.0,<0.4`；P0-5B 解析并锁定 `pwdlib 0.3.1`、`argon2-cffi 25.1.0`，CPython 3.14.7 compatibility 与实际 password-hash API 已验证。
 - `email-validator`：NO；当前没有 email credential 或 email field。
 - `PyJWT` / `python-jose`：NO；当前不采用 JWT。
 - OAuth/social/auth framework：NO；当前没有对应 caller。
-- P0-5A 不安装任何 dependency，也不修改 `pyproject.toml` 或 `uv.lock`。
+- P0-5A 未安装 dependency；P0-5B 只因上述批准 dependency graph 修改 `pyproject.toml` 与 `uv.lock`。
 
 ## Planned API and Web boundary
 
@@ -179,11 +178,11 @@ P0-5D Web 只实现 register、login、current-user status、logout 的技术闭
 ## Migration policy and safety
 
 - Baseline revision `7c6ccd86b3c5` 不可修改、不 squash。
-- P0-5B 创建第一批且仅包含批准 identity schema 的真实 migration，保持 single head。
+- P0-5B 已创建 revision `4fe43b42641b`，且仅包含批准的 identity schema；baseline immutable，revision count 2，保持 single head。
 - 首次 development DB migration 前，必须先在 fresh isolated temporary database 验证：upgrade、downgrade、re-upgrade、`alembic check` 和 constraints。
 - Development DB 操作必须有 exact database-name guard、read-only preflight、schema precondition 和明确获批的实施范围。
-- Development DB precondition 预期：public product tables = 0，`alembic_version` absent；发现不一致即停止。
-- 不自动 downgrade development DB。
+- Development DB precondition 已验证：public product tables = 0、`alembic_version` absent；随后首次升级到 identity head并验证 repeat upgrade no-op。
+- Development DB 未执行 downgrade；当前精确包含 `users`、`auth_sessions` 与 infrastructure `alembic_version`，两张 product table 行数为 0。
 
 ## NOW / DEFER
 
@@ -214,7 +213,7 @@ P0-5D Web 只实现 register、login、current-user status、logout 的技术闭
 - `users`、`auth_sessions` models/constraints/indexes 与 session token primitives 符合本计划；无 deferred fields/tables。
 - 新 migration single head、baseline unchanged；fresh temporary DB upgrade/downgrade/re-upgrade/check/constraints 全通过。
 - 获明确批准并通过 exact-name/read-only/schema preflight 后，才可首次迁移 development DB；不得自动 downgrade。
-- Unit、integration、lint、format、typecheck 和 migration gates 全通过；P0-5C 尚未开始。
+- Unit、integration、lint、format、typecheck 和 migration gates 全通过；P0-5C 尚未实施并等待明确批准。
 
 ### P0-5C
 
@@ -255,7 +254,7 @@ P0-5D Web 只实现 register、login、current-user status、logout 的技术闭
 ## Progress
 
 - [x] P0-5A approved preflight, ADR-015 and scope freeze
-- [ ] P0-5B identity persistence, migration and security primitives — awaiting explicit approval
-- [ ] P0-5C backend auth runtime, DB lifecycle and API
+- [x] P0-5B identity persistence, migration and security primitives — completed
+- [ ] P0-5C backend auth runtime, DB lifecycle and API — awaiting explicit approval
 - [ ] P0-5D Web round trip, CORS/CSRF and cross-layer validation
 - [ ] P0-5E independent final review

@@ -3,8 +3,8 @@
 - Status: Active
 - Managed scope: P0 only
 - Current task: P0-5 — IN_PROGRESS
-- Current substep: P0-5A completed
-- Next substep: P0-5B awaiting explicit approval
+- Current substep: P0-5B completed
+- Next substep: P0-5C awaiting explicit approval
 - Allowed status values: `TODO` / `IN_PROGRESS` / `BLOCKED` / `DONE`
 - Related roadmap: [`ROADMAP.md`](ROADMAP.md)
 
@@ -177,7 +177,7 @@
 ### P0-4D implementation note
 
 - Alembic `1.18.5` 仅加入 development dependency group，已建立 async migration environment；
-- 唯一 head `7c6ccd86b3c5` 是不含业务 DDL 的 zero-op baseline，`Base.metadata.tables` 仍为 `0`；
+- P0-4D 验收时唯一 head `7c6ccd86b3c5` 是不含业务 DDL 的 zero-op baseline，`Base.metadata.tables` 为 `0`；P0-5B 已在不修改 baseline 的前提下追加 identity head；
 - 使用隔离的随机 `gia_p04d_*` PostgreSQL database 完成 upgrade、重复 upgrade、drift check、downgrade base 与 re-upgrade smoke；临时数据库已删除，开发数据库未迁移且 `SELECT 1` 通过；
 - 新增 4 项 migration static/unit tests，总计 35 项 API tests 通过；本轮 smoke 不等同于 P0-4E reusable integration test suite；
 - 未增加业务 table/model、FastAPI DB dependency、app migration startup 或 `create_all`/`drop_all`；当前 P0-4E 完成状态见下方 completion note。
@@ -187,8 +187,8 @@
 - 已建立 `tests/integration/` reusable harness，以 test-only typed settings 安全读取根 `.env`，为每个数据库测试创建唯一 `gia_p04e_*` PostgreSQL database 并精确清理；
 - protected database guard 覆盖 development database、system databases 与无安全前缀名称，admin DDL 使用 `psycopg.sql.Identifier`；
 - 真实验证 AsyncEngine、AsyncSession、PostgreSQL major 18、commit 与 rollback；test-only probe table 不属于 product schema；
-- programmatic Alembic tests 覆盖 fresh → head、repeat upgrade、drift check、downgrade base、re-upgrade 与 final check，business table count 始终为 `0`；
-- unit suite 35 项、integration suite 11 项（skipped 0）、full suite 46 项全部通过；development database 未迁移，`SELECT 1` 通过且无 `alembic_version`；临时数据库残留为 0；
+- P0-4E 验收时 programmatic Alembic tests 覆盖 fresh → zero-op head、repeat upgrade、drift check、downgrade base、re-upgrade 与 final check，当时 business table count 为 `0`；
+- unit suite 35 项、integration suite 11 项（skipped 0）、full suite 46 项全部通过；P0-4E 验收时 development database 未迁移，`SELECT 1` 通过且无 `alembic_version`；P0-5B 后的当前状态见下方 completion note；临时数据库残留为 0；
 - 未新增 dependency，`uv.lock` 与 baseline revision 均未改变；本段只记录 P0-4E 证据，P0-4F 的独立验收结果见下方 completion note。
 
 ### P0-4F completion note
@@ -196,7 +196,7 @@
 - 从 clean `main` HEAD `622170f9f1cae0d6ad7492d4134564001b030713` 独立复核 P0-4，不沿用此前子步骤 PASS 作为替代证据；
 - 总纲 SHA-256、Git history、Docker/PostgreSQL/Compose runtime、loopback binding、named volume、secret/dependency 边界、SQLAlchemy/Alembic 静态架构、单一 zero-op revision 与 integration harness safety 全部通过；
 - unit suite 35 项、integration suite 11 项（skipped 0）、full suite 46 项通过；frozen sync、lock check、Ruff、format、Pyright 与 Alembic heads 通过；
-- development database 保持未迁移、无 `alembic_version`、public table count 为 `0` 且 `SELECT 1` 通过；`gia_p04e_%` 残留为 `0`；
+- P0-4F 验收时 development database 保持未迁移、无 `alembic_version`、public table count 为 `0` 且 `SELECT 1` 通过；P0-5B 后已安全迁移至 identity head；`gia_p04e_%` 残留为 `0`；
 - 未修改被审计实现、测试、依赖、Compose 或 migration；P0-4 已转为 `DONE`，P0-5 等待明确批准。
 
 ## P0-5 — 最小身份边界
@@ -204,7 +204,7 @@
 - ID: `P0-5`
 - 名称：最小身份边界
 - Status: `IN_PROGRESS`
-- Approval state：P0-5A completed；P0-5B awaiting explicit approval；P0-5C/P0-5D/P0-5E not started。
+- Approval state：P0-5A/P0-5B completed；P0-5C awaiting explicit approval；P0-5D/P0-5E not started。
 - 目标：建立内部 V0.1 的 username/password identity、稳定 UUIDv4 `user_id`、PostgreSQL-backed opaque Cookie session 与 authenticated current-user boundary。
 - In scope：Argon2id password security、`users`/`auth_sessions` persistence、第一批真实 identity migration、FastAPI DB lifecycle、register/login/logout/me、host-only HttpOnly Cookie、credentialed explicit CORS、Origin/custom-header CSRF、最小 Web auth round trip 与分层安全测试。
 - Out of scope：email/phone/SMS/WeChat/OAuth、JWT/refresh token、MFA、V0.1 self-service recovery、profile/account center、RBAC/permissions、payment、Redis session、训练业务 persistence 及其他 P1+ 能力。
@@ -214,8 +214,8 @@
 ### Substep progress
 
 - `P0-5A — Identity preflight / security & scope freeze`：completed；
-- `P0-5B — Identity persistence + migration + security primitives`：awaiting explicit approval；
-- `P0-5C — Backend auth runtime + FastAPI DB lifecycle + API`：not started；
+- `P0-5B — Identity persistence + migration + security primitives`：completed；
+- `P0-5C — Backend auth runtime + FastAPI DB lifecycle + API`：awaiting explicit approval；
 - `P0-5D — Web auth round trip + CORS/CSRF + cross-layer validation`：not started；
 - `P0-5E — Independent final review`：not started。
 
@@ -229,6 +229,15 @@
 - 本子步骤只完成治理、架构、范围与 execution plan，不包含 identity/auth 代码、依赖、migration、schema、endpoint 或 Web 实现。
 
 详细 scoped baseline、迁移门禁和各子步骤 exit criteria 见 [`exec-plans/P0-5_identity-boundary.md`](exec-plans/P0-5_identity-boundary.md)。
+
+### P0-5B completion note
+
+- 唯一新增 direct runtime dependency 为 `pwdlib[argon2]>=0.3.0,<0.4`，解析 `pwdlib 0.3.1` 与 `argon2-cffi 25.1.0`，已在 CPython 3.14.7 验证；
+- 已实现先校验 raw ASCII 的 canonical username、15–128 code-point password policy、small offline full-match blocklist、显式参数 Argon2id hash/verify/verify-and-update，以及 opaque token generation、32-byte SHA-256 digest 与 7-day absolute expiry primitives；
+- 已建立 `users`、`auth_sessions` ORM models，`Base.metadata` 精确包含两张 product table；session primitive 与 integration persistence 验证 32-byte SHA-256 digest，无 Deferred field、relationship 或额外 product table；
+- 已新增 identity revision `4fe43b42641b`，线性承接 immutable baseline `7c6ccd86b3c5`，fresh PostgreSQL migration/downgrade/re-upgrade/check 与 exact schema tests 全部通过；
+- development database 已在 exact-name/read-only/schema preflight 后首次迁移至 identity head，重复 upgrade 为 no-op，未 downgrade、未写入测试 user/session；
+- FastAPI DB lifecycle、auth routes、Cookie、credentialed CORS/CSRF 与 Web auth 均未开始，仍属于 P0-5C/D。
 
 ## P0-6 — CI、日志与基础可观测性
 

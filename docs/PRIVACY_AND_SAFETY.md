@@ -70,12 +70,12 @@
 - P0：建立安全边界、密钥规则、数据隔离原则和后续检查责任。
 - V0.1：即使是内部文字版，也必须遵守 AI 标识、训练用途、数据最小化、密钥和隔离规则。
 - V0.5：公开 MVP 必须提供删除数据和隐私设置，并对语音生命周期完成明确实现。
-- P0-2 已记录获批的信任边界、配置、错误和日志原则，未实现认证、存储、内容审核或安全代码。
+- P0-2 只记录了获批的信任边界、配置、错误和日志原则；P0-5B 后续已实现 identity persistence 与 security primitives，但完整认证 runtime、内容审核和其他安全能力仍未实现。
 
-## P0-5 approved identity security boundary — planned
+## P0-5 identity security boundary — P0-5B primitives implemented
 
 - Initial credential 是 username/password；password 使用 application 显式拥有参数的 Argon2id，只持久化 password hash；
-- small application-owned offline password blocklist 在 P0-5B 实施，只做 full-password match，并覆盖 context-specific obvious passwords；不做 substring 禁止；
+- small application-owned offline password blocklist 已在 P0-5B 实施，只做 full-password match，并覆盖 context-specific obvious passwords；不做 substring 禁止；
 - P0-5 不接入 external breach API、massive leaked-password dataset、Redis 或 production distributed rate limiter；公开暴露前必须重新评估 stronger compromised-password controls 与 durable authentication retry/rate limiting；
 - opaque raw session token 只存在于 host-only HttpOnly Cookie；数据库只保存 cryptographic digest；
 - password、password hash、raw token、Cookie header、session digest 与 database credential URL 不得进入 response 或日志；
@@ -83,7 +83,7 @@
 - 当前 username/password 没有 verified email、verified phone 或 WeChat identity，因此 V0.1 self-service password/account recovery Deferred；不得加入 security questions、plaintext recovery secret、generic admin reset endpoint 或虚假 email recovery；
 - 公开测试前必须形成 verified recovery identity/flow，并重新审查账号删除、数据保留和用户所有业务数据的处置边界。
 
-以上是 approved architecture 和 planned P0-5 implementation；当前尚未实现 password hashing、identity tables、session Cookie、auth endpoint、CSRF 或 recovery。
+P0-5B 已实现显式参数的 Argon2id hash/verify/verify-and-update、username/password policy、`users`/`auth_sessions` persistence、SHA-256 session digest 与 7-day absolute-expiry primitives。当前尚未实现 session Cookie、auth endpoint、CSRF/CORS credential runtime 或 recovery；不能把 primitives 描述为完整认证已上线。
 
 ## Implementation guidance
 
@@ -110,7 +110,7 @@
 ## Future work
 
 - P0-2：在架构决策中记录基础信任边界；完整威胁建模随实际接口、数据和 Provider 逐步细化。
-- P0-5B～P0-5D：依次落实 approved identity persistence、backend/browser authentication、Cookie/CORS/CSRF 与最小日志边界。
+- P0-5C～P0-5D：在 P0-5B persistence/primitives 基础上依次落实 backend/browser authentication、Cookie/CORS/CSRF 与最小日志边界。
 - P0-6：建立不泄露敏感信息的日志、安全检查和基础监控。
 - P2：完成语音同意、上传、保存和删除设计。
 - P4/P5：完成支付审计、公开隐私设置、投诉和发布合规检查。

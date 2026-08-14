@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from sqlalchemy.pool import NullPool
 
 from group_interview_arena_api.core.config import DatabaseSettings
-from group_interview_arena_api.db.base import Base
+from group_interview_arena_api.db import Base
 
 _DATABASE_DRIVERNAME = "postgresql+psycopg"
 

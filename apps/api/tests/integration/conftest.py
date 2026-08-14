@@ -1,11 +1,15 @@
+import os
 import re
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
+from unittest.mock import patch
 from uuid import uuid4
 
 import psycopg
 import pytest
+from alembic import command
+from alembic.config import Config
 from psycopg import sql
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -173,3 +177,18 @@ def temporary_database(
         )
     finally:
         _drop_database(integration_database_settings, database_name)
+
+
+@pytest.fixture
+def migrated_database(temporary_database: TemporaryDatabase) -> TemporaryDatabase:
+    config = Config()
+    config.set_main_option("script_location", str(API_ROOT / "migrations"))
+    database_url = temporary_database.database_settings().database_url
+
+    with patch.dict(
+        os.environ,
+        {"GIA_API_DATABASE_URL": database_url.get_secret_value()},
+    ):
+        command.upgrade(config, "head")
+
+    return temporary_database

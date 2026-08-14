@@ -6,8 +6,8 @@
 - P0-3 foundation status: DONE
 - P0-4 database foundation status: DONE
 - P0-5 identity boundary status: IN_PROGRESS
-- Current substep: P0-5A completed
-- Next substep: P0-5B awaiting explicit approval
+- Current substep: P0-5B completed
+- Next substep: P0-5C awaiting explicit approval
 - Target version: V0.1 Internal Validation
 - Business architecture detail: Incremental from P1
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
@@ -153,7 +153,7 @@ psycopg 3.3.4
 PostgreSQL 18.4
 ```
 
-`GIA_API_DATABASE_URL` 是通过 `SecretStr` 按需加载的 server-only 配置；只有 DB factory 或 Alembic command 的调用方需要提供。当前没有 global engine、FastAPI DB dependency、app DB lifecycle、启动连接、SQL echo 或 pool tuning。`Base.metadata.tables` 为空。P0-4D migration flow 为：
+`GIA_API_DATABASE_URL` 是通过 `SecretStr` 按需加载的 server-only 配置；只有 DB factory 或 Alembic command 的调用方需要提供。当前没有 global engine、FastAPI DB dependency、app DB lifecycle、启动连接、SQL echo 或 pool tuning。P0-4C 完成时 `Base.metadata.tables` 为空；P0-5B 完成后已精确注册 `users` 与 `auth_sessions`。P0-4D migration flow 为：
 
 ```text
 SQLAlchemy Base.metadata
@@ -177,11 +177,11 @@ SQLAlchemy async runtime / Alembic
 drop exact temporary database
 ```
 
-Test-only sync psycopg 只管理临时 database lifecycle，application DB runtime 仍为 async。Development database 受 guard 保护，integration suite 从不对其执行 migration。Redis 继续不运行，业务 Schema 尚未创建。
+Test-only sync psycopg 只管理临时 database lifecycle，application DB runtime 仍为 async。Development database 受 guard 保护，integration suite 从不对其执行 migration。P0-5B 已通过独立临时数据库验证后单独迁移 development database；Redis 继续不运行。
 
-P0-4F 已从 clean `main` HEAD 独立复核 Git、总纲 hash、Docker/PostgreSQL runtime、Compose、secret/dependency 边界、SQLAlchemy/Alembic 架构、migration history、integration harness、unit/integration/full suites、质量门、development database 保护、临时数据库残留与范围。所有 gate 通过，P0-4 已转为 `DONE`；这不表示业务 Schema、FastAPI DB caller 或 readiness 已实现。
+P0-4F 已从 clean `main` HEAD 独立复核 Git、总纲 hash、Docker/PostgreSQL runtime、Compose、secret/dependency 边界、SQLAlchemy/Alembic 架构、migration history、integration harness、unit/integration/full suites、质量门、development database 保护、临时数据库残留与范围。所有 gate 通过，P0-4 已转为 `DONE`；P0-4F 当时未建立业务 Schema、FastAPI DB caller 或 readiness，P0-5B 后的 identity schema 现状见下节。
 
-### P0-5 approved identity boundary — planned, not implemented
+### P0-5 identity boundary — P0-5B persistence implemented
 
 `ADR-015` 已批准以下长期边界：
 
@@ -192,7 +192,7 @@ P0-4F 已从 clean `main` HEAD 独立复核 Git、总纲 hash、Docker/PostgreSQ
 - browser security 使用 credentialed explicit CORS、exact Origin validation、required custom CSRF header 与 SameSite defense-in-depth；CORS/CSRF 共用 `GIA_API_CORS_ORIGINS` normalized set；
 - V0.1 self-service account/password recovery Deferred；公开测试前必须重新设计 verified recovery identity/flow。
 
-P0-5B 计划建立 `users`、`auth_sessions`、identity migration 与 password/session security primitives；P0-5C 才把现有 DB factory 接入 FastAPI lifespan/app state/request-scoped `AsyncSession` 并实现最小 auth API；P0-5D 才建立 Web、credentialed CORS/CSRF 与真实浏览器闭环。当前仍没有 identity ORM model、业务 table、FastAPI DB caller、auth endpoint、Cookie auth 或 Web auth UI。
+P0-5B 已建立 `users`、`auth_sessions`、identity migration 与 password/session security primitives，metadata 以 `db` package 的显式 model registration 精确包含两张 product table。P0-5C 才把现有 DB factory 接入 FastAPI lifespan/app state/request-scoped `AsyncSession` 并实现最小 auth API；P0-5D 才建立 Web、credentialed CORS/CSRF 与真实浏览器闭环。当前仍没有 FastAPI DB caller、auth endpoint、Cookie auth 或 Web auth UI。
 
 计划中的 DB application lifecycle 为：
 
@@ -280,8 +280,8 @@ Redis 只在多 API workers、横向扩容、跨进程 WebSocket broadcast、dis
 
 ## Future work
 
-- P0-5B：等待明确批准后建立 identity persistence、migration 与 security primitives；
-- P0-5C/P0-5D：依次建立 backend auth runtime/API 与真实 browser Cookie/CORS/CSRF 闭环；
+- P0-5C：等待明确批准；获批后建立 backend auth runtime/API；
+- P0-5D：保持 not started；P0-5C 完成并获批后再建立真实 browser Cookie/CORS/CSRF 闭环；
 - P0-6：建立 CI 和基础可观测性；
 - P1：逐步设计题目、角色、会话、状态机、调度、记忆和基础报告，并建立第一个 WebSocket vertical slice；
 - P2 以后：只在对应阶段获批后增加语音、评分训练和商业化能力。
