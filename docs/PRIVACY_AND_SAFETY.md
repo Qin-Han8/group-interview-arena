@@ -5,6 +5,7 @@
 - Target version: V0.1 Internal Validation
 - Detailed design: Not started
 - Security boundaries: Active from project start
+- P0-5A identity security boundary: completed / approved
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -71,6 +72,19 @@
 - V0.5：公开 MVP 必须提供删除数据和隐私设置，并对语音生命周期完成明确实现。
 - P0-2 已记录获批的信任边界、配置、错误和日志原则，未实现认证、存储、内容审核或安全代码。
 
+## P0-5 approved identity security boundary — planned
+
+- Initial credential 是 username/password；password 使用 application 显式拥有参数的 Argon2id，只持久化 password hash；
+- small application-owned offline password blocklist 在 P0-5B 实施，只做 full-password match，并覆盖 context-specific obvious passwords；不做 substring 禁止；
+- P0-5 不接入 external breach API、massive leaked-password dataset、Redis 或 production distributed rate limiter；公开暴露前必须重新评估 stronger compromised-password controls 与 durable authentication retry/rate limiting；
+- opaque raw session token 只存在于 host-only HttpOnly Cookie；数据库只保存 cryptographic digest；
+- password、password hash、raw token、Cookie header、session digest 与 database credential URL 不得进入 response 或日志；
+- browser Cookie authentication 需要 explicit credentialed CORS、exact Origin validation、required custom CSRF header 与 SameSite defense-in-depth；CORS/CSRF 共用同一 typed trusted-origin Source of Truth；
+- 当前 username/password 没有 verified email、verified phone 或 WeChat identity，因此 V0.1 self-service password/account recovery Deferred；不得加入 security questions、plaintext recovery secret、generic admin reset endpoint 或虚假 email recovery；
+- 公开测试前必须形成 verified recovery identity/flow，并重新审查账号删除、数据保留和用户所有业务数据的处置边界。
+
+以上是 approved architecture 和 planned P0-5 implementation；当前尚未实现 password hashing、identity tables、session Cookie、auth endpoint、CSRF 或 recovery。
+
 ## Implementation guidance
 
 - 每个新数据字段都应说明目的、保留、删除、访问和日志处理。
@@ -84,7 +98,8 @@
 - TBD：音频、转写、日志、报告和匿名数据的精确保留期限；
 - TBD：是否允许用户上传自定义题目（总纲第 37 节）；
 - TBD：国内备案公开运营还是小范围邀请测试（总纲第 37 节）；
-- TBD：正式身份认证和授权方案；
+- TBD：V0.1 之后的 phone/WeChat/additional identity mapping 与 authorization；
+- TBD：public testing 前的 verified recovery identity/flow；
 - TBD：内容审核、投诉、申诉和人工处置流程；
 - TBD：隐私同意文本、撤回机制和隐私影响评估流程；
 - TBD：供应商数据处理、跨境及数据驻留要求；
@@ -95,7 +110,7 @@
 ## Future work
 
 - P0-2：在架构决策中记录基础信任边界；完整威胁建模随实际接口、数据和 Provider 逐步细化。
-- P0-4/P0-5：落实数据隔离、删除、身份和审计基础。
+- P0-5B～P0-5D：依次落实 approved identity persistence、backend/browser authentication、Cookie/CORS/CSRF 与最小日志边界。
 - P0-6：建立不泄露敏感信息的日志、安全检查和基础监控。
 - P2：完成语音同意、上传、保存和删除设计。
 - P4/P5：完成支付审计、公开隐私设置、投诉和发布合规检查。

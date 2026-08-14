@@ -5,8 +5,9 @@
 - Architecture baseline established by: P0-2 — DONE
 - P0-3 foundation status: DONE
 - P0-4 database foundation status: DONE
-- Current substep: P0-4F completed
-- Next task: P0-5 awaiting explicit approval
+- P0-5 identity boundary status: IN_PROGRESS
+- Current substep: P0-5A completed
+- Next substep: P0-5B awaiting explicit approval
 - Target version: V0.1 Internal Validation
 - Business architecture detail: Incremental from P1
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
@@ -15,7 +16,7 @@
 
 本文件记录 P0-2 已批准的技术架构基线、系统边界、规划目录、开发拓扑和演进约束。它不是完整业务架构；P1 以后的题目、角色、会话、编排和评分模块仍须在进入对应任务时逐步设计。
 
-正式技术决策及其上下文以 [`DECISIONS.md`](DECISIONS.md) 中 `ADR-001`～`ADR-014` 为准。本文件只整理这些决策对实现的直接约束。
+正式技术决策及其上下文以 [`DECISIONS.md`](DECISIONS.md) 中 `ADR-001`～`ADR-015` 为准。本文件只整理这些决策对实现的直接约束。
 
 ## Accepted architecture baseline
 
@@ -109,7 +110,7 @@ developer
 Web 与 API 继续作为 Windows native process。Docker Compose 当前只运行 PostgreSQL，不包含 Web、API、Redis、worker 或管理 UI。
 ```
 
-本地 browser origin 必须通过 `GIA_API_CORS_ORIGINS` 显式加入 allowlist；缺省为空，不允许跨源。`NEXT_PUBLIC_API_BASE_URL` 是公开浏览器 base URL，不是 secret。Web 直接请求 FastAPI，不建立 Next.js Route Handler proxy。
+本地 browser origin 必须通过 `GIA_API_CORS_ORIGINS` 显式加入 allowlist；缺省为空，不允许跨源。该 typed normalized origin set 已批准作为 P0-5 CORS 与 CSRF exact Origin validation 共用的 browser trusted-origin Source of Truth，不新增第二套 CSRF origins 配置。`NEXT_PUBLIC_API_BASE_URL` 是公开浏览器 base URL，不是 secret。Web 直接请求 FastAPI，不建立 Next.js Route Handler proxy。
 
 ### P0-3 — completed
 
@@ -180,6 +181,31 @@ Test-only sync psycopg 只管理临时 database lifecycle，application DB runti
 
 P0-4F 已从 clean `main` HEAD 独立复核 Git、总纲 hash、Docker/PostgreSQL runtime、Compose、secret/dependency 边界、SQLAlchemy/Alembic 架构、migration history、integration harness、unit/integration/full suites、质量门、development database 保护、临时数据库残留与范围。所有 gate 通过，P0-4 已转为 `DONE`；这不表示业务 Schema、FastAPI DB caller 或 readiness 已实现。
 
+### P0-5 approved identity boundary — planned, not implemented
+
+`ADR-015` 已批准以下长期边界：
+
+- P0/V0.1 初始 credential 为 username/password，稳定 UUIDv4 `user_id` 与登录标识、未来 display name、phone/WeChat identity 分离；
+- Password 使用 application 显式拥有并在目标环境 benchmark 的 Argon2id 参数；
+- 第一方浏览器采用 PostgreSQL-backed opaque server-side session，当前不采用 JWT；
+- raw session token 只进入 host-only HttpOnly Cookie，`auth_sessions` 只保存 cryptographic digest；
+- browser security 使用 credentialed explicit CORS、exact Origin validation、required custom CSRF header 与 SameSite defense-in-depth；CORS/CSRF 共用 `GIA_API_CORS_ORIGINS` normalized set；
+- V0.1 self-service account/password recovery Deferred；公开测试前必须重新设计 verified recovery identity/flow。
+
+P0-5B 计划建立 `users`、`auth_sessions`、identity migration 与 password/session security primitives；P0-5C 才把现有 DB factory 接入 FastAPI lifespan/app state/request-scoped `AsyncSession` 并实现最小 auth API；P0-5D 才建立 Web、credentialed CORS/CSRF 与真实浏览器闭环。当前仍没有 identity ORM model、业务 table、FastAPI DB caller、auth endpoint、Cookie auth 或 Web auth UI。
+
+计划中的 DB application lifecycle 为：
+
+```text
+FastAPI lifespan
+  -> AsyncEngine
+  -> async_sessionmaker
+  -> app state
+  -> request-scoped AsyncSession
+```
+
+禁止 import-time engine、eager global connection、startup migration、`create_all` 或 `drop_all`。Request dependency 负责 session lifecycle 和异常 rollback，但不对所有请求隐式 commit；application operation boundary 显式拥有事务。
+
 ## Communication and contract boundaries
 
 - REST：resource CRUD、question fetch、session create、session snapshot/load、reports、settings 及未来 admin/orders；
@@ -246,7 +272,7 @@ WebSocket 使用独立版本化事件契约，至少表达 event type、schema v
 - WebSocket schema generator；
 - OpenTelemetry exporter、Sentry/SaaS、analytics；
 - 具体 LLM/model、ASR、TTS 和 Embedding 实现；
-- 正式认证、支付、云平台、中国生产部署、对象存储、CDN 和 PWA production strategy。
+- V0.1 之后的 email/phone/WeChat/OAuth identity、verified recovery flow、RBAC/authorization、支付、云平台、中国生产部署、对象存储、CDN 和 PWA production strategy。
 
 Redis 只在多 API workers、横向扩容、跨进程 WebSocket broadcast、distributed lock、centralized rate limiting 或 durable task queue 出现时重新评估。
 
@@ -254,7 +280,8 @@ Redis 只在多 API workers、横向扩容、跨进程 WebSocket broadcast、dis
 
 ## Future work
 
-- P0-5：等待明确批准后落实内部 V0.1 最小身份边界；
+- P0-5B：等待明确批准后建立 identity persistence、migration 与 security primitives；
+- P0-5C/P0-5D：依次建立 backend auth runtime/API 与真实 browser Cookie/CORS/CSRF 闭环；
 - P0-6：建立 CI 和基础可观测性；
 - P1：逐步设计题目、角色、会话、状态机、调度、记忆和基础报告，并建立第一个 WebSocket vertical slice；
 - P2 以后：只在对应阶段获批后增加语音、评分训练和商业化能力。

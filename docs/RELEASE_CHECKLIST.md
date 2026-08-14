@@ -17,7 +17,7 @@
 
 ## 当前版本范围
 
-P0-2 技术架构决策、P0-3 前后端项目骨架与 P0-4 数据库及迁移基础已完成。P0-4A～P0-4F 均已完成，P0-4 已通过独立最终验收并转为 `DONE`；P0-5 等待明确批准。P0 尚未完成，V0.1 业务能力尚未实现。下方 P0 exit 与产品版本复选框仍表示完整阶段/版本验收，不能由单个子任务替代。
+P0-2 技术架构决策、P0-3 前后端项目骨架与 P0-4 数据库及迁移基础已完成。P0-4A～P0-4F 均已完成，P0-4 已通过独立最终验收并转为 `DONE`。P0-5 已进入 `IN_PROGRESS`：P0-5A identity/security/scope decision closeout completed，P0-5B awaiting explicit approval，P0-5C/P0-5D/P0-5E not started。P0 尚未完成，identity implementation 与 V0.1 业务能力尚未实现。下方 P0 exit 与产品版本复选框仍表示完整阶段/版本验收，不能由单个子任务替代。
 
 ## Implementation guidance
 
@@ -168,7 +168,18 @@ P0-3 已通过第二次独立最终验收并转为 `DONE`。P0 整体仍为 `IN_
 - [x] development database `SELECT 1` 通过、无 `alembic_version`、public product table 为 `0`；`gia_p04e_%` residual 为 `0`；
 - [x] 未修改被审计实现或运行资源，PostgreSQL container、named volume 与 development database 均保留。
 
-P0-4 已通过独立最终验收并转为 `DONE`。这不代表 P0 exit 或 V0.1 业务能力已完成；P0-5 仍需明确批准。
+P0-4 已通过独立最终验收并转为 `DONE`。该验收时 P0-5 尚未获批；当前 P0-5A 已完成，实施状态见下方记录。这不代表 P0 exit 或 V0.1 业务能力已完成。
+
+### P0-5A identity decision closeout — 2026-08-14
+
+- [x] P0-5A identity preflight/security/scope freeze 已由用户批准；
+- [x] `ADR-015` 已记录 username/password、稳定 UUIDv4 `user_id`、Argon2id 与 PostgreSQL-backed opaque Cookie session 的长期边界；
+- [x] raw token only in HttpOnly Cookie、database digest-only persistence 与 current no-JWT decision 已记录；
+- [x] explicit Argon2 parameter ownership/benchmark、small offline full-password blocklist、shared `GIA_API_CORS_ORIGINS` trusted-origin Source of Truth 与 V0.1 recovery defer 四项修订已记录；
+- [x] P0-5 five-stage execution plan、migration safety、security risks 与 public-exposure gates 已建立；
+- [x] 文档明确区分 approved architecture、planned implementation 与 actually implemented capability。
+
+这些证据只覆盖 P0-5A 决策和范围收尾。当前没有 `users`/`auth_sessions`、identity migration、password hashing、FastAPI DB lifecycle/auth endpoint、Cookie session、credentialed CORS/CSRF 或 Web auth implementation；P0 identity exit item 仍不得勾选。
 
 ## P0 exit
 
@@ -183,7 +194,7 @@ P0-4 已通过独立最终验收并转为 `DONE`。这不代表 P0 exit 或 V0.1
 - [ ] P0-1～P0-6 均满足各自验收条件；
 - [ ] 已完成 P0-7 独立验收并获得进入 P1 的明确批准。
 
-P0-2 已 Accepted PostgreSQL、SQLAlchemy 2.x 和 Alembic，P0-4 实施基线为 PostgreSQL 18.x，并要求真实 PostgreSQL integration/migration checks。完整公开认证方案仍不是 P0-5 的硬前置条件。
+P0-2 已 Accepted PostgreSQL、SQLAlchemy 2.x 和 Alembic，P0-4 实施基线为 PostgreSQL 18.x，并要求真实 PostgreSQL integration/migration checks。`ADR-015` 已确认 P0/V0.1 initial identity boundary；email/phone/WeChat/OAuth、verified recovery 与完整公开账号产品继续 Deferred，不是 P0-5B 的前置实现范围。
 
 ## V0.1 internal validation
 
@@ -288,6 +299,7 @@ P0-2 已 Accepted PostgreSQL、SQLAlchemy 2.x 和 Alembic，P0-4 实施基线为
 
 ## Future work
 
+- P0-5B～P0-5E：按 approved five-stage plan 实施、跨层验证并独立验收身份边界。
 - P0-6：补充实际自动检查和基础可观测性项目。
 - P0-7：执行并记录 P0 exit 验收。
 - 各版本发布任务：补充负责人、环境、命令、证据和发布/回滚步骤。

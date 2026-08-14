@@ -2,9 +2,9 @@
 
 - Status: Active
 - Managed scope: P0 only
-- Current task: P0-4 — DONE
-- Current substep: P0-4F completed
-- Next task: P0-5 awaiting explicit approval
+- Current task: P0-5 — IN_PROGRESS
+- Current substep: P0-5A completed
+- Next substep: P0-5B awaiting explicit approval
 - Allowed status values: `TODO` / `IN_PROGRESS` / `BLOCKED` / `DONE`
 - Related roadmap: [`ROADMAP.md`](ROADMAP.md)
 
@@ -203,15 +203,32 @@
 
 - ID: `P0-5`
 - 名称：最小身份边界
-- Status: `TODO`
-- Approval state：awaiting explicit approval。
-- 目标：建立内部 V0.1 所需的最小身份及数据隔离边界。
-- In scope：V0.1 内部环境所需的最小身份策略、数据隔离边界，以及防止不安全开发身份在生产环境误启的保护要求；具体实现由后续获批任务确定。
-- Out of scope：完整公开账号体系、短信验证码、邮箱验证码、OAuth 矩阵、付费会员和企业权限系统。
-- Dependencies：P0-3、P0-4，以及 V0.1 内部最小身份边界所需的技术决策；不依赖完整公开认证方案。
-- Acceptance criteria：内部身份边界可验证，用户数据隔离明确，生产环境不会误启不安全的开发身份，且不提前实现 V0.5 账号产品。
+- Status: `IN_PROGRESS`
+- Approval state：P0-5A completed；P0-5B awaiting explicit approval；P0-5C/P0-5D/P0-5E not started。
+- 目标：建立内部 V0.1 的 username/password identity、稳定 UUIDv4 `user_id`、PostgreSQL-backed opaque Cookie session 与 authenticated current-user boundary。
+- In scope：Argon2id password security、`users`/`auth_sessions` persistence、第一批真实 identity migration、FastAPI DB lifecycle、register/login/logout/me、host-only HttpOnly Cookie、credentialed explicit CORS、Origin/custom-header CSRF、最小 Web auth round trip 与分层安全测试。
+- Out of scope：email/phone/SMS/WeChat/OAuth、JWT/refresh token、MFA、V0.1 self-service recovery、profile/account center、RBAC/permissions、payment、Redis session、训练业务 persistence 及其他 P1+ 能力。
+- Dependencies：P0-3、P0-4、Accepted `ADR-015`；每个实施子步骤仍需用户明确批准。
+- Acceptance criteria：五阶段全部完成并经 P0-5E 独立验收后，P1 可依赖稳定 `user_id`、authenticated current user、request-scoped `AsyncSession`、identity migration、secure Cookie session 及真实浏览器 register/login/logout/me 闭环；不得把 Deferred 能力描述为已实现。
 
-完整公开认证方案继续保持 `TBD`，不构成 P0-5 的硬前置条件。
+### Substep progress
+
+- `P0-5A — Identity preflight / security & scope freeze`：completed；
+- `P0-5B — Identity persistence + migration + security primitives`：awaiting explicit approval；
+- `P0-5C — Backend auth runtime + FastAPI DB lifecycle + API`：not started；
+- `P0-5D — Web auth round trip + CORS/CSRF + cross-layer validation`：not started；
+- `P0-5E — Independent final review`：not started。
+
+### P0-5A completion note
+
+- 用户已批准 `ADR-015`：P0/V0.1 使用 username/password、Argon2id、稳定 UUIDv4 `user_id` 与 PostgreSQL-backed opaque server-side session；当前不采用 JWT；
+- raw session token 只允许存在于 HttpOnly Cookie，数据库只持久化 cryptographic digest；
+- CORS 与 CSRF exact Origin validation 必须共用现有 typed browser trusted-origin Source of Truth；
+- P0-5B 需显式配置并 benchmark Argon2 参数，实施 small application-owned offline full-password blocklist；
+- V0.1 self-service recovery Deferred，公开测试前必须设计 verified recovery identity/flow；
+- 本子步骤只完成治理、架构、范围与 execution plan，不包含 identity/auth 代码、依赖、migration、schema、endpoint 或 Web 实现。
+
+详细 scoped baseline、迁移门禁和各子步骤 exit criteria 见 [`exec-plans/P0-5_identity-boundary.md`](exec-plans/P0-5_identity-boundary.md)。
 
 ## P0-6 — CI、日志与基础可观测性
 

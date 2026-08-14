@@ -5,6 +5,7 @@
 - API architecture baseline established by: P0-2 — DONE
 - Target version: V0.1 Internal Validation
 - Implemented contracts: `GET /health`
+- Approved planned P0-5 contracts: register / login / logout / current user
 - Detailed P1 WebSocket schema: Not started
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
@@ -12,7 +13,7 @@
 
 本文件记录 P0-2 已批准的 REST、WebSocket、契约生成、恢复和错误语义基线，并同步 P0-3D/P0-3E 已实现的最小 REST 技术契约与连通方式。它不冻结完整 P1 事件集合。
 
-正式决策见 [`DECISIONS.md`](DECISIONS.md) `ADR-006`、`ADR-007`、`ADR-013`。
+正式决策见 [`DECISIONS.md`](DECISIONS.md) `ADR-006`、`ADR-007`、`ADR-013`、`ADR-015`。
 
 ## Accepted protocol split
 
@@ -86,6 +87,31 @@ P0-3E 的实际流程为：FastAPI `/openapi.json` → `openapi-typescript` → 
 - response 暴露 `X-Request-ID`；未批准 origin 不获得 `Access-Control-Allow-Origin`；
 - `NEXT_PUBLIC_API_BASE_URL` 是浏览器可见的公开 base URL，不是 secret；当前 Web 从浏览器直接请求 FastAPI，不经过 Next.js proxy。
 
+这些是当前已实现行为。P0-5D 计划在保持 explicit origin allowlist 和 wildcard rejection 的前提下启用 credentialed Cookie requests；未到 P0-5D 前不得把 `allow_credentials=true` 描述为已实现。
+
+## P0-5 approved REST identity contract — planned
+
+P0-5C 计划建立以下最小 contract；当前只有 architecture approval，endpoint 尚不存在：
+
+- `POST /auth/register`：接收 username/password；成功后候选行为是创建 authenticated server session；
+- `POST /auth/login`：成功时始终生成新 opaque session；unknown username 与 wrong password 使用 generic authentication failure；
+- `POST /auth/logout`：使服务端 session 失效并清除 Cookie；
+- `GET /auth/me`：只返回 authenticated user 的 `id` 与 `username`；未认证返回 `401`。
+
+Password、password hash 与 raw session token 永不进入 response。具体成功 status、machine-readable error codes 与 optional logout semantics 由 P0-5C 在现有 safe error envelope 下落实并用 OpenAPI/tests 冻结，本文件不提前制造已经实现的细节。
+
+Cookie session 在 OpenAPI 中使用适合的 Cookie security scheme，不引入 JWT bearer scheme。FastAPI OpenAPI 继续是 REST contract Source of Truth；P0-5D 必须重新生成并验证 Web TypeScript contract，不得手写平行 auth DTO。
+
+## P0-5 browser security boundary — planned
+
+- Raw session token 只存在于 host-only HttpOnly Cookie；database 只保存 digest；
+- local development baseline：`Secure=false`、`SameSite=Lax`、`Path=/`、省略 Domain；
+- production HTTPS baseline：`Secure=true`，其他 host-only/HttpOnly/SameSite/Path 约束不降低；
+- exact Cookie name 是 P0-5C scoped detail，本轮不永久冻结；
+- P0-5 implementation-scoped default 为 7-day absolute expiry，无 sliding refresh、无 refresh token。
+
+所有当前 browser state-changing auth POST（`POST /auth/register`、`POST /auth/login`、`POST /auth/logout`）统一要求 exact Origin validation 和 required custom browser CSRF/request header；Origin 必须存在于与 CORS 共用的 `GIA_API_CORS_ORIGINS` normalized trusted-origin set，并使用 credentialed explicit CORS。`GET /auth/me` 不要求 CSRF header。不得新增会漂移的 `GIA_API_CSRF_TRUSTED_ORIGINS`；SameSite=Lax 只作为 defense-in-depth，不是唯一 CSRF 控制。当前只有 first-party Web caller；未来如需 non-browser、mobile 或 third-party auth client，必须通过新的明确 API/security decision 重新评估，不得因此弱化当前 browser boundary。
+
 ## Versioned WebSocket contract
 
 WebSocket 使用独立版本化 event contract。原则至少包含：
@@ -154,7 +180,7 @@ P0-3D 已实现的最小错误 envelope 为：
 - FastAPI 是领域、会话状态和持久化的业务权威；
 - Next.js server-side 能力不得复制领域规则、状态机、评分、Agent 编排或持久化权威；
 - 服务端密钥不得进入浏览器；
-- 正式认证方案仍为 TBD；
+- P0/V0.1 initial username/password 与 opaque Cookie session boundary 已由 `ADR-015` 批准，但尚未实现；
 - production 环境不得误启不安全的开发身份；
 - structured output 和关键事件 payload 在对应实现阶段使用 Schema validation；
 - prompt、角色私有信息和评分规则不得因 API 错误或日志泄露。
@@ -189,7 +215,8 @@ P0-3D 已完成最小 API、OpenAPI authority、typed config、request correlati
 - TBD：WebSocket schema generator package；
 - TBD：P1 最小 REST endpoint 和 WebSocket event 集合；
 - TBD：事件投递、重放、幂等窗口和兼容策略；
-- TBD：正式认证与授权方案；
+- TBD：P0-5C scoped HTTP/error details；
+- TBD：V0.1 之后的 identity expansion、verified recovery flow 与 authorization；
 - TBD：音频上传和短期签名协议；
 - TBD：支付 Provider 和 webhook 契约；
 - TBD：公开 API 是否存在及其时间点。

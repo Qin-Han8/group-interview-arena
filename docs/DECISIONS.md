@@ -3,7 +3,7 @@
 - Status: Active governance baseline
 - Current phase: P0
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md)，高于领域文档和代码实现
-- Last established by task: P0-2 — DONE
+- Last established by task: P0-5A decision closeout — approved
 
 ## 1. 文档规则
 
@@ -292,6 +292,32 @@ ADR-007 在 P0-2 建立时将具体 OpenAPI generator package 保持 Deferred；
 - Alternatives: 领域代码直接依赖厂商 SDK；P0-3 创建所有 Provider 空接口；让 LangGraph 控制完整群面状态机。
 - Related documents: [`ARCHITECTURE.md`](ARCHITECTURE.md)、[`AGENT_BEHAVIOR.md`](AGENT_BEHAVIOR.md)
 
+### ADR-015 — Initial identity and browser session boundary
+
+- ID: `ADR-015`
+- Title: Initial identity and browser session boundary
+- Date: 2026-08-14
+- Status: Accepted
+- Type: Security
+- Source: 用户批准的 P0-5A 身份边界、安全边界与决策收尾
+- Context: P0/V0.1 需要第一个可验证的稳定用户身份和第一方浏览器认证边界，同时当前没有 mobile client、third-party API 或 distributed service trust boundary 等必须采用 JWT 的需求。未来 phone、WeChat 等身份方式尚未进入当前实现范围，V0.1 也没有可验证的 self-service recovery identity。
+- Decision:
+  1. P0/V0.1 的首个认证机制采用 `username + password`；email、phone、SMS、WeChat、OAuth/social login、MFA 与 password recovery 不进入当前身份实现。
+  2. UUIDv4 `user_id` 是稳定内部身份。`username` 是当前登录标识，未来 display name、phone、WeChat 等都不得成为核心用户主键。
+  3. Password 使用 Argon2id。安全参数由 application 显式配置和拥有，并在目标环境 benchmark；不得仅依赖第三方库未来可能变化的默认值形成永久参数承诺。
+  4. 第一方浏览器使用 PostgreSQL-backed opaque server-side session；当前架构不采用 JWT。
+  5. Cryptographically random raw session token 只存在于浏览器 HttpOnly Cookie；数据库只持久化用于 lookup 的 cryptographic digest，不保存 raw token。
+  6. `auth_sessions` 属于 FastAPI/PostgreSQL identity boundary，由服务端验证并解析为 authenticated current user。
+  7. Browser security boundary 由 host-only Cookie、credentialed explicit CORS、exact Origin validation、required custom CSRF header 与 SameSite defense-in-depth 共同组成；不得把 SameSite 当作唯一 CSRF 防线。
+  8. CORS 与 CSRF exact Origin validation 共用同一份 typed browser trusted-origin configuration Source of Truth；不得建立两套会漂移的 trusted-origin 配置。
+  9. 未来 phone/WeChat 等身份方式通过后续获批的 identity mapping migration 指向既有 `user_id`；当前不提前创建没有 caller 的 identity-provider tables。
+  10. V0.1 self-service account/password recovery 保持 Deferred。公开测试前必须重新建立 verified recovery identity 与 recovery flow，不得以 security questions、plaintext recovery secret、generic admin reset endpoint 或虚假 email recovery 替代。
+- Rationale: 当前是 first-party Next.js Web → FastAPI → PostgreSQL 拓扑，数据库服务端 session 能直接提供可撤销、可过期、可审计且不向 JavaScript 暴露 token 的最小认证边界，同时为未来新增身份方式保留稳定 `user_id`。
+- Consequences: P0-5 按五阶段实施；P0-5B 先建立 identity persistence、migration 与显式 Argon2id security primitives，P0-5C 建立 backend runtime/API，P0-5D 建立真实浏览器 Cookie/CORS/CSRF 闭环，P0-5E 独立验收。没有 verified recovery identity 时，V0.1 用户不能依赖 self-service recovery；公开暴露前还必须补充 durable authentication retry/rate limiting 与更强 compromised-password controls。
+- Alternatives: email-first identity；JWT access/refresh token；将 raw session token 持久化；把 phone/WeChat 字段直接耦合到用户主键；仅依赖 SameSite；为每个安全机制维护独立 trusted-origin 配置。
+- Re-evaluation: JWT 不是永久禁止。出现 mobile client、third-party API、distributed service trust boundary 或其他 server-side session 无法满足的真实需求时，通过新的 ADR 重新评估。
+- Related documents: [`ARCHITECTURE.md`](ARCHITECTURE.md)、[`DATABASE.md`](DATABASE.md)、[`API.md`](API.md)、[`PRIVACY_AND_SAFETY.md`](PRIVACY_AND_SAFETY.md)、[`exec-plans/P0-5_identity-boundary.md`](exec-plans/P0-5_identity-boundary.md)
+
 ## 4. 仍保持 TBD 的技术事项
 
 以下都是派生 TBD，不是总纲原始 D-xxx：
@@ -300,7 +326,7 @@ ADR-007 在 P0-2 建立时将具体 OpenAPI generator package 保持 Deferred；
 - TBD：ASR provider；
 - TBD：TTS provider；
 - TBD：支付供应商与正式价格；
-- TBD：V0.5 正式身份认证供应商；
+- TBD：V0.5 public identity expansion、verified recovery identity 与 recovery flow；
 - TBD：云平台、中国正式生产部署、CDN 和对象存储产品；
 - TBD：analytics 产品与 Sentry/SaaS exporter；
 - TBD：Redis implementation/product；

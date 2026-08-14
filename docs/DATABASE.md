@@ -9,15 +9,17 @@
 - PostgreSQL integration test foundation: P0-4E — completed
 - Independent final review: P0-4F — completed
 - P0-4 database foundation: DONE
+- P0-5A identity data boundary: completed / approved
+- P0-5B identity persistence: awaiting explicit approval
 - Target version: V0.1 Internal Validation
 - Business schema: Not started
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
 
-本文件记录 P0-2 已批准的数据技术基线、数据边界和 P0-4 完成状态。P0-4B 已建立本地 PostgreSQL infrastructure；P0-4C 已建立 SQLAlchemy async/psycopg 3 底层 factory；P0-4D 已建立 Alembic async migration foundation 与 zero-op baseline revision；P0-4E 已建立隔离的真实 PostgreSQL integration/migration test foundation；P0-4F 已完成独立最终验收。当前仍未建立业务表，也未冻结 V0.1 实体集合。
+本文件记录 P0-2 已批准的数据技术基线、P0-4 完成状态，以及 P0-5A 已批准但尚未实现的 identity persistence 边界。P0-4B 已建立本地 PostgreSQL infrastructure；P0-4C 已建立 SQLAlchemy async/psycopg 3 底层 factory；P0-4D 已建立 Alembic async migration foundation 与 zero-op baseline revision；P0-4E 已建立隔离的真实 PostgreSQL integration/migration test foundation；P0-4F 已完成独立最终验收。当前仍无业务表；第一批真实 identity schema 计划由 P0-5B 建立。
 
-正式决策见 [`DECISIONS.md`](DECISIONS.md) `ADR-005`、`ADR-010`、`ADR-013`。
+正式决策见 [`DECISIONS.md`](DECISIONS.md) `ADR-005`、`ADR-010`、`ADR-013`、`ADR-015`。
 
 ## Accepted technical baseline
 
@@ -110,6 +112,41 @@ P0-4 已依据 Accepted ADR 建立：
 
 P0-4F 已独立确认上述基础的实现、运行态与质量门均通过。P0-4 不运行 Redis，不创建未来完整业务 Schema，也不提前实现支付、语音、成长或 V0.5/V1.0 实体。
 
+## P0-5 approved identity persistence — planned
+
+以下是 P0-5A 已批准、供 P0-5B 获得明确批准后实施的 scoped baseline，不表示 table、ORM model 或 migration 已存在。
+
+### `users` candidate
+
+- `id`：UUIDv4 primary key，stable internal `user_id`；
+- `username`：`VARCHAR(32) UNIQUE NOT NULL`，保存 lowercase canonical ASCII login identifier，不使用 `CITEXT`，不承担 display name 职责；
+- `password_hash`：`TEXT NOT NULL`，只保存 application 显式配置的 Argon2id PHC hash；
+- `created_at`：`TIMESTAMPTZ NOT NULL`；
+- `updated_at`：`TIMESTAMPTZ NOT NULL`。
+
+当前 DEFER：email、phone、display name、role、status、`is_active`、`deleted_at`、`last_login_at` 与 verification timestamps。
+
+### `auth_sessions` candidate
+
+- `id`：UUIDv4 primary key；
+- `user_id`：`UUID NOT NULL`，foreign key → `users.id`，`ON DELETE CASCADE`；
+- `token_hash`：`BYTEA UNIQUE NOT NULL`，只保存高熵 raw session token 的 cryptographic digest；
+- `created_at`：`TIMESTAMPTZ NOT NULL`；
+- `expires_at`：`TIMESTAMPTZ NOT NULL`，提供适当 expiry lookup index。
+
+当前 DEFER：`revoked_at`、`last_seen_at`、IP、User-Agent、device metadata 与 refresh token。Raw session token 永不进入数据库；P0-5 baseline 使用 `secrets.token_urlsafe(32)` 生成 token，并使用 SHA-256 或等价 cryptographic digest 进行高熵 token lookup，不使用 Argon2 处理 session token。
+
+### First identity migration policy
+
+- 保持 baseline revision `7c6ccd86b3c5` immutable；
+- 新增一个只创建批准 identity schema 的 revision，保持 single head，不 squash；
+- 先在 fresh isolated temporary PostgreSQL database 验证 upgrade、repeat upgrade、downgrade、re-upgrade、`alembic check` 与 constraints；
+- 只有全部门禁通过后，才允许对 exact development database 执行首次 migration；
+- development preflight 必须核对 exact database name、public product table count、`alembic_version` absence 与 schema precondition；
+- 不自动 downgrade development database。
+
+当前 development database 仍未迁移、public product table count 为 `0`、无 `alembic_version`。P0-5A 没有改变这些事实。
+
 ## Confirmed data principles from master plan
 
 ### 可追溯性
@@ -133,17 +170,18 @@ P0-4F 已独立确认上述基础的实现、运行态与质量门均通过。P0
 
 总纲提到 `users`、题目版本、角色模板、会话、参与者、阶段、发言、讨论事件、结构化记忆、报告、证据、训练、反馈、模型调用和审计等未来领域概念。
 
-这些只是长期领域导航：
+除上述 P0-5 identity candidate 外，其余仍只是长期领域导航：
 
 - 表名、字段、关系、索引和删除策略尚未冻结；
 - V0.1 最小实体集合仍需在 P1 业务设计中确认；
 - 支付、权益、语音和成长数据不得提前进入 V0.1 Schema；
-- 正式认证方案仍是 TBD，不影响 P0-4 建立技术基础。
+- P0/V0.1 initial identity boundary 已由 `ADR-015` 确认；公开身份扩展与 recovery 仍 Deferred。
 
 ## TBD
 
-- TBD：V0.1 最小实体集合和正式 Schema；
-- TBD：正式认证方案及用户主键边界；
+- TBD：P1 文字讨论闭环的最小实体集合和正式 Schema；
+- TBD：未来 phone/WeChat identity mapping 的具体 Schema；
+- TBD：verified recovery identity、account recovery 与账号删除的完整数据语义；
 - TBD：原始音频是否默认完全不保存（总纲第 37 节）；
 - TBD：各类数据的精确保留期限；
 - TBD：删除、匿名化和审计的具体规则；
@@ -152,6 +190,8 @@ P0-4F 已独立确认上述基础的实现、运行态与质量门均通过。P0
 
 ## Future work
 
+- P0-5B：按 approved scoped baseline 建立第一批 identity table、migration 与数据库测试；
+- P0-5C：由 FastAPI lifespan/request dependency 成为现有 async DB runtime 的第一个 application caller；
 - P1：按文字讨论闭环实现最小题目、角色、会话、事件、记忆和报告数据；
 - P2～P4：仅随获批范围增加音频、评分训练和商业化数据。
 

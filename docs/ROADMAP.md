@@ -2,9 +2,9 @@
 
 - Status: Active baseline
 - Current development phase: P0 — 项目基础
-- Current task: P0-4 — DONE
-- Current substep: P0-4F completed
-- Next task: P0-5 awaiting explicit approval
+- Current task: P0-5 — IN_PROGRESS
+- Current substep: P0-5A completed
+- Next substep: P0-5B awaiting explicit approval
 - Target product version: V0.1 — Internal Validation
 - Source: [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) §30–31
 
@@ -41,11 +41,13 @@
 | P0-2 技术架构决策 | 确认技术选择、模块边界和必要 ADR | DONE |
 | P0-3 前后端项目骨架 | 创建最小 Web/API skeleton、工具链、健康检查、基础配置与日志、基础测试及 Web → API 连通；不包含数据库 | DONE |
 | P0-4 数据库与迁移基础 | 使用 Docker Compose、PostgreSQL 18.x、SQLAlchemy 2.x 和 Alembic 建立数据与 migration 基础及数据库集成验证 | DONE |
-| P0-5 最小身份边界 | 建立 V0.1 所需身份边界，不做完整公开账号产品 | TODO |
+| P0-5 最小身份边界 | 建立 V0.1 username/password、稳定 user_id 与服务端 Cookie session 身份边界，不做完整公开账号产品 | IN_PROGRESS |
 | P0-6 CI、日志与基础可观测性 | 建立自动检查、日志和基础监控能力 | TODO |
 | P0-7 P0 独立验收 | 独立确认 P0 是否满足进入 P1 的条件 | TODO |
 
-任务细节及验收条件见 [`TASKS.md`](TASKS.md)。P0-3 与 P0-4 均已通过独立最终验收并转为 `DONE`。P0-4A～P0-4F 已全部完成；P0-5 保持 `TODO` 并等待明确批准。P0 整体仍为 `IN_PROGRESS`。
+任务细节及验收条件见 [`TASKS.md`](TASKS.md)。P0-3 与 P0-4 均已通过独立最终验收并转为 `DONE`。P0-5A 身份、安全与范围决策已批准并完成；P0-5 保持 `IN_PROGRESS`，P0-5B 等待明确批准。P0 整体仍为 `IN_PROGRESS`。
+
+P0-5 固定采用五阶段执行：P0-5A identity preflight（completed）、P0-5B identity persistence/migration/security primitives（awaiting explicit approval）、P0-5C backend auth runtime/API（not started）、P0-5D Web/CORS/CSRF cross-layer validation（not started）、P0-5E independent final review（not started）。
 
 P0-2 已 Accepted PostgreSQL、SQLAlchemy 2.x 和 Alembic；P0-4 实施基线为 PostgreSQL 18.x，且 Redis 不进入默认 Compose。完整决策和重新评估条件见 [`DECISIONS.md`](DECISIONS.md)。
 
