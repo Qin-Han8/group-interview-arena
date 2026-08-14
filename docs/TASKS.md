@@ -3,8 +3,8 @@
 - Status: Active
 - Managed scope: P0 only
 - Current task: P0-5 — IN_PROGRESS
-- Current substep: P0-5B completed
-- Next substep: P0-5C awaiting explicit approval
+- Current substep: P0-5C completed
+- Next substep: P0-5D awaiting explicit approval
 - Allowed status values: `TODO` / `IN_PROGRESS` / `BLOCKED` / `DONE`
 - Related roadmap: [`ROADMAP.md`](ROADMAP.md)
 
@@ -204,7 +204,7 @@
 - ID: `P0-5`
 - 名称：最小身份边界
 - Status: `IN_PROGRESS`
-- Approval state：P0-5A/P0-5B completed；P0-5C awaiting explicit approval；P0-5D/P0-5E not started。
+- Approval state：P0-5A/P0-5B/P0-5C completed；P0-5D awaiting explicit approval；P0-5E not started。
 - 目标：建立内部 V0.1 的 username/password identity、稳定 UUIDv4 `user_id`、PostgreSQL-backed opaque Cookie session 与 authenticated current-user boundary。
 - In scope：Argon2id password security、`users`/`auth_sessions` persistence、第一批真实 identity migration、FastAPI DB lifecycle、register/login/logout/me、host-only HttpOnly Cookie、credentialed explicit CORS、Origin/custom-header CSRF、最小 Web auth round trip 与分层安全测试。
 - Out of scope：email/phone/SMS/WeChat/OAuth、JWT/refresh token、MFA、V0.1 self-service recovery、profile/account center、RBAC/permissions、payment、Redis session、训练业务 persistence 及其他 P1+ 能力。
@@ -215,8 +215,8 @@
 
 - `P0-5A — Identity preflight / security & scope freeze`：completed；
 - `P0-5B — Identity persistence + migration + security primitives`：completed；
-- `P0-5C — Backend auth runtime + FastAPI DB lifecycle + API`：awaiting explicit approval；
-- `P0-5D — Web auth round trip + CORS/CSRF + cross-layer validation`：not started；
+- `P0-5C — Backend auth runtime + FastAPI DB lifecycle + API`：completed；
+- `P0-5D — Web auth round trip + CORS/CSRF + cross-layer validation`：awaiting explicit approval；
 - `P0-5E — Independent final review`：not started。
 
 ### P0-5A completion note
@@ -237,7 +237,18 @@
 - 已建立 `users`、`auth_sessions` ORM models，`Base.metadata` 精确包含两张 product table；session primitive 与 integration persistence 验证 32-byte SHA-256 digest，无 Deferred field、relationship 或额外 product table；
 - 已新增 identity revision `4fe43b42641b`，线性承接 immutable baseline `7c6ccd86b3c5`，fresh PostgreSQL migration/downgrade/re-upgrade/check 与 exact schema tests 全部通过；
 - development database 已在 exact-name/read-only/schema preflight 后首次迁移至 identity head，重复 upgrade 为 no-op，未 downgrade、未写入测试 user/session；
-- FastAPI DB lifecycle、auth routes、Cookie、credentialed CORS/CSRF 与 Web auth 均未开始，仍属于 P0-5C/D。
+- FastAPI DB lifecycle、auth routes 与 Cookie runtime 当时尚未开始；现已由 P0-5C 实现。Credentialed CORS/CSRF 与 Web auth 仍未开始，属于 P0-5D。
+
+### P0-5C implementation note
+
+- FastAPI lifespan 在 runtime boundary 按需解析 `DatabaseSettings`，创建 AsyncEngine/sessionmaker、写入 app state 并在 shutdown dispose；module import 与 OpenAPI generation 不需要 DB URL 或 PostgreSQL；
+- request dependency 为每个请求创建独立 `AsyncSession`，只负责 lifecycle/rollback/close；register、login 与 logout 显式拥有 transaction；
+- 已实现 `POST /auth/register`（201）、`POST /auth/login`（200）、`POST /auth/logout`（idempotent 204）与 `GET /auth/me`（200/401），公开 identity 仅含 `id`、`username`；
+- `gia_session` 为 host-only HttpOnly、SameSite=Lax、Path=/、7-day Max-Age Cookie；local `Secure=false`，production 要求 typed `GIA_API_SESSION_COOKIE_SECURE=true` 并在不安全配置下 fail closed；数据库只持久化 SHA-256 digest，raw token 不进入普通 result repr；
+- unknown user 与 wrong password 共用 generic 401，unknown path 执行固定非 secret Argon2id dummy verification；successful register/login 始终创建 fresh token，login rehash 与新 session 原子提交；
+- unit 102、integration 18（skipped 0）、full 120 项通过；真实 auth integration 使用 Alembic head 上的隔离 `gia_p04e_*` PostgreSQL database；无新 dependency、lockfile、migration 或 schema change；
+- FastAPI OpenAPI 与 Web generated derivative 已同步，`/auth/me` 使用 Cookie security scheme，无 Bearer/JWT；
+- P0-5C 明确保持 `allow_credentials=false`，没有 CSRF、Web auth UI 或真实 browser auth acceptance；P0-5D 仍为必要 browser security gate。
 
 ## P0-6 — CI、日志与基础可观测性
 

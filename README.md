@@ -18,12 +18,12 @@ AI 群面训练场让用户无需临时召集真人，即可与具有不同性�
   - `P0-4 — 数据库与迁移基础`
 - 已完成子步骤：`P0-4A`、`P0-4B`、`P0-4C`、`P0-4D`、`P0-4E`、`P0-4F`、`P0-5A`、`P0-5B`
 - 当前任务：`P0-5 — 最小身份边界（IN_PROGRESS）`
-- 当前子步骤：`P0-5B — Identity persistence + migration + security primitives（completed）`
-- 下一子步骤：`P0-5C — Backend auth runtime + FastAPI DB lifecycle + API（awaiting explicit approval）`
+- 当前子步骤：`P0-5C — Backend auth runtime + FastAPI DB lifecycle + API（completed）`
+- 下一子步骤：`P0-5D — Web auth round trip + CORS/CSRF + cross-layer validation（awaiting explicit approval）`
 - 当前目标版本：`V0.1 — Internal Validation / 内部技术验证版`
-- 当前实现状态：Web/API 技术骨架、本地 PostgreSQL 18.4、SQLAlchemy async/psycopg 3 底层 factory、Alembic 与 reusable PostgreSQL integration harness 已建立；P0-5B 已实现 `users`、`auth_sessions`、第二个 identity revision、显式 Argon2id hash/verify/rehash primitives 与 digest-only session primitives，并首次安全迁移 development database。FastAPI DB lifecycle、auth API、Cookie runtime、credentialed CORS/CSRF 与 Web auth 仍未实现
+- 当前实现状态：Web/API 技术骨架、本地 PostgreSQL 18.4、SQLAlchemy async/psycopg 3、Alembic 与 reusable PostgreSQL integration harness 已建立；P0-5B 已实现 identity persistence/security primitives，P0-5C 已实现 FastAPI DB lifespan、request-scoped `AsyncSession`、backend register/login/logout/me、opaque Cookie issue/clear 与真实 PostgreSQL auth integration。Credentialed CORS、CSRF、Web auth UI 与真实浏览器 auth round trip 仍未实现
 
-> P0-4 已通过独立最终验收并转为 `DONE`。P0 仍在进行中；P0-5A 与 P0-5B 已完成，P0-5C 等待明确批准。
+> P0-4 已通过独立最终验收并转为 `DONE`。P0 仍在进行中；P0-5A、P0-5B 与 P0-5C 已完成，P0-5D 等待明确批准。
 
 ## 核心原则摘要
 
@@ -46,7 +46,7 @@ AI 群面训练场让用户无需临时召集真人，即可与具有不同性�
 - Redis、独立 task queue、OpenTelemetry、具体 AI/语音供应商和 UI component library 仍为 Deferred/TBD；
 - V0.1 使用自定义确定性讨论状态机，不使用 LangGraph。
 
-P0-5 已批准的初始身份边界为 username/password、Argon2id、稳定 UUIDv4 `user_id` 与 PostgreSQL-backed opaque server-side session。P0-5B 已实现 identity persistence 及 password/session security primitives；raw session token 仍只允许未来由 P0-5C 放入 host-only HttpOnly Cookie，数据库只保存 cryptographic digest。当前不采用 JWT；CORS 与 CSRF exact Origin validation 将共用现有 typed browser trusted-origin 配置。实施顺序与门禁见 [`docs/exec-plans/P0-5_identity-boundary.md`](docs/exec-plans/P0-5_identity-boundary.md)。
+P0-5 已批准的初始身份边界为 username/password、Argon2id、稳定 UUIDv4 `user_id` 与 PostgreSQL-backed opaque server-side session。P0-5B 已实现 identity persistence 及 password/session security primitives；P0-5C 已让 raw token 仅通过 host-only HttpOnly `gia_session` Cookie 传输，数据库仍只保存 cryptographic digest。当前不采用 JWT；CORS 与 CSRF exact Origin validation 将在 P0-5D 共用现有 typed browser trusted-origin 配置。实施顺序与门禁见 [`docs/exec-plans/P0-5_identity-boundary.md`](docs/exec-plans/P0-5_identity-boundary.md)。
 
 完整决策、替代方案和重新评估条件见 [`docs/DECISIONS.md`](docs/DECISIONS.md)。
 
@@ -102,7 +102,7 @@ P0-5 已批准的初始身份边界为 username/password、Argon2id、稳定 UUI
     └── exec-plans/              # 复杂任务执行计划约定
 ```
 
-当前数据基础包括 PostgreSQL 18.4、SQLAlchemy 2.0、psycopg 3 async runtime primitives，以及 Alembic 1.18.5 async migration environment、zero-op baseline 和 identity revision。Development database 当前 head 为 `4fe43b42641b`，product tables 精确为 `users`、`auth_sessions`，两表均为 `0` rows；尚无 FastAPI DB caller、auth runtime 或群面业务模块。
+当前数据基础包括 PostgreSQL 18.4、SQLAlchemy 2.0、psycopg 3 async runtime，以及 Alembic 1.18.5 async migration environment、zero-op baseline 和 identity revision。Development database 当前 head 为 `4fe43b42641b`，product tables 精确为 `users`、`auth_sessions`，两表均为 `0` rows；FastAPI lifespan/request dependency 已成为 DB runtime caller，但尚无群面业务模块。
 
 ## 文档阅读顺序
 
@@ -138,7 +138,7 @@ docker compose --env-file .env -f infra/compose.yaml stop postgres
 
 不要使用 `docker compose down -v`；P0-4B 不建立 SQLAlchemy、Alembic 或业务 Schema。
 
-只有代码实际调用 P0-4C DB infrastructure factory 时才需要 server-only `GIA_API_DATABASE_URL`。格式参考 `.env.example` 中的 `postgresql+psycopg://` placeholder；普通 API 启动与 `GET /health` 不加载该配置。
+P0-5C 起真实 API runtime startup 需要 server-only `GIA_API_DATABASE_URL`；格式参考 `.env.example` 中的 `postgresql+psycopg://` placeholder。模块 import 与 OpenAPI schema generation 不读取该设置或连接 PostgreSQL；`GET /health` handler 本身也不查询数据库。
 
 Alembic 命令从 `apps/api` 执行，并与应用共用 server-only `GIA_API_DATABASE_URL`：
 
@@ -158,6 +158,8 @@ uv run alembic check
 cd apps/api
 uv sync --frozen
 $env:GIA_API_CORS_ORIGINS='["http://localhost:3000"]'
+$env:GIA_API_DATABASE_URL='postgresql+psycopg://group_interview_arena:<local-development-password>@127.0.0.1:5432/group_interview_arena'
+$env:GIA_API_SESSION_COOKIE_SECURE='false'
 uv run uvicorn group_interview_arena_api.app:app --host localhost --port 8000
 ```
 
@@ -208,7 +210,7 @@ uv run pytest
 
 `integration` 与完整 suite 需要 Docker Desktop、healthy 的 PostgreSQL Compose service，以及仓库根目录中被 Git ignore 的本地 `.env`；unit-only 命令不读取这些本地数据库配置。Integration fixture 为每个需要数据库状态的测试创建并精确删除独立 `gia_p04e_*` database，不迁移 development database。
 
-当前实现技术基础、`GET /health` 连通、本地 PostgreSQL Compose、尚未接入 app runtime 的 SQLAlchemy async/psycopg 3 factory，以及 baseline → identity head 的线性 Alembic history。P0-5B identity schema 与 security primitives 已建立；认证 API、浏览器 Cookie 安全闭环和群面业务功能尚未建立。
+当前已实现 `GET /health`、本地 PostgreSQL Compose、FastAPI lifespan/request-scoped SQLAlchemy async runtime、baseline → identity head 的线性 Alembic history，以及 backend register/login/logout/me 和 Cookie session validation。Credentialed CORS、CSRF、Web auth/真实浏览器闭环与群面业务功能尚未建立。
 
 ## 贡献规则
 

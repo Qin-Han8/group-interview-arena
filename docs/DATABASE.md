@@ -11,7 +11,7 @@
 - P0-4 database foundation: DONE
 - P0-5A identity data boundary: completed / approved
 - P0-5B identity persistence: completed
-- P0-5C backend auth runtime: awaiting explicit approval
+- P0-5C backend auth runtime: completed
 - Target version: V0.1 Internal Validation
 - Business schema: P0-5B identity schema only (`users`, `auth_sessions`)
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
@@ -115,7 +115,7 @@ P0-4F 已独立确认上述基础的实现、运行态与质量门均通过。P0
 
 ## P0-5B implemented identity persistence
 
-以下 P0-5A scoped baseline 已由 P0-5B 实现为 ORM model 与 Alembic migration；不表示 auth API、Cookie runtime 或其他 product schema 已实现。
+以下 P0-5A scoped baseline 已由 P0-5B 实现为 ORM model 与 Alembic migration；P0-5C 使用它们实现 backend auth runtime，但没有新增 table、column、constraint 或 migration，也不表示其他 product schema 已实现。
 
 ### `users`
 
@@ -191,7 +191,8 @@ P0-4F 已独立确认上述基础的实现、运行态与质量门均通过。P0
 
 ## Future work
 
-- P0-5C：等待明确批准；获批后由 FastAPI lifespan/request dependency 成为现有 async DB runtime 的第一个 application caller；
+- P0-5C：FastAPI lifespan/request dependency 已成为现有 async DB runtime 的第一个 application caller；真实 PostgreSQL auth integration 只使用迁移到 head 的隔离临时数据库，development DB 保持 head `4fe43b42641b` 且两张表均为 0 rows；
+- P0-5D：awaiting explicit approval；后续 browser closure 不得新增第二套 trusted-origin config；
 - P1：按文字讨论闭环实现最小题目、角色、会话、事件、记忆和报告数据；
 - P2～P4：仅随获批范围增加音频、评分训练和商业化数据。
 

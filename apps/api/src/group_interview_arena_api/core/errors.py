@@ -19,6 +19,19 @@ class ErrorCode(StrEnum):
     NOT_FOUND = "NOT_FOUND"
     VALIDATION_ERROR = "VALIDATION_ERROR"
     INTERNAL_ERROR = "INTERNAL_ERROR"
+    INVALID_USERNAME = "INVALID_USERNAME"
+    INVALID_PASSWORD = "INVALID_PASSWORD"
+    USERNAME_UNAVAILABLE = "USERNAME_UNAVAILABLE"
+    INVALID_CREDENTIALS = "INVALID_CREDENTIALS"
+    AUTHENTICATION_REQUIRED = "AUTHENTICATION_REQUIRED"
+
+
+class ApiError(Exception):
+    def __init__(self, *, status_code: int, code: ErrorCode, message: str) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+        self.code = code
+        self.message = message
 
 
 class ErrorDetail(BaseModel):
@@ -70,6 +83,17 @@ async def http_exception_handler(
         status_code=exception.status_code,
         code=ErrorCode.INTERNAL_ERROR,
         message="An internal error occurred.",
+    )
+
+
+async def api_error_handler(_request: Request, exception: Exception) -> JSONResponse:
+    if not isinstance(exception, ApiError):
+        raise TypeError("Expected ApiError")
+
+    return error_response(
+        status_code=exception.status_code,
+        code=exception.code,
+        message=exception.message,
     )
 
 

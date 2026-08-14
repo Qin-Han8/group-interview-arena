@@ -21,6 +21,7 @@ def _clear_api_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("GIA_API_ENVIRONMENT", raising=False)
     monkeypatch.delenv("GIA_API_LOG_LEVEL", raising=False)
     monkeypatch.delenv("GIA_API_CORS_ORIGINS", raising=False)
+    monkeypatch.delenv("GIA_API_SESSION_COOKIE_SECURE", raising=False)
     monkeypatch.delenv("GIA_API_DATABASE_URL", raising=False)
 
 
@@ -34,6 +35,7 @@ def test_development_settings_can_be_created(
     assert settings.environment is Environment.DEVELOPMENT
     assert settings.log_level is LogLevel.INFO
     assert settings.cors_origins == ()
+    assert settings.session_cookie_secure is False
 
 
 def test_test_settings_can_be_created(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -126,7 +128,7 @@ def test_database_settings_repr_redacts_password() -> None:
     assert "**********" in repr(settings)
 
 
-def test_application_startup_does_not_require_database_url(
+def test_application_construction_does_not_require_database_url(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _clear_api_environment(monkeypatch)
@@ -135,3 +137,66 @@ def test_application_startup_does_not_require_database_url(
     application = create_app(settings)
 
     assert application is not None
+
+
+def test_session_cookie_secure_loads_as_typed_boolean(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _clear_api_environment(monkeypatch)
+    monkeypatch.setenv("GIA_API_SESSION_COOKIE_SECURE", "true")
+
+    assert Settings().session_cookie_secure is True
+
+
+@pytest.mark.parametrize(
+    ("environment", "session_cookie_secure"),
+    [
+        (Environment.DEVELOPMENT, False),
+        (Environment.TEST, False),
+        (Environment.DEVELOPMENT, True),
+        (Environment.TEST, True),
+        (Environment.PRODUCTION, True),
+    ],
+)
+def test_session_cookie_security_accepts_safe_environment_combinations(
+    environment: Environment,
+    session_cookie_secure: bool,
+) -> None:
+    settings = Settings(
+        environment=environment,
+        session_cookie_secure=session_cookie_secure,
+    )
+
+    assert settings.session_cookie_secure is session_cookie_secure
+
+
+def test_production_settings_reject_insecure_session_cookie() -> None:
+    with pytest.raises(
+        ValidationError,
+        match="Production sessions require secure cookies",
+    ):
+        Settings(
+            environment=Environment.PRODUCTION,
+            session_cookie_secure=False,
+        )
+
+
+def test_production_environment_rejects_insecure_session_cookie_from_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _clear_api_environment(monkeypatch)
+    monkeypatch.setenv("GIA_API_ENVIRONMENT", "production")
+    monkeypatch.setenv("GIA_API_SESSION_COOKIE_SECURE", "false")
+
+    with pytest.raises(ValidationError):
+        Settings()
+
+
+def test_production_environment_requires_explicit_secure_session_cookie(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _clear_api_environment(monkeypatch)
+    monkeypatch.setenv("GIA_API_ENVIRONMENT", "production")
+
+    with pytest.raises(ValidationError):
+        Settings()

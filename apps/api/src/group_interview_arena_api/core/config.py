@@ -1,7 +1,8 @@
 from enum import StrEnum
+from typing import Self
 from urllib.parse import urlsplit
 
-from pydantic import SecretStr, field_validator
+from pydantic import SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -31,6 +32,16 @@ class Settings(BaseSettings):
     environment: Environment = Environment.DEVELOPMENT
     log_level: LogLevel = LogLevel.INFO
     cors_origins: tuple[str, ...] = ()
+    session_cookie_secure: bool = False
+
+    @model_validator(mode="after")
+    def require_secure_production_session_cookie(self) -> Self:
+        if (
+            self.environment is Environment.PRODUCTION
+            and not self.session_cookie_secure
+        ):
+            raise ValueError("Production sessions require secure cookies")
+        return self
 
     @field_validator("cors_origins")
     @classmethod

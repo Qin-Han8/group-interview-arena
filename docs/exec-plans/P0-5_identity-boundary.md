@@ -1,6 +1,6 @@
 # P0-5 Identity Boundary Execution Plan
 
-Status: `P0-5 IN_PROGRESS`; `P0-5A completed`; `P0-5B completed`; `P0-5C awaiting explicit approval`; `P0-5D`～`P0-5E` not started
+Status: `P0-5 IN_PROGRESS`; `P0-5A completed`; `P0-5B completed`; `P0-5C completed`; `P0-5D awaiting explicit approval`; `P0-5E not started`
 
 Target version: `V0.1 Internal Validation`
 
@@ -19,15 +19,15 @@ Product baseline: [`PROJECT_MASTER_PLAN.md`](../PROJECT_MASTER_PLAN.md)
 - P0-4 已完成 PostgreSQL、SQLAlchemy async、Alembic 和 integration test foundation。
 - Alembic baseline revision 为 `7c6ccd86b3c5`，必须保持不可变且 migration graph 保持 single head。
 - P0-5B 前 development database 为 public product tables = 0 且不存在 `alembic_version`；通过全部 isolated gates 后，现已首次迁移至 identity head `4fe43b42641b`。
-- 当前应用已具有 `users`、`auth_sessions`、password/session security primitives；仍没有 session Cookie、认证 API、FastAPI DB lifecycle 或 Web auth flow。
+- 当前应用已具有 `users`、`auth_sessions`、password/session security primitives、FastAPI DB lifecycle、backend auth API 与 `gia_session` Cookie runtime；仍没有 credentialed CORS、CSRF runtime 或 Web auth flow。
 - 现有 typed `GIA_API_CORS_ORIGINS` 是已批准的 browser trusted-origin Source of Truth；P0-5 不建立第二套 CSRF trusted-origin 配置。
 
 ## Five-stage decomposition
 
 1. **P0-5A — Identity preflight / security & scope freeze**：`completed`。批准 ADR-015、范围、风险与本执行计划；不实施认证代码。
 2. **P0-5B — Identity persistence + migration + security primitives**：`completed`。已实现 identity schema、migration、显式 Argon2id 配置和 session token primitives，并通过最终源码审核。
-3. **P0-5C — Backend auth runtime + FastAPI DB lifecycle + API**：`awaiting explicit approval`。获批后接入 request-scoped database session 和最小 auth API。
-4. **P0-5D — Web auth round trip + CORS/CSRF + cross-layer validation**：`not started`。完成 Web 技术闭环和浏览器安全验证。
+3. **P0-5C — Backend auth runtime + FastAPI DB lifecycle + API**：`completed`。已接入 request-scoped database session、最小 auth API 与 backend Cookie runtime；不包含 browser security closure。
+4. **P0-5D — Web auth round trip + CORS/CSRF + cross-layer validation**：`awaiting explicit approval`。获批后完成 Web 技术闭环和浏览器安全验证。
 5. **P0-5E — Independent final review**：`not started`。独立复核完整 P0-5 diff、质量门、迁移安全和范围一致性，不新增业务能力。
 
 不得机械增加第六阶段，也不得在未获明确批准时进入下一阶段。
@@ -124,7 +124,7 @@ Production HTTPS baseline：
 - `Path = /`
 - `Domain` omitted，保持 host-only
 
-Cookie exact name 属于 P0-5C scoped detail；若现有文档没有已批准名称，本阶段不凭空永久冻结。
+P0-5C scoped Cookie exact name 已冻结为 `gia_session`；它不是永久 ADR contract。
 
 ### CSRF and trusted origins
 
@@ -140,7 +140,7 @@ Cookie exact name 属于 P0-5C scoped detail；若现有文档没有已批准名
 
 ### FastAPI database lifecycle
 
-P0-5C 是 database runtime 的首个真实 application caller，预期生命周期为：
+P0-5C 已成为 database runtime 的首个真实 application caller，生命周期为：
 
 ```text
 FastAPI lifespan
@@ -162,16 +162,16 @@ FastAPI lifespan
 - OAuth/social/auth framework：NO；当前没有对应 caller。
 - P0-5A 未安装 dependency；P0-5B 只因上述批准 dependency graph 修改 `pyproject.toml` 与 `uv.lock`。
 
-## Planned API and Web boundary
+## Implemented API and planned Web boundary
 
-P0-5C 最小 planned API contract：
+P0-5C 已实现最小 API contract：
 
-- `POST /auth/register`：成功后创建 authenticated session 的候选流程。
-- `POST /auth/login`：成功后创建新 session；unknown username 与 wrong password 返回相同的 generic auth failure。
-- `POST /auth/logout`：服务端 session invalidation 并清除 Cookie。
+- `POST /auth/register`：成功后原子创建 user/session、返回 `201` 并设置 Cookie。
+- `POST /auth/login`：成功后创建新 session并返回 `200`；unknown username 与 wrong password 返回相同的 generic `401`。
+- `POST /auth/logout`：幂等 `204`，服务端 exact current-session invalidation 并清除 Cookie。
 - `GET /auth/me`：只返回 `id` 和 `username`；unauthenticated 返回 `401`。
 
-Password、password hash 和 raw token 不得出现在 response。除 unauthenticated `401` 外，具体成功 HTTP status 与 REST error code 由 P0-5C 在现有 error semantics 下落实，当前不制造尚未实现的细节。
+Password、password hash 和 raw token 不出现在 JSON response 或 structured request log。FastAPI OpenAPI 使用 `SessionCookie` Cookie security scheme，Web generated derivative 已同步；无 Bearer/JWT scheme。
 
 P0-5D Web 只实现 register、login、current-user status、logout 的技术闭环。不实现 profile、account center、settings、phone、WeChat、password reset、avatar 或 marketing auth UI。
 
@@ -213,14 +213,14 @@ P0-5D Web 只实现 register、login、current-user status、logout 的技术闭
 - `users`、`auth_sessions` models/constraints/indexes 与 session token primitives 符合本计划；无 deferred fields/tables。
 - 新 migration single head、baseline unchanged；fresh temporary DB upgrade/downgrade/re-upgrade/check/constraints 全通过。
 - 获明确批准并通过 exact-name/read-only/schema preflight 后，才可首次迁移 development DB；不得自动 downgrade。
-- Unit、integration、lint、format、typecheck 和 migration gates 全通过；P0-5C 尚未实施并等待明确批准。
+- Unit、integration、lint、format、typecheck 和 migration gates 全通过；P0-5B 已完成。
 
 ### P0-5C
 
 - FastAPI lifespan 建立并清理 AsyncEngine/sessionmaker；request-scoped session 无隐式 commit。
 - Register/login/logout/me API 与 generic auth failure、session invalidation、safe response/logging 行为有测试证据。
-- Cookie flags、absolute expiry、digest lookup 和 shared-origin CSRF design 按 approved baseline 落实。
-- P0-5A 已冻结的 register/login/logout browser-origin protection 已实现并测试，不存在安全策略分叉。
+- Cookie flags、absolute expiry 与 digest lookup 按 approved baseline 落实；Cookie name 为 `gia_session`。
+- Credentialed CORS、register/login/logout Origin/custom-header CSRF enforcement、Web caller 与真实 browser acceptance 明确留给 P0-5D；P0-5C 保持 `allow_credentials=false` 且不建立第二套 origin config。
 - 无 startup migration、create/drop all、import-time engine 或 raw token persistence。
 
 ### P0-5D
@@ -255,6 +255,6 @@ P0-5D Web 只实现 register、login、current-user status、logout 的技术闭
 
 - [x] P0-5A approved preflight, ADR-015 and scope freeze
 - [x] P0-5B identity persistence, migration and security primitives — completed
-- [ ] P0-5C backend auth runtime, DB lifecycle and API — awaiting explicit approval
-- [ ] P0-5D Web round trip, CORS/CSRF and cross-layer validation
+- [x] P0-5C backend auth runtime, DB lifecycle and API — completed
+- [ ] P0-5D Web round trip, CORS/CSRF and cross-layer validation — awaiting explicit approval
 - [ ] P0-5E independent final review

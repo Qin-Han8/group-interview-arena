@@ -42,6 +42,7 @@ def test_allowed_origin_receives_cors_headers() -> None:
     assert response.status_code == 200
     assert response.headers["Access-Control-Allow-Origin"] == ALLOWED_ORIGIN
     assert "X-Request-ID" in response.headers["Access-Control-Expose-Headers"]
+    assert "Access-Control-Allow-Credentials" not in response.headers
 
 
 def test_disallowed_origin_is_not_authorized() -> None:

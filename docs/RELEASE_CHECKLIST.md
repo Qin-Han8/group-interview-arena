@@ -17,7 +17,7 @@
 
 ## 当前版本范围
 
-P0-2 技术架构决策、P0-3 前后端项目骨架与 P0-4 数据库及迁移基础已完成。P0-4A～P0-4F 均已完成，P0-4 已通过独立最终验收并转为 `DONE`。P0-5 已进入 `IN_PROGRESS`：P0-5A/P0-5B completed，P0-5C awaiting explicit approval，P0-5D/P0-5E not started。P0 尚未完成；identity persistence/security primitives 已实现，但 backend/browser auth runtime 与 V0.1 业务能力尚未实现。下方 P0 exit 与产品版本复选框仍表示完整阶段/版本验收，不能由单个子任务替代。
+P0-2 技术架构决策、P0-3 前后端项目骨架与 P0-4 数据库及迁移基础已完成。P0-4A～P0-4F 均已完成，P0-4 已通过独立最终验收并转为 `DONE`。P0-5 已进入 `IN_PROGRESS`：P0-5A/P0-5B/P0-5C completed，P0-5D awaiting explicit approval，P0-5E not started。P0 尚未完成；backend auth runtime 已实现，但 browser CORS/CSRF/Web closure 与 V0.1 业务能力尚未实现。下方 P0 exit 与产品版本复选框仍表示完整阶段/版本验收，不能由单个子任务替代。
 
 ## Implementation guidance
 
@@ -194,7 +194,20 @@ P0-4 已通过独立最终验收并转为 `DONE`。该验收时 P0-5 尚未获�
 - [x] development database preflight 确认 product table count 0、`alembic_version` absent 后首次迁移至 identity head；repeat upgrade no-op，两张表 row count 0，未 downgrade；
 - [x] `gia_p05b_%` 与 `gia_p04e_%` residual 均为 0；无 wildcard cleanup；无 auth route、FastAPI DB lifecycle、Cookie/CORS/CSRF 或 Web auth scope expansion。
 
-P0-5B 最终源码审核已 PASS 并转为 completed；P0-5C 等待明确批准。
+P0-5B 最终源码审核已 PASS 并转为 completed；其后的 P0-5C 当前状态见下节。
+
+### P0-5C backend authentication runtime — 2026-08-14
+
+- [x] FastAPI lifespan、AsyncEngine/sessionmaker app state、shutdown disposal 与 request-scoped `AsyncSession` 已实现；import/OpenAPI 不加载 DB settings 或连接 PostgreSQL；
+- [x] register/login/logout/me、generic login failure、fixed dummy Argon2 verification、rehash、fresh-session fixation defense、absolute expiry 与 exact logout deletion 已验证；
+- [x] `gia_session` local/production flags、7-day Max-Age、host-only behavior 与 logout clear semantics 已验证；production + insecure Cookie 配置 fail closed，raw token 不进入普通 result repr，且 raw token/password/hash/digest/DB URL 不进入 JSON response 或 structured request log；
+- [x] auth PostgreSQL integration 覆盖 atomic register rollback、rehash rollback、unknown/expired session、no sliding expiry 与 other-session preservation；
+- [x] unit 102、integration 18（skipped 0）、full 120 项通过；frozen sync、lock check、Ruff、format、Pyright、唯一 Alembic head 与 revision count 2 通过；
+- [x] FastAPI OpenAPI 与 Web generated derivative 已同步；Web frozen install、lint、typecheck、8 tests、format check、build 与 OpenAPI drift 通过；
+- [x] 无新 dependency、lockfile change、migration、schema change 或 development DB mutation；development DB 仍为 identity head 且 `users`/`auth_sessions` 均 0 rows；
+- [ ] Credentialed CORS、CSRF、Web auth UI 与真实 browser auth round trip 留给 P0-5D，P0-5C 不构成 browser authentication closure。
+
+P0-5C final review 已 PASS 并转为 completed；P0-5D awaiting explicit approval；P0-5E 保持 not started。
 
 ## P0 exit
 
@@ -314,7 +327,7 @@ P0-2 已 Accepted PostgreSQL、SQLAlchemy 2.x 和 Alembic，P0-4 实施基线为
 
 ## Future work
 
-- P0-5C：等待明确批准；P0-5D/P0-5E 保持 not started。
+- P0-5C：completed；P0-5D awaiting explicit approval；P0-5E 保持 not started。
 - P0-6：补充实际自动检查和基础可观测性项目。
 - P0-7：执行并记录 P0 exit 验收。
 - 各版本发布任务：补充负责人、环境、命令、证据和发布/回滚步骤。

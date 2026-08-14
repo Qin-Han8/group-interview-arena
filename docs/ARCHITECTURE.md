@@ -6,8 +6,8 @@
 - P0-3 foundation status: DONE
 - P0-4 database foundation status: DONE
 - P0-5 identity boundary status: IN_PROGRESS
-- Current substep: P0-5B completed
-- Next substep: P0-5C awaiting explicit approval
+- Current substep: P0-5C completed
+- Next substep: P0-5D awaiting explicit approval
 - Target version: V0.1 Internal Validation
 - Business architecture detail: Incremental from P1
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
@@ -181,7 +181,7 @@ Test-only sync psycopg 只管理临时 database lifecycle，application DB runti
 
 P0-4F 已从 clean `main` HEAD 独立复核 Git、总纲 hash、Docker/PostgreSQL runtime、Compose、secret/dependency 边界、SQLAlchemy/Alembic 架构、migration history、integration harness、unit/integration/full suites、质量门、development database 保护、临时数据库残留与范围。所有 gate 通过，P0-4 已转为 `DONE`；P0-4F 当时未建立业务 Schema、FastAPI DB caller 或 readiness，P0-5B 后的 identity schema 现状见下节。
 
-### P0-5 identity boundary — P0-5B persistence implemented
+### P0-5 identity boundary — P0-5C backend runtime implemented
 
 `ADR-015` 已批准以下长期边界：
 
@@ -192,9 +192,9 @@ P0-4F 已从 clean `main` HEAD 独立复核 Git、总纲 hash、Docker/PostgreSQ
 - browser security 使用 credentialed explicit CORS、exact Origin validation、required custom CSRF header 与 SameSite defense-in-depth；CORS/CSRF 共用 `GIA_API_CORS_ORIGINS` normalized set；
 - V0.1 self-service account/password recovery Deferred；公开测试前必须重新设计 verified recovery identity/flow。
 
-P0-5B 已建立 `users`、`auth_sessions`、identity migration 与 password/session security primitives，metadata 以 `db` package 的显式 model registration 精确包含两张 product table。P0-5C 才把现有 DB factory 接入 FastAPI lifespan/app state/request-scoped `AsyncSession` 并实现最小 auth API；P0-5D 才建立 Web、credentialed CORS/CSRF 与真实浏览器闭环。当前仍没有 FastAPI DB caller、auth endpoint、Cookie auth 或 Web auth UI。
+P0-5B 已建立 `users`、`auth_sessions`、identity migration 与 password/session security primitives，metadata 以 `db` package 的显式 model registration 精确包含两张 product table。P0-5C 已把现有 DB factory 接入 FastAPI lifespan/app state/request-scoped `AsyncSession`，并实现最小 register/login/logout/me、server-side session validation 与 `gia_session` Cookie issue/clear。P0-5D 才建立 Web、credentialed CORS/CSRF 与真实浏览器闭环；当前仍没有 Web auth UI 或 browser auth closure。
 
-计划中的 DB application lifecycle 为：
+已实现的 DB application lifecycle 为：
 
 ```text
 FastAPI lifespan
@@ -204,7 +204,7 @@ FastAPI lifespan
   -> request-scoped AsyncSession
 ```
 
-禁止 import-time engine、eager global connection、startup migration、`create_all` 或 `drop_all`。Request dependency 负责 session lifecycle 和异常 rollback，但不对所有请求隐式 commit；application operation boundary 显式拥有事务。
+DatabaseSettings 只在 lifespan boundary 解析；模块 import 与 OpenAPI generation 不创建 engine 或连接数据库。禁止 import-time engine、eager global connection、startup migration、`create_all` 或 `drop_all`。Request dependency 负责 session lifecycle 和异常 rollback，但不对所有请求隐式 commit；register、login 与 logout operation boundary 显式拥有短事务，read-only current-user lookup 不 commit。
 
 ## Communication and contract boundaries
 
@@ -280,8 +280,8 @@ Redis 只在多 API workers、横向扩容、跨进程 WebSocket broadcast、dis
 
 ## Future work
 
-- P0-5C：等待明确批准；获批后建立 backend auth runtime/API；
-- P0-5D：保持 not started；P0-5C 完成并获批后再建立真实 browser Cookie/CORS/CSRF 闭环；
+- P0-5C：completed；
+- P0-5D：awaiting explicit approval；获批后方可建立真实 browser Cookie/CORS/CSRF 闭环；
 - P0-6：建立 CI 和基础可观测性；
 - P1：逐步设计题目、角色、会话、状态机、调度、记忆和基础报告，并建立第一个 WebSocket vertical slice；
 - P2 以后：只在对应阶段获批后增加语音、评分训练和商业化能力。
