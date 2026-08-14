@@ -3,8 +3,8 @@
 - Status: Active
 - Managed scope: P0 only
 - Current task: P0-4 — IN_PROGRESS
-- Current substep: P0-4D completed
-- Next substep: P0-4E awaiting explicit approval
+- Current substep: P0-4E completed
+- Next substep: P0-4F awaiting explicit approval
 - Allowed status values: `TODO` / `IN_PROGRESS` / `BLOCKED` / `DONE`
 - Related roadmap: [`ROADMAP.md`](ROADMAP.md)
 
@@ -139,7 +139,7 @@
 - ID: `P0-4`
 - 名称：数据库与迁移基础
 - Status: `IN_PROGRESS`
-- Approval state：P0-4A/P0-4B/P0-4C/P0-4D completed；P0-4E awaiting explicit approval。
+- Approval state：P0-4A/P0-4B/P0-4C/P0-4D/P0-4E completed；P0-4F awaiting explicit approval。
 - 目标：依据 P0-2 已批准的技术决策，建立 V0.1 所需的 PostgreSQL 数据库、数据访问层和 migration 基础。
 - In scope：Docker Compose、PostgreSQL 18.x、安全连接配置、SQLAlchemy 2.x、Alembic、最小基础模型、PostgreSQL integration tests 及 migration checks。
 - Out of scope：一次性实现总纲所有未来业务实体或完整会话数据模型。
@@ -153,8 +153,8 @@
 - `P0-4B — Docker Compose + PostgreSQL local infrastructure`：completed；
 - `P0-4C — SQLAlchemy async foundation + typed DB config`：completed；
 - `P0-4D — Alembic migration foundation + zero-op baseline revision`：completed；
-- `P0-4E — PostgreSQL integration tests + migration validation + docs`：awaiting explicit approval；
-- `P0-4F — Independent final review`：not started。
+- `P0-4E — PostgreSQL integration tests + migration validation + docs`：completed；
+- `P0-4F — Independent final review`：awaiting explicit approval。
 
 ### P0-4B completion note
 
@@ -172,7 +172,7 @@
 - 已建立 `DeclarativeBase`、稳定 naming convention、async engine/session factory 与显式 dispose helper；没有 global engine 或 app lifecycle 接入；
 - 31 项 API 测试通过，其中 14 项为新增 DB foundation unit tests；这些测试不连接 PostgreSQL，不是 integration tests；
 - 当前 metadata table count 为 0；未加入 Alembic、migration、业务 ORM model、FastAPI DB dependency 或业务 Schema；
-- P0-4C 与 P0-4D 已完成；P0-4E 等待明确批准。
+- P0-4C、P0-4D 与 P0-4E 已完成；P0-4F 等待明确批准。
 
 ### P0-4D implementation note
 
@@ -180,7 +180,16 @@
 - 唯一 head `7c6ccd86b3c5` 是不含业务 DDL 的 zero-op baseline，`Base.metadata.tables` 仍为 `0`；
 - 使用隔离的随机 `gia_p04d_*` PostgreSQL database 完成 upgrade、重复 upgrade、drift check、downgrade base 与 re-upgrade smoke；临时数据库已删除，开发数据库未迁移且 `SELECT 1` 通过；
 - 新增 4 项 migration static/unit tests，总计 35 项 API tests 通过；本轮 smoke 不等同于 P0-4E reusable integration test suite；
-- 未增加业务 table/model、FastAPI DB dependency、app migration startup 或 `create_all`/`drop_all`；P0-4E 等待明确批准。
+- 未增加业务 table/model、FastAPI DB dependency、app migration startup 或 `create_all`/`drop_all`；当前 P0-4E 完成状态见下方 completion note。
+
+### P0-4E completion note
+
+- 已建立 `tests/integration/` reusable harness，以 test-only typed settings 安全读取根 `.env`，为每个数据库测试创建唯一 `gia_p04e_*` PostgreSQL database 并精确清理；
+- protected database guard 覆盖 development database、system databases 与无安全前缀名称，admin DDL 使用 `psycopg.sql.Identifier`；
+- 真实验证 AsyncEngine、AsyncSession、PostgreSQL major 18、commit 与 rollback；test-only probe table 不属于 product schema；
+- programmatic Alembic tests 覆盖 fresh → head、repeat upgrade、drift check、downgrade base、re-upgrade 与 final check，business table count 始终为 `0`；
+- unit suite 35 项、integration suite 11 项（skipped 0）、full suite 46 项全部通过；development database 未迁移，`SELECT 1` 通过且无 `alembic_version`；临时数据库残留为 0；
+- 未新增 dependency，`uv.lock` 与 baseline revision 均未改变；P0-4E 已完成，P0-4F 等待明确批准。
 
 ## P0-5 — 最小身份边界
 

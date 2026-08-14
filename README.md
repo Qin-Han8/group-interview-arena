@@ -18,11 +18,12 @@ AI 群面训练场让用户无需临时召集真人，即可与具有不同性�
 - 当前任务：`P0-4 — 数据库与迁移基础（IN_PROGRESS）`
 - 已完成子步骤：`P0-4A — Preflight + scope freeze`、`P0-4B — Docker Compose + PostgreSQL local infrastructure`、`P0-4C — SQLAlchemy async foundation + typed DB config`
 - 已完成子步骤：`P0-4D — Alembic migration foundation + zero-op baseline revision（completed）`
-- 下一子步骤：`P0-4E — PostgreSQL integration tests + migration validation + docs（awaiting explicit approval）`
+- 当前子步骤：`P0-4E — PostgreSQL integration tests + migration validation + docs（completed）`
+- 下一子步骤：`P0-4F — Independent final review（awaiting explicit approval）`
 - 当前目标版本：`V0.1 — Internal Validation / 内部技术验证版`
-- 当前实现状态：Web/API 技术骨架、本地 PostgreSQL 18.4、SQLAlchemy async/psycopg 3 底层 factory 与 Alembic async migration foundation 已建立；当前唯一 revision 是不创建业务表的 zero-op baseline，业务 Schema、FastAPI DB caller 与 P0-4E reusable integration test suite 尚未建立
+- 当前实现状态：Web/API 技术骨架、本地 PostgreSQL 18.4、SQLAlchemy async/psycopg 3 底层 factory、Alembic async migration foundation 与逐测试隔离的 reusable PostgreSQL integration test harness 已建立；当前唯一 revision 是不创建业务表的 zero-op baseline，业务 Schema 与 FastAPI DB caller 尚未建立
 
-> P0-3、P0-4A、P0-4B、P0-4C 与 P0-4D 已完成。P0 仍在进行中；P0-4E 等待明确批准。
+> P0-3、P0-4A、P0-4B、P0-4C、P0-4D 与 P0-4E 已完成。P0 仍在进行中；P0-4F 等待明确批准。
 
 ## 核心原则摘要
 
@@ -193,6 +194,16 @@ uv run ruff format --check .
 uv run pyright
 uv run pytest
 ```
+
+API 测试分层命令：
+
+```powershell
+uv run pytest -m "not integration"
+uv run pytest -m integration
+uv run pytest
+```
+
+`integration` 与完整 suite 需要 Docker Desktop、healthy 的 PostgreSQL Compose service，以及仓库根目录中被 Git ignore 的本地 `.env`；unit-only 命令不读取这些本地数据库配置。Integration fixture 为每个需要数据库状态的测试创建并精确删除独立 `gia_p04e_*` database，不迁移 development database。
 
 当前实现技术基础、`GET /health` 连通、本地 PostgreSQL Compose、尚未接入 app runtime 的 SQLAlchemy async/psycopg 3 factory，以及 Alembic zero-op migration baseline。业务 Schema 与群面业务功能尚未建立。
 

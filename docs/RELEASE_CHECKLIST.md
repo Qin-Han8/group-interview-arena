@@ -17,7 +17,7 @@
 
 ## 当前版本范围
 
-P0-2 技术架构决策与 P0-3 前后端项目骨架已完成。P0-4A preflight/scope freeze、P0-4B PostgreSQL local infrastructure、P0-4C SQLAlchemy async foundation 与 P0-4D Alembic migration foundation 已完成；P0-4E 等待明确批准。P0 尚未完成，V0.1 业务能力尚未实现。下方 P0 exit 与产品版本复选框仍表示完整阶段/版本验收，不能由单个子任务替代。
+P0-2 技术架构决策与 P0-3 前后端项目骨架已完成。P0-4A preflight/scope freeze、P0-4B PostgreSQL local infrastructure、P0-4C SQLAlchemy async foundation、P0-4D Alembic migration foundation 与 P0-4E PostgreSQL integration test foundation 已完成；P0-4F 等待明确批准。P0 尚未完成，V0.1 业务能力尚未实现。下方 P0 exit 与产品版本复选框仍表示完整阶段/版本验收，不能由单个子任务替代。
 
 ## Implementation guidance
 
@@ -140,7 +140,23 @@ P0-3 已通过第二次独立最终验收并转为 `DONE`。P0 整体仍为 `IN_
 - [x] 临时数据库已精确删除；development database 未迁移、仍存在且 `SELECT 1` 通过；
 - [x] Ruff、format check、Pyright 与 35 项 pytest 通过，其中 4 项为 migration static/unit tests。
 
-这些证据是 P0-4D migration runtime smoke，不是 P0-4E reusable PostgreSQL integration test suite。P0-4D 已完成；P0-4E 等待明确批准。
+这些证据是 P0-4D migration runtime smoke，不是 P0-4E reusable PostgreSQL integration test suite。P0-4D 已完成；当前 P0-4E 证据见下方 verification。
+
+### P0-4E PostgreSQL integration verification — 2026-08-14
+
+- [x] reusable per-test `gia_p04e_*` temporary database fixture 与 exact cleanup；
+- [x] development/system/unprefixed database guards 在执行 SQL 前拒绝危险名称；
+- [x] sync psycopg admin connection 使用 autocommit，database identifier 使用 `psycopg.sql.Identifier`；
+- [x] 现有 AsyncEngine 与 AsyncSession 真实连接 PostgreSQL major 18；
+- [x] test-only probe table 上的 commit 与 explicit rollback 均通过；
+- [x] fresh database → unique migration head、repeat upgrade、`alembic check`、downgrade base、re-upgrade 与 final check 通过；
+- [x] migration business table count 与 `Base.metadata` table count 均为 `0`；probe table 未进入 product schema；
+- [x] unit suite 35 项、integration suite 11 项（skipped 0）、full suite 46 项通过；
+- [x] `uv sync --frozen`、`uv lock --check`、Ruff、format check 与 Pyright 通过；
+- [x] development database 未执行 migration、没有 `alembic_version`、`SELECT 1` 通过；本轮临时 database residual count 为 `0`；
+- [x] 未新增 dependency，`uv.lock`、baseline revision、Web、Compose 与业务 schema 均未改变。
+
+这些证据只覆盖 P0-4E reusable PostgreSQL integration/migration test foundation，不代表 P0-4 独立最终审查已完成。P0-4E 已完成；P0-4F 等待明确批准。
 
 ## P0 exit
 

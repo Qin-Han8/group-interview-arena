@@ -6,6 +6,7 @@
 - Local PostgreSQL infrastructure: P0-4B — completed
 - SQLAlchemy async foundation: P0-4C — completed
 - Alembic migration foundation: P0-4D — completed
+- PostgreSQL integration test foundation: P0-4E — completed
 - Target version: V0.1 Internal Validation
 - Business schema: Not started
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
@@ -56,7 +57,7 @@
 - lifecycle：仅提供显式 `await engine.dispose()` 的薄 helper；尚无 FastAPI DB dependency、app lifespan 或启动连接；
 - verification：14 项新增 DB foundation unit tests 不连接 PostgreSQL；真实 integration/migration tests 尚未执行。
 
-P0-4E reusable PostgreSQL integration test suite 等待明确批准。
+P0-4E reusable PostgreSQL integration test suite 已完成。
 
 ## P0-4D implemented migration foundation
 
@@ -70,6 +71,17 @@ P0-4E reusable PostgreSQL integration test suite 等待明确批准。
 - lifecycle：API startup 不自动执行 migration，现有 `/health` 仍不加载数据库配置。
 
 上述真实 PostgreSQL 操作是 P0-4D migration runtime smoke，不是 P0-4E reusable integration test suite。
+
+## P0-4E implemented integration test foundation
+
+- config：test-only typed settings 从根目录被 Git ignore 的 `.env` 读取 `POSTGRES_*`；password 使用 `SecretStr`，不会成为 application runtime config；
+- isolation：每个需要独立 schema state 的测试使用唯一 `gia_p04e_<uuid hex>` database；development database 与 `postgres`/`template0`/`template1` 受显式 guard 保护；
+- administration：复用现有 psycopg 3 sync API 和 autocommit maintenance connection，只用于 test database create/drop；SQL identifier 使用 `psycopg.sql.Identifier`；
+- cleanup：fixture `finally` 只终止并删除本轮精确 database，随后验证其不存在；不通配清理历史 database；
+- application runtime：现有 `create_database_engine()` 与 `create_database_session_factory()` 在真实 PostgreSQL 上验证 `AsyncEngine`、`AsyncSession`、server major 18、commit 与显式 rollback；application DB runtime 保持 async；
+- transaction probe：`gia_test_transaction_probe` 只存在于独立临时 database，不加入 `Base.metadata`、migration 或 product schema；
+- migration：fresh → unique head、repeat upgrade、`current --check-heads`、`alembic check`、downgrade base、re-upgrade 与 final check 均通过；migration business table count 为 `0`；
+- regression：`Base.metadata.tables = 0`；development database 未迁移、没有 `alembic_version` 且 `SELECT 1` 通过；本轮 `gia_p04e_%` residual audit 为 `0`。
 
 ## Rejected paths
 
@@ -138,7 +150,7 @@ P0-4 不运行 Redis，不创建未来完整业务 Schema，也不提前实现�
 
 ## Future work
 
-- P0-4E～P0-4F：建立 reusable PostgreSQL integration tests 并完成独立审查；
+- P0-4F：独立审查 P0-4 database foundation；
 - P1：按文字讨论闭环实现最小题目、角色、会话、事件、记忆和报告数据；
 - P2～P4：仅随获批范围增加音频、评分训练和商业化数据。
 

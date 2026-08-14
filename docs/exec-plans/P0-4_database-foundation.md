@@ -12,7 +12,8 @@
 - 当前已完成子步骤：`P0-4B — Docker Compose + PostgreSQL local infrastructure`。
 - 当前已完成子步骤：`P0-4C — SQLAlchemy async foundation + typed DB config`。
 - 当前已完成子步骤：`P0-4D — Alembic migration foundation + zero-op baseline revision`。
-- 下一子步骤：`P0-4E — PostgreSQL integration tests + migration validation + docs`，awaiting explicit approval。
+- 当前子步骤：`P0-4E — PostgreSQL integration tests + migration validation + docs`，completed。
+- 下一子步骤：`P0-4F — Independent final review`，awaiting explicit approval。
 
 ## Scope
 
@@ -76,7 +77,7 @@ P0-4B 要求：
 - restart 后重新 healthy 且 `SELECT 1` 成功；
 - `git diff --check`、scope audit、secret audit 与总纲 hash 检查。
 
-P0-4D 的隔离 migration runtime smoke 已完成；P0-4E reusable integration/migration test suite 仍只在获得明确批准后执行。
+P0-4D 的隔离 migration runtime smoke 与 P0-4E reusable integration/migration test suite 均已完成；P0-4F 等待明确批准。
 
 ## Decisions
 
@@ -98,7 +99,8 @@ P0-4D 的隔离 migration runtime smoke 已完成；P0-4E reusable integration/m
 - 2026-08-13：`P0-4B` completed；PostgreSQL-only Compose、official image pull、healthy、18.4 server、开发数据库、`SELECT 1`、named volume、restart smoke 与 IPv4 loopback binding 已验证，最终 diff 审核通过。
 - 2026-08-13：`P0-4C` completed；resolved SQLAlchemy `2.0.52`、psycopg/psycopg-binary `3.3.4`，已创建 `db/__init__.py`、`db/base.py`、`db/runtime.py`，31 项 API 测试通过（14 项新增 DB foundation unit tests），最终源码/diff 审核通过。
 - 2026-08-13：`P0-4D` completed；resolved Alembic `1.18.5`，建立 async migration environment 与唯一 zero-op baseline head `7c6ccd86b3c5`。隔离临时 PostgreSQL database 的 upgrade/repeat/check/downgrade/re-upgrade smoke 通过，business table count 为 `0`，临时数据库已清理，development database 未迁移且回归通过，最终源码与 migration foundation 审核通过。
-- 当前下一步：P0-4E awaiting explicit approval。
+- 2026-08-14：`P0-4E` completed；新增 `tests/integration/conftest.py`、`test_database.py`、`test_migrations.py` 与 pytest marker/importlib mode。Unit 35、integration 11、full 46 项通过；逐测试 `gia_p04e_*` database 均精确清理，development database 未迁移且回归通过。
+- 当前下一步：P0-4F awaiting explicit approval。
 
 ## Deviations
 
@@ -108,6 +110,9 @@ P0-4D 的隔离 migration runtime smoke 已完成；P0-4E reusable integration/m
 - P0-4C 首轮质量检查发现 import order、Pyright 对环境注入必填 field 的静态建模和显式 `echo=False` 断言问题；均已最小修正，最终全门通过。
 - P0-4D 首次 `uv add` 在 sandbox 中因 network restriction 失败；按已批准的 scoped `uv add --dev` 权限访问 PyPI 后成功，未扩大文件系统权限。
 - P0-4D 前两次 migration smoke 在运行 Alembic 前分别暴露 PowerShell URL scalar 解析问题与 Windows Proactor event loop 不兼容；相应临时数据库均由精确 `finally` cleanup 删除。migration environment 最小改用 selector event loop 后，第三次 Alembic upgrade 已通过；随后修正仅用于验证的 catalog scalar 解析并用新临时数据库完成全部闭环。没有迁移 development database。
+- P0-4E 执行中发生一次 response stream 网络中断；working tree 修改被保留，并从当前 diff 恢复审查，未 reset、restore 或重复建立 infrastructure。恢复后所有最终质量门与 integration gates 均重新执行，中断前未完整返回的结果未作为最终 PASS 证据。
+- 根 tests 与 `tests/integration/` 的同名模块在 pytest 默认 prepend mode 下发生 collection collision；最小启用 `--import-mode=importlib`，未新增 `__init__.py`、pytest dependency 或重命名批准文件。
+- Full suite 首轮发现 programmatic Alembic `fileConfig()` 会污染同进程 logging state；integration tests 改用无 config filename 的 programmatic `Config()` 与绝对 `script_location`，自然跳过 `fileConfig()`，并以 logging isolation regression 验证既有 logger state 保持不变。Production migration/logging config 未修改。
 
 ## Verification evidence
 
@@ -129,3 +134,10 @@ P0-4D 的隔离 migration runtime smoke 已完成；P0-4E reusable integration/m
 - P0-4D runtime：随机 `gia_p04d_*` 临时 PostgreSQL database 上 fresh upgrade、repeat upgrade、`current --check-heads`、两次 `alembic check`、downgrade base 与 re-upgrade 全部通过；business table count 始终为 `0`。
 - P0-4D cleanup/regression：临时数据库不存在；development database 存在、未迁移且 `SELECT 1` 通过；PostgreSQL container 与 named volume 保留。
 - P0-4D quality：`uv sync --frozen`、`uv lock --check`、Ruff lint/format、Pyright 与 35 项 pytest 全部通过（4 项新增 migration static/unit tests）。
+- P0-4E Git baseline：`main`、clean、HEAD `94ee4f0`；
+- P0-4E test architecture：test-only typed root `.env` settings、`SecretStr` password、per-test `gia_p04e_*` isolation、psycopg sync autocommit admin、`sql.Identifier` 与 exact cleanup；
+- P0-4E database integration：AsyncEngine/AsyncSession、PostgreSQL major 18、commit/rollback 通过；test-only probe 不属于 product schema；
+- P0-4E migration integration：fresh/repeat/check/downgrade/re-upgrade/final check 通过，unique head `7c6ccd86b3c5`，business table count 为 `0`；
+- P0-4E test totals：unit 35 passed、integration 11 passed/0 skipped、full 46 passed；Ruff、format、Pyright、frozen sync 与 lock check 通过；
+- P0-4E cleanup/regression：run-created temp database 最终均不存在，`gia_p04e_%` residual count 为 `0`；development database 存在、未迁移、无 `alembic_version` 且 `SELECT 1` 通过；
+- P0-4E dependency/schema：无新增 dependency，`uv.lock` 未变；`Base.metadata.tables = 0`，baseline revision 未改且无新 revision。

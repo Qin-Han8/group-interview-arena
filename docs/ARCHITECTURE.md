@@ -5,8 +5,8 @@
 - Architecture baseline established by: P0-2 — DONE
 - P0-3 foundation status: DONE
 - Current task: P0-4 — IN_PROGRESS
-- Current substep: P0-4D completed
-- Next substep: P0-4E awaiting explicit approval
+- Current substep: P0-4E completed
+- Next substep: P0-4F awaiting explicit approval
 - Target version: V0.1 Internal Validation
 - Business architecture detail: Incremental from P1
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
@@ -164,7 +164,19 @@ reviewed migration revisions
 PostgreSQL
 ```
 
-Alembic 使用 migration-specific `AsyncEngine`、`connection.run_sync(...)` 与 `NullPool`，只接受 `postgresql+psycopg`。当前唯一 head 是不含业务 DDL 的 zero-op baseline。API runtime startup 不自动执行 migration；P0-4E reusable PostgreSQL integration test suite 等待明确批准。Redis 继续不运行，业务 Schema 尚未创建。
+Alembic 使用 migration-specific `AsyncEngine`、`connection.run_sync(...)` 与 `NullPool`，只接受 `postgresql+psycopg`。当前唯一 head 是不含业务 DDL 的 zero-op baseline。API runtime startup 不自动执行 migration。P0-4E test architecture 为：
+
+```text
+pytest integration
+  ↓
+safe per-test gia_p04e_* PostgreSQL database
+  ↓
+SQLAlchemy async runtime / Alembic
+  ↓
+drop exact temporary database
+```
+
+Test-only sync psycopg 只管理临时 database lifecycle，application DB runtime 仍为 async。Development database 受 guard 保护，integration suite 从不对其执行 migration。Redis 继续不运行，业务 Schema 尚未创建。
 
 ## Communication and contract boundaries
 
@@ -240,7 +252,7 @@ Redis 只在多 API workers、横向扩容、跨进程 WebSocket broadcast、dis
 
 ## Future work
 
-- P0-4E～P0-4F：建立 reusable PostgreSQL integration tests 并完成独立审查；
+- P0-4F：独立审查 P0-4 database foundation，不新增业务能力；
 - P0-5：落实内部 V0.1 最小身份边界；
 - P0-6：建立 CI 和基础可观测性；
 - P1：逐步设计题目、角色、会话、状态机、调度、记忆和基础报告，并建立第一个 WebSocket vertical slice；
