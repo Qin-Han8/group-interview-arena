@@ -3,15 +3,14 @@
 ## Status
 
 - Parent task：`P0-6 — IN_PROGRESS`
-- Completed substeps：`P0-6A — completed；actual-source final review PASS；four review findings closed`；`P0-6B — completed；implementation/local parity/actual-source review/remote CI PASS`；`P0-6C — completed；implementation/API quality gates/actual-source review/finding remediation/re-review/remote CI PASS`
-- Current substep：`P0-6D — implementation complete / actual-source review pending`
-- Later substep：`P0-6E — NOT_STARTED`
+- Completed substeps：`P0-6A — completed；actual-source final review PASS；four review findings closed`；`P0-6B — completed；implementation/local parity/actual-source review/remote CI PASS`；`P0-6C — completed；implementation/API quality gates/actual-source review/finding remediation/re-review/remote CI PASS`；`P0-6D — completed；implementation/local gates/actual-source review/findings remediation/re-review/remote CI PASS`
+- Current gate：`P0-6E — awaiting explicit user approval / NOT_STARTED`
 - P0-7：独立任务，`NOT_STARTED`
 - Scope owner：[`TASKS.md`](../TASKS.md)
 - Product baseline：[`PROJECT_MASTER_PLAN.md`](../PROJECT_MASTER_PLAN.md)
 - Last updated：2026-08-16
 
-本计划冻结 P0-6 的执行边界与风险门禁。P0-6A 已完成且只产生文档。P0-6B workflow implementation、local parity、actual-source review、findings remediation 与 remote GitHub Actions verification 均已完成并 `PASS`。P0-6C implementation、API quality gates、actual-source review、finding remediation/re-review 与 remote GitHub Actions verification 均已完成并 `PASS`。P0-6D implementation complete / actual-source review pending；P0-6E not started。
+本计划冻结 P0-6 的执行边界与风险门禁。P0-6A 已完成且只产生文档。P0-6B workflow implementation、local parity、actual-source review、findings remediation 与 remote GitHub Actions verification 均已完成并 `PASS`。P0-6C implementation、API quality gates、actual-source review、finding remediation/re-review 与 remote GitHub Actions verification 均已完成并 `PASS`。P0-6D implementation、local gates、actual-source review、findings remediation/re-review 与 remote GitHub Actions verification 均已完成并 `PASS`；P0-6E awaiting explicit user approval / not started。
 
 ## Goal
 
@@ -125,14 +124,14 @@
 - 2026-08-16 live official preflight 确认 OTel API/SDK/OTLP HTTP exporter `1.44.0` 为 current stable core release，支持 CPython 3.14；实际核对 `TracerProvider`、`SpanKind.SERVER`、`record_exception=False`、`set_status_on_exception=False`、W3C propagator、`BatchSpanProcessor`、`OTLPSpanExporter`、`Resource`、`force_flush`/`shutdown` 与 `InMemorySpanExporter` public APIs；
 - direct dependencies 为 `opentelemetry-api>=1.44.0,<2`、`opentelemetry-sdk>=1.44.0,<2`、`opentelemetry-exporter-otlp-proto-http>=1.44.0,<2`，lock resolution 为 1.44.0；标准 OTLP HTTP transitive graph 包含 proto/common、semantic conventions、protobuf、googleapis common protos 与 requests HTTP stack，无 contrib instrumentation、distro、gRPC、metrics/log exporter 或 vendor SDK；
 - `Settings` 已实现默认 disabled、service name 与 fail-closed OTLP endpoint 校验；endpoint 仅允许 scheme/host/port/path，拒绝 userinfo/query/fragment，配置不进入 Web/OpenAPI；
-- 每个 FastAPI app lifespan 显式拥有 non-global provider/tracer；disabled path 不创建 provider/exporter/worker/network，enabled path 使用 OTLP HTTP + `BatchSpanProcessor`，startup 不探测 collector；shutdown 的 OTLP/export/flush timeout 为 5 秒并先于 database dispose；
+- 每个 FastAPI app lifespan 显式拥有 non-global provider/tracer；disabled path 不创建 provider/exporter/worker/network，enabled path 使用 OTLP HTTP + `BatchSpanProcessor`，startup 不探测 collector；OTLP HTTP export timeout 为 5 秒，SDK BatchSpanProcessor shutdown 使用 OTel 1.44 自身 bounded shutdown semantics，并先于 database dispose；
 - 既有 middleware 仅把白名单 `traceparent` 交给 W3C propagator，不接受 `tracestate`/baggage，并创建受控 `SpanKind.SERVER` span；matched name 为 `METHOD route-template`，unmatched 为固定 `METHOD <unmatched>`；attributes 仅含 method、route template、status、固定 error category，resource 直接由 project typed config 构造唯一 `service.name`，不运行 ambient detector；4xx/404 保持 unset status，5xx 标记 error，禁用 exception recording；
 - project JSON formatter 从 active valid span context 自动增加固定宽度 lowercase `trace_id`/`span_id`，caller-supplied 同名字段无效；无 active span 时省略，lookup failure 继续输出安全单行 JSON；
 - OTel SDK 1.44.0 的 `BatchSpanProcessor` 没有简洁可靠的 public async export-failure callback，因此不建立 wrapper hierarchy 或依赖 private internals；异步 export result 保留 SDK handling，项目只在真实可控的 flush timeout/error、provider shutdown error caller 记录安全 `telemetry.export.failed` category；
 - initial targeted 56、API unit 165、PostgreSQL integration 18、API full 183、Ruff、format、Pyright、Alembic single-head/drift 与 Chromium 1 均通过；sensitive sentinel、export failure availability、provider isolation、database dispose 与 processor-thread cleanup 均有回归；
-- actual-source review 的两个 data-boundary findings 已修复：`traceparent` allowlist carrier 防止 arbitrary `tracestate` 进入 child context，public `Resource(attributes=...)` 防止 `OTEL_RESOURCE_ATTRIBUTES`/`OTEL_SERVICE_NAME` 与 detector metadata 绕过 project allowlist；remediation targeted tracing/logging/config 58 项通过，P0-6D 状态仍为 implementation complete / actual-source review pending；
-- 后续 actual-source review 的两个 ambient-config findings 已修复：enabled path 对会实际禁用 SDK 的 `OTEL_SDK_DISABLED` fail closed，并用 public `ParentBased(ALWAYS_ON)` 固定默认语义；OTLP HTTP exporter 的 ambient headers、client key/certificate 与 trace credential-provider side channel 在构造 provider/exporter 前做 presence-only fail-closed validation，不读取 credential value；disabled path 保持无 exporter 且不受这些变量影响；
-- application behavior、REST/OpenAPI/error envelope、database schema/migrations、Web、CI workflow 与 JavaScript dependencies 未改变；P0-6D implementation complete / actual-source review pending。
+- actual-source review 的两个 data-boundary findings 已修复并通过 re-review：`traceparent` allowlist carrier 防止 arbitrary `tracestate` 进入 child context，public `Resource(attributes=...)` 防止 `OTEL_RESOURCE_ATTRIBUTES`/`OTEL_SERVICE_NAME` 与 detector metadata 绕过 project allowlist；remediation targeted tracing/logging/config 58 项通过；
+- 后续 actual-source review 的两个 ambient-config findings 已修复并通过 re-review：enabled path 对会实际禁用 SDK 的 `OTEL_SDK_DISABLED` fail closed，并用 public `ParentBased(ALWAYS_ON)` 固定默认语义；OTLP HTTP exporter 的 ambient headers、client key/certificate 与 trace credential-provider side channel 在构造 provider/exporter 前做 presence-only fail-closed validation，不读取 credential value；disabled path 保持无 exporter 且不受这些变量影响；
+- application behavior、REST/OpenAPI/error envelope、database schema/migrations、Web、CI workflow 与 JavaScript dependencies 未改变；reviewed commit `96581dd7c3f972dbe5d90592ee34d9973bd3dd41` 经 push-to-main 触发 GitHub Actions CI run #6，API quality、PostgreSQL integration and migration、Web quality and OpenAPI drift、Chromium E2E 四个 required jobs 均 completed / success；P0-6D completed。
 
 ### P0-6E — Cross-layer validation / P0-6 closeout
 
@@ -321,7 +320,7 @@ P0-6D 在既有 middleware 内使用 OTel API 创建 `SpanKind.SERVER` span：
 - production path 使用 OTLP over HTTP/protobuf `BatchSpanProcessor`，不使用 gRPC 双栈；
 - default disabled 时不创建/export provider，不发网络请求；
 - enabled 时配置校验要求 endpoint，并拒绝与 project enable authority 冲突的 active ambient SDK disablement 及 unsupported exporter authentication side channel；sampler 通过 public API 显式固定为 parent-based always-on，不接受 ambient sampler 覆盖；startup 不探测 collector；collector 不可达只产生受控 telemetry diagnostic，不阻断 startup/request；
-- lifespan shutdown 使用 bounded `force_flush` 后 `shutdown`，无论 export 成功与否都继续 dispose database engine；
+- lifespan shutdown 先执行 5 秒 OTLP HTTP export/force-flush boundary，再调用采用 OTel 1.44 自身 bounded shutdown semantics 的 SDK BatchSpanProcessor shutdown；无论 export 成功与否都继续 dispose database engine；
 - tests 注入 SDK in-memory exporter，不需要 collector/backend，也不写全局永久 provider 状态；每个 app instance 显式拥有并清理 provider。
 
 ### SQLAlchemy instrumentation
@@ -431,7 +430,7 @@ P0-6D 修改 dependency 前必须重新：
 - enabled 时逐项拒绝 OTel 1.44.0 OTLP HTTP exporter 的 ambient headers、client key/certificate 与 trace credential-provider variables，错误不包含变量值且不创建 provider/exporter worker；disabled 时同组变量不导致失败；
 - invalid trace context 不导致 request failure；
 - in-memory exporter tests，无 external backend；
-- unreachable OTLP endpoint 不阻断 startup/request，shutdown bounded flush；
+- unreachable OTLP endpoint 不阻断 startup/request；OTLP HTTP export timeout 为 5 秒，SDK BatchSpanProcessor shutdown 使用 OTel 1.44 自身 bounded shutdown semantics；
 - 在项目真实可控的 flush/shutdown failure caller 实现并测试 `telemetry.export.failed`，只含安全 event/category 与 active correlation fields，不含 endpoint、credential、response body 或 exception message；BatchSpanProcessor 异步 export result 因无可靠 public callback 保留 SDK handling，不以 private API 或大型 wrapper 伪造捕获；
 - sentinel query/header/body/Cookie/exception/DB URL 不进入 span/log/response；
 - targeted tests 通过后运行 API integration/full gates。
@@ -473,7 +472,7 @@ P0-7 之后从 committed repository state 单独进行 independent P0 acceptance
 - active trace_id/span_id 可与既有 request_id 日志关联；
 - OTLP/HTTP exporter 不做 startup availability dependency，in-memory tests 不需要 backend；
 - 项目可控 flush/shutdown caller 的 `telemetry.export.failed` 已实现并通过无 endpoint/credential/body/exception-message leakage tests；BatchSpanProcessor async exporter failure 的 public callback limitation 已记录；
-- lifespan bounded flush/shutdown 与 database dispose 均验证；
+- 5 秒 OTLP HTTP export/force-flush boundary、OTel 1.44 SDK BatchSpanProcessor bounded shutdown semantics 与 database dispose 均验证；
 - 不含 OTel Logs、metrics、SQLAlchemy/FastAPI/ASGI auto-instrumentation 或 external backend；
 - dependency/API/Python 3.14 review 与 lock diff 有证据。
 
@@ -502,7 +501,7 @@ P0-7 之后从 committed repository state 单独进行 independent P0 acceptance
 - OTLP/HTTP 无 auth 配置只适用于受控 endpoint；生产 authenticated exporter 属于后续 deployment/operations decision，当前不得把 credential 放入 URL。
 - Chromium CI 会增加运行时间，但其 Cookie/CSRF 安全覆盖不可由 unit test 替代，因此保留为 gate；首版通过 one worker、Chromium-only 控制成本。
 - GitHub action pins、hosted runner image 与 OTel releases 会变化；B/D 开始时重新核对，不把 2026-08-15 的查询结果当作永久最新值。
-- 当前没有阻断 P0-6D actual-source review 的产品或 durable architecture open question；P0-6E 仍须获得用户明确批准。
+- P0-6D actual-source review 与 findings re-review 已通过，无 remaining blocker；P0-6E 仍须获得用户明确批准。
 
 ## Official references reviewed
 
@@ -515,7 +514,7 @@ P0-7 之后从 committed repository state 单独进行 independent P0 acceptance
 
 ## Progress
 
-- Completed：P0-6A baseline gate、scope freeze、execution plan 与 actual-source final review `PASS`；P0-6B workflow implementation、live action preflight、local parity、cleanup validation、actual-source review、findings remediation 与 remote GitHub Actions run #1 `PASS`；P0-6C structured JSON logging implementation、security regression coverage、actual-source review、`JsonFormatter` safe fallback remediation/re-review 与 remote GitHub Actions run #4 `PASS`；
-- Current：P0-6D implementation complete / actual-source review pending；
+- Completed：P0-6A baseline gate、scope freeze、execution plan 与 actual-source final review `PASS`；P0-6B workflow implementation、live action preflight、local parity、cleanup validation、actual-source review、findings remediation 与 remote GitHub Actions run #1 `PASS`；P0-6C structured JSON logging implementation、security regression coverage、actual-source review、`JsonFormatter` safe fallback remediation/re-review 与 remote GitHub Actions run #4 `PASS`；P0-6D OpenTelemetry 1.44 tracing foundation、local gates、actual-source review、tracestate/Resource 与 ambient SDK/exporter config remediation/re-review、remote GitHub Actions run #6 `PASS`；
+- Current gate：P0-6E awaiting explicit user approval / not started；
 - Not started：P0-6E、P0-7；
-- Next：等待 P0-6D actual-source review；不得自行进入 P0-6E。
+- Next：等待用户明确批准 P0-6E；不得自行进入 P0-6E。

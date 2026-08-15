@@ -3,9 +3,9 @@
 - Status: Active baseline
 - Current development phase: P0 — 项目基础
 - Current task: P0-6 — `IN_PROGRESS`
-- Most recently completed substep: P0-6C — implementation, API quality gates, actual-source review, finding remediation/re-review and remote CI `PASS`
-- Current substep: P0-6D — implementation complete / actual-source review pending
-- P0-6 status: `IN_PROGRESS`; P0-6A/P0-6B/P0-6C completed；P0-6D implementation complete / actual-source review pending；P0-6E not started
+- Most recently completed substep: P0-6D — implementation, local gates, actual-source review/remediation/re-review and remote CI `PASS`
+- Current gate: P0-6E — awaiting explicit user approval / not started
+- P0-6 status: `IN_PROGRESS`; P0-6A/P0-6B/P0-6C/P0-6D completed；P0-6E awaiting explicit user approval / not started
 - Target product version: V0.1 — Internal Validation
 - Source: [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) §30–31
 
@@ -43,14 +43,14 @@
 | P0-3 前后端项目骨架 | 创建最小 Web/API skeleton、工具链、健康检查、基础配置与日志、基础测试及 Web → API 连通；不包含数据库 | DONE |
 | P0-4 数据库与迁移基础 | 使用 Docker Compose、PostgreSQL 18.x、SQLAlchemy 2.x 和 Alembic 建立数据与 migration 基础及数据库集成验证 | DONE |
 | P0-5 最小身份边界 | 建立 V0.1 username/password、稳定 user_id 与服务端 Cookie session 身份边界，不做完整公开账号产品 | DONE |
-| P0-6 CI、日志与基础可观测性 | 建立自动检查、日志和基础监控能力 | IN_PROGRESS — P0-6A/P0-6B/P0-6C completed；P0-6D implementation complete / actual-source review pending；P0-6E not started |
+| P0-6 CI、日志与基础可观测性 | 建立自动检查、日志和基础监控能力 | IN_PROGRESS — P0-6A/P0-6B/P0-6C/P0-6D completed；P0-6E awaiting explicit user approval / not started |
 | P0-7 P0 独立验收 | 独立确认 P0 是否满足进入 P1 的条件 | NOT_STARTED |
 
-任务细节及验收条件见 [`TASKS.md`](TASKS.md)。P0-1～P0-5 均已完成并转为 `DONE`。P0 整体仍为 `IN_PROGRESS`；P0-6A/P0-6B/P0-6C completed，其中 P0-6B remote GitHub Actions run #1 与 P0-6C actual-source review、finding remediation/re-review、remote GitHub Actions run #4 均 `PASS`；P0-6D implementation complete / actual-source review pending，P0-6E not started，P0-7 not started。
+任务细节及验收条件见 [`TASKS.md`](TASKS.md)。P0-1～P0-5 均已完成并转为 `DONE`。P0 整体仍为 `IN_PROGRESS`；P0-6A/P0-6B/P0-6C/P0-6D completed，其中 P0-6B remote GitHub Actions run #1、P0-6C remote GitHub Actions run #4 与 P0-6D actual-source review/remediation/re-review、remote GitHub Actions run #6 均 `PASS`；P0-6E awaiting explicit user approval / not started，P0-7 not started。
 
 P0-5 固定采用五阶段执行：P0-5A identity preflight（completed）、P0-5B identity persistence/migration/security primitives（completed）、P0-5C backend auth runtime/API（completed）、P0-5D Web/CORS/CSRF cross-layer validation（completed）、P0-5E independent final review（completed；PASS after findings remediation and independent recheck）。
 
-P0-6 固定采用五阶段执行：P0-6A preflight/scope freeze/execution plan（completed；actual-source final review `PASS`）、P0-6B GitHub Actions CI baseline（completed；remote CI `PASS`）、P0-6C structured logging hardening（completed；actual-source review、finding remediation/re-review 与 remote CI `PASS`）、P0-6D OpenTelemetry tracing foundation（implementation complete / actual-source review pending）、P0-6E cross-layer validation/P0-6 closeout（not started）。P0-7 仍为独立 P0 final acceptance，不并入 P0-6E。详细计划见 [`exec-plans/P0-6_ci-observability.md`](exec-plans/P0-6_ci-observability.md)。
+P0-6 固定采用五阶段执行：P0-6A preflight/scope freeze/execution plan（completed；actual-source final review `PASS`）、P0-6B GitHub Actions CI baseline（completed；remote CI `PASS`）、P0-6C structured logging hardening（completed；actual-source review、finding remediation/re-review 与 remote CI `PASS`）、P0-6D OpenTelemetry tracing foundation（completed；actual-source review、findings remediation/re-review 与 remote CI run #6 `PASS`）、P0-6E cross-layer validation/P0-6 closeout（awaiting explicit user approval / not started）。P0-7 仍为独立 P0 final acceptance，不并入 P0-6E。详细计划见 [`exec-plans/P0-6_ci-observability.md`](exec-plans/P0-6_ci-observability.md)。
 
 P0-2 已 Accepted PostgreSQL、SQLAlchemy 2.x 和 Alembic；P0-4 实施基线为 PostgreSQL 18.x，且 Redis 不进入默认 Compose。完整决策和重新评估条件见 [`DECISIONS.md`](DECISIONS.md)。
 
