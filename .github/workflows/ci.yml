@@ -1,0 +1,369 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api-quality:
+    name: API quality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+          check-latest: false
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: "0.12.4"
+          enable-cache: false
+
+      - name: Sync frozen API dependencies
+        working-directory: apps/api
+        run: uv sync --frozen
+
+      - name: Check API lockfile
+        working-directory: apps/api
+        run: uv lock --check
+
+      - name: Run API unit tests
+        working-directory: apps/api
+        run: uv run pytest -m "not integration"
+
+      - name: Run Ruff lint
+        working-directory: apps/api
+        run: uv run ruff check .
+
+      - name: Check Ruff formatting
+        working-directory: apps/api
+        run: uv run ruff format --check .
+
+      - name: Run Pyright
+        working-directory: apps/api
+        run: uv run pyright
+
+  postgres-integration:
+    name: PostgreSQL integration and migration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      POSTGRES_DB: gia_ci_admin
+      POSTGRES_USER: gia_ci
+      POSTGRES_PASSWORD: gia_ci_test_only
+
+    services:
+      postgres:
+        image: postgres:18.4-trixie
+        env:
+          POSTGRES_DB: gia_ci_admin
+          POSTGRES_USER: gia_ci
+          POSTGRES_PASSWORD: gia_ci_test_only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U gia_ci -d gia_ci_admin"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+          check-latest: false
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: "0.12.4"
+          enable-cache: false
+
+      - name: Sync frozen API dependencies
+        working-directory: apps/api
+        run: uv sync --frozen
+
+      - name: Check API lockfile
+        working-directory: apps/api
+        run: uv lock --check
+
+      - name: Validate migrations on disposable CI database
+        working-directory: apps/api
+        shell: bash
+        run: |
+          set -euo pipefail
+          database_url="postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@127.0.0.1:5432/${POSTGRES_DB}"
+          GIA_API_DATABASE_URL="$database_url" uv run alembic heads
+          GIA_API_DATABASE_URL="$database_url" uv run alembic upgrade head
+          GIA_API_DATABASE_URL="$database_url" uv run alembic current --check-heads
+          GIA_API_DATABASE_URL="$database_url" uv run alembic check
+
+      - name: Run PostgreSQL integration tests
+        working-directory: apps/api
+        run: uv run pytest -m integration --junitxml="${RUNNER_TEMP}/integration.xml"
+
+      - name: Require selected integration tests with zero skips
+        working-directory: apps/api
+        shell: bash
+        run: |
+          uv run python - <<'PY'
+          import os
+          import xml.etree.ElementTree as ET
+
+          report = ET.parse(os.path.join(os.environ["RUNNER_TEMP"], "integration.xml"))
+          suites = report.findall(".//testsuite")
+          selected = sum(int(suite.attrib.get("tests", "0")) for suite in suites)
+          skipped = sum(int(suite.attrib.get("skipped", "0")) for suite in suites)
+          print(f"integration selected={selected} skipped={skipped}")
+          if selected <= 0 or skipped != 0:
+              raise SystemExit("Integration selection gate failed.")
+          PY
+
+      - name: Verify PostgreSQL test database cleanup
+        if: always()
+        working-directory: apps/api
+        shell: bash
+        run: |
+          uv run python - <<'PY'
+          import os
+          import psycopg
+
+          with psycopg.connect(
+              host="127.0.0.1",
+              port=5432,
+              dbname="postgres",
+              user=os.environ["POSTGRES_USER"],
+              password=os.environ["POSTGRES_PASSWORD"],
+          ) as connection:
+              database_rows = connection.execute(
+                  "SELECT datname FROM pg_database"
+              ).fetchall()
+          residual = [
+              database_name
+              for (database_name,) in database_rows
+              if database_name.startswith(("gia_p04e_", "gia_p05d_"))
+          ]
+          print(f"temporary database residual={len(residual)}")
+          if residual:
+              raise SystemExit("Temporary PostgreSQL databases remain after CI tests.")
+          PY
+
+  web-quality:
+    name: Web quality and OpenAPI drift
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          check-latest: false
+
+      - name: Set up pnpm
+        uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2 # v2.0.2
+        with:
+          version: "11.21.0"
+          install: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+          check-latest: false
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: "0.12.4"
+          enable-cache: false
+
+      - name: Install frozen Web dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Sync frozen API dependencies for OpenAPI generation
+        working-directory: apps/api
+        run: uv sync --frozen
+
+      - name: Run Web lint
+        run: pnpm web:lint
+
+      - name: Check Web formatting
+        run: pnpm web:format:check
+
+      - name: Run Web typecheck
+        run: pnpm web:typecheck
+
+      - name: Run Web unit tests
+        run: pnpm web:test
+
+      - name: Build production Web application
+        run: pnpm web:build
+
+      - name: Check DB-independent OpenAPI drift
+        shell: bash
+        run: |
+          set -euo pipefail
+          api_log="${RUNNER_TEMP}/openapi-api.log"
+          uv run --project apps/api uvicorn group_interview_arena_api.app:app \
+            --host 127.0.0.1 --port 8000 --lifespan off >"$api_log" 2>&1 &
+          api_pid=$!
+          cleanup() {
+            kill "$api_pid" 2>/dev/null || true
+            wait "$api_pid" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          ready=false
+          for _ in {1..60}; do
+            if ! kill -0 "$api_pid" 2>/dev/null; then
+              tail -n 40 "$api_log"
+              exit 1
+            fi
+            if curl --fail --silent --show-error http://localhost:8000/openapi.json >/dev/null; then
+              ready=true
+              break
+            fi
+            sleep 0.25
+          done
+          if [[ "$ready" != "true" ]]; then
+            tail -n 40 "$api_log"
+            exit 1
+          fi
+
+          pnpm web:api:check
+
+  chromium-e2e:
+    name: Chromium E2E
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      POSTGRES_DB: gia_ci_admin
+      POSTGRES_USER: gia_ci
+      POSTGRES_PASSWORD: gia_ci_test_only
+
+    services:
+      postgres:
+        image: postgres:18.4-trixie
+        env:
+          POSTGRES_DB: gia_ci_admin
+          POSTGRES_USER: gia_ci
+          POSTGRES_PASSWORD: gia_ci_test_only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U gia_ci -d gia_ci_admin"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          check-latest: false
+
+      - name: Set up pnpm
+        uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2 # v2.0.2
+        with:
+          version: "11.21.0"
+          install: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+          check-latest: false
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: "0.12.4"
+          enable-cache: false
+
+      - name: Install frozen Web dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Sync frozen API dependencies
+        working-directory: apps/api
+        run: uv sync --frozen
+
+      - name: Install Chromium browser dependencies
+        run: node apps/web/node_modules/@playwright/test/cli.js install --with-deps chromium
+
+      - name: Run real Chromium E2E
+        run: pnpm web:test:e2e
+
+      - name: Verify E2E cleanup
+        if: always()
+        shell: bash
+        run: |
+          rm -rf apps/web/test-results apps/web/playwright-report
+          uv run --project apps/api python - <<'PY'
+          import os
+          import socket
+          import psycopg
+
+          with psycopg.connect(
+              host="127.0.0.1",
+              port=5432,
+              dbname="postgres",
+              user=os.environ["POSTGRES_USER"],
+              password=os.environ["POSTGRES_PASSWORD"],
+          ) as connection:
+              database_rows = connection.execute(
+                  "SELECT datname FROM pg_database"
+              ).fetchall()
+          residual = [
+              database_name
+              for (database_name,) in database_rows
+              if database_name.startswith(("gia_p04e_", "gia_p05d_"))
+          ]
+
+          listeners = []
+          for port in (3000, 8000):
+              with socket.socket() as client:
+                  client.settimeout(0.5)
+                  if client.connect_ex(("127.0.0.1", port)) == 0:
+                      listeners.append(port)
+
+          print(f"temporary database residual={len(residual)}")
+          print(f"listener residual={listeners}")
+          if residual or listeners:
+              raise SystemExit("Chromium E2E cleanup verification failed.")
+          PY

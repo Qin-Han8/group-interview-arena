@@ -4,14 +4,14 @@
 
 - Parent task：`P0-6 — IN_PROGRESS`
 - Completed substep：`P0-6A — completed；actual-source final review PASS；four review findings closed`
-- Current approval gate：`P0-6B — awaiting explicit user approval / not started`
+- Current substep：`P0-6B — implementation complete / actual-source review pending`
 - Later substeps：`P0-6C` / `P0-6D` / `P0-6E` 均为 `NOT_STARTED`
 - P0-7：独立任务，`NOT_STARTED`
 - Scope owner：[`TASKS.md`](../TASKS.md)
 - Product baseline：[`PROJECT_MASTER_PLAN.md`](../PROJECT_MASTER_PLAN.md)
 - Last updated：2026-08-15
 
-本计划冻结 P0-6 的执行边界与风险门禁。P0-6A 已完成且只产生文档，未实施 workflow、logging runtime、OpenTelemetry runtime 或 dependency change。每个后续子步骤仍需用户明确批准；P0-6B 当前未开始。
+本计划冻结 P0-6 的执行边界与风险门禁。P0-6A 已完成且只产生文档。P0-6B workflow implementation 与 local parity validation 已完成，等待 actual-source review；remote GitHub Actions verification 需在 reviewed commit/push 后进行。P0-6C～P0-6E 仍需用户逐步明确批准。
 
 ## Goal
 
@@ -85,6 +85,16 @@
 - 新建唯一基础 CI workflow；
 - 自动化 API static/unit、real PostgreSQL integration/migration、Web quality/OpenAPI drift 与 Chromium E2E；
 - 先以正确性和清晰失败边界为目标，不加入 CD、发布或仓库自动化扩展。
+
+#### P0-6B implementation checkpoint
+
+- `.github/workflows/ci.yml` 已实现 pull request 与 push-to-main triggers、`contents: read`、per-workflow/ref concurrency cancellation、四个 fail-closed jobs 与合理 timeouts；
+- live official preflight 后 authoritative pins 为 checkout v7.0.1 `3d3c42e5aac5ba805825da76410c181273ba90b1`、setup-python v7.0.0 `5fda3b95a4ea91299a34e894583c3862153e4b97`、setup-node v7.0.0 `820762786026740c76f36085b0efc47a31fe5020`、setup-uv v10.0.1 `20cfd1bf945f4377ade1205e4dbc17946fc9a30d`、pnpm/setup v2.0.2 `84cb39b217b10273981911c288cd62326dc7c6d2`；
+- API quality job 不使用 PostgreSQL；PostgreSQL integration/migration 与 Chromium E2E jobs 使用 `postgres:18.4-trixie`、CI-only dummy credentials 和 disposable databases；Web/OpenAPI job 不使用 PostgreSQL，并通过 actual app + `--lifespan off` 复用正式 HTTP generator；
+- local parity：frozen sync/lock、API unit 132、integration 18、Ruff、format、Pyright、disposable Alembic CLI、Web lint/format/typecheck/Vitest 16/build/OpenAPI drift、Chromium 1 均通过，skipped 0；
+- cleanup：temporary database、`:3000`、`:8000`、Playwright test-results/report/screenshot/video/trace residual 均为 0；
+- dependency/lockfile/runtime/schema/migration/API contract 均未改变；P0-6C/D 未开始；
+- `REMOTE_CI_VERIFICATION_PENDING` until the reviewed commit is pushed；因此 P0-6B 当前为 implementation complete / actual-source review pending，不标记 completed。
 
 ### P0-6C — Structured logging hardening
 
@@ -465,13 +475,14 @@ P0-7 之后从 committed repository state 单独进行 independent P0 acceptance
 ## Official references reviewed
 
 - GitHub Actions：[workflow concurrency](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency)、[PostgreSQL service containers](https://docs.github.com/en/actions/tutorials/use-containerized-services/create-postgresql-service-containers)
-- Action releases：[checkout v7.0.1](https://github.com/actions/checkout/releases/tag/v7.0.1)、[setup-node v7.0.0](https://github.com/actions/setup-node/releases/tag/v7.0.0)、[setup-python v6.2.0](https://github.com/actions/setup-python/releases/tag/v6.2.0)、[pnpm/action-setup v6.0.9](https://github.com/pnpm/action-setup/releases/tag/v6.0.9)、[setup-uv v9.0.0](https://github.com/astral-sh/setup-uv/releases/tag/v9.0.0)
+- P0-6A action snapshot：[checkout v7.0.1](https://github.com/actions/checkout/releases/tag/v7.0.1)、[setup-node v7.0.0](https://github.com/actions/setup-node/releases/tag/v7.0.0)、[setup-python v6.2.0](https://github.com/actions/setup-python/releases/tag/v6.2.0)、[pnpm/action-setup v6.0.9](https://github.com/pnpm/action-setup/releases/tag/v6.0.9)、[setup-uv v9.0.0](https://github.com/astral-sh/setup-uv/releases/tag/v9.0.0)
+- P0-6B live action preflight：[checkout v7.0.1](https://github.com/actions/checkout/releases/tag/v7.0.1)、[setup-node v7.0.0](https://github.com/actions/setup-node/releases/tag/v7.0.0)、[setup-python v7.0.0](https://github.com/actions/setup-python/releases/tag/v7.0.0)、[pnpm/setup v2.0.2](https://github.com/pnpm/setup/releases/tag/v2.0.2)、[setup-uv v10.0.1](https://github.com/astral-sh/setup-uv/releases/tag/v10.0.1)
 - OpenTelemetry Python：[signal status](https://opentelemetry.io/docs/languages/python/)、[instrumentation](https://opentelemetry.io/docs/languages/python/instrumentation/)、[propagation](https://opentelemetry.io/docs/languages/python/propagation/)、[resources](https://opentelemetry.io/docs/concepts/resources/)、[OTLP exporters](https://opentelemetry.io/docs/languages/python/exporters/)
 - OpenTelemetry contrib：[FastAPI instrumentation](https://opentelemetry-python-contrib.readthedocs.io/en/latest/instrumentation/fastapi/fastapi.html)、[ASGI request attribute source](https://opentelemetry-python-contrib.readthedocs.io/en/latest/_modules/opentelemetry/instrumentation/asgi.html)
 
 ## Progress
 
-- Completed：P0-6A baseline gate、repository capability recovery、official CI/OTel research、scope freeze、execution plan、TASKS/ROADMAP sync、documentation validation、actual-source final review `PASS` 与 four findings closeout；
-- Current：P0-6B awaiting explicit user approval / not started；
-- Not started：P0-6B、P0-6C、P0-6D、P0-6E、P0-7；
-- Next：等待用户明确批准 P0-6B；不得自行进入 P0-6B。
+- Completed：P0-6A baseline gate、scope freeze、execution plan 与 actual-source final review `PASS`；P0-6B workflow implementation、live action preflight、local parity 与 cleanup validation；
+- Current：P0-6B implementation complete / actual-source review pending；`REMOTE_CI_VERIFICATION_PENDING` until reviewed commit/push；
+- Not started：P0-6C、P0-6D、P0-6E、P0-7；
+- Next：等待用户完成 P0-6B actual-source review；不得自行进入 P0-6C。
