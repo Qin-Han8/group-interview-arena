@@ -92,7 +92,19 @@ P0-5B 已实现显式参数的 Argon2id hash/verify/verify-and-update、username
 - unexpected exception 只记录固定 `exception_category`，不记录 exception message、traceback、locals、SQL 或 filesystem path；
 - negative tests 覆盖 password、request body、Cookie、raw session token、Authorization、CSRF header、query、dynamic path、exception 与 credential database URL sentinel，application logs 与 error response 均不得包含这些值；
 - missing、`None`、non-string 或 empty event 使用固定低基数 `logging.record.invalid` fallback；formatter 不读取 message/args 或输出 exception diagnostic，logging misuse 不影响 request handling；
-- P0-6C 未安装或实现 OpenTelemetry、OTel Logs、exporter、vendor SDK 或 logging backend；相关 tracing caller 仍归 P0-6D。
+- P0-6C 未预建 tracing caller；P0-6D 已单独实现最小 OpenTelemetry tracing，OTel Logs、metrics、auto-instrumentation、vendor SDK 与 logging backend 仍未引入。
+
+## P0-6D tracing safety boundary — implementation complete / review pending
+
+- tracing 默认关闭，不创建 provider/exporter，不联系 collector；启用配置是 server-only，OTLP endpoint 对 userinfo、query、fragment fail closed，P0-6 不支持 auth header/token/certificate/credential-provider；
+- request carrier 只白名单复制 W3C `traceparent`，不接受 `tracestate` 或 baggage；不将 arbitrary headers、query、body、Cookie/session、Authorization/CSRF、identity、SQL、database URL、exception message/stack 或模型 payload 写入 span；
+- resource 只由项目 typed config 直接构造 `service.name`，不运行 OTel ambient resource detection，也不吸收任意 `OTEL_RESOURCE_ATTRIBUTES`、`OTEL_SERVICE_NAME` 或 detector metadata；
+- tracing enable 与 sampler authority 均由项目拥有：enabled 时若 ambient `OTEL_SDK_DISABLED` 会禁用 SDK 则在创建 provider/exporter 前 fail closed，sampler 显式固定为 parent-based always-on，不受 `OTEL_TRACES_SAMPLER`/`OTEL_TRACES_SAMPLER_ARG` 覆盖；
+- enabled 时对 OTel 1.44.0 OTLP HTTP exporter 会读取的 headers、client key/certificate 与 trace credential-provider ambient variables 做 presence-only fail-closed validation，不读取或记录 credential value；disabled 时不建立 exporter，因此不因这些变量失败；
+- matched span 仅使用 resolved route template；unmatched/404 使用固定 `<unmatched>`，不保留 raw/hashed/truncated path；5xx 只记录固定 `error.type`，不自动 record exception event；
+- logs 的 `trace_id`/`span_id` 仅来自 active valid OTel span context，caller-supplied 同名字段不能伪造 correlation；
+- exporter flush/shutdown failure 只产生固定 `telemetry.export.failed` 与安全 category，不记录 endpoint、credential、response body 或异常消息；失败不影响 request handling 或 database cleanup；
+- sentinel negative tests 已覆盖 query/header/body/Cookie/Authorization/CSRF/dynamic path/exception/database URL，exported spans、application logs 与 error response 均不包含这些值。
 
 ## Implementation guidance
 
@@ -120,7 +132,7 @@ P0-5B 已实现显式参数的 Argon2id hash/verify/verify-and-update、username
 
 - P0-2：在架构决策中记录基础信任边界；完整威胁建模随实际接口、数据和 Provider 逐步细化。
 - P0-5C～P0-5E：backend/browser authentication、Cookie/CORS/CSRF 与最小日志边界已实现；P0-5E final outcome 为 `PASS after findings remediation and independent recheck`，P0-5 已转为 `DONE`。
-- P0-6：`IN_PROGRESS`；P0-6A/P0-6B/P0-6C completed，P0-6D awaiting explicit user approval / not started，P0-6E not started。
+- P0-6：`IN_PROGRESS`；P0-6A/P0-6B/P0-6C completed，P0-6D implementation complete / actual-source review pending，P0-6E not started。
 - P2：完成语音同意、上传、保存和删除设计。
 - P4/P5：完成支付审计、公开隐私设置、投诉和发布合规检查。
 

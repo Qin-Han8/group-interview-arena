@@ -4,6 +4,8 @@ import sys
 from datetime import UTC, datetime
 from typing import cast
 
+from opentelemetry import trace
+
 from group_interview_arena_api.core.config import LogLevel
 
 _APPLICATION_LOGGER_NAME = "group_interview_arena_api"
@@ -19,9 +21,20 @@ _OPTIONAL_FIELDS = (
     "status_code",
     "duration_ms",
     "exception_category",
-    "trace_id",
-    "span_id",
 )
+
+
+def _active_trace_fields() -> dict[str, str]:
+    try:
+        span_context = trace.get_current_span().get_span_context()
+        if not span_context.is_valid:
+            return {}
+        return {
+            "trace_id": trace.format_trace_id(span_context.trace_id),
+            "span_id": trace.format_span_id(span_context.span_id),
+        }
+    except Exception:
+        return {}
 
 
 class _MaximumLevelFilter(logging.Filter):
@@ -52,6 +65,8 @@ class JsonFormatter(logging.Formatter):
             value = cast(object | None, record.__dict__.get(field))
             if value is not None:
                 payload[field] = value
+
+        payload.update(_active_trace_fields())
 
         return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
 

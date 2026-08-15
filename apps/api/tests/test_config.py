@@ -1,5 +1,5 @@
 import pytest
-from pydantic import SecretStr, ValidationError
+from pydantic import AnyHttpUrl, SecretStr, ValidationError
 from pydantic_settings import SettingsError
 
 from group_interview_arena_api.app import create_app
@@ -23,6 +23,9 @@ def _clear_api_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("GIA_API_CORS_ORIGINS", raising=False)
     monkeypatch.delenv("GIA_API_SESSION_COOKIE_SECURE", raising=False)
     monkeypatch.delenv("GIA_API_DATABASE_URL", raising=False)
+    monkeypatch.delenv("GIA_API_OTEL_TRACING_ENABLED", raising=False)
+    monkeypatch.delenv("GIA_API_OTEL_SERVICE_NAME", raising=False)
+    monkeypatch.delenv("GIA_API_OTEL_OTLP_HTTP_ENDPOINT", raising=False)
 
 
 def test_development_settings_can_be_created(
@@ -36,6 +39,76 @@ def test_development_settings_can_be_created(
     assert settings.log_level is LogLevel.INFO
     assert settings.cors_origins == ()
     assert settings.session_cookie_secure is False
+    assert settings.otel_tracing_enabled is False
+    assert settings.otel_service_name == "group-interview-arena-api"
+    assert settings.otel_otlp_http_endpoint is None
+
+
+def test_enabled_tracing_requires_otlp_http_endpoint() -> None:
+    with pytest.raises(ValidationError, match="Tracing requires an OTLP HTTP endpoint"):
+        Settings(otel_tracing_enabled=True)
+
+
+@pytest.mark.parametrize(
+    ("configured", "expected"),
+    [
+        ("  internal-api  ", "internal-api"),
+        ("a" * 128, "a" * 128),
+    ],
+)
+def test_otel_service_name_is_trimmed_and_bounded(
+    configured: str,
+    expected: str,
+) -> None:
+    settings = Settings(otel_service_name=configured)
+
+    assert settings.otel_service_name == expected
+
+
+@pytest.mark.parametrize("configured", ["", "   ", "a" * 129])
+def test_invalid_otel_service_name_is_rejected(configured: str) -> None:
+    with pytest.raises(ValidationError):
+        Settings(otel_service_name=configured)
+
+
+@pytest.mark.parametrize(
+    "endpoint",
+    [
+        "http://localhost:4318/v1/traces",
+        "https://telemetry.example.test:8443/custom/traces",
+    ],
+)
+def test_otel_endpoint_accepts_http_host_port_and_path(endpoint: str) -> None:
+    settings = Settings(
+        otel_tracing_enabled=True,
+        otel_otlp_http_endpoint=AnyHttpUrl(endpoint),
+    )
+
+    assert str(settings.otel_otlp_http_endpoint) == endpoint
+
+
+@pytest.mark.parametrize(
+    "endpoint",
+    [
+        "ftp://telemetry.example.test/v1/traces",
+        "https://user@telemetry.example.test/v1/traces",
+        "https://user:password@telemetry.example.test/v1/traces",
+        "https://telemetry.example.test/v1/traces?token=secret",
+        "https://telemetry.example.test/v1/traces#fragment",
+    ],
+)
+def test_otel_endpoint_rejects_unsafe_components(endpoint: str) -> None:
+    with pytest.raises(ValidationError):
+        Settings(otel_otlp_http_endpoint=AnyHttpUrl(endpoint))
+
+
+def test_disabled_tracing_allows_preconfigured_safe_endpoint() -> None:
+    settings = Settings(
+        otel_tracing_enabled=False,
+        otel_otlp_http_endpoint=AnyHttpUrl("http://localhost:4318/v1/traces"),
+    )
+
+    assert settings.otel_tracing_enabled is False
 
 
 def test_test_settings_can_be_created(monkeypatch: pytest.MonkeyPatch) -> None:

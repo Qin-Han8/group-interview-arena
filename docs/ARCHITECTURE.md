@@ -6,8 +6,8 @@
 - P0-3 foundation status: DONE
 - P0-4 database foundation status: DONE
 - P0-5 identity boundary status: DONE
-- Most recently completed substep: P0-5E independent review completed; PASS after findings remediation and independent recheck
-- P0-6 status: awaiting explicit user approval / not started
+- Most recently completed substep: P0-6C completed; actual-source review/remediation/re-review and remote CI PASS
+- P0-6 status: IN_PROGRESS; P0-6D implementation complete / actual-source review pending
 - Target version: V0.1 Internal Validation
 - Business architecture detail: Incremental from P1
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
@@ -93,6 +93,8 @@ providers/    provider adapters that have actual callers
 禁止 full DDD ceremony、repository/service/controller 多层空壳、global giant `services.py`，以及提前创建未来全部 module。
 
 P0-3D 已实现的 API 技术基础使用 CPython `3.14.7`、uv `0.12.3`、FastAPI `0.141.1`、Pydantic `2.13.4`、pydantic-settings `2.15.0` 与 Uvicorn `0.52.1`。项目采用 packaged `src/group_interview_arena_api` layout；`api/` 当前只有 health transport，`core/` 包含 typed settings、安全错误语义、标准库 JSON logging 与 UUIDv4 `request_id`。P0-4C 已建立 `db/` persistence infrastructure，使用 SQLAlchemy `2.0.52`、psycopg/psycopg-binary `3.3.4`、`postgresql+psycopg://`、`DeclarativeBase`、async engine/session factory 与显式 dispose helper；P0-4D 已加入 Alembic `1.18.5` async migration environment 与 zero-op baseline revision。业务 `modules/`、`providers/` 与 WebSocket 目录仍未创建。
+
+P0-6D 为 `core/` 增加 OpenTelemetry API/SDK/OTLP HTTP exporter `1.44.0` tracing foundation；它是 cross-cutting infrastructure，不是业务 provider adapter。实现不设置 process-global provider，不采用 contrib auto-instrumentation，并保持默认 disabled。
 
 ## Local development model
 
@@ -252,7 +254,9 @@ WebSocket 使用独立版本化事件契约，至少表达 event type、schema v
 - `session_id`、`connection_id`、provider invocation id、`job_id` 只在相关能力实际出现后增加；
 - 不为未来字段生成虚假 ID；
 - request/response body、headers、Cookie/session、Authorization、query、raw path、credential URL、exception message/traceback 与敏感模型 payload 不进入 application logging data model；
-- OpenTelemetry tracing 仍属于未开始的 P0-6D；P0-6C 仅让 JSON formatter 可自然接纳未来 active trace/span IDs，不创建 tracer/exporter；
+- P0-6D 已实现默认关闭、app-owned/non-global 的 provider-neutral OpenTelemetry tracing；既有 middleware 只将白名单 `traceparent` 交给 W3C propagator，明确不接受 `tracestate`/baggage，并创建受控 `SpanKind.SERVER` span；active trace/span IDs 与 `request_id` 日志关联；
+- span 只允许 method、resolved route template、status、固定 error category 与 project-owned `service.name`；resource 直接由 typed config 构造，不运行 ambient detector 或吸收任意 `OTEL_RESOURCE_ATTRIBUTES`/`OTEL_SERVICE_NAME`；不采集 query/header/body/Cookie/identity/SQL 或 exception detail；404 使用固定 `<unmatched>`；
+- enabled path 使用显式 parent-based always-on sampler 与 OTLP/HTTP `BatchSpanProcessor`，不接受 ambient sampler 覆盖；会实际禁用 SDK 的 `OTEL_SDK_DISABLED` 或会注入 exporter headers/client credentials/session provider 的 ambient config 均在 provider/exporter 创建前 fail closed；startup 不探测 collector，lifespan 做 bounded flush/shutdown 并继续 database dispose；默认关闭不执行这些 ambient checks，也不创建 exporter 或网络 caller；
 - Sentry 或其他 SaaS exporter 保持 Deferred。
 
 ## Provider neutrality and orchestration
@@ -274,7 +278,7 @@ WebSocket 使用独立版本化事件契约，至少表达 event type、schema v
 - 独立 task queue 及其具体产品；
 - UI primitives/component library；
 - WebSocket schema generator；
-- OpenTelemetry exporter、Sentry/SaaS、analytics；
+- OTel Logs/metrics、auto-instrumentation、Collector/backend deployment、authenticated exporter config、Sentry/SaaS、analytics；
 - 具体 LLM/model、ASR、TTS 和 Embedding 实现；
 - V0.1 之后的 email/phone/WeChat/OAuth identity、verified recovery flow、RBAC/authorization、支付、云平台、中国生产部署、对象存储、CDN 和 PWA production strategy。
 
@@ -287,7 +291,7 @@ Redis 只在多 API workers、横向扩容、跨进程 WebSocket broadcast、dis
 - P0-5C：completed；
 - P0-5D：completed；真实 browser Cookie/CORS/CSRF 闭环已通过 Chromium 验证；
 - P0-5E：completed；final outcome `PASS after findings remediation and independent recheck`；
-- P0-6：awaiting explicit user approval / not started；
+- P0-6：`IN_PROGRESS`；P0-6A/P0-6B/P0-6C completed，P0-6D implementation complete / actual-source review pending，P0-6E not started；
 - P1：逐步设计题目、角色、会话、状态机、调度、记忆和基础报告，并建立第一个 WebSocket vertical slice；
 - P2 以后：只在对应阶段获批后增加语音、评分训练和商业化能力。
 

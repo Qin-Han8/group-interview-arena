@@ -175,6 +175,8 @@ P0-3D 已实现的最小错误 envelope 为：
 
 P0-6C application request logs 为单行 JSON。每条记录有 UTC `timestamp`、uppercase `level`、稳定 `event` 和 `logger`；请求记录按适用性包含与 `X-Request-ID`/error envelope 一致的 `request_id`、`method`、FastAPI resolved route template、固定 `route_classification`、`status_code` 与 monotonic `duration_ms`。matched request 只记录 route template；unmatched/404 omit `route` 并使用 `unmatched`，不保留 raw/hashed/truncated path。合法 HTTP response（包括 handled 4xx）记录 `http.request.completed`；真正未完成 pipeline 的异常记录 `http.request.failed`。不记录 request/response body、arbitrary headers、Cookie/Set-Cookie、Authorization、query、raw session token、credential URL 或 exception message/traceback。
 
+P0-6D 在不改变 REST/OpenAPI/error envelope 的前提下，为现有 request middleware 增加 provider-neutral server tracing。启用时从 request headers 白名单复制并仅提取标准 W3C `traceparent`，明确不接受 `tracestate` 或 baggage，创建 `METHOD route-template` `SpanKind.SERVER` span；unmatched/404 使用固定 `METHOD <unmatched>` 且不保存 raw path。span allowlist 仅为 method、route template、status、固定 error category 与 project-owned resource `service.name`；resource 不运行 ambient detector，也不吸收 `OTEL_RESOURCE_ATTRIBUTES`/`OTEL_SERVICE_NAME`。application log 从 active valid span context 增加固定宽度 `trace_id`/`span_id`，客户端 contract 仍只暴露既有 `X-Request-ID` 与 error `request_id`，不新增 trace response header。
+
 ## Security and authority boundaries
 
 - FastAPI 是领域、会话状态和持久化的业务权威；

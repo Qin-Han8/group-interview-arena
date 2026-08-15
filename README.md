@@ -17,14 +17,14 @@ AI 群面训练场让用户无需临时召集真人，即可与具有不同性�
   - `P0-3 — 前后端项目骨架`
   - `P0-4 — 数据库与迁移基础`
   - `P0-5 — 最小身份边界`
-- 已完成子步骤：`P0-4A`～`P0-4F`、`P0-5A`～`P0-5E`、`P0-6A`、`P0-6B`
+- 已完成子步骤：`P0-4A`～`P0-4F`、`P0-5A`～`P0-5E`、`P0-6A`、`P0-6B`、`P0-6C`
 - 当前任务：`P0-6 — CI、日志与基础可观测性（IN_PROGRESS）`
-- 当前子步骤：`P0-6C — Structured Logging Hardening（implementation complete / actual-source review pending）`
-- 后续子步骤：`P0-6D`、`P0-6E`、`P0-7` 均 not started
+- 当前子步骤：`P0-6D — OpenTelemetry tracing foundation（implementation complete / actual-source review pending）`
+- 后续子步骤：`P0-6E`、`P0-7` 均 not started
 - 当前目标版本：`V0.1 — Internal Validation / 内部技术验证版`
-- 当前实现状态：Web/API 技术骨架、本地 PostgreSQL 18.4、SQLAlchemy async/psycopg 3、Alembic 与 reusable PostgreSQL integration harness 已建立；P0-5D 已完成 credentialed exact-origin CORS、Origin/custom-header CSRF、最小 Web auth UI、raw/canonical username browser/backend 闭环与隔离 PostgreSQL 上的真实 Chromium register/restore/logout 验证。P0-5E initial independent review verdict 为 `BLOCKED`，两个 findings 已完成 remediation，并通过 findings-only independent recheck；P0-5E final outcome 为 `PASS`，P0-5 已转为 `DONE`
+- 当前实现状态：Web/API 技术骨架、本地 PostgreSQL 18.4、SQLAlchemy async/psycopg 3、Alembic 与 reusable PostgreSQL integration harness 已建立；P0-5 identity/browser boundary 已完成；P0-6B CI 与 P0-6C structured logging 已 completed，P0-6D 已实现默认关闭、app-owned 的 provider-neutral tracing 并等待 actual-source review
 
-> P0-1～P0-5 均已完成并转为 `DONE`。P0 仍在进行中；P0-6 awaiting explicit user approval / not started，P0-7 not started。
+> P0-1～P0-5 均已完成并转为 `DONE`。P0 与 P0-6 仍为 `IN_PROGRESS`；P0-6D 等待 actual-source review，P0-6E 与 P0-7 not started。
 
 ## 核心原则摘要
 
@@ -44,7 +44,7 @@ AI 群面训练场让用户无需临时召集真人，即可与具有不同性�
 - 数据：P0-4 使用 PostgreSQL 18.x、SQLAlchemy 2.x、Alembic；
 - 通信：REST + WebSocket；FastAPI OpenAPI 是 REST contract 权威；
 - 本地开发：应用原生运行，P0-4 起基础服务使用 Docker Compose；
-- Redis、独立 task queue、OpenTelemetry、具体 AI/语音供应商和 UI component library 仍为 Deferred/TBD；
+- Redis、独立 task queue、OTel Logs/metrics/auto-instrumentation、具体 AI/语音供应商和 UI component library 仍为 Deferred/TBD；P0-6D 已建立默认关闭的 provider-neutral OpenTelemetry tracing；
 - V0.1 使用自定义确定性讨论状态机，不使用 LangGraph。
 
 P0-5 已批准的初始身份边界为 username/password、Argon2id、稳定 UUIDv4 `user_id` 与 PostgreSQL-backed opaque server-side session。P0-5D 已让 CORS 与 CSRF exact Origin validation 共用现有 typed browser trusted-origin 配置，并由 Web 的正式 `openapi-fetch` client 以 `credentials: "include"` 和 unsafe POST `X-GIA-CSRF: 1` 完成真实浏览器闭环。raw token 只通过 host-only HttpOnly `gia_session` Cookie 传输，数据库仍只保存 cryptographic digest；当前不采用 JWT。实施顺序与门禁见 [`docs/exec-plans/P0-5_identity-boundary.md`](docs/exec-plans/P0-5_identity-boundary.md)。
@@ -75,7 +75,7 @@ P0-5 已批准的初始身份边界为 username/password、Argon2id、稳定 UUI
 │   └── api/                     # FastAPI 技术骨架
 │       ├── src/group_interview_arena_api/
 │       │   ├── api/             # 当前仅有 GET /health
-│       │   ├── core/            # 配置、错误、日志与 request_id
+│       │   ├── core/            # 配置、错误、日志、request_id 与 tracing
 │       │   ├── db/              # SQLAlchemy Base、identity models 与 async engine/session factory
 │       │   ├── identity/        # username/password/session security primitives
 │       │   └── app.py           # application factory 与模块级 app
@@ -140,6 +140,8 @@ docker compose --env-file .env -f infra/compose.yaml stop postgres
 不要使用 `docker compose down -v`；P0-4B 不建立 SQLAlchemy、Alembic 或业务 Schema。
 
 P0-5C 起真实 API runtime startup 需要 server-only `GIA_API_DATABASE_URL`；格式参考 `.env.example` 中的 `postgresql+psycopg://` placeholder。模块 import 与 OpenAPI schema generation 不读取该设置或连接 PostgreSQL；`GET /health` handler 本身也不查询数据库。
+
+P0-6D tracing 默认关闭。只有显式设置 `GIA_API_OTEL_TRACING_ENABLED=true` 时才要求合法的 server-only `GIA_API_OTEL_OTLP_HTTP_ENDPOINT`；endpoint 禁止 userinfo、query 和 fragment。启用时项目固定 parent-based always-on sampler，并对会禁用 SDK 或注入 exporter authentication 的 ambient OTel environment fail closed；P0-6 不支持 exporter auth 配置。启用 tracing 不会在 startup 探测 collector，且这些配置不得进入 `NEXT_PUBLIC_*`。
 
 Alembic 命令从 `apps/api` 执行，并与应用共用 server-only `GIA_API_DATABASE_URL`：
 

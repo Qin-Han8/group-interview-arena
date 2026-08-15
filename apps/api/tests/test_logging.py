@@ -11,6 +11,7 @@ from typing import Any, cast
 
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient, Response
+from opentelemetry import trace
 from pydantic import SecretStr
 
 from group_interview_arena_api.app import create_app
@@ -108,6 +109,8 @@ def test_request_log_is_single_line_json_with_resolved_route_template() -> None:
     assert payload["route"] == "/resources/{resource_id}"
     assert payload["route_classification"] == "matched"
     assert payload["status_code"] == 200
+    assert "trace_id" not in payload
+    assert "span_id" not in payload
     assert isinstance(payload["duration_ms"], (int, float))
     assert cast(float, payload["duration_ms"]) >= 0
     assert payload["level"] == "INFO"
@@ -337,7 +340,9 @@ def test_missing_or_malformed_event_uses_safe_json_fallback(capsys: Any) -> None
     )
 
 
-def test_optional_trace_fields_are_omitted_or_serialized_without_otel() -> None:
+def test_trace_fields_are_omitted_without_active_span_even_if_record_supplies_values() -> (
+    None
+):
     logger = logging.getLogger(f"{APPLICATION_LOGGER_NAME}.format_test")
     without_trace = logger.makeRecord(
         logger.name,
@@ -372,8 +377,36 @@ def test_optional_trace_fields_are_omitted_or_serialized_without_otel() -> None:
     )
     assert "trace_id" not in without_payload
     assert "span_id" not in without_payload
-    assert with_payload["trace_id"] == "0123456789abcdef0123456789abcdef"
-    assert with_payload["span_id"] == "0123456789abcdef"
+    assert "trace_id" not in with_payload
+    assert "span_id" not in with_payload
+
+
+def test_trace_context_lookup_failure_keeps_safe_json_fallback(
+    monkeypatch: Any,
+) -> None:
+    sentinel = "trace-lookup-message-sentinel"
+
+    def fail_lookup() -> None:
+        raise RuntimeError(sentinel)
+
+    monkeypatch.setattr(trace, "get_current_span", fail_lookup)
+    logger = logging.getLogger(f"{APPLICATION_LOGGER_NAME}.trace_lookup_test")
+    record = logger.makeRecord(
+        logger.name,
+        logging.WARNING,
+        __file__,
+        1,
+        sentinel,
+        (),
+        None,
+    )
+
+    encoded = JsonFormatter().format(record)
+    payload = cast(dict[str, object], json.loads(encoded))
+
+    assert payload["event"] == "logging.record.invalid"
+    assert set(payload) == {"timestamp", "level", "event", "logger"}
+    assert sentinel not in encoded
 
 
 class FailingHandler(logging.Handler):
