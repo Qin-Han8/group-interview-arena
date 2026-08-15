@@ -70,7 +70,7 @@
 - P0：建立安全边界、密钥规则、数据隔离原则和后续检查责任。
 - V0.1：即使是内部文字版，也必须遵守 AI 标识、训练用途、数据最小化、密钥和隔离规则。
 - V0.5：公开 MVP 必须提供删除数据和隐私设置，并对语音生命周期完成明确实现。
-- P0-2 只记录了获批的信任边界、配置、错误和日志原则；P0-5B 已实现 identity persistence/security primitives，P0-5C 已实现 backend auth runtime，P0-5D 已实现 browser CORS/CSRF/Web closure；P0-6C structured logging hardening implementation 已完成并等待 actual-source review；内容审核和其他后续安全能力仍未实现。
+- P0-2 只记录了获批的信任边界、配置、错误和日志原则；P0-5B 已实现 identity persistence/security primitives，P0-5C 已实现 backend auth runtime，P0-5D 已实现 browser CORS/CSRF/Web closure；P0-6C structured logging hardening、actual-source review 与 `JsonFormatter` safe fallback remediation/re-review 已完成并 `PASS`；内容审核和其他后续安全能力仍未实现。
 
 ## P0-5 identity security boundary — P0-5D browser closure implemented
 
@@ -85,12 +85,13 @@
 
 P0-5B 已实现显式参数的 Argon2id hash/verify/verify-and-update、username/password policy、`users`/`auth_sessions` persistence、SHA-256 session digest 与 7-day absolute-expiry primitives。P0-5C 已实现 backend register/login/logout/me、固定 dummy Argon2 unknown-user path、server-side session validation 与 host-only HttpOnly `gia_session` Cookie issue/clear；raw session token 不进入普通 result repr，production + insecure Cookie 配置会 fail closed，safe response tests 与 structured-log field audit 确认不回显 password、hash、raw token 或 digest。P0-5D 已实现 shared exact-origin credentialed CORS、unsafe auth POST 的 Origin/custom-header CSRF、`credentials: "include"` Web client 与真实 Chromium closure；浏览器验证确认 `document.cookie` 不暴露 `gia_session`，local/session storage 不保存认证 secret，logout 后服务端 session 与 Cookie 均失效。recovery 继续 Deferred。
 
-## P0-6C application logging safety boundary — implementation complete / review pending
+## P0-6C application logging safety boundary — completed
 
 - application logs 只从显式安全字段构造，不先收集 body/header/query/path/exception 再依赖通用 redaction；
 - matched request 只记录 resolved route template；unmatched/404 只记录固定 `unmatched` classification，不记录 raw path 或任何 hash/truncation derivative；
 - unexpected exception 只记录固定 `exception_category`，不记录 exception message、traceback、locals、SQL 或 filesystem path；
 - negative tests 覆盖 password、request body、Cookie、raw session token、Authorization、CSRF header、query、dynamic path、exception 与 credential database URL sentinel，application logs 与 error response 均不得包含这些值；
+- missing、`None`、non-string 或 empty event 使用固定低基数 `logging.record.invalid` fallback；formatter 不读取 message/args 或输出 exception diagnostic，logging misuse 不影响 request handling；
 - P0-6C 未安装或实现 OpenTelemetry、OTel Logs、exporter、vendor SDK 或 logging backend；相关 tracing caller 仍归 P0-6D。
 
 ## Implementation guidance
@@ -119,7 +120,7 @@ P0-5B 已实现显式参数的 Argon2id hash/verify/verify-and-update、username
 
 - P0-2：在架构决策中记录基础信任边界；完整威胁建模随实际接口、数据和 Provider 逐步细化。
 - P0-5C～P0-5E：backend/browser authentication、Cookie/CORS/CSRF 与最小日志边界已实现；P0-5E final outcome 为 `PASS after findings remediation and independent recheck`，P0-5 已转为 `DONE`。
-- P0-6：`IN_PROGRESS`；P0-6A/P0-6B completed，P0-6C implementation complete / actual-source review pending，P0-6D/P0-6E not started。
+- P0-6：`IN_PROGRESS`；P0-6A/P0-6B/P0-6C completed，P0-6D awaiting explicit user approval / not started，P0-6E not started。
 - P2：完成语音同意、上传、保存和删除设计。
 - P4/P5：完成支付审计、公开隐私设置、投诉和发布合规检查。
 

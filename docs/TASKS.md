@@ -3,9 +3,9 @@
 - Status: Active
 - Managed scope: P0 only
 - Current task: P0-6 — `IN_PROGRESS`
-- Most recently completed substep: P0-6B — implementation, local parity, actual-source review and remote CI `PASS`
-- Current substep: P0-6C — implementation complete / actual-source review pending
-- P0-6 status: `IN_PROGRESS`; P0-6A/P0-6B completed；P0-6C implementation complete / actual-source review pending；P0-6D/P0-6E not started
+- Most recently completed substep: P0-6C — implementation, API quality gates, actual-source review, finding remediation/re-review and remote CI `PASS`
+- Current substep: P0-6D — awaiting explicit user approval / not started
+- P0-6 status: `IN_PROGRESS`; P0-6A/P0-6B/P0-6C completed；P0-6D awaiting explicit user approval / not started；P0-6E not started
 - Allowed status values: `TODO` / `IN_PROGRESS` / `BLOCKED` / `DONE`
 - Related roadmap: [`ROADMAP.md`](ROADMAP.md)
 
@@ -266,7 +266,7 @@
 - ID: `P0-6`
 - 名称：CI、日志与基础可观测性
 - Status: `IN_PROGRESS`
-- Approval state：P0-6A completed，actual-source final review `PASS`，four review findings closed；P0-6B implementation、local parity、actual-source review、findings remediation 与 remote CI 均 `PASS`，已 completed；P0-6C implementation complete / actual-source review pending；P0-6D/P0-6E not started，均需后续明确批准。
+- Approval state：P0-6A completed，actual-source final review `PASS`，four review findings closed；P0-6B implementation、local parity、actual-source review、findings remediation 与 remote CI 均 `PASS`，已 completed；P0-6C implementation、API quality gates、actual-source review、finding remediation/re-review 与 remote CI 均 `PASS`，已 completed；P0-6D awaiting explicit user approval / not started；P0-6E not started。
 - 目标：建立与当前代码规模匹配的自动检查、结构化日志和基础监控能力。
 - In scope：GitHub Actions CI、现有 API/Web/PostgreSQL/Chromium quality gates automation、structured logging hardening、request/trace correlation、provider-neutral basic OpenTelemetry tracing、documentation 与 observability safety tests。
 - Out of scope：deployment/CD、production hosting/secrets、alerting/on-call、dashboard、vendor observability backend/SDK、OpenTelemetry Collector deployment、OTel Logs pipeline、无真实 caller 的 metrics、product/AI/payment analytics 与 P0-7 final acceptance。
@@ -277,8 +277,8 @@
 
 - `P0-6A — Preflight / scope freeze / execution plan`：completed；actual-source final review `PASS`，four review findings closed；
 - `P0-6B — GitHub Actions CI baseline`：completed；implementation、local parity、actual-source review、findings remediation 与 remote GitHub Actions run #1 均 `PASS`；
-- `P0-6C — Structured logging hardening`：implementation complete / actual-source review pending；
-- `P0-6D — OpenTelemetry tracing foundation`：not started；
+- `P0-6C — Structured logging hardening`：completed；implementation、API quality gates、actual-source review、finding remediation/re-review 与 remote CI 均 `PASS`；
+- `P0-6D — OpenTelemetry tracing foundation`：awaiting explicit user approval / not started；
 - `P0-6E — Cross-layer validation / P0-6 closeout`：not started。
 
 详细 baseline、CI/logging/tracing 边界、dependency gate 与各子步骤 exit criteria 见 [`exec-plans/P0-6_ci-observability.md`](exec-plans/P0-6_ci-observability.md)。
@@ -296,7 +296,8 @@
 - project-owned logs 使用 stdlib newline-delimited JSON，冻结 `timestamp`/`level`/`event`/`logger` 核心字段、互斥 stdout/stderr、resolved route template 与 fixed unmatched classification；
 - `http.request.completed`、`http.request.failed`、`app.startup.completed`、`app.shutdown.completed` 已有真实 caller；handled 4xx 不误分为 failed，未预建 `telemetry.export.failed`；
 - request_id 与 `X-Request-ID`/error envelope 保持一致；exception 只记录固定安全 category，不记录 message/traceback；sentinel negative tests 证明 body/header/query/Cookie/session/credential/path/exception 数据不进入 application logs；
-- targeted 53、API unit 139、PostgreSQL integration 18、API full 157、Ruff、format、Pyright 与 Alembic single-head checks 通过；dependency/lockfile、schema/migration、API/OpenAPI contract、Web/CI workflow 与 P0-6D 均未改变。
+- initial targeted 53、API unit 139、PostgreSQL integration 18、API full 157、Ruff、format、Pyright 与 Alembic single-head checks 通过；actual-source review 发现的 `JsonFormatter` missing/malformed event fail-safe finding 已用固定 `logging.record.invalid` fallback 和安全 regression 修复，remediation source re-review `PASS`；
+- Remote CI verification completed / `PASS`：reviewed commit `2d3d235d08aefb6b536ad6217a99c167fe879eb3` 经 push-to-main 触发 GitHub Actions CI run #4，四个 required jobs 均 completed / success；dependency/lockfile、schema/migration、API/OpenAPI contract、Web/CI workflow 与 P0-6D 均未改变；P0-6C completed。
 
 ## P0-7 — P0 独立验收
 
