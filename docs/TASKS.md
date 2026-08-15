@@ -3,9 +3,9 @@
 - Status: Active
 - Managed scope: P0 only
 - Current task: P0-6 — `IN_PROGRESS`
-- Most recently completed substep: P0-6A actual-source final review `PASS`; four review findings closed
-- Current substep: P0-6B — implementation complete / actual-source review pending
-- P0-6 status: `IN_PROGRESS`; P0-6A completed；P0-6B implementation complete / actual-source review pending；P0-6C～P0-6E not started
+- Most recently completed substep: P0-6B — implementation, local parity, actual-source review and remote CI `PASS`
+- Current substep: P0-6C — awaiting explicit user approval / not started
+- P0-6 status: `IN_PROGRESS`; P0-6A/P0-6B completed；P0-6C awaiting explicit user approval / not started；P0-6D/P0-6E not started
 - Allowed status values: `TODO` / `IN_PROGRESS` / `BLOCKED` / `DONE`
 - Related roadmap: [`ROADMAP.md`](ROADMAP.md)
 
@@ -266,7 +266,7 @@
 - ID: `P0-6`
 - 名称：CI、日志与基础可观测性
 - Status: `IN_PROGRESS`
-- Approval state：P0-6A completed，actual-source final review `PASS`，four review findings closed；用户已批准 P0-6B，当前 implementation complete / actual-source review pending；P0-6C～P0-6E not started，均需后续明确批准。
+- Approval state：P0-6A completed，actual-source final review `PASS`，four review findings closed；P0-6B implementation、local parity、actual-source review、findings remediation 与 remote CI 均 `PASS`，已 completed；P0-6C awaiting explicit user approval / not started；P0-6D/P0-6E not started，均需后续明确批准。
 - 目标：建立与当前代码规模匹配的自动检查、结构化日志和基础监控能力。
 - In scope：GitHub Actions CI、现有 API/Web/PostgreSQL/Chromium quality gates automation、structured logging hardening、request/trace correlation、provider-neutral basic OpenTelemetry tracing、documentation 与 observability safety tests。
 - Out of scope：deployment/CD、production hosting/secrets、alerting/on-call、dashboard、vendor observability backend/SDK、OpenTelemetry Collector deployment、OTel Logs pipeline、无真实 caller 的 metrics、product/AI/payment analytics 与 P0-7 final acceptance。
@@ -276,8 +276,8 @@
 ### Substep progress
 
 - `P0-6A — Preflight / scope freeze / execution plan`：completed；actual-source final review `PASS`，four review findings closed；
-- `P0-6B — GitHub Actions CI baseline`：implementation complete / actual-source review pending；remote GitHub Actions verification pending reviewed commit/push；
-- `P0-6C — Structured logging hardening`：not started；
+- `P0-6B — GitHub Actions CI baseline`：completed；implementation、local parity、actual-source review、findings remediation 与 remote GitHub Actions run #1 均 `PASS`；
+- `P0-6C — Structured logging hardening`：awaiting explicit user approval / not started；
 - `P0-6D — OpenTelemetry tracing foundation`：not started；
 - `P0-6E — Cross-layer validation / P0-6 closeout`：not started。
 
@@ -289,7 +289,7 @@
 - 所有 external actions 使用 P0-6B live official preflight 核对的 full 40-character release commit SHA；无 cache action、write permission、production secret、deployment/CD 或 `continue-on-error`；
 - API unit 132、PostgreSQL integration 18、Web Vitest 16、Chromium E2E 1 均通过，skipped 0；Alembic disposable database、DB-independent OpenAPI 与 cleanup gates 通过；
 - application dependency、lockfile、runtime、schema、migration history、API contract 与 P0-6C/D observability runtime 均未修改；
-- `REMOTE_CI_VERIFICATION_PENDING`：实际 GitHub Actions run 需在 source review 后 commit/push 才能取得，因此 P0-6B 尚未标记 completed。
+- Remote CI verification completed / `PASS`：reviewed commit `513491af128849f93c3ae601a906bd88fd8860f4` 经 push-to-main 触发 GitHub Actions run #1，API quality、PostgreSQL integration and migration、Web quality and OpenAPI drift、Chromium E2E 四个 required jobs 均 completed / success；P0-6B completed。
 
 ## P0-7 — P0 独立验收
 

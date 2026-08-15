@@ -3,15 +3,15 @@
 ## Status
 
 - Parent task：`P0-6 — IN_PROGRESS`
-- Completed substep：`P0-6A — completed；actual-source final review PASS；four review findings closed`
-- Current substep：`P0-6B — implementation complete / actual-source review pending`
-- Later substeps：`P0-6C` / `P0-6D` / `P0-6E` 均为 `NOT_STARTED`
+- Completed substeps：`P0-6A — completed；actual-source final review PASS；four review findings closed`；`P0-6B — completed；implementation/local parity/actual-source review/remote CI PASS`
+- Current approval gate：`P0-6C — awaiting explicit user approval / not started`
+- Later substeps：`P0-6D` / `P0-6E` 均为 `NOT_STARTED`
 - P0-7：独立任务，`NOT_STARTED`
 - Scope owner：[`TASKS.md`](../TASKS.md)
 - Product baseline：[`PROJECT_MASTER_PLAN.md`](../PROJECT_MASTER_PLAN.md)
-- Last updated：2026-08-15
+- Last updated：2026-08-16
 
-本计划冻结 P0-6 的执行边界与风险门禁。P0-6A 已完成且只产生文档。P0-6B workflow implementation 与 local parity validation 已完成，等待 actual-source review；remote GitHub Actions verification 需在 reviewed commit/push 后进行。P0-6C～P0-6E 仍需用户逐步明确批准。
+本计划冻结 P0-6 的执行边界与风险门禁。P0-6A 已完成且只产生文档。P0-6B workflow implementation、local parity、actual-source review、findings remediation 与 remote GitHub Actions verification 均已完成并 `PASS`。P0-6C 等待用户明确批准且尚未开始；P0-6D/P0-6E 仍需后续逐步明确批准。
 
 ## Goal
 
@@ -94,7 +94,8 @@
 - local parity：frozen sync/lock、API unit 132、integration 18、Ruff、format、Pyright、disposable Alembic CLI、Web lint/format/typecheck/Vitest 16/build/OpenAPI drift、Chromium 1 均通过，skipped 0；
 - cleanup：temporary database、`:3000`、`:8000`、Playwright test-results/report/screenshot/video/trace residual 均为 0；
 - dependency/lockfile/runtime/schema/migration/API contract 均未改变；P0-6C/D 未开始；
-- `REMOTE_CI_VERIFICATION_PENDING` until the reviewed commit is pushed；因此 P0-6B 当前为 implementation complete / actual-source review pending，不标记 completed。
+- actual-source review `PASS`；两个 findings（pnpm v11 successor action 与 temporary database exact-prefix residual diagnostics）完成 remediation 并通过 re-review；
+- Remote CI verification completed / `PASS`：reviewed commit `513491af128849f93c3ae601a906bd88fd8860f4` 经 push-to-main 触发 GitHub Actions run #1，API quality、PostgreSQL integration and migration、Web quality and OpenAPI drift、Chromium E2E 四个 required jobs 均 completed / success；P0-6B completed。
 
 ### P0-6C — Structured logging hardening
 
@@ -380,7 +381,7 @@ P0-6D 修改 dependency 前必须重新：
 
 - workflow YAML/action input review，full SHA/version/permissions/concurrency/service health review；
 - 针对每个 job 在本地或等价环境运行现有命令，避免每次小 patch 重跑 Chromium；
-- PR 上完成一次 authoritative GitHub Actions run，四个 job 全部通过；
+- reviewed commit 通过已配置 trigger 完成一次 authoritative GitHub Actions run，四个 job 全部通过；
 - OpenAPI drift generator 在无 database URL、无 PostgreSQL service、无 lifespan 的条件下通过；PostgreSQL integration/migration 与 Chromium E2E jobs 的真实数据库覆盖保持不变；
 - 失败路径检查 process/database cleanup，确认 development DB 未使用；
 - cache cold-run correctness 不依赖 cache hit。
@@ -426,6 +427,7 @@ P0-7 之后从 committed repository state 单独进行 independent P0 acceptance
 - PostgreSQL 精确镜像、disposable DB 和 cleanup 可验证，未触碰 development DB；
 - 所有 action 固定到已核对的 full SHA，frozen install/lock checks 生效；
 - 无 deployment/CD/production secret 或未批准 automation。
+- Exit evidence：commit `513491af128849f93c3ae601a906bd88fd8860f4` 的 push-to-main GitHub Actions run #1 conclusion `success`，四个 required jobs 均 completed / success。
 
 ### P0-6C exit
 
@@ -470,7 +472,7 @@ P0-7 之后从 committed repository state 单独进行 independent P0 acceptance
 - OTLP/HTTP 无 auth 配置只适用于受控 endpoint；生产 authenticated exporter 属于后续 deployment/operations decision，当前不得把 credential 放入 URL。
 - Chromium CI 会增加运行时间，但其 Cookie/CSRF 安全覆盖不可由 unit test 替代，因此保留为 gate；首版通过 one worker、Chromium-only 控制成本。
 - GitHub action pins、hosted runner image 与 OTel releases 会变化；B/D 开始时重新核对，不把 2026-08-15 的查询结果当作永久最新值。
-- 当前没有阻断 P0-6B 的产品或 durable architecture open question；若 implementation 证明安全 telemetry attribute contract 无法用 public OTel API 实现，应停止 P0-6D 并提出 Proposed Decision，而不是采用 private API 或放宽隐私边界。
+- 当前没有阻断 P0-6C 的产品或 durable architecture open question；若 implementation 证明安全 telemetry attribute contract 无法用 public OTel API 实现，应停止 P0-6D 并提出 Proposed Decision，而不是采用 private API 或放宽隐私边界。
 
 ## Official references reviewed
 
@@ -482,7 +484,7 @@ P0-7 之后从 committed repository state 单独进行 independent P0 acceptance
 
 ## Progress
 
-- Completed：P0-6A baseline gate、scope freeze、execution plan 与 actual-source final review `PASS`；P0-6B workflow implementation、live action preflight、local parity 与 cleanup validation；
-- Current：P0-6B implementation complete / actual-source review pending；`REMOTE_CI_VERIFICATION_PENDING` until reviewed commit/push；
+- Completed：P0-6A baseline gate、scope freeze、execution plan 与 actual-source final review `PASS`；P0-6B workflow implementation、live action preflight、local parity、cleanup validation、actual-source review、findings remediation 与 remote GitHub Actions run #1 `PASS`；
+- Current：P0-6C awaiting explicit user approval / not started；
 - Not started：P0-6C、P0-6D、P0-6E、P0-7；
-- Next：等待用户完成 P0-6B actual-source review；不得自行进入 P0-6C。
+- Next：等待用户明确批准 P0-6C；不得自行开始 implementation。
