@@ -2,9 +2,10 @@
 
 - Status: Active
 - Managed scope: P0 only
-- Current task: P0-6 — awaiting explicit user approval / not started
-- Most recently completed substep: P0-5E independent review completed; PASS after findings remediation and independent recheck
-- P0-6 status: awaiting explicit user approval / not started
+- Current task: P0-6 — `IN_PROGRESS`
+- Most recently completed substep: P0-6A actual-source final review `PASS`; four review findings closed
+- Current substep: P0-6B — awaiting explicit user approval / not started
+- P0-6 status: `IN_PROGRESS`; P0-6A completed；P0-6B awaiting explicit user approval / not started；P0-6C～P0-6E not started
 - Allowed status values: `TODO` / `IN_PROGRESS` / `BLOCKED` / `DONE`
 - Related roadmap: [`ROADMAP.md`](ROADMAP.md)
 
@@ -264,18 +265,29 @@
 
 - ID: `P0-6`
 - 名称：CI、日志与基础可观测性
-- Status: `TODO` — awaiting explicit user approval / not started
+- Status: `IN_PROGRESS`
+- Approval state：P0-6A completed，actual-source final review `PASS`，four review findings closed；P0-6B awaiting explicit user approval / not started；P0-6C～P0-6E not started，均需后续明确批准。
 - 目标：建立与当前代码规模匹配的自动检查、结构化日志和基础监控能力。
-- In scope：经批准的 lint/typecheck/test/build 检查、基础日志和错误观测。
-- Out of scope：完整生产监控平台、所有业务指标和过度复杂的部署流水线。
-- Dependencies：P0-2、P0-3；数据库相关检查依赖 P0-4。
-- Acceptance criteria：自动检查可复现，日志不泄露敏感信息，失败可定位。
+- In scope：GitHub Actions CI、现有 API/Web/PostgreSQL/Chromium quality gates automation、structured logging hardening、request/trace correlation、provider-neutral basic OpenTelemetry tracing、documentation 与 observability safety tests。
+- Out of scope：deployment/CD、production hosting/secrets、alerting/on-call、dashboard、vendor observability backend/SDK、OpenTelemetry Collector deployment、OTel Logs pipeline、无真实 caller 的 metrics、product/AI/payment analytics 与 P0-7 final acceptance。
+- Dependencies：P0-2、P0-3、P0-4、P0-5；每个实施子步骤仍需用户明确批准。
+- Acceptance criteria：P0-6A～P0-6E 全部完成并通过实际源码审核；CI 可复现现有 quality gates；日志与 traces 可关联且不泄露敏感信息；tracing 默认关闭且无外部 backend 仍可运行/测试；P0-7 保持独立验收。
+
+### Substep progress
+
+- `P0-6A — Preflight / scope freeze / execution plan`：completed；actual-source final review `PASS`，four review findings closed；
+- `P0-6B — GitHub Actions CI baseline`：awaiting explicit user approval / not started；
+- `P0-6C — Structured logging hardening`：not started；
+- `P0-6D — OpenTelemetry tracing foundation`：not started；
+- `P0-6E — Cross-layer validation / P0-6 closeout`：not started。
+
+详细 baseline、CI/logging/tracing 边界、dependency gate 与各子步骤 exit criteria 见 [`exec-plans/P0-6_ci-observability.md`](exec-plans/P0-6_ci-observability.md)。
 
 ## P0-7 — P0 独立验收
 
 - ID: `P0-7`
 - 名称：P0 独立验收
-- Status: `TODO`
+- Status: `TODO` — not started
 - 目标：独立确认 P0 的基础能力和治理是否足以进入 P1。
 - In scope：仓库、规范、架构、骨架、数据库基础、身份边界、CI/日志和决策记录验收。
 - Out of scope：提前实现 P1 文字讨论闭环。
