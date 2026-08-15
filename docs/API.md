@@ -171,9 +171,9 @@ P0-3D 已实现的最小错误 envelope 为：
 }
 ```
 
-当前基础 code 仅为 `NOT_FOUND`、`VALIDATION_ERROR` 和 `INTERNAL_ERROR`。404、FastAPI request validation 与 unexpected exception 均映射为安全 envelope；unexpected exception 在服务端记录，客户端不接收 stack trace、source path 或原始异常消息。
+当前基础 code 仅为 `NOT_FOUND`、`VALIDATION_ERROR` 和 `INTERNAL_ERROR`。404、FastAPI request validation 与 unexpected exception 均映射为安全 envelope；unexpected exception 只产生带固定安全 category 的 `http.request.failed` application event，客户端不接收 stack trace、source path 或原始异常消息。
 
-每个 HTTP request 的完成日志使用 JSON structured logging，包含 `request_id`、`method`、不含 query 的 `path`、`status_code` 与 `duration_ms`。本阶段不记录 request body、完整 headers、Authorization 或 Cookie。
+P0-6C application request logs 为单行 JSON。每条记录有 UTC `timestamp`、uppercase `level`、稳定 `event` 和 `logger`；请求记录按适用性包含与 `X-Request-ID`/error envelope 一致的 `request_id`、`method`、FastAPI resolved route template、固定 `route_classification`、`status_code` 与 monotonic `duration_ms`。matched request 只记录 route template；unmatched/404 omit `route` 并使用 `unmatched`，不保留 raw/hashed/truncated path。合法 HTTP response（包括 handled 4xx）记录 `http.request.completed`；真正未完成 pipeline 的异常记录 `http.request.failed`。不记录 request/response body、arbitrary headers、Cookie/Set-Cookie、Authorization、query、raw session token、credential URL 或 exception message/traceback。
 
 ## Security and authority boundaries
 

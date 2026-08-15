@@ -4,14 +4,14 @@
 
 - Parent task：`P0-6 — IN_PROGRESS`
 - Completed substeps：`P0-6A — completed；actual-source final review PASS；four review findings closed`；`P0-6B — completed；implementation/local parity/actual-source review/remote CI PASS`
-- Current approval gate：`P0-6C — awaiting explicit user approval / not started`
+- Current substep：`P0-6C — implementation complete / actual-source review pending`
 - Later substeps：`P0-6D` / `P0-6E` 均为 `NOT_STARTED`
 - P0-7：独立任务，`NOT_STARTED`
 - Scope owner：[`TASKS.md`](../TASKS.md)
 - Product baseline：[`PROJECT_MASTER_PLAN.md`](../PROJECT_MASTER_PLAN.md)
 - Last updated：2026-08-16
 
-本计划冻结 P0-6 的执行边界与风险门禁。P0-6A 已完成且只产生文档。P0-6B workflow implementation、local parity、actual-source review、findings remediation 与 remote GitHub Actions verification 均已完成并 `PASS`。P0-6C 等待用户明确批准且尚未开始；P0-6D/P0-6E 仍需后续逐步明确批准。
+本计划冻结 P0-6 的执行边界与风险门禁。P0-6A 已完成且只产生文档。P0-6B workflow implementation、local parity、actual-source review、findings remediation 与 remote GitHub Actions verification 均已完成并 `PASS`。P0-6C implementation 与 API gates 已完成，等待 actual-source review；P0-6D/P0-6E 仍需后续逐步明确批准。
 
 ## Goal
 
@@ -102,6 +102,14 @@
 - 在现有 request_id/logging foundation 上增加稳定 event schema、低基数字段、exception category 与安全测试；
 - 保持 API error envelope 与用户可见错误边界不变；
 - 输出仍为 stdlib structured application logs，不引入 vendor SDK 或日志 backend。
+
+#### P0-6C implementation checkpoint
+
+- project-owned logger 输出单行 UTF-8 JSON，核心字段、互斥 stdout/stderr、idempotent handlers 与 root/Uvicorn boundary 均按冻结 contract 实现；
+- request middleware 复用既有 UUIDv4 request context，matched route 仅记录 resolved template，unmatched/404 omit route 并使用 fixed classification；handled responses 与真正 pipeline failures 使用不同 event 且每个请求只记录一个终态 event；
+- lifespan 的真实 database lifecycle caller 产生 startup/shutdown events；unexpected exception 与 auth persistence failure 只记录安全固定 category，无 exception message/traceback；
+- targeted 53、API unit 139、PostgreSQL integration 18、API full 157、Ruff、format、Pyright 与 Alembic single-head checks 均通过；sensitive sentinel、query/raw/derived path negative tests 通过；
+- dependency/lockfile、schema/migration、API/OpenAPI contract、Web、CI workflow 与 OpenTelemetry 均未改变；P0-6C 当前为 implementation complete / actual-source review pending，不标记 completed。
 
 ### P0-6D — OpenTelemetry tracing foundation
 
@@ -485,6 +493,6 @@ P0-7 之后从 committed repository state 单独进行 independent P0 acceptance
 ## Progress
 
 - Completed：P0-6A baseline gate、scope freeze、execution plan 与 actual-source final review `PASS`；P0-6B workflow implementation、live action preflight、local parity、cleanup validation、actual-source review、findings remediation 与 remote GitHub Actions run #1 `PASS`；
-- Current：P0-6C awaiting explicit user approval / not started；
-- Not started：P0-6C、P0-6D、P0-6E、P0-7；
-- Next：等待用户明确批准 P0-6C；不得自行开始 implementation。
+- Current：P0-6C implementation complete / actual-source review pending；
+- Not started：P0-6D、P0-6E、P0-7；
+- Next：等待用户完成 P0-6C actual-source review；不得自行进入 P0-6D。

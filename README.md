@@ -17,10 +17,10 @@ AI 群面训练场让用户无需临时召集真人，即可与具有不同性�
   - `P0-3 — 前后端项目骨架`
   - `P0-4 — 数据库与迁移基础`
   - `P0-5 — 最小身份边界`
-- 已完成子步骤：`P0-4A`、`P0-4B`、`P0-4C`、`P0-4D`、`P0-4E`、`P0-4F`、`P0-5A`、`P0-5B`、`P0-5C`、`P0-5D`、`P0-5E`
-- 当前任务：`P0-6 — CI、日志与基础可观测性（awaiting explicit user approval / not started）`
-- 最近完成子步骤：`P0-5E — Independent final review（completed；PASS after findings remediation and independent recheck）`
-- 后续子步骤：`P0-6 — awaiting explicit user approval / not started`
+- 已完成子步骤：`P0-4A`～`P0-4F`、`P0-5A`～`P0-5E`、`P0-6A`、`P0-6B`
+- 当前任务：`P0-6 — CI、日志与基础可观测性（IN_PROGRESS）`
+- 当前子步骤：`P0-6C — Structured Logging Hardening（implementation complete / actual-source review pending）`
+- 后续子步骤：`P0-6D`、`P0-6E`、`P0-7` 均 not started
 - 当前目标版本：`V0.1 — Internal Validation / 内部技术验证版`
 - 当前实现状态：Web/API 技术骨架、本地 PostgreSQL 18.4、SQLAlchemy async/psycopg 3、Alembic 与 reusable PostgreSQL integration harness 已建立；P0-5D 已完成 credentialed exact-origin CORS、Origin/custom-header CSRF、最小 Web auth UI、raw/canonical username browser/backend 闭环与隔离 PostgreSQL 上的真实 Chromium register/restore/logout 验证。P0-5E initial independent review verdict 为 `BLOCKED`，两个 findings 已完成 remediation，并通过 findings-only independent recheck；P0-5E final outcome 为 `PASS`，P0-5 已转为 `DONE`
 

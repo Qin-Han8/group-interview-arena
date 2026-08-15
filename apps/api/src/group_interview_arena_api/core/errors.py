@@ -1,4 +1,3 @@
-import logging
 from enum import StrEnum
 
 from fastapi import Request
@@ -11,8 +10,6 @@ from group_interview_arena_api.core.request_id import (
     create_request_id,
     get_request_id,
 )
-
-logger = logging.getLogger(__name__)
 
 
 class ErrorCode(StrEnum):
@@ -112,18 +109,8 @@ async def validation_exception_handler(
 
 
 async def unexpected_exception_handler(
-    request: Request, exception: Exception
+    _request: Request, _exception: Exception
 ) -> JSONResponse:
-    logger.error(
-        "Unhandled request exception",
-        exc_info=(type(exception), exception, exception.__traceback__),
-        extra={
-            "request_id": _current_or_new_request_id(),
-            "method": request.method,
-            "path": request.url.path,
-            "status_code": 500,
-        },
-    )
     return error_response(
         status_code=500,
         code=ErrorCode.INTERNAL_ERROR,

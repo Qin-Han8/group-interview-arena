@@ -245,12 +245,14 @@ WebSocket 使用独立版本化事件契约，至少表达 event type、schema v
 
 ## Logging and observability
 
-- 从 P0-3 应用骨架开始使用 structured logging；
-- 通用请求使用 `request_id`；
+- P0-6C 已将 project-owned application logs harden 为 UTF-8 newline-delimited JSON，核心字段为 UTC `timestamp`、uppercase `level`、稳定 `event` 与 `logger`；
+- 通用请求沿用既有 UUIDv4 `request_id`，并记录 method、resolved route template、固定 `matched`/`unmatched` classification、status 与 monotonic duration；404/unmatched 不记录 raw/hashed/truncated path 或 query；
+- handled HTTP response（包括 4xx）使用 `http.request.completed`，只有未正常完成 pipeline 的异常路径使用 `http.request.failed` 和固定安全 exception category；现有 lifespan 发出 `app.startup.completed` / `app.shutdown.completed`；
+- project logger 使用互斥 stdout（DEBUG～WARNING）/stderr（ERROR～CRITICAL）handlers，重复 `create_app()` 不叠加 handler，也不重配 process root logger；Uvicorn/server-owned logs 保持独立；
 - `session_id`、`connection_id`、provider invocation id、`job_id` 只在相关能力实际出现后增加；
 - 不为未来字段生成虚假 ID；
-- 敏感 prompt、secret 和不必要的完整输入默认不写日志；
-- OpenTelemetry 延后到 P0-6；
+- request/response body、headers、Cookie/session、Authorization、query、raw path、credential URL、exception message/traceback 与敏感模型 payload 不进入 application logging data model；
+- OpenTelemetry tracing 仍属于未开始的 P0-6D；P0-6C 仅让 JSON formatter 可自然接纳未来 active trace/span IDs，不创建 tracer/exporter；
 - Sentry 或其他 SaaS exporter 保持 Deferred。
 
 ## Provider neutrality and orchestration

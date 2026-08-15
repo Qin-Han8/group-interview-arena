@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.base import RequestResponseEndpoint
 from starlette.responses import Response
+from starlette.routing import BaseRoute
 
 from group_interview_arena_api.api.health import router as health_router
 from group_interview_arena_api.core.config import DatabaseSettings, Settings
@@ -19,7 +20,7 @@ from group_interview_arena_api.core.errors import (
     unexpected_exception_handler,
     validation_exception_handler,
 )
-from group_interview_arena_api.core.logging import configure_logging
+from group_interview_arena_api.core.logging import configure_logging, log_event
 from group_interview_arena_api.core.request_id import (
     create_request_id,
     reset_request_id,
@@ -36,6 +37,15 @@ from group_interview_arena_api.db.runtime import (
 from group_interview_arena_api.identity.routes import create_auth_router
 
 logger = logging.getLogger(__name__)
+
+
+def _resolved_route(request: Request) -> tuple[str | None, str]:
+    route = request.scope.get("route")
+    if isinstance(route, BaseRoute):
+        route_template = getattr(route, "path", None)
+        if isinstance(route_template, str):
+            return route_template, "matched"
+    return None, "unmatched"
 
 
 def create_app(
@@ -58,12 +68,14 @@ def create_app(
             DATABASE_SESSION_FACTORY_STATE_KEY,
             session_factory,
         )
+        log_event(logger, logging.INFO, "app.startup.completed")
         try:
             yield
         finally:
             delattr(application.state, DATABASE_SESSION_FACTORY_STATE_KEY)
             del application.state.database_engine
             await dispose_database_engine(engine)
+            log_event(logger, logging.INFO, "app.shutdown.completed")
 
     application = FastAPI(title="AI 群面训练场 API", lifespan=lifespan)
     application.include_router(health_router)
@@ -83,22 +95,31 @@ def create_app(
         started_at = perf_counter()
 
         try:
+            event = "http.request.completed"
+            level = logging.INFO
+            exception_category = None
             try:
                 response = await call_next(request)
             except Exception as exception:
                 response = await unexpected_exception_handler(request, exception)
+                event = "http.request.failed"
+                level = logging.ERROR
+                exception_category = "unhandled_exception"
 
             duration_ms = round((perf_counter() - started_at) * 1000, 3)
             response.headers["X-Request-ID"] = request_id
-            logger.info(
-                "Request completed",
-                extra={
-                    "request_id": request_id,
-                    "method": request.method,
-                    "path": request.url.path,
-                    "status_code": response.status_code,
-                    "duration_ms": duration_ms,
-                },
+            route, route_classification = _resolved_route(request)
+            log_event(
+                logger,
+                level,
+                event,
+                request_id=request_id,
+                method=request.method,
+                route=route,
+                route_classification=route_classification,
+                status_code=response.status_code,
+                duration_ms=duration_ms,
+                exception_category=exception_category,
             )
             return response
         finally:

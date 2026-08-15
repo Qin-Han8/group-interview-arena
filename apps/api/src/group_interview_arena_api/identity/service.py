@@ -10,6 +10,7 @@ from sqlalchemy import delete, select, update
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from group_interview_arena_api.core.logging import log_event
 from group_interview_arena_api.db.models import AuthSession, User
 from group_interview_arena_api.identity.credentials import (
     hash_password,
@@ -74,9 +75,12 @@ def _is_username_unique_violation(exception: IntegrityError) -> bool:
 
 
 def _raise_persistence_error(operation: str) -> Never:
-    logger.error(
-        "Authentication persistence operation failed",
-        extra={"operation": operation},
+    del operation
+    log_event(
+        logger,
+        logging.ERROR,
+        "auth.persistence.failed",
+        exception_category="persistence_error",
     )
     raise AuthenticationPersistenceError from None
 

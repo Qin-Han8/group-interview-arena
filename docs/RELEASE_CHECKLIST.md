@@ -17,7 +17,7 @@
 
 ## 当前版本范围
 
-P0-2 技术架构决策、P0-3 前后端项目骨架、P0-4 数据库及迁移基础与 P0-5 最小身份边界已完成。P0-4A～P0-4F 均已完成，P0-4 已通过独立最终验收并转为 `DONE`。P0-5A/P0-5B/P0-5C/P0-5D completed；P0-5E initial independent review verdict 为 `BLOCKED`，两个 findings 已完成 remediation，并通过 findings-only independent recheck；P0-5E final outcome 为 `PASS`，P0-5 已转为 `DONE`。P0 尚未完成；P0-6 `IN_PROGRESS`，其中 P0-6A/P0-6B completed、P0-6C awaiting explicit user approval / not started、P0-6D/P0-6E not started；P0-7 not started。P0-6B local parity、actual-source review、findings remediation 与 remote GitHub Actions run #1 均 `PASS`；下方 P0 exit 与产品版本复选框仍表示完整阶段/版本验收，不能由单个子任务替代。
+P0-2 技术架构决策、P0-3 前后端项目骨架、P0-4 数据库及迁移基础与 P0-5 最小身份边界已完成。P0-4A～P0-4F 均已完成，P0-4 已通过独立最终验收并转为 `DONE`。P0-5A/P0-5B/P0-5C/P0-5D completed；P0-5E initial independent review verdict 为 `BLOCKED`，两个 findings 已完成 remediation，并通过 findings-only independent recheck；P0-5E final outcome 为 `PASS`，P0-5 已转为 `DONE`。P0 尚未完成；P0-6 `IN_PROGRESS`，其中 P0-6A/P0-6B completed、P0-6C implementation complete / actual-source review pending、P0-6D/P0-6E not started；P0-7 not started。P0-6B local parity、actual-source review、findings remediation 与 remote GitHub Actions run #1 均 `PASS`；P0-6C logging/security/API gates 已 `PASS`，但必须经 actual-source review 后才能 completed。下方 P0 exit 与产品版本复选框仍表示完整阶段/版本验收，不能由单个子任务替代。
 
 ## Implementation guidance
 
