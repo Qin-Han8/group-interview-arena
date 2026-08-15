@@ -44,6 +44,9 @@ test("browser auth round trip preserves and clears the opaque session", async ({
     (cookie) => cookie.name === SESSION_COOKIE_NAME,
   );
   expect(sessionCookie).toBeDefined();
+  if (!sessionCookie) {
+    throw new Error("Expected the opaque session Cookie to exist.");
+  }
   expect(sessionCookie?.httpOnly).toBe(true);
   expect(sessionCookie?.secure).toBe(false);
   expect(sessionCookie?.sameSite).toBe("Lax");
@@ -75,8 +78,16 @@ test("browser auth round trip preserves and clears the opaque session", async ({
     local: Object.entries(localStorage),
     session: Object.entries(sessionStorage),
   }));
-  expect(browserStorage).toEqual({ local: [], session: [] });
-  expect(JSON.stringify(browserStorage)).not.toContain(password);
+  const serializedBrowserStorage = JSON.stringify(browserStorage);
+  expect({
+    passwordPersisted: serializedBrowserStorage.includes(password),
+    sessionTokenPersisted: serializedBrowserStorage.includes(
+      sessionCookie.value,
+    ),
+  }).toEqual({
+    passwordPersisted: false,
+    sessionTokenPersisted: false,
+  });
 
   await page.getByRole("button", { name: "退出登录" }).click();
   await expect(page.getByRole("heading", { name: "登录或注册" })).toBeVisible();

@@ -11,7 +11,7 @@
 
 ## 文档目的
 
-本文件记录 P0-2 已批准的 REST、WebSocket、契约生成、恢复和错误语义基线，并同步 P0-3D/P0-3E、P0-5C 与 P0-5D 已实现的 REST/browser 技术契约。本文件不冻结完整 P1 事件集合；P0-5E awaiting explicit approval，独立最终审核尚未开始。
+本文件记录 P0-2 已批准的 REST、WebSocket、契约生成、恢复和错误语义基线，并同步 P0-3D/P0-3E、P0-5C 与 P0-5D 已实现的 REST/browser 技术契约。本文件不冻结完整 P1 事件集合；P0-5E final outcome 为 `PASS after findings remediation and independent recheck`，P0-5 已转为 `DONE`。
 
 正式决策见 [`DECISIONS.md`](DECISIONS.md) `ADR-006`、`ADR-007`、`ADR-013`、`ADR-015`。
 

@@ -17,7 +17,7 @@
 
 ## 当前版本范围
 
-P0-2 技术架构决策、P0-3 前后端项目骨架与 P0-4 数据库及迁移基础已完成。P0-4A～P0-4F 均已完成，P0-4 已通过独立最终验收并转为 `DONE`。P0-5 已进入 `IN_PROGRESS`：P0-5A/P0-5B/P0-5C/P0-5D completed，P0-5E awaiting explicit approval，independent final review not started。P0 尚未完成；browser CORS/CSRF/Web closure 已实现，但 P0-5E 与 V0.1 业务能力尚未完成。下方 P0 exit 与产品版本复选框仍表示完整阶段/版本验收，不能由单个子任务替代。
+P0-2 技术架构决策、P0-3 前后端项目骨架、P0-4 数据库及迁移基础与 P0-5 最小身份边界已完成。P0-4A～P0-4F 均已完成，P0-4 已通过独立最终验收并转为 `DONE`。P0-5A/P0-5B/P0-5C/P0-5D completed；P0-5E initial independent review verdict 为 `BLOCKED`，两个 findings 已完成 remediation，并通过 findings-only independent recheck；P0-5E final outcome 为 `PASS`，P0-5 已转为 `DONE`。P0 尚未完成；P0-6 awaiting explicit user approval / not started，P0-7 not started；下方 P0 exit 与产品版本复选框仍表示完整阶段/版本验收，不能由单个子任务替代。
 
 ## Implementation guidance
 
@@ -207,7 +207,7 @@ P0-5B 最终源码审核已 PASS 并转为 completed；其后的 P0-5C 当前状
 - [x] 无新 dependency、lockfile change、migration、schema change 或 development DB mutation；development DB 仍为 identity head 且 `users`/`auth_sessions` 均 0 rows；
 - [ ] Credentialed CORS、CSRF、Web auth UI 与真实 browser auth round trip 留给 P0-5D，P0-5C 不构成 browser authentication closure。
 
-P0-5C final review 已 PASS 并转为 completed；P0-5D 证据见下节，P0-5E awaiting explicit approval / not started。
+P0-5C final review 已 PASS 并转为 completed；P0-5D 证据见下节；P0-5E final outcome 为 `PASS after findings remediation and independent recheck`。
 
 ### P0-5D browser authentication closure — 2026-08-14
 
@@ -222,7 +222,7 @@ P0-5C final review 已 PASS 并转为 completed；P0-5D 证据见下节，P0-5E 
 - [x] 真实 Chromium 验证 register、Cookie flags、`document.cookie` 隔离、reload restore、storage 无 secret、missing-CSRF `403`、logout、后续 `/auth/me` `401` 与 Cookie 清除；selected 1、skipped 0、passed 1；
 - [x] Windows Uvicorn runtime 使用 Psycopg-compatible `SelectorEventLoop`；E2E 后 3000/8000 listener 与 `gia_p05d_*` residual 均为 0。
 
-P0-5D actual-source final review 已 PASS 并转为 completed；P0-5E awaiting explicit approval，independent final review not started，因此 P0-5 尚不能转为 `DONE`。
+P0-5D actual-source final review 已 PASS 并转为 completed；P0-5E initial independent review verdict 为 `BLOCKED`，两个 findings 已完成 remediation，并通过 findings-only independent recheck；P0-5E final outcome 为 `PASS`，因此 P0-5 已转为 `DONE`。
 
 ## P0 exit
 
@@ -230,7 +230,7 @@ P0-5D actual-source final review 已 PASS 并转为 completed；P0-5E awaiting e
 
 - [ ] 项目仓库和开发规范可供后续任务使用；
 - [ ] 环境配置方式已由正式技术决策确定并验证；
-- [ ] V0.1 所需的最小身份边界已验证，且生产环境不会误启不安全的开发身份；
+- [x] V0.1 所需的最小身份边界已验证，且生产环境不会误启不安全的开发身份；
 - [x] 已依据 P0-2 批准的技术决策验证 V0.1 所需的关系型数据库、数据访问层和 migration 基础；
 - [ ] 自动检查、日志和基础监控已验证；
 - [ ] 产品及技术决策记录完整可追溯；
@@ -342,8 +342,8 @@ P0-2 已 Accepted PostgreSQL、SQLAlchemy 2.x 和 Alembic，P0-4 实施基线为
 
 ## Future work
 
-- P0-5D：completed；P0-5E awaiting explicit approval，independent final review not started。
-- P0-6：补充实际自动检查和基础可观测性项目。
+- P0-5D：completed；P0-5E completed；final outcome `PASS after findings remediation and independent recheck`。
+- P0-6：awaiting explicit user approval / not started；获准进入后补充实际自动检查和基础可观测性项目。
 - P0-7：执行并记录 P0 exit 验收。
 - 各版本发布任务：补充负责人、环境、命令、证据和发布/回滚步骤。
 

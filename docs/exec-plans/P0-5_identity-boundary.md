@@ -1,6 +1,6 @@
 # P0-5 Identity Boundary Execution Plan
 
-Status: `P0-5 IN_PROGRESS`; `P0-5A completed`; `P0-5B completed`; `P0-5C completed`; `P0-5D completed`; `P0-5E awaiting explicit approval / independent final review not started`
+Status: `P0-5 DONE`; `P0-5A completed`; `P0-5B completed`; `P0-5C completed`; `P0-5D completed`; `P0-5E completed / PASS after findings remediation and independent recheck`; `P0-6 awaiting explicit user approval / not started`
 
 Target version: `V0.1 Internal Validation`
 
@@ -19,7 +19,7 @@ Product baseline: [`PROJECT_MASTER_PLAN.md`](../PROJECT_MASTER_PLAN.md)
 - P0-4 已完成 PostgreSQL、SQLAlchemy async、Alembic 和 integration test foundation。
 - Alembic baseline revision 为 `7c6ccd86b3c5`，必须保持不可变且 migration graph 保持 single head。
 - P0-5B 前 development database 为 public product tables = 0 且不存在 `alembic_version`；通过全部 isolated gates 后，现已首次迁移至 identity head `4fe43b42641b`。
-- 当前应用已具有 `users`、`auth_sessions`、password/session security primitives、FastAPI DB lifecycle、backend auth API、`gia_session` Cookie runtime、credentialed CORS/CSRF 与最小 Web auth flow；P0-5D actual-source final review 已通过，P0-5E awaiting explicit approval，独立最终审核尚未开始。
+- 当前应用已具有 `users`、`auth_sessions`、password/session security primitives、FastAPI DB lifecycle、backend auth API、`gia_session` Cookie runtime、credentialed CORS/CSRF 与最小 Web auth flow；P0-5D actual-source final review 已通过；P0-5E initial independent review verdict 为 `BLOCKED`，两个 findings 已完成 remediation，并通过 findings-only independent recheck；P0-5E final outcome 为 `PASS`，P0-5 已转为 `DONE`。
 - 现有 typed `GIA_API_CORS_ORIGINS` 是已批准的 browser trusted-origin Source of Truth；P0-5 不建立第二套 CSRF trusted-origin 配置。
 
 ## Five-stage decomposition
@@ -28,7 +28,7 @@ Product baseline: [`PROJECT_MASTER_PLAN.md`](../PROJECT_MASTER_PLAN.md)
 2. **P0-5B — Identity persistence + migration + security primitives**：`completed`。已实现 identity schema、migration、显式 Argon2id 配置和 session token primitives，并通过最终源码审核。
 3. **P0-5C — Backend auth runtime + FastAPI DB lifecycle + API**：`completed`。已接入 request-scoped database session、最小 auth API 与 backend Cookie runtime；不包含 browser security closure。
 4. **P0-5D — Web auth round trip + CORS/CSRF + cross-layer validation**：`completed`。Web 技术闭环、浏览器安全验证与 P0-5D actual-source final review 均已完成。
-5. **P0-5E — Independent final review**：`awaiting explicit approval / not started`。获批后独立复核完整 P0-5 diff、质量门、迁移安全和范围一致性，不新增业务能力。
+5. **P0-5E — Independent final review**：`completed`。已独立复核完整 P0-5 diff、质量门、迁移安全和范围一致性；initial verdict 为 `BLOCKED`，两个 findings 已完成 remediation，并通过 findings-only independent recheck；final outcome 为 `PASS`，不新增业务能力。
 
 不得机械增加第六阶段，也不得在未获明确批准时进入下一阶段。
 
@@ -269,4 +269,4 @@ P0-5D 的跨层实现与证据：
 - [x] P0-5B identity persistence, migration and security primitives — completed
 - [x] P0-5C backend auth runtime, DB lifecycle and API — completed
 - [x] P0-5D Web round trip, CORS/CSRF and cross-layer validation — completed
-- [ ] P0-5E independent final review — awaiting explicit approval / not started
+- [x] P0-5E independent final review — completed; PASS after findings remediation and independent recheck

@@ -5,9 +5,9 @@
 - Architecture baseline established by: P0-2 — DONE
 - P0-3 foundation status: DONE
 - P0-4 database foundation status: DONE
-- P0-5 identity boundary status: IN_PROGRESS
-- Most recently completed substep: P0-5D completed
-- Next substep: P0-5E awaiting explicit approval / independent final review not started
+- P0-5 identity boundary status: DONE
+- Most recently completed substep: P0-5E independent review completed; PASS after findings remediation and independent recheck
+- P0-6 status: awaiting explicit user approval / not started
 - Target version: V0.1 Internal Validation
 - Business architecture detail: Incremental from P1
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
@@ -194,7 +194,7 @@ P0-4F 已从 clean `main` HEAD 独立复核 Git、总纲 hash、Docker/PostgreSQ
 - browser security 使用 credentialed explicit CORS、exact Origin validation、required custom CSRF header 与 SameSite defense-in-depth；CORS/CSRF 共用 `GIA_API_CORS_ORIGINS` normalized set；
 - V0.1 self-service account/password recovery Deferred；公开测试前必须重新设计 verified recovery identity/flow。
 
-P0-5B 已建立 `users`、`auth_sessions`、identity migration 与 password/session security primitives，metadata 以 `db` package 的显式 model registration 精确包含两张 product table。P0-5C 已把现有 DB factory 接入 FastAPI lifespan/app state/request-scoped `AsyncSession`，并实现最小 register/login/logout/me、server-side session validation 与 `gia_session` Cookie issue/clear。P0-5D 已完成 shared-origin credentialed CORS/CSRF、最小 Web auth UI、raw/canonical username browser/backend closure 与真实 Chromium browser closure；P0-5E awaiting explicit approval，独立最终审核尚未开始。
+P0-5B 已建立 `users`、`auth_sessions`、identity migration 与 password/session security primitives，metadata 以 `db` package 的显式 model registration 精确包含两张 product table。P0-5C 已把现有 DB factory 接入 FastAPI lifespan/app state/request-scoped `AsyncSession`，并实现最小 register/login/logout/me、server-side session validation 与 `gia_session` Cookie issue/clear。P0-5D 已完成 shared-origin credentialed CORS/CSRF、最小 Web auth UI、raw/canonical username browser/backend closure 与真实 Chromium browser closure；P0-5E initial independent review verdict 为 `BLOCKED`，两个 findings 已完成 remediation，并通过 findings-only independent recheck；P0-5E final outcome 为 `PASS`，P0-5 已转为 `DONE`。
 
 已实现的 DB application lifecycle 为：
 
@@ -284,8 +284,8 @@ Redis 只在多 API workers、横向扩容、跨进程 WebSocket broadcast、dis
 
 - P0-5C：completed；
 - P0-5D：completed；真实 browser Cookie/CORS/CSRF 闭环已通过 Chromium 验证；
-- P0-5E：awaiting explicit approval；independent final review not started，获批后独立复核完整 P0-5 actual source 与全部门禁；
-- P0-6：建立 CI 和基础可观测性；
+- P0-5E：completed；final outcome `PASS after findings remediation and independent recheck`；
+- P0-6：awaiting explicit user approval / not started；
 - P1：逐步设计题目、角色、会话、状态机、调度、记忆和基础报告，并建立第一个 WebSocket vertical slice；
 - P2 以后：只在对应阶段获批后增加语音、评分训练和商业化能力。
 

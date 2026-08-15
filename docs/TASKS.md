@@ -2,9 +2,9 @@
 
 - Status: Active
 - Managed scope: P0 only
-- Current task: P0-5 — IN_PROGRESS
-- Most recently completed substep: P0-5D completed
-- Next substep: P0-5E awaiting explicit approval / independent final review not started
+- Current task: P0-6 — awaiting explicit user approval / not started
+- Most recently completed substep: P0-5E independent review completed; PASS after findings remediation and independent recheck
+- P0-6 status: awaiting explicit user approval / not started
 - Allowed status values: `TODO` / `IN_PROGRESS` / `BLOCKED` / `DONE`
 - Related roadmap: [`ROADMAP.md`](ROADMAP.md)
 
@@ -203,8 +203,8 @@
 
 - ID: `P0-5`
 - 名称：最小身份边界
-- Status: `IN_PROGRESS`
-- Approval state：P0-5A/P0-5B/P0-5C/P0-5D completed；P0-5E awaiting explicit approval，independent final review not started。
+- Status: `DONE`
+- Approval state：P0-5A/P0-5B/P0-5C/P0-5D completed；P0-5E independent review completed；initial verdict `BLOCKED` with two findings；findings remediation completed；findings-only independent recheck `PASS`；final P0-5E outcome `PASS`。
 - 目标：建立内部 V0.1 的 username/password identity、稳定 UUIDv4 `user_id`、PostgreSQL-backed opaque Cookie session 与 authenticated current-user boundary。
 - In scope：Argon2id password security、`users`/`auth_sessions` persistence、第一批真实 identity migration、FastAPI DB lifecycle、register/login/logout/me、host-only HttpOnly Cookie、credentialed explicit CORS、Origin/custom-header CSRF、最小 Web auth round trip 与分层安全测试。
 - Out of scope：email/phone/SMS/WeChat/OAuth、JWT/refresh token、MFA、V0.1 self-service recovery、profile/account center、RBAC/permissions、payment、Redis session、训练业务 persistence 及其他 P1+ 能力。
@@ -217,7 +217,7 @@
 - `P0-5B — Identity persistence + migration + security primitives`：completed；
 - `P0-5C — Backend auth runtime + FastAPI DB lifecycle + API`：completed；
 - `P0-5D — Web auth round trip + CORS/CSRF + cross-layer validation`：completed；
-- `P0-5E — Independent final review`：awaiting explicit approval / not started。
+- `P0-5E — Independent final review`：completed；PASS after findings remediation and independent recheck。
 
 ### P0-5A completion note
 
@@ -258,13 +258,13 @@
 - Web 不对 raw ASCII username 做 lowercase mutation；backend canonical lowercase username 在 register response、authenticated UI 与 reload restore 中保持一致；
 - 新增唯一获批 Web direct dev dependency `@playwright/test 1.62.1`，只运行 Chromium；隔离编排器创建并迁移精确 `gia_p05d_*` PostgreSQL database，启动 API/Web，运行浏览器测试后在成功/失败路径停止服务并精确删除临时库；
 - 真实 Chromium 已验证 register、HttpOnly/host-only/SameSite=Lax/Path=/ Cookie、`document.cookie` 不可见、reload restore、browser storage 无 auth secret、missing-CSRF `403`、logout、后续 `/auth/me` `401` 与 Cookie 清除；selected 1、skipped 0、passed 1；
-- Windows Uvicorn runtime 现通过 custom loop factory 显式使用 Psycopg-compatible `SelectorEventLoop`；未新增 API dependency，development DB 保持 head `4fe43b42641b` 且 `users`/`auth_sessions` 均为 0；P0-5D actual-source final review 已通过并转为 completed；P0-5E awaiting explicit approval，independent final review not started。
+- Windows Uvicorn runtime 现通过 custom loop factory 显式使用 Psycopg-compatible `SelectorEventLoop`；未新增 API dependency，development DB 保持 head `4fe43b42641b` 且 `users`/`auth_sessions` 均为 0；P0-5D actual-source final review 已通过并转为 completed；P0-5E initial independent review verdict 为 `BLOCKED`，两个 findings 已完成 remediation，并通过 findings-only independent recheck；P0-5E final outcome 为 `PASS`，P0-5 已转为 `DONE`。
 
 ## P0-6 — CI、日志与基础可观测性
 
 - ID: `P0-6`
 - 名称：CI、日志与基础可观测性
-- Status: `TODO`
+- Status: `TODO` — awaiting explicit user approval / not started
 - 目标：建立与当前代码规模匹配的自动检查、结构化日志和基础监控能力。
 - In scope：经批准的 lint/typecheck/test/build 检查、基础日志和错误观测。
 - Out of scope：完整生产监控平台、所有业务指标和过度复杂的部署流水线。
