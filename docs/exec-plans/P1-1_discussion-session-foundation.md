@@ -1,6 +1,6 @@
 # P1-1 Discussion Session Foundation Execution Plan
 
-Status: `P1 IN_PROGRESS`; `P1-1 IN_PROGRESS`; `P1-1A completed`; `P1-1B` through `P1-1E` not started and require separate explicit approval
+Status: `P1 IN_PROGRESS`; `P1-1 IN_PROGRESS`; `P1-1A` and `P1-1B completed`; `P1-1C` through `P1-1E` not started and require separate explicit approval
 
 Target version: `V0.1 Internal Validation`
 
@@ -32,7 +32,7 @@ P1-1 只证明 session、persistence、transport、authentication/authorization�
 ## Five-stage decomposition
 
 1. **P1-1A — Preflight / scope freeze / execution plan**：`completed`。只冻结本计划和同步 current-state 文档；不修改 runtime、tests、migration、schema、dependencies、lockfiles 或 CI。
-2. **P1-1B — Session persistence + migration foundation**：`not started`。实现三张最小 product tables、ORM metadata 和线性 Alembic revision；只验证 schema/migration，不实现 REST、WebSocket 或 Web UI。
+2. **P1-1B — Session persistence + migration foundation**：`completed`。已实现三张最小 product tables、ORM metadata 和线性 Alembic revision；只验证 schema/migration，不实现 REST、WebSocket 或 Web UI。
 3. **P1-1C — Backend REST + WebSocket vertical slice**：`not started`。实现 authenticated create/snapshot、WS v1 contract、持久化 command handling、idempotency、sequence、catch-up 和安全错误；不实现 Web caller。
 4. **P1-1D — Web realtime caller + reconnect cross-layer validation**：`not started`。只有此时因真实 caller 创建 `lib/realtime`，建立最小 browser session UI 和 PostgreSQL-backed Chromium 回归。
 5. **P1-1E — Independent final review / P1-1 closeout**：`not started`。从 committed/approved source state 独立复核完整 P1-1，不增加新业务能力；只有 PASS 后 P1-1 才可转为 `DONE`。
@@ -276,12 +276,12 @@ P1-1 only promises delivery to the originating connection plus reconnect catch-u
 
 **Steps**
 
-- [ ] Write failing metadata/model tests for exact five-table product metadata, columns, generic checks, FKs and indexes。
-- [ ] Implement the three ORM models without native enum, relationship graph or future entities。
-- [ ] Write migration-history and revision-shape tests that preserve both existing revisions byte-for-byte and require a linear single head。
-- [ ] Create/review the migration; downgrade must remove only the three P1-1 tables in dependency-safe order and return to the identity head。
-- [ ] Run isolated real PostgreSQL fresh upgrade、repeat upgrade、`current --check-heads`、`alembic check`、downgrade to identity、re-upgrade and exact schema/index/constraint checks。
-- [ ] After all disposable-database gates pass, verify the development DB exact name、current identity head、expected two-table schema and row counts; under the separately approved P1-1B scope run `upgrade head` once, verify repeat upgrade is a no-op, and never downgrade development。
+- [x] Write failing metadata/model tests for exact five-table product metadata, columns, generic checks, FKs and indexes。
+- [x] Implement the three ORM models without native enum, relationship graph or future entities。
+- [x] Write migration-history and revision-shape tests that preserve both existing revisions byte-for-byte and require a linear single head。
+- [x] Create/review the migration; downgrade removes only the three P1-1 tables in dependency-safe order and returns to the identity head。
+- [x] Run isolated real PostgreSQL fresh upgrade、repeat upgrade、`current --check-heads`、`alembic check`、downgrade to identity、re-upgrade and exact schema/index/constraint checks。
+- [x] After all disposable-database gates pass, verify the development DB exact name、current identity head、expected two-table schema and row counts; run approved `upgrade head` once, verify repeat upgrade is a no-op, and never downgrade development。
 
 **Acceptance**
 
@@ -442,7 +442,7 @@ Git staging、commit and push remain separate user-authorized actions in every i
 - [x] P1-1A Git/source-of-truth/actual-source preflight completed。
 - [x] P1-1 scope、schema、REST/WS contract、idempotency、sequence、reconnect、security and B～E acceptance frozen。
 - [x] P1-1A docs/static validation completed；no runtime implementation started。
-- [ ] P1-1B not started；awaiting separate explicit user approval。
+- [x] P1-1B persistence/migration implementation and risk-matched validation completed；no REST/WS/UI implementation started。
 - [ ] P1-1C not started。
 - [ ] P1-1D not started。
 - [ ] P1-1E not started。

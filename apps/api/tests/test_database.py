@@ -40,8 +40,14 @@ def test_metadata_naming_convention_matches_baseline() -> None:
     assert dict(Base.metadata.naming_convention) == EXPECTED_NAMING_CONVENTION
 
 
-def test_base_metadata_has_exact_identity_tables() -> None:
-    assert set(Base.metadata.tables) == {"auth_sessions", "users"}
+def test_base_metadata_has_exact_product_tables() -> None:
+    assert set(Base.metadata.tables) == {
+        "auth_sessions",
+        "discussion_events",
+        "session_actions",
+        "simulation_sessions",
+        "users",
+    }
 
 
 def test_psycopg_url_creates_async_engine() -> None:

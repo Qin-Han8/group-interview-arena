@@ -10,6 +10,7 @@ API_ROOT = Path(__file__).resolve().parents[1]
 ALEMBIC_CONFIG_PATH = API_ROOT / "alembic.ini"
 BASELINE_REVISION = "7c6ccd86b3c5"
 IDENTITY_REVISION = "4fe43b42641b"
+SESSION_FOUNDATION_REVISION = "f1a11d15c001"
 
 
 def _alembic_config() -> Config:
@@ -26,13 +27,15 @@ def test_alembic_config_uses_project_migration_directory_without_url() -> None:
     assert config.get_main_option("sqlalchemy.url") is None
 
 
-def test_migration_history_is_linear_with_single_identity_head() -> None:
+def test_migration_history_is_linear_with_single_session_foundation_head() -> None:
     script = ScriptDirectory.from_config(_alembic_config())
     baseline = script.get_revision(BASELINE_REVISION)
     identity = script.get_revision(IDENTITY_REVISION)
+    session_foundation = script.get_revision(SESSION_FOUNDATION_REVISION)
 
-    assert script.get_heads() == [IDENTITY_REVISION]
+    assert script.get_heads() == [SESSION_FOUNDATION_REVISION]
     assert [revision.revision for revision in script.walk_revisions()] == [
+        SESSION_FOUNDATION_REVISION,
         IDENTITY_REVISION,
         BASELINE_REVISION,
     ]
@@ -44,6 +47,10 @@ def test_migration_history_is_linear_with_single_identity_head() -> None:
     assert identity.down_revision == BASELINE_REVISION
     assert identity.branch_labels == set()
     assert identity.dependencies is None
+    assert session_foundation.revision == SESSION_FOUNDATION_REVISION
+    assert session_foundation.down_revision == IDENTITY_REVISION
+    assert session_foundation.branch_labels == set()
+    assert session_foundation.dependencies is None
 
 
 def test_baseline_upgrade_and_downgrade_are_zero_op() -> None:
@@ -65,5 +72,11 @@ def test_baseline_upgrade_and_downgrade_are_zero_op() -> None:
         assert isinstance(function.body[1], ast.Pass)
 
 
-def test_migration_target_metadata_has_exact_identity_tables() -> None:
-    assert set(Base.metadata.tables) == {"auth_sessions", "users"}
+def test_migration_target_metadata_has_exact_product_tables() -> None:
+    assert set(Base.metadata.tables) == {
+        "auth_sessions",
+        "discussion_events",
+        "session_actions",
+        "simulation_sessions",
+        "users",
+    }

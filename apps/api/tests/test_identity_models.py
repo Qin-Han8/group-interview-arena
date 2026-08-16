@@ -14,8 +14,8 @@ from sqlalchemy import (
 from group_interview_arena_api.db import AuthSession, Base, User
 
 
-def test_identity_metadata_contains_exact_product_tables() -> None:
-    assert set(Base.metadata.tables) == {"auth_sessions", "users"}
+def test_identity_metadata_contains_identity_tables() -> None:
+    assert {"auth_sessions", "users"} <= set(Base.metadata.tables)
 
 
 def test_users_model_has_exact_columns_and_constraints() -> None:

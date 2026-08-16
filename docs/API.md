@@ -1,12 +1,12 @@
 # API 与事件技术基线
 
-- Status: P0 API Architecture Baseline + P1-1A scoped design
+- Status: P0 API Architecture Baseline + P1-1 contract / P1-1B persistence foundation
 - Current phase: P1 — IN_PROGRESS
 - API architecture baseline established by: P0-2 — DONE
 - Target version: V0.1 Internal Validation
 - Implemented contracts: `GET /health`, `POST /auth/register`, `POST /auth/login`, `POST /auth/logout`, `GET /auth/me`
 - P0-5 browser CORS/CSRF/Web closure: P0-5D completed
-- P1-1 contract: scoped/frozen by P1-1A; runtime not implemented; P1-1B awaiting explicit approval
+- P1-1 contract: scoped/frozen by P1-1A; P1-1B persistence implemented; REST/WebSocket runtime pending P1-1C approval
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的

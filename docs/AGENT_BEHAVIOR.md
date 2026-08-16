@@ -94,7 +94,7 @@ P1-1A 只冻结讨论会话的 persistence/transport foundation，不实现本�
 - FastAPI/domain service 是 session state authority，Browser 只消费 REST snapshot `last_sequence` 和后续 ordered events；
 - P1-1 不创建 question、participant、utterance、AI persona、orchestrator、memory 或 LLM/provider；不会用 event JSON 假装这些 canonical objects；
 - `session.abort` 不要求 question/participant/utterance，因此可在不提前决定其 Schema 的前提下建立真实 vertical slice；
-- P1-1B 尚未开始。完整计划见 [`exec-plans/P1-1_discussion-session-foundation.md`](exec-plans/P1-1_discussion-session-foundation.md)。
+- P1-1B persistence/migration foundation 已完成；domain command service、REST 与 WebSocket 仍未开始并留给 P1-1C。完整计划见 [`exec-plans/P1-1_discussion-session-foundation.md`](exec-plans/P1-1_discussion-session-foundation.md)。
 
 ## Implementation guidance
 

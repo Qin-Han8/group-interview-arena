@@ -1,6 +1,6 @@
 # P0 技术架构基线
 
-- Status: P0 Architecture Baseline + P1-1A scoped design
+- Status: P0 Architecture Baseline + P1-1B persistence foundation
 - Current phase: P1 — IN_PROGRESS
 - Architecture baseline established by: P0-2 — DONE
 - P0-3 foundation status: DONE
@@ -8,9 +8,9 @@
 - P0-5 identity boundary status: DONE
 - Most recently completed task: P0-7 independent final acceptance — PASS after two documentation findings remediation and finding-only recheck
 - P0 status: DONE; P0-1 through P0-7 completed
-- P1 status: IN_PROGRESS; P1-1A completed; P1-1B awaiting explicit user approval
+- P1 status: IN_PROGRESS; P1-1A～B completed; P1-1C awaiting explicit user approval
 - Target version: V0.1 Internal Validation
-- Business architecture detail: P1-1 session foundation scoped; runtime not implemented
+- Business architecture detail: P1-1 persistence/migration implemented; transport/domain runtime not implemented
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -223,10 +223,10 @@ FastAPI OpenAPI 是 REST contract 的 Source of Truth。P0-3E 从运行中的 `/
 
 WebSocket 使用独立版本化事件契约，至少表达 event type、schema version、session identity、ordering sequence、occurrence timestamp 和 action identity。P1-1A 已冻结第一条 vertical slice 的 v1 scoped contract；它不等于完整 P1/P2 事件集合，详见 [`exec-plans/P1-1_discussion-session-foundation.md`](exec-plans/P1-1_discussion-session-foundation.md)。
 
-### P1-1A scoped session architecture — designed, not implemented
+### P1-1 session architecture — persistence implemented, transport/domain pending
 
 - P1-1 aggregate root 为 `simulation_session`；FastAPI domain/service 是状态和 command outcome authority，PostgreSQL 是 session/action/event persistence authority，Browser 只是 snapshot + event projection。
-- 首批计划 product tables 精确为 `simulation_sessions`、`session_actions`、`discussion_events`；当前 actual schema 仍只有 `users`、`auth_sessions`，P1-1B 尚未开始。
+- 首批 product tables `simulation_sessions`、`session_actions`、`discussion_events` 已由 P1-1B 实现；加既有 `users`、`auth_sessions` 后，actual product table set 精确为五张，Alembic single head 为 `f1a11d15c001`。
 - REST scoped contract 为 authenticated `POST /sessions` 与 owner-only `GET /sessions/{session_id}`；WebSocket scoped endpoint 为 `/ws/sessions/{session_id}?after_sequence=`。
 - 创建 session 产生 `session.created`；唯一 v1 business command `session.abort` 产生 `session.state_changed`。该最小动作不依赖 future question/participant/utterance，也不创建 test-only `noop` 产品行为。
 - `action_id` 在单一 session 内持久化幂等；正式 events 使用 session row lock + durable counter 分配连续 sequence，不使用 `MAX(sequence)+1`。action 到 event 为一对多 causation 边界。
@@ -305,7 +305,7 @@ Redis 只在多 API workers、横向扩容、跨进程 WebSocket broadcast、dis
 - P0-5D：completed；真实 browser Cookie/CORS/CSRF 闭环已通过 Chromium 验证；
 - P0-5E：completed；final outcome `PASS after findings remediation and independent recheck`；
 - P0：`DONE`；P0-1～P0-7 completed；P0-7 finding-only independent recheck `PASS`，P1 readiness `READY`；其后用户已明确批准进入 P1；
-- P1：`IN_PROGRESS`；P1-1A 已完成 session foundation preflight/scope freeze/plan，P1-1B 尚未开始并等待明确批准；题目、角色、完整状态机、调度、记忆和基础报告仍需后续分别设计；
+- P1：`IN_PROGRESS`；P1-1A～B 已完成 session foundation preflight/scope freeze 和 persistence/migration；P1-1C 尚未开始并等待明确批准，题目、角色、完整状态机、调度、记忆和基础报告仍需后续分别设计；
 - P2 以后：只在对应阶段获批后增加语音、评分训练和商业化能力。
 
 ## 与其他文档关系

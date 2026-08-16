@@ -1,6 +1,6 @@
 # 数据库技术基线
 
-- Status: P0 Data Architecture Baseline + P1-1A scoped design
+- Status: P0 Data Architecture Baseline + P1-1B session persistence foundation
 - Current phase: P1 — IN_PROGRESS
 - Data architecture baseline established by: P0-2 — DONE
 - Local PostgreSQL infrastructure: P0-4B — completed
@@ -13,8 +13,8 @@
 - P0-5B identity persistence: completed
 - P0-5C backend auth runtime: completed
 - Target version: V0.1 Internal Validation
-- Business schema: P0-5B identity schema only (`users`, `auth_sessions`)
-- P1-1 status: P1-1A completed; persistence/migration not implemented; P1-1B awaiting explicit approval
+- Business schema: identity plus P1-1B session foundation (`users`, `auth_sessions`, `simulation_sessions`, `session_actions`, `discussion_events`)
+- P1-1 status: P1-1A～B completed; P1-1C awaiting explicit approval
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -168,11 +168,11 @@ P0-4F 已独立确认上述基础的实现、运行态与质量门均通过。P0
 - 匿名训练数据必须单独授权并去标识化；
 - 数据隔离、删除、审计和最小保留必须从首次业务 Schema 设计开始考虑。
 
-## P1-1A scoped persistence design — not implemented
+## P1-1B session persistence foundation — implemented
 
-P1-1A 冻结第一条 session foundation 的最小 schema，但没有修改 ORM、migration 或 PostgreSQL。当前 actual product tables 仍精确为 `users`、`auth_sessions`；以下内容只有在 P1-1B 获得单独批准并通过 migration gates 后才成为 implemented schema。
+P1-1A 冻结第一条 session foundation 的最小 schema；P1-1B 已按该 scope 实现 ORM、revision `f1a11d15c001` 和 PostgreSQL schema。当前 actual product tables 精确为 `users`、`auth_sessions`、`simulation_sessions`、`session_actions`、`discussion_events`。REST、WebSocket 和 command/domain service 仍未实现。
 
-### Planned `simulation_sessions`
+### Implemented `simulation_sessions`
 
 - `id UUID PRIMARY KEY`（UUIDv4）；
 - `owner_user_id UUID NOT NULL` → `users.id ON DELETE CASCADE`；
@@ -183,7 +183,7 @@ P1-1A 冻结第一条 session foundation 的最小 schema，但没有修改 ORM�
 
 不使用 PostgreSQL native enum 或只允许当前两个状态的封闭 DB check。当前 owner authorization 查询由 primary key + owner predicate 完成，不为尚不存在的 list/filter caller 提前建立 owner-only index。
 
-### Planned `session_actions`
+### Implemented `session_actions`
 
 - composite primary key `(session_id, action_id)`；
 - `session_id UUID NOT NULL` → `simulation_sessions.id ON DELETE CASCADE`；
@@ -195,7 +195,7 @@ P1-1A 冻结第一条 session foundation 的最小 schema，但没有修改 ORM�
 
 幂等记录随 session 持久化，不使用 memory-only cache，也不重复保存 command content。相同 action/type/version/digest 重试返回原 events；同 action 不同 semantic digest 返回 conflict 且无 mutation。
 
-### Planned `discussion_events`
+### Implemented `discussion_events`
 
 - composite primary key `(session_id, sequence)`；
 - `session_id UUID NOT NULL` → `simulation_sessions.id ON DELETE CASCADE`；
@@ -224,7 +224,7 @@ P1-1A 冻结第一条 session foundation 的最小 schema，但没有修改 ORM�
 
 总纲提到 `users`、题目版本、角色模板、会话、参与者、阶段、发言、讨论事件、结构化记忆、报告、证据、训练、反馈、模型调用和审计等未来领域概念。
 
-除上述 P0-5 identity schema 外，P1-1 三表是已冻结但尚未实施的 scoped design；其余仍只是长期领域导航：
+除上述 P0-5 identity schema 与 P1-1B 三表外，其余仍只是长期领域导航：
 
 - P1-1 之外实体的表名、字段、关系、索引和删除策略尚未冻结；
 - V0.1 最小实体集合仍需在 P1 业务设计中确认；
@@ -246,7 +246,7 @@ P1-1A 冻结第一条 session foundation 的最小 schema，但没有修改 ORM�
 
 - P0-5C：FastAPI lifespan/request dependency 已成为现有 async DB runtime 的第一个 application caller；真实 PostgreSQL auth integration 只使用迁移到 head 的隔离临时数据库，development DB 保持 head `4fe43b42641b` 且两张表均为 0 rows；
 - P0-5D：completed；browser closure 已实现，existing Cookie/CORS/CSRF/shared trusted-origin boundary 已生效；P1 不得创建第二套 trusted-origin config；
-- P1：`IN_PROGRESS`；P1-1A 已冻结 session/action/event 最小 persistence，P1-1B 尚未实施；题目、角色、participant/utterance、记忆和报告数据留给后续获批任务；
+- P1：`IN_PROGRESS`；P1-1A～B 已完成 session/action/event scope freeze 与 persistence/migration foundation，development database 已安全向前迁移至 `f1a11d15c001`；P1-1C 尚未开始，题目、角色、participant/utterance、记忆和报告数据留给后续获批任务；
 - P2～P4：仅随获批范围增加音频、评分训练和商业化数据。
 
 ## 与其他文档关系
