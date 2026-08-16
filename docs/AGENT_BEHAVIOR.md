@@ -3,7 +3,7 @@
 - Status: Skeleton / Baseline + P1-1 foundation boundary
 - Current phase: P1 — IN_PROGRESS
 - Target version: V0.1 Internal Validation
-- Detailed orchestrator/agent design: Not started; P1-1A～D session foundation only
+- Detailed orchestrator/agent design: Not started; P1-1A～E session foundation completed; P1-2 awaiting explicit approval
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的

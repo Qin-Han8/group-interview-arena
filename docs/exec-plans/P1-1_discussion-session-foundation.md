@@ -1,6 +1,6 @@
 # P1-1 Discussion Session Foundation Execution Plan
 
-Status: `P1 IN_PROGRESS`; `P1-1 IN_PROGRESS`; `P1-1A` through `P1-1D completed`; `P1-1E` not started and requires separate explicit approval
+Status: `P1 IN_PROGRESS`; `P1-1 DONE`; `P1-1A` through `P1-1E completed`; independent final verdict `PASS`; `P1-2` not started and requires separate explicit approval
 
 Target version: `V0.1 Internal Validation`
 
@@ -35,7 +35,7 @@ P1-1 只证明 session、persistence、transport、authentication/authorization�
 2. **P1-1B — Session persistence + migration foundation**：`completed`。已实现三张最小 product tables、ORM metadata 和线性 Alembic revision；只验证 schema/migration，不实现 REST、WebSocket 或 Web UI。
 3. **P1-1C — Backend REST + WebSocket vertical slice**：`completed`。已实现 authenticated create/snapshot、WS v1 contract、持久化 command handling、idempotency、sequence、catch-up 和安全错误；Web caller 随后的 P1-1D 才创建。
 4. **P1-1D — Web realtime caller + reconnect cross-layer validation**：`completed`。已因真实 caller 创建最小 `lib/realtime` 与 browser session UI，并以 PostgreSQL-backed Chromium 回归验证 reconnect/idempotency/ordered projection。
-5. **P1-1E — Independent final review / P1-1 closeout**：`not started`。从 committed/approved source state 独立复核完整 P1-1，不增加新业务能力；只有 PASS 后 P1-1 才可转为 `DONE`。
+5. **P1-1E — Independent final review / P1-1 closeout**：`completed`。已从 committed/approved source state 独立复核完整 P1-1，不增加新业务能力；verdict `PASS`、findings none，P1-1 已转为 `DONE`。
 
 每个子阶段都需要用户单独明确批准。P1-1D 完成后不得自动进入 P1-1E。
 
@@ -354,7 +354,7 @@ P1-1C actual-source review finding F1 identified a real network-runtime blocker:
 - Web unit/component tests、lint、format、typecheck、production build、REST OpenAPI drift and real PostgreSQL Chromium E2E pass with zero skips。
 - API regression/integration and migration gates remain green；no dependency/lockfile/CI changes unless a separately approved blocker proves unavoidable。
 
-P1-1D completion evidence: Web Vitest `35`、lint、format、typecheck、production build 与 REST OpenAPI drift 通过；API non-integration `201`、PostgreSQL integration `39`、full `240`、Ruff、format、Pyright 与 Alembic heads/current/check 通过。真实 Next/Chromium → Uvicorn WS → disposable `gia_p11d_*` PostgreSQL E2E 为 `2 passed` / zero skips，验证 opaque Cookie + trusted Origin、sequence `1` catch-up、stable `action_id` abort/replay、sequence `2`、REST reload restore、单一 durable action、events `[1, 2]` 及 DB/process/port cleanup。No dependency/lockfile、CI、backend contract、schema 或 migration change；P1-1E remains not started。
+P1-1D completion evidence: Web Vitest `37`、lint、format、typecheck、production build 与 REST OpenAPI drift 通过；API non-integration `201`、PostgreSQL integration `39`、full `240`、Ruff、format、Pyright 与 Alembic heads/current/check 通过。真实 Next/Chromium → Uvicorn WS → disposable `gia_p11d_*` PostgreSQL E2E 为 `2 passed` / zero skips，验证 opaque Cookie + trusted Origin、sequence `1` catch-up、stable `action_id` abort/replay、sequence `2`、REST reload restore、单一 durable action、events `[1, 2]` 及 DB/process/port cleanup。Actual-source review F1 reconnect-budget remediation 以 deterministic regression 证明健康恢复后新的独立断线仍可有界重连，持续失败仍有上限。No dependency/lockfile、CI、backend contract、schema 或 migration change；P1-1E subsequently completed with independent verdict `PASS`。
 
 ### P1-1E — Independent final review / closeout
 
@@ -364,11 +364,11 @@ P1-1D completion evidence: Web Vitest `35`、lint、format、typecheck、product
 
 **Steps**
 
-- [ ] Independently recover committed Git/Source of Truth baseline and review actual P1-1 diff rather than prior PASS prose。
-- [ ] Re-run migration history/schema/concurrency/idempotency/authz/Origin/error/privacy/reconnect and cleanup evidence。
-- [ ] Re-run full API/Web/PostgreSQL/Chromium quality gates required by the final changed boundary。
-- [ ] Confirm no Redis、queue、LangGraph、LLM/vendor、question CMS、participant/utterance、voice、score、payment or speculative directory scope creep。
-- [ ] Record findings; remediate and re-review any real blocker before marking P1-1 `DONE`。
+- [x] Independently recover committed Git/Source of Truth baseline and review actual P1-1 diff rather than prior PASS prose。
+- [x] Re-run migration history/schema/concurrency/idempotency/authz/Origin/error/privacy/reconnect and cleanup evidence。
+- [x] Re-run full API/Web/PostgreSQL/Chromium quality gates required by the final changed boundary。
+- [x] Confirm no Redis、queue、LangGraph、LLM/vendor、question CMS、participant/utterance、voice、score、payment or speculative directory scope creep。
+- [x] Record findings; independent verdict `PASS` with findings none; mark P1-1 `DONE`。
 
 **Acceptance**
 
@@ -450,5 +450,6 @@ Git staging、commit and push remain separate user-authorized actions in every i
 - [x] P1-1A docs/static validation completed；no runtime implementation started。
 - [x] P1-1B persistence/migration implementation and risk-matched validation completed；no REST/WS/UI implementation started。
 - [x] P1-1C backend REST/WebSocket vertical slice completed；actual-source review F1 runtime dependency blocker remediated with direct `websockets` and real Uvicorn network evidence；P1/P1-1 remain `IN_PROGRESS`。
-- [x] P1-1D Web realtime caller + reconnect cross-layer validation completed；P1/P1-1 remain `IN_PROGRESS`。
-- [ ] P1-1E not started。
+- [x] P1-1D Web realtime caller + reconnect cross-layer validation completed；actual-source review F1 reconnect-budget finding remediated with deterministic independent-disconnect and bounded-failure regressions；P1/P1-1 remained `IN_PROGRESS` pending P1-1E。
+- [x] P1-1E independently reviewed clean committed `main` at `252ca9524c459ce19d11190ae17059d55c5bd0c1`；verdict `PASS`、findings none；API `201`/`39`/`240`、Web Vitest `37`、Chromium `2 passed` zero skips、static/build/OpenAPI/Alembic gates and cleanup all passed。
+- [x] P1-1 `DONE`；P1 remains `IN_PROGRESS`；P1-2 not started / awaiting explicit user approval。

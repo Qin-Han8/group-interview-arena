@@ -1,6 +1,6 @@
 # P0 技术架构基线
 
-- Status: P0 Architecture Baseline + P1-1B persistence foundation
+- Status: P0 Architecture Baseline + P1-1 session foundation completed
 - Current phase: P1 — IN_PROGRESS
 - Architecture baseline established by: P0-2 — DONE
 - P0-3 foundation status: DONE
@@ -8,9 +8,9 @@
 - P0-5 identity boundary status: DONE
 - Most recently completed task: P0-7 independent final acceptance — PASS after two documentation findings remediation and finding-only recheck
 - P0 status: DONE; P0-1 through P0-7 completed
-- P1 status: IN_PROGRESS; P1-1A～D completed; P1-1E awaiting explicit user approval
+- P1 status: IN_PROGRESS; P1-1A～E completed; P1-1 independent verdict PASS; P1-1 DONE; P1-2 awaiting explicit user approval
 - Target version: V0.1 Internal Validation
-- Business architecture detail: P1-1 persistence, backend REST/WS/domain runtime and minimal Web realtime caller implemented
+- Business architecture detail: P1-1 persistence, backend REST/WS/domain runtime, minimal Web realtime caller and independent final review completed
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -308,7 +308,7 @@ Redis 只在多 API workers、横向扩容、跨进程 WebSocket broadcast、dis
 - P0-5D：completed；真实 browser Cookie/CORS/CSRF 闭环已通过 Chromium 验证；
 - P0-5E：completed；final outcome `PASS after findings remediation and independent recheck`；
 - P0：`DONE`；P0-1～P0-7 completed；P0-7 finding-only independent recheck `PASS`，P1 readiness `READY`；其后用户已明确批准进入 P1；
-- P1：`IN_PROGRESS`；P1-1A～D 已完成 session foundation preflight/scope freeze、persistence/migration、backend REST/WS vertical slice 与 Web realtime caller/cross-layer validation；P1-1E 尚未开始并等待明确批准，题目、角色、完整状态机、调度、记忆和基础报告仍需后续分别设计；
+- P1：`IN_PROGRESS`；P1-1A～E 已完成 session foundation preflight/scope freeze、persistence/migration、backend REST/WS vertical slice、Web realtime caller/cross-layer validation 与 independent final review；P1-1 verdict `PASS`、findings none，现为 `DONE`；P1-2 尚未开始并等待明确批准，题目、角色、完整状态机、调度、记忆和基础报告仍需后续分别设计；
 - P2 以后：只在对应阶段获批后增加语音、评分训练和商业化能力。
 
 ## 与其他文档关系

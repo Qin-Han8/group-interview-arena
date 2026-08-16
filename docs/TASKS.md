@@ -1,12 +1,12 @@
 # 当前任务清单
 
-- Status: P1 in progress; P1-1 discussion session foundation approved
-- Managed scope: P1-1 only; P1-1A～D completed; P1-1E requires separate explicit approval
-- Most recently completed task: P1-1D — `DONE`
+- Status: P1 in progress; P1-1 discussion session foundation completed
+- Managed scope: P1-1 only; P1-1A～E completed; P1-2 remains not started and requires separate explicit approval
+- Most recently completed task: P1-1E — `DONE`
 - P0-7 final outcome: initial verdict `BLOCKED` with two documentation findings; remediation completed; finding-only independent recheck `PASS`; new blockers none; P1 readiness `READY`
 - Current phase: P1 — `IN_PROGRESS`
-- Current task: P1-1 — `IN_PROGRESS`
-- Next subphase gate: P1-1E — `TODO` / not started / awaiting explicit user approval
+- Current task: P1-1 — `DONE`
+- Next subphase gate: P1-2 — `TODO` / not started / awaiting explicit user approval
 - P0 status: `DONE`; P0-1 through P0-7 completed
 - Allowed status values: `TODO` / `IN_PROGRESS` / `BLOCKED` / `DONE`
 - Related roadmap: [`ROADMAP.md`](ROADMAP.md)
@@ -342,12 +342,12 @@
 
 - ID: `P1-1`
 - 名称：Discussion session foundation
-- Status: `IN_PROGRESS`
-- Approval state：用户已明确批准进入 P1；P1-1A～D completed；P1-1E not started / awaiting separate explicit approval。
+- Status: `DONE`
+- Approval state：用户已明确批准进入 P1；P1-1A～E completed；P1-1 independent final verdict `PASS`。
 - 目标：建立 authenticated session create/snapshot、versioned WebSocket、durable action idempotency、session monotonic sequence 和 snapshot + ordered-events reconnect 的第一条文字会话 vertical slice。
 - In scope：最小 session/action/event persistence、REST create/snapshot、WS v1 command/event/error contract、opaque Cookie authentication/owner authorization、shared trusted-origin Origin validation、transaction/concurrency、deterministic regression、最小 Web caller 和最终独立验收。
 - Out of scope：question CMS/schema、participant、utterance、完整讨论状态机/调度/记忆、LLM/provider、六维评分/报告、voice/ASR/TTS、Redis、task queue、payment/entitlement/growth/industry pack。
-- Dependencies：P0 `DONE`；Accepted `ADR-003`、`ADR-005`～`ADR-015` 中相关边界；每个实施子步骤仍需用户明确批准。
+- Dependencies：P0 `DONE`；Accepted `ADR-003`、`ADR-005`～`ADR-015` 中相关边界；P1-2 及后续任务仍需用户明确批准。
 - Acceptance criteria：P1-1A～E 全部完成并经 P1-1E 独立验收后，第一条 session vertical slice 可在真实 PostgreSQL 与 browser 中证明 server authority、owner isolation、durable idempotency、race-free ordered events 和 reconnect；不得把 Deferred 能力描述为已实现。
 
 ### Substep progress
@@ -356,7 +356,7 @@
 - `P1-1B — Session persistence + migration foundation`：completed；
 - `P1-1C — Backend REST + WebSocket vertical slice`：completed；
 - `P1-1D — Web realtime caller + reconnect cross-layer validation`：completed；
-- `P1-1E — Independent final review / P1-1 closeout`：`TODO`；not started。
+- `P1-1E — Independent final review / P1-1 closeout`：completed；independent verdict `PASS`；findings none。
 
 ### P1-1A completion note
 
@@ -394,8 +394,17 @@
 - pending `session.abort` 在内存中保留稳定 UUIDv4 `action_id` 并在 reconnect 后重发；matching duplicate replay 可确认 pending action 但不重复应用 mutation，client 仅应用精确 next sequence；
 - sequence gap 会停止应用 incrementals、重新加载 authoritative REST snapshot 并以新 watermark 重连；connection generation 与 React cleanup 阻止 stale socket/remount 覆盖新 state 或产生双连接；
 - disposable `gia_p11d_*` PostgreSQL + 真实 Next/Chromium/Uvicorn E2E 以 opaque Cookie 和 trusted Origin 验证 create、sequence `1` catch-up、abort sequence `2`、相同 action replay、REST reload restore；数据库精确为一个 action 与 events `[1, 2]`，2 个 Chromium tests zero skips，进程、端口和临时库清理完成；
-- API non-integration `201`、PostgreSQL integration `39`、API full `240`、Web Vitest `35`、Ruff、format、Pyright、Web lint/format/typecheck/build、Alembic heads/current/check 与 REST OpenAPI drift 均通过；无 dependency/lockfile、CI、backend contract、schema 或 migration 变化；
+- actual-source review finding F1 的 reconnect budget 已改为有界的连续恢复失败预算；健康连接稳定后会重置预算，独立的后续断线可再次有界重连，rapid open-close 失败仍不会形成无限循环；deterministic regressions 已覆盖成功恢复但无 formal event 后的第二次断线与持续失败上限；
+- API non-integration `201`、PostgreSQL integration `39`、API full `240`、Web Vitest `37`、Ruff、format、Pyright、Web lint/format/typecheck/build、Alembic heads/current/check 与 REST OpenAPI drift 均通过；无 dependency/lockfile、CI、backend contract、schema 或 migration 变化；
 - P1 / P1-1 保持 `IN_PROGRESS`；P1-1E 未开始，不自动进入独立 final review。
+
+### P1-1E completion note
+
+- 从 clean committed `main` HEAD `252ca9524c459ce19d11190ae17059d55c5bd0c1` 独立恢复 Source of Truth，并重新审计 P1-1A～D actual-source diff；不依赖此前 PASS 或 GitHub CI 结论；
+- 三表 migration/schema、locked-row sequence allocation、durable idempotency/rollback、REST auth/CSRF/owner nondisclosure、WS Origin/auth/commit-before-send/catch-up、安全 errors/logging、browser stable action/replay/gap/reconnect/stale-socket 边界均独立复核通过；未发现 blocker 或 material finding；
+- `uv sync --frozen`、`uv lock --check`、Ruff、format、Pyright、API non-integration `201`、PostgreSQL integration `39`、API full `240`、Web lint/format/typecheck、Vitest `37`、production build、OpenAPI drift、Alembic single-head/current/drift 全部通过；
+- disposable `gia_p11d_*` PostgreSQL + 真实 Next/Chromium/Uvicorn E2E 为 `2 passed` / zero skips，并复证一个 durable action、events `[1, 2]`、REST reload restore；测试后临时数据库残留为 `0`、端口 `3000`/`8000` clean、生成测试产物已清理；
+- development PostgreSQL 在独立验收前后均为 revision `f1a11d15c001`、精确五张 product tables、各表 `0` rows；P1-1 转为 `DONE`，P1 保持 `IN_PROGRESS`，P1-2 未开始并等待用户明确批准。
 
 ## 任务更新规则
 

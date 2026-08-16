@@ -1,13 +1,13 @@
 # API 与事件技术基线
 
-- Status: P0 API Architecture Baseline + P1-1 contract / P1-1B persistence foundation
+- Status: P0 API Architecture Baseline + P1-1 session foundation completed
 - Current phase: P1 — IN_PROGRESS
 - API architecture baseline established by: P0-2 — DONE
 - Target version: V0.1 Internal Validation
 - Implemented REST contracts: `GET /health`, `POST /auth/register`, `POST /auth/login`, `POST /auth/logout`, `GET /auth/me`, `POST /sessions`, `GET /sessions/{session_id}`
 - Implemented realtime contract: `/ws/sessions/{session_id}?after_sequence=` v1 scoped session channel
 - P0-5 browser CORS/CSRF/Web closure: P0-5D completed
-- P1-1 contract: scoped/frozen by P1-1A; P1-1B persistence, P1-1C REST/WebSocket runtime and P1-1D Web realtime caller implemented
+- P1-1 contract: scoped/frozen by P1-1A; P1-1B persistence, P1-1C REST/WebSocket runtime, P1-1D Web realtime caller and P1-1E independent final review completed
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -245,9 +245,9 @@ P0-3D 已完成最小 API、OpenAPI authority、typed config、request correlati
 
 ### P1
 
-- `IN_PROGRESS`；P1-1A 已细化并冻结第一条文字会话 REST/WS scoped contract，P1-1B～C 已实现 persistence 与 backend REST/WS；
-- P1-1D 仍需单独批准后实现 Web caller 与 browser cross-layer reconnect regression；
-- P1-1E 独立验收后才可声称该 foundation 已实现。
+- `IN_PROGRESS`；P1-1A～D 已完成第一条文字会话 scoped contract、persistence、backend REST/WS、Web caller 与 browser cross-layer reconnect regression；
+- P1-1E independent final verdict `PASS`、findings none；P1-1 session foundation 现为 `DONE`；
+- P1-2 未开始并等待用户明确批准，不由 P1-1 closeout 自动进入。
 
 ### P2 and later
 
