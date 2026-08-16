@@ -1,4 +1,4 @@
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import Annotated
 
 from fastapi import Header, Request, status
@@ -33,11 +33,20 @@ def _csrf_rejected() -> ApiError:
     )
 
 
+def has_exact_trusted_origin(
+    origin_values: Sequence[str],
+    trusted_origins: tuple[str, ...],
+) -> bool:
+    return (
+        len(origin_values) == 1
+        and origin_values[0] != "null"
+        and origin_values[0] in frozenset(trusted_origins)
+    )
+
+
 def create_browser_csrf_guard(
     trusted_origins: tuple[str, ...],
 ) -> Callable[..., None]:
-    trusted_origin_set = frozenset(trusted_origins)
-
     def require_browser_csrf(
         request: Request,
         csrf_header: CsrfHeader = None,
@@ -45,9 +54,7 @@ def create_browser_csrf_guard(
         origins = request.headers.getlist("origin")
         csrf_headers = request.headers.getlist(CSRF_HEADER_NAME)
         if (
-            len(origins) != 1
-            or origins[0] == "null"
-            or origins[0] not in trusted_origin_set
+            not has_exact_trusted_origin(origins, trusted_origins)
             or len(csrf_headers) != 1
             or csrf_header != CSRF_HEADER_VALUE
         ):

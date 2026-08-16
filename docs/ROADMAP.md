@@ -2,11 +2,11 @@
 
 - Status: Active baseline
 - Most recently completed development phase: P0 — `DONE`
-- Most recently completed task: P1-1B — `DONE`
+- Most recently completed task: P1-1C — `DONE`
 - P0-7 final outcome: initial `BLOCKED`; two documentation findings remediated; finding-only independent recheck `PASS`; P1 readiness `READY`
 - Current phase: P1 — `IN_PROGRESS`
 - Current task: P1-1 — `IN_PROGRESS`
-- Next subphase gate: P1-1C — `NOT_STARTED` / awaiting explicit user approval
+- Next subphase gate: P1-1D — `NOT_STARTED` / awaiting explicit user approval
 - P0 status: `DONE`; P0-1 through P0-7 completed
 - Target product version: V0.1 — Internal Validation
 - Source: [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) §30–31
@@ -62,11 +62,11 @@ P1 已正式启动，但当前只展开 `P1-1 — Discussion session foundation`
 
 - `P1-1A — Preflight / scope freeze / execution plan`：completed；
 - `P1-1B — Session persistence + migration foundation`：completed；
-- `P1-1C — Backend REST + WebSocket vertical slice`：not started；
+- `P1-1C — Backend REST + WebSocket vertical slice`：completed；
 - `P1-1D — Web realtime caller + reconnect cross-layer validation`：not started；
 - `P1-1E — Independent final review / P1-1 closeout`：not started。
 
-P1-1A 完成 docs-only plan/scope freeze；P1-1B 已完成三表 ORM/migration 与真实 PostgreSQL persistence foundation，但没有实现 REST、WebSocket、domain command service 或 Web caller。详细计划见 [`exec-plans/P1-1_discussion-session-foundation.md`](exec-plans/P1-1_discussion-session-foundation.md)。P1-1C～E 以及题目、participant/utterance、完整状态机/调度/记忆、AI 和基础报告仍需后续分别批准，不自动开始。
+P1-1A 完成 docs-only plan/scope freeze；P1-1B 完成三表 ORM/migration 与真实 PostgreSQL persistence foundation；P1-1C 已完成 authenticated REST create/snapshot、versioned WS v1、durable action idempotency、locked-row sequence allocation、ordered catch-up/reconnect 与安全 realtime errors/logging。详细计划见 [`exec-plans/P1-1_discussion-session-foundation.md`](exec-plans/P1-1_discussion-session-foundation.md)。Web caller 留给 P1-1D，最终独立验收留给 P1-1E；题目、participant/utterance、完整状态机/调度/记忆、AI 和基础报告仍需后续分别批准，不自动开始。
 
 ## 5. 产品版本
 

@@ -49,7 +49,10 @@ async def _post(
         return await client.post(path, json=AUTH_PAYLOAD, headers=headers)
 
 
-@pytest.mark.parametrize("path", ["/auth/register", "/auth/login", "/auth/logout"])
+@pytest.mark.parametrize(
+    "path",
+    ["/auth/register", "/auth/login", "/auth/logout", "/sessions"],
+)
 @pytest.mark.parametrize(
     "headers",
     [
@@ -99,7 +102,7 @@ def test_me_does_not_require_browser_csrf_headers() -> None:
 def test_openapi_marks_csrf_header_required_on_unsafe_auth_routes() -> None:
     schema = _application().openapi()
 
-    for path in ("/auth/register", "/auth/login", "/auth/logout"):
+    for path in ("/auth/register", "/auth/login", "/auth/logout", "/sessions"):
         operation = schema["paths"][path]["post"]
         parameter = next(
             item for item in operation["parameters"] if item["name"] == "X-GIA-CSRF"

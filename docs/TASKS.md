@@ -1,12 +1,12 @@
 # 当前任务清单
 
 - Status: P1 in progress; P1-1 discussion session foundation approved
-- Managed scope: P1-1 only; P1-1A～B completed; P1-1C～E require separate explicit approval
-- Most recently completed task: P1-1B — `DONE`
+- Managed scope: P1-1 only; P1-1A～C completed; P1-1D～E require separate explicit approval
+- Most recently completed task: P1-1C — `DONE`
 - P0-7 final outcome: initial verdict `BLOCKED` with two documentation findings; remediation completed; finding-only independent recheck `PASS`; new blockers none; P1 readiness `READY`
 - Current phase: P1 — `IN_PROGRESS`
 - Current task: P1-1 — `IN_PROGRESS`
-- Next subphase gate: P1-1C — `TODO` / not started / awaiting explicit user approval
+- Next subphase gate: P1-1D — `TODO` / not started / awaiting explicit user approval
 - P0 status: `DONE`; P0-1 through P0-7 completed
 - Allowed status values: `TODO` / `IN_PROGRESS` / `BLOCKED` / `DONE`
 - Related roadmap: [`ROADMAP.md`](ROADMAP.md)
@@ -343,7 +343,7 @@
 - ID: `P1-1`
 - 名称：Discussion session foundation
 - Status: `IN_PROGRESS`
-- Approval state：用户已明确批准进入 P1；P1-1A～B completed；P1-1C～E not started / awaiting separate explicit approval。
+- Approval state：用户已明确批准进入 P1；P1-1A～C completed；P1-1D～E not started / awaiting separate explicit approval。
 - 目标：建立 authenticated session create/snapshot、versioned WebSocket、durable action idempotency、session monotonic sequence 和 snapshot + ordered-events reconnect 的第一条文字会话 vertical slice。
 - In scope：最小 session/action/event persistence、REST create/snapshot、WS v1 command/event/error contract、opaque Cookie authentication/owner authorization、shared trusted-origin Origin validation、transaction/concurrency、deterministic regression、最小 Web caller 和最终独立验收。
 - Out of scope：question CMS/schema、participant、utterance、完整讨论状态机/调度/记忆、LLM/provider、六维评分/报告、voice/ASR/TTS、Redis、task queue、payment/entitlement/growth/industry pack。
@@ -354,7 +354,7 @@
 
 - `P1-1A — Preflight / scope freeze / execution plan`：completed；docs-only；未修改 runtime/tests/migration/schema/dependency/CI；
 - `P1-1B — Session persistence + migration foundation`：completed；
-- `P1-1C — Backend REST + WebSocket vertical slice`：`TODO`；not started；
+- `P1-1C — Backend REST + WebSocket vertical slice`：completed；
 - `P1-1D — Web realtime caller + reconnect cross-layer validation`：`TODO`；not started；
 - `P1-1E — Independent final review / P1-1 closeout`：`TODO`；not started。
 
@@ -373,9 +373,20 @@
 - 新增 `simulation_sessions`、`session_actions`、`discussion_events` 三张精确 scoped tables 及 ORM metadata；状态为可演进 `VARCHAR`，没有 PostgreSQL native enum、question/participant/utterance 或其他 speculative schema；
 - revision `f1a11d15c001` 线性承接 immutable identity head `4fe43b42641b`，保持 single head；fresh/repeat/check、downgrade-to-identity/re-upgrade 和 exact PostgreSQL catalog assertions 通过；
 - `(session_id, action_id)` composite primary key、`(session_id, sequence)` composite primary key、nullable composite causation foreign key 与 replay index 建立 durable idempotency、ordered events 和一 action 多 events 的 persistence boundary；
-- 真实 PostgreSQL regression 证明 session row `FOR UPDATE` + durable `last_sequence` 可串行化并发 sequence allocation，transaction rollback 不留下 action/event/watermark partial state；P1-1C 才实现 command/domain service；
+- 真实 PostgreSQL regression 证明 session row `FOR UPDATE` + durable `last_sequence` 可串行化并发 sequence allocation，transaction rollback 不留下 action/event/watermark partial state；command/domain service 已在其后的 P1-1C 实现；
 - development database 经 exact-name、identity-head、two-table schema 与 row-count read-only preflight 后只向前迁移至 `f1a11d15c001`；repeat upgrade 为 no-op，未 downgrade development；
-- P1 / P1-1 保持 `IN_PROGRESS`；P1-1C～E 未开始且继续要求 separate explicit approval。
+- P1 / P1-1 保持 `IN_PROGRESS`；P1-1C 当时尚未开始，其后已完成；P1-1D～E 继续要求 separate explicit approval。
+
+### P1-1C completion note
+
+- 实现 authenticated `POST /sessions` 与 owner-only `GET /sessions/{session_id}`；创建 transaction 原子写入 `CREATED` session 与 sequence `1` 的 `session.created`，snapshot 精确返回五个冻结字段，missing/non-owner 共用 `404 SESSION_NOT_FOUND`；FastAPI OpenAPI 与 Web generated derivative 已同步；
+- 新增轻量 `modules/discussion_sessions` domain/contracts/service/routes/realtime 边界；纯 domain 确定性实现 `CREATED -> ABORTED_USER`，唯一 v1 command `session.abort` 产生 `session.state_changed`，未创建 repository/interface/factory/provider/event bus；
+- command service 在短 transaction 内以 owner predicate 锁定 session row，先检查 durable `(session_id, action_id)`，再推进 state/`last_sequence` 并写入一到多条 contiguous events；duplicate 重放原 stored events，semantic conflict 与 invalid state 均不产生 mutation；没有 `MAX(sequence)+1`、process-local lock 或 network-before-commit；
+- `/ws/sessions/{session_id}?after_sequence=` 复用 opaque `gia_session` current-user lookup 和 `Settings.cors_origins` exact Origin Source of Truth，在 accept 前验证 auth/owner；实现 ordered PostgreSQL catch-up、ahead reload error、durable duplicate/lost-send reconnect、recoverable domain errors、protocol `1008` 与 internal `1011`；只向 originating connection 投递；
+- realtime logs 只增加 validated UUIDv4 `session_id`/`connection_id`/`action_id` 与 positive sequence；negative tests 证明 payload、Cookie/token、Origin、raw path/query 和 exception sentinel 不进入 safe errors/application logs；未增加 WebSocket tracing propagation；
+- API unit `201`、PostgreSQL integration `38`、API full `239`、Ruff、format、Pyright、Alembic single-head/current/drift、Web lint/format/typecheck/Vitest `16`/build 与 OpenAPI drift 均通过；没有 schema/migration、CI 或 Web `lib/realtime` 修改；
+- actual-source review finding F1 发现 bare Uvicorn 缺少真实 WebSocket protocol backend；获批 finding-only exception 以 direct `websockets>=16.0,<17` 和 frozen lock update 修复，并用 disposable PostgreSQL + 真实 Uvicorn 进程验证 Upgrade、catch-up 与 `session.abort`；未引入 `uvicorn[standard]` extras，也未改变 REST/WS/domain contract；
+- P1 / P1-1 保持 `IN_PROGRESS`；P1-1D～E 未开始，不自动进入 P1-1D。
 
 ## 任务更新规则
 

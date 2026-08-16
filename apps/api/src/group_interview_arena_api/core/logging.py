@@ -3,6 +3,7 @@ import logging
 import sys
 from datetime import UTC, datetime
 from typing import cast
+from uuid import UUID
 
 from opentelemetry import trace
 
@@ -21,7 +22,23 @@ _OPTIONAL_FIELDS = (
     "status_code",
     "duration_ms",
     "exception_category",
+    "session_id",
+    "connection_id",
+    "action_id",
+    "sequence",
 )
+
+
+def _validated_uuid4(value: str | None) -> str | None:
+    if value is None:
+        return None
+    try:
+        parsed = UUID(value)
+    except ValueError:
+        return None
+    if parsed.version != 4 or str(parsed) != value:
+        return None
+    return value
 
 
 def _active_trace_fields() -> dict[str, str]:
@@ -83,6 +100,10 @@ def log_event(
     status_code: int | None = None,
     duration_ms: float | None = None,
     exception_category: str | None = None,
+    session_id: str | None = None,
+    connection_id: str | None = None,
+    action_id: str | None = None,
+    sequence: int | None = None,
 ) -> None:
     extra: dict[str, object] = {"event": event}
     optional_fields: dict[str, object | None] = {
@@ -93,6 +114,10 @@ def log_event(
         "status_code": status_code,
         "duration_ms": duration_ms,
         "exception_category": exception_category,
+        "session_id": _validated_uuid4(session_id),
+        "connection_id": _validated_uuid4(connection_id),
+        "action_id": _validated_uuid4(action_id),
+        "sequence": sequence if isinstance(sequence, int) and sequence > 0 else None,
     }
     extra.update(
         {field: value for field, value in optional_fields.items() if value is not None}

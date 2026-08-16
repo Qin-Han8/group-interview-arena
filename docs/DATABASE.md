@@ -1,6 +1,6 @@
 # 数据库技术基线
 
-- Status: P0 Data Architecture Baseline + P1-1B session persistence foundation
+- Status: P0 Data Architecture Baseline + P1-1B persistence / P1-1C transaction callers
 - Current phase: P1 — IN_PROGRESS
 - Data architecture baseline established by: P0-2 — DONE
 - Local PostgreSQL infrastructure: P0-4B — completed
@@ -13,13 +13,13 @@
 - P0-5B identity persistence: completed
 - P0-5C backend auth runtime: completed
 - Target version: V0.1 Internal Validation
-- Business schema: identity plus P1-1B session foundation (`users`, `auth_sessions`, `simulation_sessions`, `session_actions`, `discussion_events`)
-- P1-1 status: P1-1A～B completed; P1-1C awaiting explicit approval
+- Business schema: identity plus P1-1 session foundation (`users`, `auth_sessions`, `simulation_sessions`, `session_actions`, `discussion_events`)
+- P1-1 status: P1-1A～C completed; P1-1D awaiting explicit approval
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
 
-本文件记录 P0-2 已批准的数据技术基线、P0-4 完成状态，以及 P0-5B 已实现的首批 identity persistence。P0-4B～P0-4F 已完成本地 PostgreSQL、SQLAlchemy async/psycopg 3、Alembic 与隔离 integration foundation；P0-5B 在该基础上建立 `users`、`auth_sessions`、第二个 migration revision，并首次安全迁移 development database。除这两张 identity table 外仍无其他 product table。
+本文件记录 P0-2 已批准的数据技术基线、P0-4 完成状态、P0-5 identity persistence，以及 P1-1B～C session persistence 与真实 transaction callers。当前 product tables 精确为 `users`、`auth_sessions`、`simulation_sessions`、`session_actions`、`discussion_events`，Alembic single head 保持 `f1a11d15c001`。
 
 正式决策见 [`DECISIONS.md`](DECISIONS.md) `ADR-005`、`ADR-010`、`ADR-013`、`ADR-015`。
 
@@ -170,7 +170,15 @@ P0-4F 已独立确认上述基础的实现、运行态与质量门均通过。P0
 
 ## P1-1B session persistence foundation — implemented
 
-P1-1A 冻结第一条 session foundation 的最小 schema；P1-1B 已按该 scope 实现 ORM、revision `f1a11d15c001` 和 PostgreSQL schema。当前 actual product tables 精确为 `users`、`auth_sessions`、`simulation_sessions`、`session_actions`、`discussion_events`。REST、WebSocket 和 command/domain service 仍未实现。
+P1-1A 冻结第一条 session foundation 的最小 schema；P1-1B 已按该 scope 实现 ORM、revision `f1a11d15c001` 和 PostgreSQL schema。当前 actual product tables 精确为 `users`、`auth_sessions`、`simulation_sessions`、`session_actions`、`discussion_events`。P1-1C 已在不改变 schema/migration 的前提下实现 REST、WebSocket 和 command/domain transaction callers。
+
+### P1-1C implemented transaction callers
+
+- session create 在单一 transaction 内写入 session、durable `last_sequence=1` 与 `session.created`；
+- command transaction 以 owner predicate `SELECT ... FOR UPDATE` 锁定 aggregate row，先检查 `(session_id, action_id)`，再验证 state、写入 action、推进 state/watermark 并插入连续一到多条 events；
+- duplicate semantic action 从 `(session_id, causation_action_id, sequence)` replay index 读取全部 stored events，保留原 sequence/occurred_at；conflict/invalid state 不写入 action/event/watermark；
+- network send 发生在 transaction commit 后；send failure 由后续 PostgreSQL catch-up 恢复；每次 authentication/catch-up/command 使用短 session，WebSocket connection 不持有长期 transaction；
+- P1-1C 没有新增 table/column/index/constraint/revision，Alembic head 与 exact five-table schema 保持不变。
 
 ### Implemented `simulation_sessions`
 
@@ -246,7 +254,7 @@ P1-1A 冻结第一条 session foundation 的最小 schema；P1-1B 已按该 scop
 
 - P0-5C：FastAPI lifespan/request dependency 已成为现有 async DB runtime 的第一个 application caller；真实 PostgreSQL auth integration 只使用迁移到 head 的隔离临时数据库，development DB 保持 head `4fe43b42641b` 且两张表均为 0 rows；
 - P0-5D：completed；browser closure 已实现，existing Cookie/CORS/CSRF/shared trusted-origin boundary 已生效；P1 不得创建第二套 trusted-origin config；
-- P1：`IN_PROGRESS`；P1-1A～B 已完成 session/action/event scope freeze 与 persistence/migration foundation，development database 已安全向前迁移至 `f1a11d15c001`；P1-1C 尚未开始，题目、角色、participant/utterance、记忆和报告数据留给后续获批任务；
+- P1：`IN_PROGRESS`；P1-1A～C 已完成 session/action/event scope freeze、persistence/migration foundation 与 transaction callers，development database 保持 `f1a11d15c001`；P1-1D 尚未开始，题目、角色、participant/utterance、记忆和报告数据留给后续获批任务；
 - P2～P4：仅随获批范围增加音频、评分训练和商业化数据。
 
 ## 与其他文档关系

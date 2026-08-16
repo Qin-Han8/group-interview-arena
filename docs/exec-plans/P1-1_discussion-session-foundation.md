@@ -1,6 +1,6 @@
 # P1-1 Discussion Session Foundation Execution Plan
 
-Status: `P1 IN_PROGRESS`; `P1-1 IN_PROGRESS`; `P1-1A` and `P1-1B completed`; `P1-1C` through `P1-1E` not started and require separate explicit approval
+Status: `P1 IN_PROGRESS`; `P1-1 IN_PROGRESS`; `P1-1A` through `P1-1C completed`; `P1-1D` through `P1-1E` not started and require separate explicit approval
 
 Target version: `V0.1 Internal Validation`
 
@@ -33,7 +33,7 @@ P1-1 只证明 session、persistence、transport、authentication/authorization�
 
 1. **P1-1A — Preflight / scope freeze / execution plan**：`completed`。只冻结本计划和同步 current-state 文档；不修改 runtime、tests、migration、schema、dependencies、lockfiles 或 CI。
 2. **P1-1B — Session persistence + migration foundation**：`completed`。已实现三张最小 product tables、ORM metadata 和线性 Alembic revision；只验证 schema/migration，不实现 REST、WebSocket 或 Web UI。
-3. **P1-1C — Backend REST + WebSocket vertical slice**：`not started`。实现 authenticated create/snapshot、WS v1 contract、持久化 command handling、idempotency、sequence、catch-up 和安全错误；不实现 Web caller。
+3. **P1-1C — Backend REST + WebSocket vertical slice**：`completed`。已实现 authenticated create/snapshot、WS v1 contract、持久化 command handling、idempotency、sequence、catch-up 和安全错误；未实现 Web caller。
 4. **P1-1D — Web realtime caller + reconnect cross-layer validation**：`not started`。只有此时因真实 caller 创建 `lib/realtime`，建立最小 browser session UI 和 PostgreSQL-backed Chromium 回归。
 5. **P1-1E — Independent final review / P1-1 closeout**：`not started`。从 committed/approved source state 独立复核完整 P1-1，不增加新业务能力；只有 PASS 后 P1-1 才可转为 `DONE`。
 
@@ -305,16 +305,16 @@ P1-1 only promises delivery to the originating connection plus reconnect catch-u
 
 **Steps**
 
-- [ ] Write failing pure-domain tests for `CREATED -> ABORTED_USER`, invalid state, and a list-valued event outcome。
-- [ ] Implement deterministic domain types/transition without I/O or framework coupling。
-- [ ] Write failing real PostgreSQL service tests for creation event sequence `1`, concurrent identical action, concurrent distinct actions, digest conflict, rollback and multi-event contiguous reservation capability。
-- [ ] Implement the row-lock/transaction command service; network send remains outside the service transaction。
-- [ ] Write failing REST tests for auth、shared CSRF、owner-only create/snapshot、safe 401/404 and OpenAPI models。
-- [ ] Implement `POST /sessions` and `GET /sessions/{id}` and update the generated REST derivative。
-- [ ] Write failing WS contract/handshake tests for Cookie auth、exact shared Origin、ownership、version/type/schema validation and safe errors。
-- [ ] Implement WS v1 accept/catch-up/receive/commit/send loop with a fresh short DB session per operation。
-- [ ] Write and pass duplicate retry、lost-send reconnect、ordered catch-up、replay ignore、ahead watermark and sequence-gap regression tests。
-- [ ] Add safe realtime logging fields and sentinel negative tests; do not expand trace collection without the bounded allowlist above。
+- [x] Write failing pure-domain tests for `CREATED -> ABORTED_USER`, invalid state, and a list-valued event outcome。
+- [x] Implement deterministic domain types/transition without I/O or framework coupling。
+- [x] Write failing real PostgreSQL service tests for creation event sequence `1`, concurrent identical action, concurrent distinct actions, digest conflict, rollback and multi-event contiguous reservation capability。
+- [x] Implement the row-lock/transaction command service; network send remains outside the service transaction。
+- [x] Write failing REST tests for auth、shared CSRF、owner-only create/snapshot、safe 401/404 and OpenAPI models。
+- [x] Implement `POST /sessions` and `GET /sessions/{id}` and update the generated REST derivative。
+- [x] Write failing WS contract/handshake tests for Cookie auth、exact shared Origin、ownership、version/type/schema validation and safe errors。
+- [x] Implement WS v1 accept/catch-up/receive/commit/send loop with a fresh short DB session per operation。
+- [x] Write and pass duplicate retry、lost-send reconnect、ordered catch-up、replay ignore、ahead watermark and sequence-gap regression tests。
+- [x] Add safe realtime logging fields and sentinel negative tests; do not expand trace collection without the bounded allowlist above。
 
 **Acceptance**
 
@@ -323,7 +323,11 @@ P1-1 only promises delivery to the originating connection plus reconnect catch-u
 - No duplicate `(session_id, sequence)` and no gap among committed formal events；no `MAX()+1` or memory-only idempotency。
 - Non-owner cannot infer or connect to another user's session。
 - API unit/integration/full suites、Ruff、format、Pyright、migration checks、OpenAPI drift and `git diff --check` pass。
-- No Web UI/realtime caller, provider, Redis, queue, LLM, dependency or CI changes。
+- No Web UI/realtime caller, provider, Redis, queue, LLM or CI changes。The actual-source review blocker exception below permits only the direct WebSocket network-runtime dependency and its lockfile update。
+
+P1-1C completion evidence: API unit `201`、PostgreSQL integration `38`、API full `239`、Ruff、format、Pyright、Alembic heads/current/check、Web lint/format/typecheck/Vitest `16`/build 与 REST OpenAPI drift 均通过；schema/migration、CI 与 Web `lib/realtime` 未修改。P1-1D 保持 not started。
+
+P1-1C actual-source review finding F1 identified a real network-runtime blocker: the project declared bare Uvicorn but neither `websockets` nor `wsproto`, so Starlette `TestClient` coverage could not prove a real Uvicorn WebSocket Upgrade。The approved finding-only exception adds direct `websockets>=16.0,<17` plus the frozen lock update and validates the existing REST/WS flow against a real Uvicorn process and disposable PostgreSQL database。This does not change the frozen contract or architecture scope and does not add Uvicorn `standard` extras。
 
 ### P1-1D — Web realtime caller + reconnect cross-layer validation
 
@@ -443,6 +447,6 @@ Git staging、commit and push remain separate user-authorized actions in every i
 - [x] P1-1 scope、schema、REST/WS contract、idempotency、sequence、reconnect、security and B～E acceptance frozen。
 - [x] P1-1A docs/static validation completed；no runtime implementation started。
 - [x] P1-1B persistence/migration implementation and risk-matched validation completed；no REST/WS/UI implementation started。
-- [ ] P1-1C not started。
+- [x] P1-1C backend REST/WebSocket vertical slice completed；actual-source review F1 runtime dependency blocker remediated with direct `websockets` and real Uvicorn network evidence；P1/P1-1 remain `IN_PROGRESS`。
 - [ ] P1-1D not started。
 - [ ] P1-1E not started。

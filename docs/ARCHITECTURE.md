@@ -8,9 +8,9 @@
 - P0-5 identity boundary status: DONE
 - Most recently completed task: P0-7 independent final acceptance — PASS after two documentation findings remediation and finding-only recheck
 - P0 status: DONE; P0-1 through P0-7 completed
-- P1 status: IN_PROGRESS; P1-1A～B completed; P1-1C awaiting explicit user approval
+- P1 status: IN_PROGRESS; P1-1A～C completed; P1-1D awaiting explicit user approval
 - Target version: V0.1 Internal Validation
-- Business architecture detail: P1-1 persistence/migration implemented; transport/domain runtime not implemented
+- Business architecture detail: P1-1 persistence plus backend REST/WS/domain runtime implemented; Web caller not implemented
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -93,7 +93,7 @@ providers/    provider adapters that have actual callers
 
 禁止 full DDD ceremony、repository/service/controller 多层空壳、global giant `services.py`，以及提前创建未来全部 module。
 
-P0-3D 已实现的 API 技术基础使用 CPython `3.14.7`、uv `0.12.3`、FastAPI `0.141.1`、Pydantic `2.13.4`、pydantic-settings `2.15.0` 与 Uvicorn `0.52.1`。项目采用 packaged `src/group_interview_arena_api` layout；`api/` 当前只有 health transport，`core/` 包含 typed settings、安全错误语义、标准库 JSON logging 与 UUIDv4 `request_id`。P0-4C 已建立 `db/` persistence infrastructure，使用 SQLAlchemy `2.0.52`、psycopg/psycopg-binary `3.3.4`、`postgresql+psycopg://`、`DeclarativeBase`、async engine/session factory 与显式 dispose helper；P0-4D 已加入 Alembic `1.18.5` async migration environment 与 zero-op baseline revision。业务 `modules/`、`providers/` 与 WebSocket 目录仍未创建。
+P0-3D 已实现的 API 技术基础使用 CPython `3.14.7`、uv `0.12.3`、FastAPI `0.141.1`、Pydantic `2.13.4`、pydantic-settings `2.15.0` 与 Uvicorn `0.52.1`。项目采用 packaged `src/group_interview_arena_api` layout；`api/` 当前只有 health transport，`core/` 包含 typed settings、安全错误语义、标准库 JSON logging 与 UUIDv4 `request_id`。P0-4C 已建立 `db/` persistence infrastructure，使用 SQLAlchemy `2.0.52`、psycopg/psycopg-binary `3.3.4`、`postgresql+psycopg://`、`DeclarativeBase`、async engine/session factory 与显式 dispose helper；P0-4D 已加入 Alembic `1.18.5` async migration environment 与 zero-op baseline revision。P1-1C 已因真实 session caller 创建 `modules/discussion_sessions` 与 WebSocket transport，并在 actual-source review finding F1 remediation 中加入 direct `websockets>=16.0,<17` 作为 Uvicorn WebSocket network runtime backend；未采用 `uvicorn[standard]`，因此没有引入无 caller 的 loop、HTTP parser 或 file-watcher extras。`providers/` 仍未创建。
 
 P0-6D 为 `core/` 增加 OpenTelemetry API/SDK/OTLP HTTP exporter `1.44.0` tracing foundation；它是 cross-cutting infrastructure，不是业务 provider adapter。实现不设置 process-global provider，不采用 contrib auto-instrumentation，并保持默认 disabled。
 
@@ -223,16 +223,16 @@ FastAPI OpenAPI 是 REST contract 的 Source of Truth。P0-3E 从运行中的 `/
 
 WebSocket 使用独立版本化事件契约，至少表达 event type、schema version、session identity、ordering sequence、occurrence timestamp 和 action identity。P1-1A 已冻结第一条 vertical slice 的 v1 scoped contract；它不等于完整 P1/P2 事件集合，详见 [`exec-plans/P1-1_discussion-session-foundation.md`](exec-plans/P1-1_discussion-session-foundation.md)。
 
-### P1-1 session architecture — persistence implemented, transport/domain pending
+### P1-1 session architecture — backend vertical slice implemented
 
 - P1-1 aggregate root 为 `simulation_session`；FastAPI domain/service 是状态和 command outcome authority，PostgreSQL 是 session/action/event persistence authority，Browser 只是 snapshot + event projection。
 - 首批 product tables `simulation_sessions`、`session_actions`、`discussion_events` 已由 P1-1B 实现；加既有 `users`、`auth_sessions` 后，actual product table set 精确为五张，Alembic single head 为 `f1a11d15c001`。
-- REST scoped contract 为 authenticated `POST /sessions` 与 owner-only `GET /sessions/{session_id}`；WebSocket scoped endpoint 为 `/ws/sessions/{session_id}?after_sequence=`。
+- REST scoped contract 为 authenticated `POST /sessions` 与 owner-only `GET /sessions/{session_id}`；WebSocket scoped endpoint 为 `/ws/sessions/{session_id}?after_sequence=`；三者已由 P1-1C 注册到 FastAPI。
 - 创建 session 产生 `session.created`；唯一 v1 business command `session.abort` 产生 `session.state_changed`。该最小动作不依赖 future question/participant/utterance，也不创建 test-only `noop` 产品行为。
 - `action_id` 在单一 session 内持久化幂等；正式 events 使用 session row lock + durable counter 分配连续 sequence，不使用 `MAX(sequence)+1`。action 到 event 为一对多 causation 边界。
 - reconnect 使用 REST snapshot `last_sequence` 和后续 ordered WS events；gap 必须重新加载 snapshot，client local state 不得补写 authoritative state。
 - WS Cookie authentication 复用现有 identity/session service；Origin exact validation 继续消费 `Settings.cors_origins`，不建立第二套 browser trusted-origin config。
-- P1-1C 只在真实 realtime log caller 出现时增加 validated `session_id`/server-generated `connection_id`；payload、Cookie、Origin、raw path/query、user identity 和 exception detail 不进入 logs/spans/errors。
+- P1-1C 已随真实 realtime callers 增加 validated `session_id`/server-generated `connection_id`/validated `action_id`/positive sequence；payload、Cookie、Origin、raw path/query、user identity 和 exception detail 不进入 logs/spans/errors。
 - `lib/realtime` 只在 P1-1D Web caller 出现时创建。P1-1 不运行 Redis、queue，不创建 provider，且不扩展 WebSocket OTel propagation unless a bounded real caller needs it。
 
 ## Configuration, secrets and error boundaries
@@ -305,7 +305,7 @@ Redis 只在多 API workers、横向扩容、跨进程 WebSocket broadcast、dis
 - P0-5D：completed；真实 browser Cookie/CORS/CSRF 闭环已通过 Chromium 验证；
 - P0-5E：completed；final outcome `PASS after findings remediation and independent recheck`；
 - P0：`DONE`；P0-1～P0-7 completed；P0-7 finding-only independent recheck `PASS`，P1 readiness `READY`；其后用户已明确批准进入 P1；
-- P1：`IN_PROGRESS`；P1-1A～B 已完成 session foundation preflight/scope freeze 和 persistence/migration；P1-1C 尚未开始并等待明确批准，题目、角色、完整状态机、调度、记忆和基础报告仍需后续分别设计；
+- P1：`IN_PROGRESS`；P1-1A～C 已完成 session foundation preflight/scope freeze、persistence/migration 与 backend REST/WS vertical slice；P1-1D Web caller 尚未开始并等待明确批准，题目、角色、完整状态机、调度、记忆和基础报告仍需后续分别设计；
 - P2 以后：只在对应阶段获批后增加语音、评分训练和商业化能力。
 
 ## 与其他文档关系

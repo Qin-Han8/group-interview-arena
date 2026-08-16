@@ -186,6 +186,8 @@ def test_openapi_generation_is_database_environment_independent(
         "/auth/me",
         "/auth/register",
         "/health",
+        "/sessions",
+        "/sessions/{session_id}",
     }
     security_schemes = schema["components"]["securitySchemes"]
     assert security_schemes == {

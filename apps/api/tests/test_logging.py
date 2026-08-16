@@ -8,6 +8,7 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from typing import Any, cast
+from uuid import uuid4
 
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient, Response
@@ -21,7 +22,7 @@ from group_interview_arena_api.core.config import (
     LogLevel,
     Settings,
 )
-from group_interview_arena_api.core.logging import JsonFormatter
+from group_interview_arena_api.core.logging import JsonFormatter, log_event
 
 APPLICATION_LOGGER_NAME = "group_interview_arena_api"
 TEST_DATABASE_URL = (
@@ -427,3 +428,45 @@ def test_logging_handler_failure_does_not_break_request_handling() -> None:
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
+
+
+def test_realtime_correlation_fields_allow_only_validated_uuid4_and_sequence() -> None:
+    logger = logging.getLogger(f"{APPLICATION_LOGGER_NAME}.realtime_test")
+    session_id = str(uuid4())
+    connection_id = str(uuid4())
+    action_id = str(uuid4())
+
+    with _captured_application_logs() as stream:
+        log_event(
+            logger,
+            logging.INFO,
+            "realtime.command.completed",
+            session_id=session_id,
+            connection_id=connection_id,
+            action_id=action_id,
+            sequence=2,
+        )
+        log_event(
+            logger,
+            logging.WARNING,
+            "realtime.command.rejected",
+            session_id="session-payload-sentinel",
+            connection_id="connection-cookie-sentinel",
+            action_id="action-origin-sentinel",
+            sequence=-1,
+        )
+
+    payloads = _payloads(stream)
+    assert payloads[0]["session_id"] == session_id
+    assert payloads[0]["connection_id"] == connection_id
+    assert payloads[0]["action_id"] == action_id
+    assert payloads[0]["sequence"] == 2
+    assert set(payloads[1]) == {"timestamp", "level", "event", "logger"}
+    _assert_values_absent(
+        stream.getvalue(),
+        (
+            "session-payload-sentinel",
+            "connection-cookie-sentinel",
+            "action-origin-sentinel",
+        ),
+    )

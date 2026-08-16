@@ -4,14 +4,15 @@
 - Current phase: P1 — IN_PROGRESS
 - API architecture baseline established by: P0-2 — DONE
 - Target version: V0.1 Internal Validation
-- Implemented contracts: `GET /health`, `POST /auth/register`, `POST /auth/login`, `POST /auth/logout`, `GET /auth/me`
+- Implemented REST contracts: `GET /health`, `POST /auth/register`, `POST /auth/login`, `POST /auth/logout`, `GET /auth/me`, `POST /sessions`, `GET /sessions/{session_id}`
+- Implemented realtime contract: `/ws/sessions/{session_id}?after_sequence=` v1 scoped session channel
 - P0-5 browser CORS/CSRF/Web closure: P0-5D completed
-- P1-1 contract: scoped/frozen by P1-1A; P1-1B persistence implemented; REST/WebSocket runtime pending P1-1C approval
+- P1-1 contract: scoped/frozen by P1-1A; P1-1B persistence and P1-1C REST/WebSocket runtime implemented; Web caller pending P1-1D approval
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
 
-本文件记录 P0-2 已批准的 REST、WebSocket、契约生成、恢复和错误语义基线，同步 P0 已实现的 REST/browser 技术契约，并记录 P1-1A 已冻结但尚未实施的第一条 session vertical slice。P1-1 contract 不等于完整 P1/P2 事件集合。
+本文件记录 P0-2 已批准的 REST、WebSocket、契约生成、恢复和错误语义基线，同步 P0 已实现的 REST/browser 技术契约，并记录 P1-1A 冻结、P1-1B～C 已实现的第一条 backend session vertical slice。P1-1 contract 不等于完整 P1/P2 事件集合。
 
 正式决策见 [`DECISIONS.md`](DECISIONS.md) `ADR-006`、`ADR-007`、`ADR-013`、`ADR-015`。
 
@@ -136,16 +137,16 @@ P1-1A 已冻结第一个 scoped v1 contract；generator package、完整 P1/P2 �
 - client action identity 用于识别重试或重复命令；
 - P1-1 scoped sequence gap、幂等和 reconnect 语义见下节；P1-1 之后的长期保留、compaction 和 compatibility 仍随真实持久化需求确定。
 
-## P1-1A scoped REST/WS contract — frozen, not implemented
+## P1-1 scoped REST/WS contract — P1-1C backend implemented
 
-完整字段、schema、transaction 和 B～E acceptance 见 [`exec-plans/P1-1_discussion-session-foundation.md`](exec-plans/P1-1_discussion-session-foundation.md)。当前 OpenAPI、runtime 和 Web 仍没有以下 session contract。
+完整字段、schema、transaction 和 B～E acceptance 见 [`exec-plans/P1-1_discussion-session-foundation.md`](exec-plans/P1-1_discussion-session-foundation.md)。以下 backend contract 已由 P1-1C 实现；Web realtime caller 仍留给 P1-1D。
 
 ### REST v1 scope
 
 - `POST /sessions`：authenticated + existing exact Origin / `X-GIA-CSRF: 1`；无 body；原子创建 `CREATED` session 和 sequence `1` 的 `session.created` event；返回 `201 SessionSnapshotResponse`。
 - `GET /sessions/{session_id}`：authenticated owner-only snapshot；missing/non-owner 均返回 `404 SESSION_NOT_FOUND`；read-only，不要求 CSRF header。
 - Snapshot fields 精确为 `id`、`status`、`created_at`、`updated_at`、`last_sequence`；owner identity、Cookie/token、question、participant、utterance 和 event backlog 不进入 response。
-- FastAPI OpenAPI 继续是 REST Source of Truth；P1-1C 实现时必须重新生成 Web derivative 并通过 drift check。
+- FastAPI OpenAPI 继续是 REST Source of Truth；Web derivative 已由 P1-1C 重新生成并通过 drift check。
 
 ### WebSocket v1 scope
 
@@ -236,8 +237,8 @@ P0-3D 已完成最小 API、OpenAPI authority、typed config、request correlati
 
 ### P1
 
-- `IN_PROGRESS`；P1-1A 已细化并冻结第一条文字会话 REST/WS scoped contract，但尚未实现；
-- P1-1B～D 将按单独批准依次实现 persistence、backend REST/WS、Web caller 与 deterministic reconnect regression；
+- `IN_PROGRESS`；P1-1A 已细化并冻结第一条文字会话 REST/WS scoped contract，P1-1B～C 已实现 persistence 与 backend REST/WS；
+- P1-1D 仍需单独批准后实现 Web caller 与 browser cross-layer reconnect regression；
 - P1-1E 独立验收后才可声称该 foundation 已实现。
 
 ### P2 and later
