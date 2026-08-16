@@ -169,7 +169,7 @@ reviewed migration revisions
 PostgreSQL
 ```
 
-Alembic 使用 migration-specific `AsyncEngine`、`connection.run_sync(...)` 与 `NullPool`，只接受 `postgresql+psycopg`。当前唯一 head 是不含业务 DDL 的 zero-op baseline。API runtime startup 不自动执行 migration。P0-4E test architecture 为：
+Alembic 使用 migration-specific `AsyncEngine`、`connection.run_sync(...)` 与 `NullPool`，只接受 `postgresql+psycopg`。zero-op revision `7c6ccd86b3c5` 保留为历史 baseline；其后的 identity migration 已增加 `users`/`auth_sessions`，当前 single Alembic head 为 `4fe43b42641b`。API runtime startup 仍不自动执行 migration。P0-4E test architecture 为：
 
 ```text
 pytest integration

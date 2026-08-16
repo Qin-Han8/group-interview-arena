@@ -192,7 +192,7 @@ P0-4F 已独立确认上述基础的实现、运行态与质量门均通过。P0
 ## Future work
 
 - P0-5C：FastAPI lifespan/request dependency 已成为现有 async DB runtime 的第一个 application caller；真实 PostgreSQL auth integration 只使用迁移到 head 的隔离临时数据库，development DB 保持 head `4fe43b42641b` 且两张表均为 0 rows；
-- P0-5D：awaiting explicit approval；后续 browser closure 不得新增第二套 trusted-origin config；
+- P0-5D：completed；browser closure 已实现，existing Cookie/CORS/CSRF/shared trusted-origin boundary 已生效；P1 不得创建第二套 trusted-origin config；
 - P1：按文字讨论闭环实现最小题目、角色、会话、事件、记忆和报告数据；
 - P2～P4：仅随获批范围增加音频、评分训练和商业化数据。
 
