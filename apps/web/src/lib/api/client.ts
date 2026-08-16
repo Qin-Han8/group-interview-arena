@@ -10,6 +10,7 @@ export type CurrentUser = components["schemas"]["CurrentUserResponse"];
 export type ErrorResponse = components["schemas"]["ErrorResponse"];
 export type LoginRequest = components["schemas"]["LoginRequest"];
 export type RegisterRequest = components["schemas"]["RegisterRequest"];
+export type SessionSnapshot = components["schemas"]["SessionSnapshotResponse"];
 
 export function createApiClient(baseUrl: string) {
   return createClient<paths>({ baseUrl, credentials: "include" });
@@ -42,6 +43,18 @@ export function loginUser(client: ApiClient, body: LoginRequest) {
 export function logoutUser(client: ApiClient) {
   return client.POST("/auth/logout", {
     params: { header: { [CSRF_HEADER_NAME]: CSRF_HEADER_VALUE } },
+  });
+}
+
+export function createSession(client: ApiClient) {
+  return client.POST("/sessions", {
+    params: { header: { [CSRF_HEADER_NAME]: CSRF_HEADER_VALUE } },
+  });
+}
+
+export function getSessionSnapshot(client: ApiClient, sessionId: string) {
+  return client.GET("/sessions/{session_id}", {
+    params: { path: { session_id: sessionId } },
   });
 }
 

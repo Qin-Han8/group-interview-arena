@@ -143,3 +143,13 @@ def test_database_guard_rejects_system_or_unprefixed_database(
             unsafe_database_name,
             protected_database_name,
         )
+
+
+def test_database_guard_accepts_exact_p1_1d_browser_database_name(
+    protected_database_name: str,
+    temporary_database_name_guard: Callable[[str, str], None],
+) -> None:
+    temporary_database_name_guard(
+        "gia_p11d_012345abcdef",
+        protected_database_name,
+    )

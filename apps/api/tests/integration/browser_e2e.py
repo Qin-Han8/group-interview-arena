@@ -11,8 +11,9 @@ from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import urlopen
 
+import psycopg
 from conftest import (
-    BROWSER_DATABASE_PREFIX,
+    SESSION_BROWSER_DATABASE_PREFIX,
     IntegrationDatabaseSettings,
     TemporaryDatabase,
     migrate_database,
@@ -168,7 +169,7 @@ def _run_browser_flow(temporary_database: TemporaryDatabase) -> None:
         )
 
     database_url = temporary_database.database_settings().database_url
-    with tempfile.TemporaryDirectory(prefix="gia_p05d_e2e_") as temp_directory:
+    with tempfile.TemporaryDirectory(prefix="gia_p11d_e2e_") as temp_directory:
         temporary_path = Path(temp_directory)
         api_log = temporary_path / "api.log"
         web_log = temporary_path / "web.log"
@@ -218,16 +219,47 @@ def _run_browser_flow(temporary_database: TemporaryDatabase) -> None:
             _wait_for_port_release(API_PORT)
 
 
+def _verify_session_persistence(temporary_database: TemporaryDatabase) -> None:
+    database_url = temporary_database.database_url
+    with psycopg.connect(
+        host=database_url.host,
+        port=database_url.port,
+        dbname=database_url.database,
+        user=database_url.username,
+        password=database_url.password,
+    ) as connection:
+        session_rows = connection.execute(
+            "SELECT status, last_sequence FROM simulation_sessions"
+        ).fetchall()
+        action_count = connection.execute(
+            "SELECT count(*) FROM session_actions"
+        ).fetchone()
+        event_sequences = connection.execute(
+            "SELECT sequence FROM discussion_events ORDER BY sequence"
+        ).fetchall()
+
+    if session_rows != [("ABORTED_USER", 2)]:
+        raise RuntimeError("Browser E2E session state was not persisted exactly.")
+    if action_count is None or action_count[0] != 1:
+        raise RuntimeError("Browser E2E action idempotency row count was not one.")
+    if event_sequences != [(1,), (2,)]:
+        raise RuntimeError("Browser E2E formal event sequences were not [1, 2].")
+
+
 def main() -> int:
     database_settings = IntegrationDatabaseSettings()  # pyright: ignore[reportCallIssue]
     with temporary_database_context(
         database_settings,
-        BROWSER_DATABASE_PREFIX,
+        SESSION_BROWSER_DATABASE_PREFIX,
     ) as temporary_database:
         migrate_database(temporary_database)
         _run_browser_flow(temporary_database)
+        _verify_session_persistence(temporary_database)
 
-    print("P0-5D browser E2E passed; temporary database and servers were cleaned.")
+    print(
+        "P1-1D browser E2E passed with one durable action and sequences [1, 2]; "
+        "temporary database and servers were cleaned."
+    )
     return 0
 
 

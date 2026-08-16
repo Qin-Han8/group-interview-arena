@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
+import SessionPanel from "@/features/sessions/session-panel";
 import {
   createApiClient,
   getCurrentUser,
@@ -151,6 +152,9 @@ export default function AuthPanel() {
           <p aria-live="polite" className="mt-3 text-sm text-red-700">
             {errorMessage}
           </p>
+        ) : null}
+        {client && baseUrl ? (
+          <SessionPanel apiClient={client} baseUrl={baseUrl} />
         ) : null}
       </section>
     );

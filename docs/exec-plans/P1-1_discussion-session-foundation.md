@@ -1,6 +1,6 @@
 # P1-1 Discussion Session Foundation Execution Plan
 
-Status: `P1 IN_PROGRESS`; `P1-1 IN_PROGRESS`; `P1-1A` through `P1-1C completed`; `P1-1D` through `P1-1E` not started and require separate explicit approval
+Status: `P1 IN_PROGRESS`; `P1-1 IN_PROGRESS`; `P1-1A` through `P1-1D completed`; `P1-1E` not started and requires separate explicit approval
 
 Target version: `V0.1 Internal Validation`
 
@@ -21,23 +21,23 @@ P1-1 只证明 session、persistence、transport、authentication/authorization�
 - P0-7 final acceptance 已在当前 `main` 完成；initial findings 已修复，finding-only independent recheck 为 `PASS`，P1 readiness 为 `READY`。
 - FastAPI 是 domain/session/persistence authority；Next.js 不持有正式 session state。
 - FastAPI lifespan 已拥有 `AsyncEngine` 和 `async_sessionmaker`；HTTP 请求使用 request-scoped `AsyncSession`，operation boundary 显式拥有 transaction。
-- PostgreSQL 18.x、SQLAlchemy 2.x、psycopg 3 和 Alembic 已建立；当前 single head 为 identity revision `4fe43b42641b`。
-- 当前 product tables 精确为 `users`、`auth_sessions`；API startup 不执行 migration，也不调用 `create_all()`/`drop_all()`。
+- PostgreSQL 18.x、SQLAlchemy 2.x、psycopg 3 和 Alembic 已建立；当前 single head 为 session foundation revision `f1a11d15c001`。
+- 当前 product tables 精确为 `users`、`auth_sessions`、`simulation_sessions`、`session_actions`、`discussion_events`；API startup 不执行 migration，也不调用 `create_all()`/`drop_all()`。
 - identity 已提供 stable UUIDv4 `user_id`、PostgreSQL-backed opaque `gia_session` Cookie 和 current-user lookup；raw token 只在 HttpOnly Cookie 中，数据库只保存 digest。
 - `Settings.cors_origins` / `GIA_API_CORS_ORIGINS` 是 CORS、CSRF 与 browser WebSocket Origin validation 必须共用的 trusted-origin Source of Truth。
 - REST OpenAPI 已由 FastAPI 生成并通过 `openapi-typescript`/`openapi-fetch` 消费；WebSocket contract 必须独立版本化。
 - structured logs 已使用安全 allowlist 字段和 `request_id`；HTTP tracing 只记录 route template 和固定安全属性。
-- Web 已有 authenticated browser caller、generated REST client、Vitest/Testing Library 和真实 PostgreSQL + Chromium E2E harness。
+- Web 已有 authenticated identity/session caller、generated REST client、minimal realtime client、Vitest/Testing Library 和真实 PostgreSQL + Chromium E2E harness。
 
 ## Five-stage decomposition
 
 1. **P1-1A — Preflight / scope freeze / execution plan**：`completed`。只冻结本计划和同步 current-state 文档；不修改 runtime、tests、migration、schema、dependencies、lockfiles 或 CI。
 2. **P1-1B — Session persistence + migration foundation**：`completed`。已实现三张最小 product tables、ORM metadata 和线性 Alembic revision；只验证 schema/migration，不实现 REST、WebSocket 或 Web UI。
-3. **P1-1C — Backend REST + WebSocket vertical slice**：`completed`。已实现 authenticated create/snapshot、WS v1 contract、持久化 command handling、idempotency、sequence、catch-up 和安全错误；未实现 Web caller。
-4. **P1-1D — Web realtime caller + reconnect cross-layer validation**：`not started`。只有此时因真实 caller 创建 `lib/realtime`，建立最小 browser session UI 和 PostgreSQL-backed Chromium 回归。
+3. **P1-1C — Backend REST + WebSocket vertical slice**：`completed`。已实现 authenticated create/snapshot、WS v1 contract、持久化 command handling、idempotency、sequence、catch-up 和安全错误；Web caller 随后的 P1-1D 才创建。
+4. **P1-1D — Web realtime caller + reconnect cross-layer validation**：`completed`。已因真实 caller 创建最小 `lib/realtime` 与 browser session UI，并以 PostgreSQL-backed Chromium 回归验证 reconnect/idempotency/ordered projection。
 5. **P1-1E — Independent final review / P1-1 closeout**：`not started`。从 committed/approved source state 独立复核完整 P1-1，不增加新业务能力；只有 PASS 后 P1-1 才可转为 `DONE`。
 
-每个子阶段都需要用户单独明确批准。P1-1A 完成后不得自动进入 P1-1B。
+每个子阶段都需要用户单独明确批准。P1-1D 完成后不得自动进入 P1-1E。
 
 ## Frozen scope and ownership
 
@@ -339,13 +339,13 @@ P1-1C actual-source review finding F1 identified a real network-runtime blocker:
 
 **Steps**
 
-- [ ] Write failing TypeScript contract fixtures/type-guard tests against backend canonical v1 examples。
-- [ ] Implement minimal realtime parsing and reject unknown/malformed server messages without applying them。
-- [ ] Write failing client state tests for stable `action_id` retry、duplicate event ignore、strict next-sequence apply、gap-triggered snapshot reload and reconnect cleanup。
-- [ ] Implement the smallest connection state machine with one live socket, bounded reconnect attempt behavior and authoritative REST reload on gap。
-- [ ] Write component tests for create、connect、abort、safe connection error and server-authoritative reload states。
-- [ ] Add the minimal authenticated browser caller; do not add question/participant/utterance/AI/report UI。
-- [ ] Extend Chromium E2E to verify Cookie-authenticated WS、created watermark、abort event、duplicate action no duplicate DB effect、reload snapshot restore and server/database/process cleanup。
+- [x] Write failing TypeScript contract fixtures/type-guard tests against backend canonical v1 examples。
+- [x] Implement minimal realtime parsing and reject unknown/malformed server messages without applying them。
+- [x] Write failing client state tests for stable `action_id` retry、duplicate event ignore、strict next-sequence apply、gap-triggered snapshot reload and reconnect cleanup。
+- [x] Implement the smallest connection state machine with one live socket, bounded reconnect attempt behavior and authoritative REST reload on gap。
+- [x] Write component tests for create、connect、abort、safe connection error and server-authoritative reload states。
+- [x] Add the minimal authenticated browser caller; do not add question/participant/utterance/AI/report UI。
+- [x] Extend Chromium E2E to verify Cookie-authenticated WS、created watermark、abort event、duplicate action no duplicate DB effect、reload snapshot restore and server/database/process cleanup。
 
 **Acceptance**
 
@@ -353,6 +353,8 @@ P1-1C actual-source review finding F1 identified a real network-runtime blocker:
 - Browser never persists raw Cookie/action payload/session authority in local/session storage。
 - Web unit/component tests、lint、format、typecheck、production build、REST OpenAPI drift and real PostgreSQL Chromium E2E pass with zero skips。
 - API regression/integration and migration gates remain green；no dependency/lockfile/CI changes unless a separately approved blocker proves unavoidable。
+
+P1-1D completion evidence: Web Vitest `35`、lint、format、typecheck、production build 与 REST OpenAPI drift 通过；API non-integration `201`、PostgreSQL integration `39`、full `240`、Ruff、format、Pyright 与 Alembic heads/current/check 通过。真实 Next/Chromium → Uvicorn WS → disposable `gia_p11d_*` PostgreSQL E2E 为 `2 passed` / zero skips，验证 opaque Cookie + trusted Origin、sequence `1` catch-up、stable `action_id` abort/replay、sequence `2`、REST reload restore、单一 durable action、events `[1, 2]` 及 DB/process/port cleanup。No dependency/lockfile、CI、backend contract、schema 或 migration change；P1-1E remains not started。
 
 ### P1-1E — Independent final review / closeout
 
@@ -448,5 +450,5 @@ Git staging、commit and push remain separate user-authorized actions in every i
 - [x] P1-1A docs/static validation completed；no runtime implementation started。
 - [x] P1-1B persistence/migration implementation and risk-matched validation completed；no REST/WS/UI implementation started。
 - [x] P1-1C backend REST/WebSocket vertical slice completed；actual-source review F1 runtime dependency blocker remediated with direct `websockets` and real Uvicorn network evidence；P1/P1-1 remain `IN_PROGRESS`。
-- [ ] P1-1D not started。
+- [x] P1-1D Web realtime caller + reconnect cross-layer validation completed；P1/P1-1 remain `IN_PROGRESS`。
 - [ ] P1-1E not started。

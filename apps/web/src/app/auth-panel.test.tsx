@@ -94,6 +94,9 @@ describe("AuthPanel", () => {
     expect(await screen.findByTestId("current-username")).toHaveTextContent(
       "web_user",
     );
+    expect(
+      await screen.findByRole("heading", { name: "讨论会话" }),
+    ).toBeInTheDocument();
     expect(mockedRegisterUser).toHaveBeenCalledWith(expect.anything(), {
       username: "Web_User",
       password: "web unit-only password phrase",

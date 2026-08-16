@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  createSession,
   createApiClient,
   getCurrentUser,
+  getSessionSnapshot,
   loginUser,
   logoutUser,
   registerUser,
@@ -16,6 +18,13 @@ const USER = {
 const CREDENTIALS = {
   username: "web_user",
   password: "web unit-only password phrase",
+};
+const SESSION = {
+  id: "00000000-0000-4000-8000-000000000010",
+  status: "CREATED" as const,
+  created_at: "2026-08-16T00:00:00Z",
+  updated_at: "2026-08-16T00:00:00Z",
+  last_sequence: 1,
 };
 
 function jsonResponse(body: object, status: number) {
@@ -84,5 +93,40 @@ describe("browser API client", () => {
     expect(request.method).toBe("POST");
     expect(request.credentials).toBe("include");
     expect(request.headers.get("X-GIA-CSRF")).toBe("1");
+  });
+
+  it("creates a session with credentials and the CSRF marker", async () => {
+    const fetchMock = vi.fn<typeof fetch>();
+    fetchMock.mockResolvedValue(jsonResponse(SESSION, 201));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await createSession(createApiClient(BASE_URL));
+
+    expect(result.data).toEqual(SESSION);
+    const request = fetchMock.mock.calls[0]?.[0];
+    if (!(request instanceof Request)) throw new Error("Expected a Request");
+    expect(request.url).toBe(`${BASE_URL}/sessions`);
+    expect(request.method).toBe("POST");
+    expect(request.credentials).toBe("include");
+    expect(request.headers.get("X-GIA-CSRF")).toBe("1");
+  });
+
+  it("loads an authoritative session snapshot without a CSRF marker", async () => {
+    const fetchMock = vi.fn<typeof fetch>();
+    fetchMock.mockResolvedValue(jsonResponse(SESSION, 200));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await getSessionSnapshot(
+      createApiClient(BASE_URL),
+      SESSION.id,
+    );
+
+    expect(result.data).toEqual(SESSION);
+    const request = fetchMock.mock.calls[0]?.[0];
+    if (!(request instanceof Request)) throw new Error("Expected a Request");
+    expect(request.url).toBe(`${BASE_URL}/sessions/${SESSION.id}`);
+    expect(request.method).toBe("GET");
+    expect(request.credentials).toBe("include");
+    expect(request.headers.has("X-GIA-CSRF")).toBe(false);
   });
 });

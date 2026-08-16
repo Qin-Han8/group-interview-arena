@@ -3,7 +3,7 @@
 - Status: Skeleton / Baseline + P1-1 foundation boundary
 - Current phase: P1 — IN_PROGRESS
 - Target version: V0.1 Internal Validation
-- Detailed orchestrator/agent design: Not started; P1-1A～C session foundation only
+- Detailed orchestrator/agent design: Not started; P1-1A～D session foundation only
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -85,16 +85,16 @@ CREATED
 - 使用文字输入输出验证准备、陈述、讨论和总结闭环；
 - 目标是验证角色差异、状态机、调度和记忆，而不是语音或视觉拟真。
 
-## P1-1 foundation boundary — backend implemented
+## P1-1 foundation boundary — backend and Web caller implemented
 
-P1-1A 冻结、P1-1B～C 已实现讨论会话的 persistence/backend transport foundation；仍不实现本文件的角色行为、发言权调度、结构化记忆或完整状态机：
+P1-1A 冻结、P1-1B～D 已实现讨论会话的 persistence/backend transport 与最小 Web caller foundation；仍不实现本文件的角色行为、发言权调度、结构化记忆或完整状态机：
 
 - 最小 session 从 `CREATED` 开始；唯一 scoped WS business command `session.abort` 只验证总纲已有异常状态 `ABORTED_USER`、durable idempotency 和 ordered event path；
 - 创建 formal event 为 `session.created`；abort formal event 为 `session.state_changed`；该集合不是未来完整 discussion event vocabulary；
 - FastAPI/domain service 是 session state authority，Browser 只消费 REST snapshot `last_sequence` 和后续 ordered events；
 - P1-1 不创建 question、participant、utterance、AI persona、orchestrator、memory 或 LLM/provider；不会用 event JSON 假装这些 canonical objects；
 - `session.abort` 不要求 question/participant/utterance，因此可在不提前决定其 Schema 的前提下建立真实 vertical slice；
-- P1-1B persistence/migration foundation 与 P1-1C deterministic domain command service、REST、WebSocket 已完成；`session.abort` 之外的状态机、讨论行为与 Web caller 仍未实现。完整计划见 [`exec-plans/P1-1_discussion-session-foundation.md`](exec-plans/P1-1_discussion-session-foundation.md)。
+- P1-1B persistence/migration foundation、P1-1C deterministic domain command service/REST/WebSocket 与 P1-1D authoritative Web projection/reconnect caller 已完成；`session.abort` 之外的状态机、讨论行为、角色与 AI 仍未实现。完整计划见 [`exec-plans/P1-1_discussion-session-foundation.md`](exec-plans/P1-1_discussion-session-foundation.md)。
 
 ## Implementation guidance
 

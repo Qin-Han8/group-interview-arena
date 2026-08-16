@@ -8,9 +8,9 @@
 - P0-5 identity boundary status: DONE
 - Most recently completed task: P0-7 independent final acceptance — PASS after two documentation findings remediation and finding-only recheck
 - P0 status: DONE; P0-1 through P0-7 completed
-- P1 status: IN_PROGRESS; P1-1A～C completed; P1-1D awaiting explicit user approval
+- P1 status: IN_PROGRESS; P1-1A～D completed; P1-1E awaiting explicit user approval
 - Target version: V0.1 Internal Validation
-- Business architecture detail: P1-1 persistence plus backend REST/WS/domain runtime implemented; Web caller not implemented
+- Business architecture detail: P1-1 persistence, backend REST/WS/domain runtime and minimal Web realtime caller implemented
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -223,7 +223,7 @@ FastAPI OpenAPI 是 REST contract 的 Source of Truth。P0-3E 从运行中的 `/
 
 WebSocket 使用独立版本化事件契约，至少表达 event type、schema version、session identity、ordering sequence、occurrence timestamp 和 action identity。P1-1A 已冻结第一条 vertical slice 的 v1 scoped contract；它不等于完整 P1/P2 事件集合，详见 [`exec-plans/P1-1_discussion-session-foundation.md`](exec-plans/P1-1_discussion-session-foundation.md)。
 
-### P1-1 session architecture — backend vertical slice implemented
+### P1-1 session architecture — backend and Web caller vertical slice implemented
 
 - P1-1 aggregate root 为 `simulation_session`；FastAPI domain/service 是状态和 command outcome authority，PostgreSQL 是 session/action/event persistence authority，Browser 只是 snapshot + event projection。
 - 首批 product tables `simulation_sessions`、`session_actions`、`discussion_events` 已由 P1-1B 实现；加既有 `users`、`auth_sessions` 后，actual product table set 精确为五张，Alembic single head 为 `f1a11d15c001`。
@@ -233,7 +233,10 @@ WebSocket 使用独立版本化事件契约，至少表达 event type、schema v
 - reconnect 使用 REST snapshot `last_sequence` 和后续 ordered WS events；gap 必须重新加载 snapshot，client local state 不得补写 authoritative state。
 - WS Cookie authentication 复用现有 identity/session service；Origin exact validation 继续消费 `Settings.cors_origins`，不建立第二套 browser trusted-origin config。
 - P1-1C 已随真实 realtime callers 增加 validated `session_id`/server-generated `connection_id`/validated `action_id`/positive sequence；payload、Cookie、Origin、raw path/query、user identity 和 exception detail 不进入 logs/spans/errors。
-- `lib/realtime` 只在 P1-1D Web caller 出现时创建。P1-1 不运行 Redis、queue，不创建 provider，且不扩展 WebSocket OTel propagation unless a bounded real caller needs it。
+- P1-1D 已随真实 caller 创建最小 `lib/realtime` parser/client 与 session panel：stable pending `action_id` 只在内存保存，strict next/duplicate/gap 处理以 REST snapshot 恢复 authority，connection generation + React cleanup 阻止 stale socket/remount 覆盖新 projection 或形成双连接。
+- Browser local/session storage 不保存 raw Cookie/token、action queue/payload 或 authoritative session state；URL 只保留非秘密 `session_id`，reload 必须重新读取 owner-only REST snapshot 并连接 ordered WS events。
+- 真实 disposable PostgreSQL + Next/Chromium/Uvicorn E2E 已验证 create、sequence `1` catch-up、abort sequence `2`、duplicate action replay、REST reload restore、单一 durable action 与资源 cleanup。
+- P1-1 不运行 Redis、queue，不创建 provider，且不扩展 WebSocket OTel propagation unless a bounded real caller needs it。
 
 ## Configuration, secrets and error boundaries
 
@@ -305,7 +308,7 @@ Redis 只在多 API workers、横向扩容、跨进程 WebSocket broadcast、dis
 - P0-5D：completed；真实 browser Cookie/CORS/CSRF 闭环已通过 Chromium 验证；
 - P0-5E：completed；final outcome `PASS after findings remediation and independent recheck`；
 - P0：`DONE`；P0-1～P0-7 completed；P0-7 finding-only independent recheck `PASS`，P1 readiness `READY`；其后用户已明确批准进入 P1；
-- P1：`IN_PROGRESS`；P1-1A～C 已完成 session foundation preflight/scope freeze、persistence/migration 与 backend REST/WS vertical slice；P1-1D Web caller 尚未开始并等待明确批准，题目、角色、完整状态机、调度、记忆和基础报告仍需后续分别设计；
+- P1：`IN_PROGRESS`；P1-1A～D 已完成 session foundation preflight/scope freeze、persistence/migration、backend REST/WS vertical slice 与 Web realtime caller/cross-layer validation；P1-1E 尚未开始并等待明确批准，题目、角色、完整状态机、调度、记忆和基础报告仍需后续分别设计；
 - P2 以后：只在对应阶段获批后增加语音、评分训练和商业化能力。
 
 ## 与其他文档关系

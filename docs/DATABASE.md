@@ -14,7 +14,7 @@
 - P0-5C backend auth runtime: completed
 - Target version: V0.1 Internal Validation
 - Business schema: identity plus P1-1 session foundation (`users`, `auth_sessions`, `simulation_sessions`, `session_actions`, `discussion_events`)
-- P1-1 status: P1-1A～C completed; P1-1D awaiting explicit approval
+- P1-1 status: P1-1A～D completed; P1-1E awaiting explicit approval
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -254,7 +254,7 @@ P1-1A 冻结第一条 session foundation 的最小 schema；P1-1B 已按该 scop
 
 - P0-5C：FastAPI lifespan/request dependency 已成为现有 async DB runtime 的第一个 application caller；真实 PostgreSQL auth integration 只使用迁移到 head 的隔离临时数据库，development DB 保持 head `4fe43b42641b` 且两张表均为 0 rows；
 - P0-5D：completed；browser closure 已实现，existing Cookie/CORS/CSRF/shared trusted-origin boundary 已生效；P1 不得创建第二套 trusted-origin config；
-- P1：`IN_PROGRESS`；P1-1A～C 已完成 session/action/event scope freeze、persistence/migration foundation 与 transaction callers，development database 保持 `f1a11d15c001`；P1-1D 尚未开始，题目、角色、participant/utterance、记忆和报告数据留给后续获批任务；
+- P1：`IN_PROGRESS`；P1-1A～D 已完成 session/action/event scope freeze、persistence/migration foundation、transaction callers 与 Web reconnect cross-layer validation，development database 保持 `f1a11d15c001` 且 P1-1D 无 schema/migration 变化；P1-1E 尚未开始，题目、角色、participant/utterance、记忆和报告数据留给后续获批任务；
 - P2～P4：仅随获批范围增加音频、评分训练和商业化数据。
 
 ## 与其他文档关系

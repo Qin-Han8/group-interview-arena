@@ -7,12 +7,12 @@
 - Implemented REST contracts: `GET /health`, `POST /auth/register`, `POST /auth/login`, `POST /auth/logout`, `GET /auth/me`, `POST /sessions`, `GET /sessions/{session_id}`
 - Implemented realtime contract: `/ws/sessions/{session_id}?after_sequence=` v1 scoped session channel
 - P0-5 browser CORS/CSRF/Web closure: P0-5D completed
-- P1-1 contract: scoped/frozen by P1-1A; P1-1B persistence and P1-1C REST/WebSocket runtime implemented; Web caller pending P1-1D approval
+- P1-1 contract: scoped/frozen by P1-1A; P1-1B persistence, P1-1C REST/WebSocket runtime and P1-1D Web realtime caller implemented
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
 
-本文件记录 P0-2 已批准的 REST、WebSocket、契约生成、恢复和错误语义基线，同步 P0 已实现的 REST/browser 技术契约，并记录 P1-1A 冻结、P1-1B～C 已实现的第一条 backend session vertical slice。P1-1 contract 不等于完整 P1/P2 事件集合。
+本文件记录 P0-2 已批准的 REST、WebSocket、契约生成、恢复和错误语义基线，同步 P0 已实现的 REST/browser 技术契约，并记录 P1-1A 冻结、P1-1B～D 已实现的第一条 session vertical slice。P1-1 contract 不等于完整 P1/P2 事件集合。
 
 正式决策见 [`DECISIONS.md`](DECISIONS.md) `ADR-006`、`ADR-007`、`ADR-013`、`ADR-015`。
 
@@ -137,9 +137,9 @@ P1-1A 已冻结第一个 scoped v1 contract；generator package、完整 P1/P2 �
 - client action identity 用于识别重试或重复命令；
 - P1-1 scoped sequence gap、幂等和 reconnect 语义见下节；P1-1 之后的长期保留、compaction 和 compatibility 仍随真实持久化需求确定。
 
-## P1-1 scoped REST/WS contract — P1-1C backend implemented
+## P1-1 scoped REST/WS contract — P1-1C backend and P1-1D Web caller implemented
 
-完整字段、schema、transaction 和 B～E acceptance 见 [`exec-plans/P1-1_discussion-session-foundation.md`](exec-plans/P1-1_discussion-session-foundation.md)。以下 backend contract 已由 P1-1C 实现；Web realtime caller 仍留给 P1-1D。
+完整字段、schema、transaction 和 B～E acceptance 见 [`exec-plans/P1-1_discussion-session-foundation.md`](exec-plans/P1-1_discussion-session-foundation.md)。以下 backend contract 已由 P1-1C 实现，P1-1D 已增加最小 authenticated Web realtime caller。
 
 ### REST v1 scope
 
@@ -171,6 +171,14 @@ P1-1A 已冻结第一个 scoped v1 contract；generator package、完整 P1/P2 �
 - P1-1 event history 随 session 保留；retention/compaction、large backlog pagination、multi-tab fan-out、cross-process broadcast 和 multi-worker routing Deferred。
 
 Backend Pydantic v2 models 是 WS v1 contract authority；P1-1D 的 TypeScript discriminated union 是由 canonical fixtures/cross-layer tests 验证的 derivative。WebSocket generator package 继续 Deferred，WS contract 不进入 REST OpenAPI。
+
+### P1-1D Web caller behavior
+
+- Browser 从 authoritative REST snapshot 启动连接，只应用精确 next sequence；`sequence <= last_sequence` 不重复应用，但 matching `action_id` replay 可确认 pending action。
+- Pending command/action identity 只在当前内存生命周期保存；reconnect 重发相同 `action_id`。Browser 不在 local/session storage 保存 Cookie/token、action queue、payload 或 authoritative session state。
+- gap 立即停止增量应用、关闭旧 socket、重新获取 REST snapshot，再以新 `last_sequence` watermark 连接；stale connection generation 和 React cleanup 不能更新当前 projection。
+- P1-1D caller 同时只拥有一个 live socket，自动 reconnect 有界；URL 只携带非秘密 `session_id` 以支持 reload 后重新获取 server truth。
+- 真实 Next/Chromium → Uvicorn WebSocket → PostgreSQL E2E 已验证 opaque Cookie、trusted Origin、created/abort ordered events、相同 action replay、REST reload restore、单一 durable action 与完整临时资源清理。
 
 ## Unified error semantics
 

@@ -23,7 +23,8 @@ REPOSITORY_ROOT = API_ROOT.parents[1]
 ROOT_ENV_FILE = REPOSITORY_ROOT / ".env"
 TEMPORARY_DATABASE_PREFIX = "gia_p04e_"
 BROWSER_DATABASE_PREFIX = "gia_p05d_"
-TEMPORARY_DATABASE_PATTERN = re.compile(r"^gia_p0(?:4e|5d)_[0-9a-f]{12}$")
+SESSION_BROWSER_DATABASE_PREFIX = "gia_p11d_"
+TEMPORARY_DATABASE_PATTERN = re.compile(r"^gia_p(?:0(?:4e|5d)|11d)_[0-9a-f]{12}$")
 SYSTEM_DATABASES = frozenset({"postgres", "template0", "template1"})
 
 
