@@ -6,8 +6,8 @@
 - P0-3 foundation status: DONE
 - P0-4 database foundation status: DONE
 - P0-5 identity boundary status: DONE
-- Most recently completed substep: P0-6D completed; actual-source review/remediation/re-review and remote CI run #6 PASS
-- P0-6 status: IN_PROGRESS; P0-6E awaiting explicit user approval / not started
+- Most recently completed substep: P0-6E cross-layer validation and P0-6 closeout PASS
+- P0-6 status: DONE; P0-6A through P0-6E completed
 - Target version: V0.1 Internal Validation
 - Business architecture detail: Incremental from P1
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
@@ -291,7 +291,7 @@ Redis 只在多 API workers、横向扩容、跨进程 WebSocket broadcast、dis
 - P0-5C：completed；
 - P0-5D：completed；真实 browser Cookie/CORS/CSRF 闭环已通过 Chromium 验证；
 - P0-5E：completed；final outcome `PASS after findings remediation and independent recheck`；
-- P0-6：`IN_PROGRESS`；P0-6A/P0-6B/P0-6C/P0-6D completed，P0-6E awaiting explicit user approval / not started；
+- P0-6：`DONE`；P0-6A～P0-6E completed，cross-layer validation/closeout `PASS`；P0-7 保持 `NOT_STARTED`；
 - P1：逐步设计题目、角色、会话、状态机、调度、记忆和基础报告，并建立第一个 WebSocket vertical slice；
 - P2 以后：只在对应阶段获批后增加语音、评分训练和商业化能力。
 

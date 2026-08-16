@@ -2,10 +2,10 @@
 
 - Status: Active
 - Managed scope: P0 only
-- Current task: P0-6 — `IN_PROGRESS`
-- Most recently completed substep: P0-6D — implementation, local gates, actual-source review/remediation/re-review and remote CI `PASS`
-- Current gate: P0-6E — awaiting explicit user approval / not started
-- P0-6 status: `IN_PROGRESS`; P0-6A/P0-6B/P0-6C/P0-6D completed；P0-6E awaiting explicit user approval / not started
+- Most recently completed task: P0-6 — `DONE`
+- Most recently completed substep: P0-6E — cross-layer validation, P0-6 closeout and actual-source review `PASS`
+- Next independent gate: P0-7 — `TODO` / not started
+- P0-6 status: `DONE`; P0-6A/P0-6B/P0-6C/P0-6D/P0-6E completed
 - Allowed status values: `TODO` / `IN_PROGRESS` / `BLOCKED` / `DONE`
 - Related roadmap: [`ROADMAP.md`](ROADMAP.md)
 
@@ -265,8 +265,8 @@
 
 - ID: `P0-6`
 - 名称：CI、日志与基础可观测性
-- Status: `IN_PROGRESS`
-- Approval state：P0-6A completed，actual-source final review `PASS`，four review findings closed；P0-6B implementation、local parity、actual-source review、findings remediation 与 remote CI 均 `PASS`，已 completed；P0-6C implementation、API quality gates、actual-source review、finding remediation/re-review 与 remote CI 均 `PASS`，已 completed；P0-6D implementation、local gates、actual-source review、findings remediation/re-review 与 remote CI 均 `PASS`，已 completed；P0-6E awaiting explicit user approval / not started。
+- Status: `DONE`
+- Approval state：P0-6A completed，actual-source final review `PASS`，four review findings closed；P0-6B implementation、local parity、actual-source review、findings remediation 与 remote CI 均 `PASS`，已 completed；P0-6C implementation、API quality gates、actual-source review、finding remediation/re-review 与 remote CI 均 `PASS`，已 completed；P0-6D implementation、local gates、actual-source review、findings remediation/re-review 与 remote CI 均 `PASS`，已 completed；P0-6E cross-layer validation 与 P0-6 closeout `PASS`，已 completed。
 - 目标：建立与当前代码规模匹配的自动检查、结构化日志和基础监控能力。
 - In scope：GitHub Actions CI、现有 API/Web/PostgreSQL/Chromium quality gates automation、structured logging hardening、request/trace correlation、provider-neutral basic OpenTelemetry tracing、documentation 与 observability safety tests。
 - Out of scope：deployment/CD、production hosting/secrets、alerting/on-call、dashboard、vendor observability backend/SDK、OpenTelemetry Collector deployment、OTel Logs pipeline、无真实 caller 的 metrics、product/AI/payment analytics 与 P0-7 final acceptance。
@@ -279,7 +279,7 @@
 - `P0-6B — GitHub Actions CI baseline`：completed；implementation、local parity、actual-source review、findings remediation 与 remote GitHub Actions run #1 均 `PASS`；
 - `P0-6C — Structured logging hardening`：completed；implementation、API quality gates、actual-source review、finding remediation/re-review 与 remote CI 均 `PASS`；
 - `P0-6D — OpenTelemetry tracing foundation`：completed；implementation、local API/full/Chromium gates、actual-source review、findings remediation/re-review 与 remote CI 均 `PASS`；
-- `P0-6E — Cross-layer validation / P0-6 closeout`：awaiting explicit user approval / not started。
+- `P0-6E — Cross-layer validation / P0-6 closeout`：completed；final API/Web/PostgreSQL/Chromium/CI、security/privacy、cleanup gates 与 7-file docs-only actual-source review 均 `PASS`。
 
 详细 baseline、CI/logging/tracing 边界、dependency gate 与各子步骤 exit criteria 见 [`exec-plans/P0-6_ci-observability.md`](exec-plans/P0-6_ci-observability.md)。
 
@@ -306,7 +306,17 @@
 - 既有 request middleware 创建受控 `SpanKind.SERVER` spans，只接受 W3C `traceparent`；span 仅含 method、resolved route template、status、固定 error category 和 `service.name`，404 使用固定 `<unmatched>`，不记录 baggage、query/header/body/Cookie/identity/SQL/exception detail；
 - project JSON logs 只从 active valid span context 增加固定宽度 `trace_id`/`span_id`，继续与既有 `request_id` 关联；exporter flush/shutdown failure 只产生安全 `telemetry.export.failed` category；
 - targeted 56、API unit 165、PostgreSQL integration 18、API full 183、Ruff、format、Pyright、Alembic single-head/drift 与 Chromium 1 均通过；默认关闭、config fail-closed、sentinel leakage、provider isolation、database dispose 和 processor thread cleanup 均有回归；
-- actual-source review 的 tracestate/Resource 与 ambient SDK/exporter config findings 均已 remediation 并通过 source re-review；reviewed commit `96581dd7c3f972dbe5d90592ee34d9973bd3dd41` 经 push-to-main 触发 GitHub Actions CI run #6，四个 required jobs 均 completed / success；P0-6D completed。P0-6、P0 均继续 `IN_PROGRESS`，P0-6E awaiting explicit user approval / not started，P0-7 not started。
+- actual-source review 的 tracestate/Resource 与 ambient SDK/exporter config findings 均已 remediation 并通过 source re-review；reviewed commit `96581dd7c3f972dbe5d90592ee34d9973bd3dd41` 经 push-to-main 触发 GitHub Actions CI run #6，四个 required jobs 均 completed / success；P0-6D completed。该子步骤 closeout 时 P0-6、P0 均继续 `IN_PROGRESS`，P0-6E awaiting explicit user approval / not started，P0-7 not started。
+
+### P0-6E closeout note
+
+- frozen API sync/lock、unit 177、integration 18、full 195、Ruff、format 与 Pyright gates 均通过；Alembic single head、current head 与 schema drift checks 通过；
+- Web frozen install、lint、format、typecheck、Vitest 16、production build、DB-independent OpenAPI drift 与真实 Chromium E2E 1 selected / 0 skipped 均通过；
+- CI workflow 仍为四个 required jobs、read-only permissions、full-SHA action pins 和 duplicate-run cancellation，无 deployment/CD/write-secret scope creep；
+- 既有 logging/tracing tests 覆盖 request/trace correlation、default-disabled tracing、project-owned provider/resource/sampler、traceparent-only propagation、ambient config fail-closed 与 sensitive sentinel negative boundaries；
+- temporary database、3000/8000 listeners、Playwright artifacts 与 unexpected untracked artifacts residual 均为 0；本步骤未修改 runtime、workflow、dependencies、lockfiles、schema、migration、master plan 或 decisions；
+- P0-6A～P0-6E completed，P0-6 转为 `DONE`；P0 整体保持 `IN_PROGRESS`，P0-7 保持 `TODO` / not started。
+- P0-6E 7-file docs-only actual-source review `PASS`，无 blocker。
 
 ## P0-7 — P0 独立验收
 

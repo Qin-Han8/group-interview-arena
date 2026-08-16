@@ -17,14 +17,13 @@ AI 群面训练场让用户无需临时召集真人，即可与具有不同性�
   - `P0-3 — 前后端项目骨架`
   - `P0-4 — 数据库与迁移基础`
   - `P0-5 — 最小身份边界`
-- 已完成子步骤：`P0-4A`～`P0-4F`、`P0-5A`～`P0-5E`、`P0-6A`、`P0-6B`、`P0-6C`、`P0-6D`
-- 当前任务：`P0-6 — CI、日志与基础可观测性（IN_PROGRESS）`
-- 当前门禁：`P0-6E — Cross-layer validation / P0-6 closeout（awaiting explicit user approval / not started）`
-- 后续独立任务：`P0-7` not started
+- 已完成子步骤：`P0-4A`～`P0-4F`、`P0-5A`～`P0-5E`、`P0-6A`～`P0-6E`
+- 最近完成任务：`P0-6 — CI、日志与基础可观测性（DONE）`
+- 后续独立门禁：`P0-7 — P0 独立验收（NOT_STARTED）`
 - 当前目标版本：`V0.1 — Internal Validation / 内部技术验证版`
-- 当前实现状态：Web/API 技术骨架、本地 PostgreSQL 18.4、SQLAlchemy async/psycopg 3、Alembic 与 reusable PostgreSQL integration harness 已建立；P0-5 identity/browser boundary 已完成；P0-6B CI、P0-6C structured logging 与 P0-6D 默认关闭、app-owned 的 provider-neutral tracing 均已 completed
+- 当前实现状态：Web/API 技术骨架、本地 PostgreSQL 18.4、SQLAlchemy async/psycopg 3、Alembic 与 reusable PostgreSQL integration harness 已建立；P0-5 identity/browser boundary 与 P0-6 CI、structured logging、默认关闭且 app-owned 的 provider-neutral tracing 及 cross-layer closeout 均已完成
 
-> P0-1～P0-5 均已完成并转为 `DONE`。P0 与 P0-6 仍为 `IN_PROGRESS`；P0-6D completed，P0-6E 等待用户明确批准且尚未开始，P0-7 not started。
+> P0-1～P0-6 均已完成并转为 `DONE`。P0 整体仍为 `IN_PROGRESS`；P0-7 独立最终验收保持 `NOT_STARTED`。
 
 ## 核心原则摘要
 

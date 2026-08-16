@@ -2,15 +2,15 @@
 
 ## Status
 
-- Parent task：`P0-6 — IN_PROGRESS`
-- Completed substeps：`P0-6A — completed；actual-source final review PASS；four review findings closed`；`P0-6B — completed；implementation/local parity/actual-source review/remote CI PASS`；`P0-6C — completed；implementation/API quality gates/actual-source review/finding remediation/re-review/remote CI PASS`；`P0-6D — completed；implementation/local gates/actual-source review/findings remediation/re-review/remote CI PASS`
-- Current gate：`P0-6E — awaiting explicit user approval / NOT_STARTED`
+- Parent task：`P0-6 — DONE`
+- Completed substeps：`P0-6A — completed；actual-source final review PASS；four review findings closed`；`P0-6B — completed；implementation/local parity/actual-source review/remote CI PASS`；`P0-6C — completed；implementation/API quality gates/actual-source review/finding remediation/re-review/remote CI PASS`；`P0-6D — completed；implementation/local gates/actual-source review/findings remediation/re-review/remote CI PASS`；`P0-6E — completed；cross-layer validation/P0-6 closeout/actual-source review PASS`
+- Current gate：none；P0-6 closed
 - P0-7：独立任务，`NOT_STARTED`
 - Scope owner：[`TASKS.md`](../TASKS.md)
 - Product baseline：[`PROJECT_MASTER_PLAN.md`](../PROJECT_MASTER_PLAN.md)
 - Last updated：2026-08-16
 
-本计划冻结 P0-6 的执行边界与风险门禁。P0-6A 已完成且只产生文档。P0-6B workflow implementation、local parity、actual-source review、findings remediation 与 remote GitHub Actions verification 均已完成并 `PASS`。P0-6C implementation、API quality gates、actual-source review、finding remediation/re-review 与 remote GitHub Actions verification 均已完成并 `PASS`。P0-6D implementation、local gates、actual-source review、findings remediation/re-review 与 remote GitHub Actions verification 均已完成并 `PASS`；P0-6E awaiting explicit user approval / not started。
+本计划冻结 P0-6 的执行边界与风险门禁。P0-6A 已完成且只产生文档。P0-6B workflow implementation、local parity、actual-source review、findings remediation 与 remote GitHub Actions verification 均已完成并 `PASS`。P0-6C implementation、API quality gates、actual-source review、finding remediation/re-review 与 remote GitHub Actions verification 均已完成并 `PASS`。P0-6D implementation、local gates、actual-source review、findings remediation/re-review 与 remote GitHub Actions verification 均已完成并 `PASS`。P0-6E cross-layer validation、security/privacy acceptance、cleanup 与 P0-6 closeout 均已完成并 `PASS`；P0-7 保持 `NOT_STARTED`。
 
 ## Goal
 
@@ -481,7 +481,8 @@ P0-7 之后从 committed repository state 单独进行 independent P0 acceptance
 - P0-6B/C/D 的全部风险门禁通过；
 - final API/Web/PostgreSQL/Chromium/CI configuration acceptance 有实际证据；
 - docs、scope、security/privacy、default-safe behavior 与 residual risks 同步；
-- P0-6 actual-source review 完成后才能把 P0-6 转为 `DONE`；P0-7 仍为 `NOT_STARTED`。
+- P0-6A～P0-6D implementation reviews 与 P0-6E final cross-layer gates 均已完成；P0-6E 7-file docs-only actual-source review `PASS` 且无 blocker；P0-6 转为 `DONE`，P0-7 仍为 `NOT_STARTED`。
+- Exit evidence：API unit 177 / integration 18 / full 195、Ruff、format、Pyright、Alembic single-head/current/drift、Web lint/format/typecheck/Vitest 16/build/DB-independent OpenAPI drift、Chromium 1 selected / 0 skipped、四-job CI scope audit与 residual cleanup 均 `PASS`。
 
 ### P0-6 overall exit
 
@@ -501,7 +502,7 @@ P0-7 之后从 committed repository state 单独进行 independent P0 acceptance
 - OTLP/HTTP 无 auth 配置只适用于受控 endpoint；生产 authenticated exporter 属于后续 deployment/operations decision，当前不得把 credential 放入 URL。
 - Chromium CI 会增加运行时间，但其 Cookie/CSRF 安全覆盖不可由 unit test 替代，因此保留为 gate；首版通过 one worker、Chromium-only 控制成本。
 - GitHub action pins、hosted runner image 与 OTel releases 会变化；B/D 开始时重新核对，不把 2026-08-15 的查询结果当作永久最新值。
-- P0-6D actual-source review 与 findings re-review 已通过，无 remaining blocker；P0-6E 仍须获得用户明确批准。
+- P0-6D actual-source review 与 findings re-review 已通过，无 remaining blocker；P0-6E final validation 与 7-file docs-only actual-source review 均已通过，未发现新的 correctness/security/privacy blocker。
 
 ## Official references reviewed
 
@@ -514,7 +515,7 @@ P0-7 之后从 committed repository state 单独进行 independent P0 acceptance
 
 ## Progress
 
-- Completed：P0-6A baseline gate、scope freeze、execution plan 与 actual-source final review `PASS`；P0-6B workflow implementation、live action preflight、local parity、cleanup validation、actual-source review、findings remediation 与 remote GitHub Actions run #1 `PASS`；P0-6C structured JSON logging implementation、security regression coverage、actual-source review、`JsonFormatter` safe fallback remediation/re-review 与 remote GitHub Actions run #4 `PASS`；P0-6D OpenTelemetry 1.44 tracing foundation、local gates、actual-source review、tracestate/Resource 与 ambient SDK/exporter config remediation/re-review、remote GitHub Actions run #6 `PASS`；
-- Current gate：P0-6E awaiting explicit user approval / not started；
-- Not started：P0-6E、P0-7；
-- Next：等待用户明确批准 P0-6E；不得自行进入 P0-6E。
+- Completed：P0-6A baseline gate、scope freeze、execution plan 与 actual-source final review `PASS`；P0-6B workflow implementation、live action preflight、local parity、cleanup validation、actual-source review、findings remediation 与 remote GitHub Actions run #1 `PASS`；P0-6C structured JSON logging implementation、security regression coverage、actual-source review、`JsonFormatter` safe fallback remediation/re-review 与 remote GitHub Actions run #4 `PASS`；P0-6D OpenTelemetry 1.44 tracing foundation、local gates、actual-source review、tracestate/Resource 与 ambient SDK/exporter config remediation/re-review、remote GitHub Actions run #6 `PASS`；P0-6E final API/Web/PostgreSQL/Chromium/CI、security/privacy、cleanup、closeout gates 与 7-file docs-only actual-source review `PASS`；P0-6 `DONE`；
+- Current gate：none；
+- Not started：P0-7；
+- Next：等待用户后续明确批准独立 P0-7；不得自行进入 P0-7。
