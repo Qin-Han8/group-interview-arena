@@ -1,7 +1,7 @@
 # 数据库技术基线
 
-- Status: P0 Data Architecture Baseline
-- Current phase: P0
+- Status: P0 Data Architecture Baseline + P1-1A scoped design
+- Current phase: P1 — IN_PROGRESS
 - Data architecture baseline established by: P0-2 — DONE
 - Local PostgreSQL infrastructure: P0-4B — completed
 - SQLAlchemy async foundation: P0-4C — completed
@@ -14,6 +14,7 @@
 - P0-5C backend auth runtime: completed
 - Target version: V0.1 Internal Validation
 - Business schema: P0-5B identity schema only (`users`, `auth_sessions`)
+- P1-1 status: P1-1A completed; persistence/migration not implemented; P1-1B awaiting explicit approval
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -167,20 +168,72 @@ P0-4F 已独立确认上述基础的实现、运行态与质量门均通过。P0
 - 匿名训练数据必须单独授权并去标识化；
 - 数据隔离、删除、审计和最小保留必须从首次业务 Schema 设计开始考虑。
 
+## P1-1A scoped persistence design — not implemented
+
+P1-1A 冻结第一条 session foundation 的最小 schema，但没有修改 ORM、migration 或 PostgreSQL。当前 actual product tables 仍精确为 `users`、`auth_sessions`；以下内容只有在 P1-1B 获得单独批准并通过 migration gates 后才成为 implemented schema。
+
+### Planned `simulation_sessions`
+
+- `id UUID PRIMARY KEY`（UUIDv4）；
+- `owner_user_id UUID NOT NULL` → `users.id ON DELETE CASCADE`；
+- `status VARCHAR(32) NOT NULL`，当前 application values 为 `CREATED` / `ABORTED_USER`；
+- `last_sequence BIGINT NOT NULL DEFAULT 0`，check `>= 0`；
+- `created_at TIMESTAMPTZ NOT NULL`；
+- `updated_at TIMESTAMPTZ NOT NULL`。
+
+不使用 PostgreSQL native enum 或只允许当前两个状态的封闭 DB check。当前 owner authorization 查询由 primary key + owner predicate 完成，不为尚不存在的 list/filter caller 提前建立 owner-only index。
+
+### Planned `session_actions`
+
+- composite primary key `(session_id, action_id)`；
+- `session_id UUID NOT NULL` → `simulation_sessions.id ON DELETE CASCADE`；
+- `action_id UUID NOT NULL`，作用域为单一 session；
+- `command_version SMALLINT NOT NULL`，generic positive check；
+- `command_type VARCHAR(64) NOT NULL`；
+- `payload_digest BYTEA NOT NULL`，check `octet_length(...) = 32`；
+- `created_at TIMESTAMPTZ NOT NULL`。
+
+幂等记录随 session 持久化，不使用 memory-only cache，也不重复保存 command content。相同 action/type/version/digest 重试返回原 events；同 action 不同 semantic digest 返回 conflict 且无 mutation。
+
+### Planned `discussion_events`
+
+- composite primary key `(session_id, sequence)`；
+- `session_id UUID NOT NULL` → `simulation_sessions.id ON DELETE CASCADE`；
+- `sequence BIGINT NOT NULL`，positive check；
+- `event_version SMALLINT NOT NULL`，generic positive check；
+- `event_type VARCHAR(64) NOT NULL`；
+- nullable `causation_action_id UUID`；
+- `payload JSONB NOT NULL`；
+- `occurred_at TIMESTAMPTZ NOT NULL`；
+- composite foreign key `(session_id, causation_action_id)` → `session_actions(session_id, action_id)`；
+- index `(session_id, causation_action_id, sequence)`。
+
+`causation_action_id` 不唯一，一个 action 可产生多条 ordered events。System/creation event 可使用 null causation。Event payload 是变化通知，不替代 future normalized question/participant/utterance records。
+
+### Concurrency and evolution boundary
+
+- 正式 sequence 从锁定的 `simulation_sessions.last_sequence` 分配 contiguous range；禁止 `MAX(sequence)+1`、UUID order 或 in-memory counter。
+- action、state update、watermark 和所有 causal events 在一个短 PostgreSQL transaction 中 commit；WebSocket network send 在 commit 后。
+- P1-1 不创建 `question_versions`、`session_participants`、`utterances`。它们在真实 caller 出现时以 additive migration 建立；session 后续增加 question version foreign key，participant 使用独立 one-to-many 表，utterance 持有 transcript/timing 并由 event payload 引用 id。
+- P1-1 foundation session 可以作为 future question foreign key migration 的 nullable legacy row；从题目 caller 出现后由 application invariant 要求新的 runnable session 关联正式 version，不使用 fake question UUID。
+- P2 voice/ASR/TTS fields、Redis/queue data 和评分/report schema 均不进入 P1-1。
+
+完整 columns/constraints/indexes、transaction semantics 和 migration acceptance 见 [`exec-plans/P1-1_discussion-session-foundation.md`](exec-plans/P1-1_discussion-session-foundation.md)。
+
 ## Future business schema
 
 总纲提到 `users`、题目版本、角色模板、会话、参与者、阶段、发言、讨论事件、结构化记忆、报告、证据、训练、反馈、模型调用和审计等未来领域概念。
 
-除上述 P0-5 identity schema 外，其余仍只是长期领域导航：
+除上述 P0-5 identity schema 外，P1-1 三表是已冻结但尚未实施的 scoped design；其余仍只是长期领域导航：
 
-- 表名、字段、关系、索引和删除策略尚未冻结；
+- P1-1 之外实体的表名、字段、关系、索引和删除策略尚未冻结；
 - V0.1 最小实体集合仍需在 P1 业务设计中确认；
 - 支付、权益、语音和成长数据不得提前进入 V0.1 Schema；
 - P0/V0.1 initial identity boundary 已由 `ADR-015` 确认；公开身份扩展与 recovery 仍 Deferred。
 
 ## TBD
 
-- TBD：P1 文字讨论闭环的最小实体集合和正式 Schema；
+- Deferred：P1-1 之后的 question、participant、utterance、memory、report 等最小实体和正式 Schema；
 - TBD：未来 phone/WeChat identity mapping 的具体 Schema；
 - TBD：verified recovery identity、account recovery 与账号删除的完整数据语义；
 - TBD：原始音频是否默认完全不保存（总纲第 37 节）；
@@ -193,7 +246,7 @@ P0-4F 已独立确认上述基础的实现、运行态与质量门均通过。P0
 
 - P0-5C：FastAPI lifespan/request dependency 已成为现有 async DB runtime 的第一个 application caller；真实 PostgreSQL auth integration 只使用迁移到 head 的隔离临时数据库，development DB 保持 head `4fe43b42641b` 且两张表均为 0 rows；
 - P0-5D：completed；browser closure 已实现，existing Cookie/CORS/CSRF/shared trusted-origin boundary 已生效；P1 不得创建第二套 trusted-origin config；
-- P1：按文字讨论闭环实现最小题目、角色、会话、事件、记忆和报告数据；
+- P1：`IN_PROGRESS`；P1-1A 已冻结 session/action/event 最小 persistence，P1-1B 尚未实施；题目、角色、participant/utterance、记忆和报告数据留给后续获批任务；
 - P2～P4：仅随获批范围增加音频、评分训练和商业化数据。
 
 ## 与其他文档关系

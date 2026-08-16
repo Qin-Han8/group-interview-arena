@@ -1,15 +1,17 @@
 # 当前任务清单
 
-- Status: P0 complete; awaiting explicit approval for P1
-- Managed scope: completed P0 only; P1 not approved
-- Most recently completed task: P0-7 — `DONE`
+- Status: P1 in progress; P1-1 discussion session foundation approved
+- Managed scope: P1-1 only; P1-1A completed; P1-1B～E require separate explicit approval
+- Most recently completed task: P1-1A — `DONE`
 - P0-7 final outcome: initial verdict `BLOCKED` with two documentation findings; remediation completed; finding-only independent recheck `PASS`; new blockers none; P1 readiness `READY`
-- Next phase gate: P1 — `TODO` / not started / awaiting explicit user approval
+- Current phase: P1 — `IN_PROGRESS`
+- Current task: P1-1 — `IN_PROGRESS`
+- Next subphase gate: P1-1B — `TODO` / not started / awaiting explicit user approval
 - P0 status: `DONE`; P0-1 through P0-7 completed
 - Allowed status values: `TODO` / `IN_PROGRESS` / `BLOCKED` / `DONE`
 - Related roadmap: [`ROADMAP.md`](ROADMAP.md)
 
-本文件记录已完成的 P0 拆分，不提前把 P1～P6 展开成大量任务。P1 仍须用户明确批准后才能从 `TODO` 转为 `IN_PROGRESS`。
+用户已明确批准正式进入 P1。本文件当前只展开获准的 P1-1 discussion session foundation，不提前展开 P1 的题目、角色、完整状态机、调度、记忆或报告任务，也不提前展开 P2～P6。
 
 ## P0-1 — 仓库与文档治理
 
@@ -334,7 +336,37 @@
 
 - initial independent verdict 为 `BLOCKED`：`ARCHITECTURE.md` 的 Alembic current head 描述错误，`DATABASE.md` 的 P0-5D browser-boundary status 过期；
 - 两个 findings 均已完成 docs-only remediation；finding-only independent recheck `PASS`，new blockers none；
-- P0-1～P0-7 completed，P0 转为 `DONE`；P1 readiness `READY`，但 P1 保持 `TODO` / not started / awaiting explicit user approval。
+- P0-1～P0-7 completed，P0 转为 `DONE`；P1 readiness `READY`。该 P0-7 closeout 当时 P1 尚未获批；其后用户已明确批准进入 P1。
+
+## P1-1 — Discussion session foundation
+
+- ID: `P1-1`
+- 名称：Discussion session foundation
+- Status: `IN_PROGRESS`
+- Approval state：用户已明确批准进入 P1 并执行 P1-1A；P1-1A completed；P1-1B～E not started / awaiting separate explicit approval。
+- 目标：建立 authenticated session create/snapshot、versioned WebSocket、durable action idempotency、session monotonic sequence 和 snapshot + ordered-events reconnect 的第一条文字会话 vertical slice。
+- In scope：最小 session/action/event persistence、REST create/snapshot、WS v1 command/event/error contract、opaque Cookie authentication/owner authorization、shared trusted-origin Origin validation、transaction/concurrency、deterministic regression、最小 Web caller 和最终独立验收。
+- Out of scope：question CMS/schema、participant、utterance、完整讨论状态机/调度/记忆、LLM/provider、六维评分/报告、voice/ASR/TTS、Redis、task queue、payment/entitlement/growth/industry pack。
+- Dependencies：P0 `DONE`；Accepted `ADR-003`、`ADR-005`～`ADR-015` 中相关边界；每个实施子步骤仍需用户明确批准。
+- Acceptance criteria：P1-1A～E 全部完成并经 P1-1E 独立验收后，第一条 session vertical slice 可在真实 PostgreSQL 与 browser 中证明 server authority、owner isolation、durable idempotency、race-free ordered events 和 reconnect；不得把 Deferred 能力描述为已实现。
+
+### Substep progress
+
+- `P1-1A — Preflight / scope freeze / execution plan`：completed；docs-only；未修改 runtime/tests/migration/schema/dependency/CI；
+- `P1-1B — Session persistence + migration foundation`：`TODO`；not started；
+- `P1-1C — Backend REST + WebSocket vertical slice`：`TODO`；not started；
+- `P1-1D — Web realtime caller + reconnect cross-layer validation`：`TODO`；not started；
+- `P1-1E — Independent final review / P1-1 closeout`：`TODO`；not started。
+
+### P1-1A completion note
+
+- 从 clean `main` HEAD `118aa6d298bd80a5868da2457484c1609ab77d3f` 恢复 Source of Truth 和 actual API/DB/identity/Web/tests；P0-7 final closeout 已在当前 main；
+- 冻结三张首批真实 caller tables：`simulation_sessions`、`session_actions`、`discussion_events`；question version、participant、utterance 保持 additive future boundary；
+- 冻结 `POST /sessions`、`GET /sessions/{session_id}`、`/ws/sessions/{session_id}?after_sequence=`，以及 `session.abort`、`session.created`、`session.state_changed` 和 non-formal safe WS error；
+- `action_id` 作用域为 `(session_id, action_id)` 并持久化；sequence 由锁定 session row 后的 durable counter 区间分配，不使用 `MAX()+1`，一个 action 可关联多 event；
+- reconnect 使用 REST snapshot `last_sequence` + ordered WS catch-up；gap 触发重新获取 snapshot，client 不成为 state authority；
+- CORS/CSRF/WS Origin 共用既有 `Settings.cors_origins`，WS 复用 opaque Cookie identity 和 owner authorization；无第二套配置、JWT、Redis 或 queue；
+- 无 Proposed Decision 或 blocker。完整 scoped schema、contract、B～E acceptance 和风险见 [`exec-plans/P1-1_discussion-session-foundation.md`](exec-plans/P1-1_discussion-session-foundation.md)。
 
 ## 任务更新规则
 

@@ -1,9 +1,9 @@
 # AI 候选人与讨论编排骨架
 
-- Status: Skeleton / Baseline
-- Current phase: P0
+- Status: Skeleton / Baseline + P1-1 foundation boundary
+- Current phase: P1 — IN_PROGRESS
 - Target version: V0.1 Internal Validation
-- Detailed design: Not started
+- Detailed orchestrator/agent design: Not started; P1-1A session foundation scoped only
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -85,6 +85,17 @@ CREATED
 - 使用文字输入输出验证准备、陈述、讨论和总结闭环；
 - 目标是验证角色差异、状态机、调度和记忆，而不是语音或视觉拟真。
 
+## P1-1 foundation boundary — designed, not implemented
+
+P1-1A 只冻结讨论会话的 persistence/transport foundation，不实现本文件的角色行为、发言权调度、结构化记忆或完整状态机：
+
+- 最小 session 从 `CREATED` 开始；唯一 scoped WS business command `session.abort` 只验证总纲已有异常状态 `ABORTED_USER`、durable idempotency 和 ordered event path；
+- 创建 formal event 为 `session.created`；abort formal event 为 `session.state_changed`；该集合不是未来完整 discussion event vocabulary；
+- FastAPI/domain service 是 session state authority，Browser 只消费 REST snapshot `last_sequence` 和后续 ordered events；
+- P1-1 不创建 question、participant、utterance、AI persona、orchestrator、memory 或 LLM/provider；不会用 event JSON 假装这些 canonical objects；
+- `session.abort` 不要求 question/participant/utterance，因此可在不提前决定其 Schema 的前提下建立真实 vertical slice；
+- P1-1B 尚未开始。完整计划见 [`exec-plans/P1-1_discussion-session-foundation.md`](exec-plans/P1-1_discussion-session-foundation.md)。
+
 ## Implementation guidance
 
 - 大模型负责自然语言和受约束的局部语义决策；项目代码负责状态、时间、发言权、私有信息隔离、记忆和恢复。
@@ -106,7 +117,7 @@ CREATED
 
 ## Future work
 
-- P1：完成 V0.1 文字版角色、状态机、调度和记忆详细设计。
+- P1：`IN_PROGRESS`；P1-1A 已完成 session foundation scope freeze，角色、完整状态机、调度和记忆详细设计仍未开始并需后续批准。
 - P2：加入语音、打断、播放停止和恢复语义。
 - P3：建立角色行为与评分证据之间的校准边界。
 - P6/V1.0：扩展到 6～8 种角色和压力模式。

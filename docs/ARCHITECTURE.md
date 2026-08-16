@@ -1,16 +1,16 @@
 # P0 技术架构基线
 
-- Status: P0 Architecture Baseline
-- Current phase: P0
+- Status: P0 Architecture Baseline + P1-1A scoped design
+- Current phase: P1 — IN_PROGRESS
 - Architecture baseline established by: P0-2 — DONE
 - P0-3 foundation status: DONE
 - P0-4 database foundation status: DONE
 - P0-5 identity boundary status: DONE
 - Most recently completed task: P0-7 independent final acceptance — PASS after two documentation findings remediation and finding-only recheck
 - P0 status: DONE; P0-1 through P0-7 completed
-- P1 status: NOT_STARTED; awaiting explicit user approval
+- P1 status: IN_PROGRESS; P1-1A completed; P1-1B awaiting explicit user approval
 - Target version: V0.1 Internal Validation
-- Business architecture detail: Incremental from P1
+- Business architecture detail: P1-1 session foundation scoped; runtime not implemented
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -221,7 +221,19 @@ DatabaseSettings 只在 lifespan boundary 解析；模块 import 与 OpenAPI gen
 
 FastAPI OpenAPI 是 REST contract 的 Source of Truth。P0-3E 从运行中的 `/openapi.json` 使用 `openapi-typescript` 生成 `apps/web/src/lib/api/generated/schema.d.ts`，再由 `openapi-fetch` 提供 typed fetch client；生成文件受版本控制且不得手改，`api:check` 验证漂移。
 
-WebSocket 使用独立版本化事件契约，至少表达 event type、schema version、session identity、ordering sequence、occurrence timestamp 和 action identity。完整 P1 事件 Schema 由 P1 API design 冻结，不在 P0-2 假装已经完成。
+WebSocket 使用独立版本化事件契约，至少表达 event type、schema version、session identity、ordering sequence、occurrence timestamp 和 action identity。P1-1A 已冻结第一条 vertical slice 的 v1 scoped contract；它不等于完整 P1/P2 事件集合，详见 [`exec-plans/P1-1_discussion-session-foundation.md`](exec-plans/P1-1_discussion-session-foundation.md)。
+
+### P1-1A scoped session architecture — designed, not implemented
+
+- P1-1 aggregate root 为 `simulation_session`；FastAPI domain/service 是状态和 command outcome authority，PostgreSQL 是 session/action/event persistence authority，Browser 只是 snapshot + event projection。
+- 首批计划 product tables 精确为 `simulation_sessions`、`session_actions`、`discussion_events`；当前 actual schema 仍只有 `users`、`auth_sessions`，P1-1B 尚未开始。
+- REST scoped contract 为 authenticated `POST /sessions` 与 owner-only `GET /sessions/{session_id}`；WebSocket scoped endpoint 为 `/ws/sessions/{session_id}?after_sequence=`。
+- 创建 session 产生 `session.created`；唯一 v1 business command `session.abort` 产生 `session.state_changed`。该最小动作不依赖 future question/participant/utterance，也不创建 test-only `noop` 产品行为。
+- `action_id` 在单一 session 内持久化幂等；正式 events 使用 session row lock + durable counter 分配连续 sequence，不使用 `MAX(sequence)+1`。action 到 event 为一对多 causation 边界。
+- reconnect 使用 REST snapshot `last_sequence` 和后续 ordered WS events；gap 必须重新加载 snapshot，client local state 不得补写 authoritative state。
+- WS Cookie authentication 复用现有 identity/session service；Origin exact validation 继续消费 `Settings.cors_origins`，不建立第二套 browser trusted-origin config。
+- P1-1C 只在真实 realtime log caller 出现时增加 validated `session_id`/server-generated `connection_id`；payload、Cookie、Origin、raw path/query、user identity 和 exception detail 不进入 logs/spans/errors。
+- `lib/realtime` 只在 P1-1D Web caller 出现时创建。P1-1 不运行 Redis、queue，不创建 provider，且不扩展 WebSocket OTel propagation unless a bounded real caller needs it。
 
 ## Configuration, secrets and error boundaries
 
@@ -292,8 +304,8 @@ Redis 只在多 API workers、横向扩容、跨进程 WebSocket broadcast、dis
 - P0-5C：completed；
 - P0-5D：completed；真实 browser Cookie/CORS/CSRF 闭环已通过 Chromium 验证；
 - P0-5E：completed；final outcome `PASS after findings remediation and independent recheck`；
-- P0：`DONE`；P0-1～P0-7 completed；P0-7 finding-only independent recheck `PASS`，P1 readiness `READY`；P1 保持 `NOT_STARTED` 并等待用户明确批准；
-- P1：逐步设计题目、角色、会话、状态机、调度、记忆和基础报告，并建立第一个 WebSocket vertical slice；
+- P0：`DONE`；P0-1～P0-7 completed；P0-7 finding-only independent recheck `PASS`，P1 readiness `READY`；其后用户已明确批准进入 P1；
+- P1：`IN_PROGRESS`；P1-1A 已完成 session foundation preflight/scope freeze/plan，P1-1B 尚未开始并等待明确批准；题目、角色、完整状态机、调度、记忆和基础报告仍需后续分别设计；
 - P2 以后：只在对应阶段获批后增加语音、评分训练和商业化能力。
 
 ## 与其他文档关系

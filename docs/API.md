@@ -1,17 +1,17 @@
 # API 与事件技术基线
 
-- Status: P0 API Architecture Baseline
-- Current phase: P0
+- Status: P0 API Architecture Baseline + P1-1A scoped design
+- Current phase: P1 — IN_PROGRESS
 - API architecture baseline established by: P0-2 — DONE
 - Target version: V0.1 Internal Validation
 - Implemented contracts: `GET /health`, `POST /auth/register`, `POST /auth/login`, `POST /auth/logout`, `GET /auth/me`
 - P0-5 browser CORS/CSRF/Web closure: P0-5D completed
-- Detailed P1 WebSocket schema: Not started
+- P1-1 contract: scoped/frozen by P1-1A; runtime not implemented; P1-1B awaiting explicit approval
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
 
-本文件记录 P0-2 已批准的 REST、WebSocket、契约生成、恢复和错误语义基线，并同步 P0-3D/P0-3E、P0-5C 与 P0-5D 已实现的 REST/browser 技术契约。本文件不冻结完整 P1 事件集合；P0-5E final outcome 为 `PASS after findings remediation and independent recheck`，P0-5 已转为 `DONE`。
+本文件记录 P0-2 已批准的 REST、WebSocket、契约生成、恢复和错误语义基线，同步 P0 已实现的 REST/browser 技术契约，并记录 P1-1A 已冻结但尚未实施的第一条 session vertical slice。P1-1 contract 不等于完整 P1/P2 事件集合。
 
 正式决策见 [`DECISIONS.md`](DECISIONS.md) `ADR-006`、`ADR-007`、`ADR-013`、`ADR-015`。
 
@@ -125,7 +125,7 @@ WebSocket 使用独立版本化 event contract。原则至少包含：
 
 时间戳使用 ISO 8601；UTC 输出使用 `Z`。事件顺序依赖 session 内 monotonic sequence，不依赖 UUID 顺序。
 
-具体字段、JSON Schema、generator package、投递与重放细节在 P1 API design 中冻结。本文件不把总纲事件示例伪装成已经完成的正式 Schema。
+P1-1A 已冻结第一个 scoped v1 contract；generator package、完整 P1/P2 事件集合和大规模投递/保留仍未冻结。本文件不把总纲事件示例伪装成已经完成的完整 Schema。
 
 ## Snapshot and reconnect principle
 
@@ -134,7 +134,42 @@ WebSocket 使用独立版本化 event contract。原则至少包含：
 - snapshot/load 使用 REST；
 - WebSocket 承载 snapshot 之后的有序增量；
 - client action identity 用于识别重试或重复命令；
-- sequence 缺口、幂等窗口、保留期和重放范围由 P1 结合持久化设计确定。
+- P1-1 scoped sequence gap、幂等和 reconnect 语义见下节；P1-1 之后的长期保留、compaction 和 compatibility 仍随真实持久化需求确定。
+
+## P1-1A scoped REST/WS contract — frozen, not implemented
+
+完整字段、schema、transaction 和 B～E acceptance 见 [`exec-plans/P1-1_discussion-session-foundation.md`](exec-plans/P1-1_discussion-session-foundation.md)。当前 OpenAPI、runtime 和 Web 仍没有以下 session contract。
+
+### REST v1 scope
+
+- `POST /sessions`：authenticated + existing exact Origin / `X-GIA-CSRF: 1`；无 body；原子创建 `CREATED` session 和 sequence `1` 的 `session.created` event；返回 `201 SessionSnapshotResponse`。
+- `GET /sessions/{session_id}`：authenticated owner-only snapshot；missing/non-owner 均返回 `404 SESSION_NOT_FOUND`；read-only，不要求 CSRF header。
+- Snapshot fields 精确为 `id`、`status`、`created_at`、`updated_at`、`last_sequence`；owner identity、Cookie/token、question、participant、utterance 和 event backlog 不进入 response。
+- FastAPI OpenAPI 继续是 REST Source of Truth；P1-1C 实现时必须重新生成 Web derivative 并通过 drift check。
+
+### WebSocket v1 scope
+
+- Endpoint：`/ws/sessions/{session_id}?after_sequence=<non-negative integer>`。
+- Handshake 复用现有 opaque `gia_session` Cookie、current-user service 和 owner authorization；browser Origin 必须是 existing `Settings.cors_origins` 中的单一 exact value。WebSocket 不增加 query token、JWT、custom origin env 或浏览器不可发送的 CSRF header。
+- 唯一 client business command：`session.abort`，fields 为 `schema_version=1`、`type`、`session_id`、stable UUIDv4 `action_id`、empty `payload`。
+- Formal events：creation 的 `session.created` 与 abort 的 `session.state_changed`；fields 为 `schema_version`、`type`、`session_id`、`sequence`、UTC `occurred_at`、nullable `action_id`、`payload`。
+- Action scope 为 `(session_id, action_id)`；同 semantic action 重试重发已持久化 events，不新增 sequence；同 id 不同 semantic payload 返回 `ACTION_ID_CONFLICT`。
+- Formal event sequence 来自 locked session row 上的 durable counter；一个 action 可以关联多 events，不使用 `MAX()+1` 或 memory-only idempotency。
+
+### WS safe error scope
+
+- Error message fields 为 `schema_version=1`、`type="error"`、session/action context、UTC `occurred_at` 和与 REST 对齐的 `error.code` / safe `error.message` / `error.request_id`。
+- WS errors 不持久化、不消耗 sequence。Recoverable domain errors keep connection open；protocol error 使用 safe `PROTOCOL_ERROR` 后 close `1008`；internal failure 使用 safe `INTERNAL_ERROR` 后 close `1011` when possible。
+- Error/log/span 不暴露 payload、Cookie/token、Origin、raw path/query、SQL、traceback、filesystem path、prompt/provider information 或 raw exception。
+
+### P1-1 reconnect scope
+
+- Browser 先 GET snapshot，再以 `after_sequence=last_sequence` 建立 WS；server 在处理 commands 前按 sequence 发送 persisted catch-up events。
+- Client 只应用精确 next sequence；`<= last_sequence` 是 replay 并忽略；`> last_sequence + 1` 是 gap，必须停止应用、重新 GET authoritative snapshot、再连接。
+- `after_sequence` ahead of server watermark 返回 safe `SEQUENCE_AHEAD` 并触发同一 REST reload path。
+- P1-1 event history 随 session 保留；retention/compaction、large backlog pagination、multi-tab fan-out、cross-process broadcast 和 multi-worker routing Deferred。
+
+Backend Pydantic v2 models 是 WS v1 contract authority；P1-1D 的 TypeScript discriminated union 是由 canonical fixtures/cross-layer tests 验证的 derivative。WebSocket generator package 继续 Deferred，WS contract 不进入 REST OpenAPI。
 
 ## Unified error semantics
 
@@ -201,10 +236,9 @@ P0-3D 已完成最小 API、OpenAPI authority、typed config、request correlati
 
 ### P1
 
-- 细化文字会话 REST 端点；
-- 冻结第一个版本化 WebSocket 事件契约；
-- 实现 action identity、sequence、snapshot/reconnect；
-- 添加 WebSocket tests 和 deterministic session regression。
+- `IN_PROGRESS`；P1-1A 已细化并冻结第一条文字会话 REST/WS scoped contract，但尚未实现；
+- P1-1B～D 将按单独批准依次实现 persistence、backend REST/WS、Web caller 与 deterministic reconnect regression；
+- P1-1E 独立验收后才可声称该 foundation 已实现。
 
 ### P2 and later
 
@@ -215,8 +249,8 @@ P0-3D 已完成最小 API、OpenAPI authority、typed config、request correlati
 ## TBD
 
 - TBD：WebSocket schema generator package；
-- TBD：P1 最小 REST endpoint 和 WebSocket event 集合；
-- TBD：事件投递、重放、幂等窗口和兼容策略；
+- Deferred：P1-1 之后的完整 REST endpoint / WebSocket command/event 集合；
+- Deferred：event retention/compaction、large replay pagination、multi-tab/cross-process delivery 和长期 compatibility policy；
 - TBD：V0.1 之后的 identity expansion、verified recovery flow 与 authorization；
 - TBD：音频上传和短期签名协议；
 - TBD：支付 Provider 和 webhook 契约；

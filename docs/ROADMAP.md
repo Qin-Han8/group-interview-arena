@@ -2,9 +2,11 @@
 
 - Status: Active baseline
 - Most recently completed development phase: P0 — `DONE`
-- Most recently completed task: P0-7 — `DONE`
+- Most recently completed task: P1-1A — `DONE`
 - P0-7 final outcome: initial `BLOCKED`; two documentation findings remediated; finding-only independent recheck `PASS`; P1 readiness `READY`
-- Next phase gate: P1 — `NOT_STARTED` / awaiting explicit user approval
+- Current phase: P1 — `IN_PROGRESS`
+- Current task: P1-1 — `IN_PROGRESS`
+- Next subphase gate: P1-1B — `NOT_STARTED` / awaiting explicit user approval
 - P0 status: `DONE`; P0-1 through P0-7 completed
 - Target product version: V0.1 — Internal Validation
 - Source: [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) §30–31
@@ -16,14 +18,14 @@
 - `P0～P6`：研发推进阶段，描述按什么顺序建立能力；
 - `V0.1 / V0.5 / V1.0`：产品交付版本，描述某个可验证版本包含什么。
 
-阶段不是版本，P0-x 也不是新增产品版本。P0 已完成不代表 V0.1 的全部业务能力已经实现；P1 尚未开始并等待用户明确批准。
+阶段不是版本，P0-x/P1-x 也不是新增产品版本。P0 已完成不代表 V0.1 的全部业务能力已经实现；用户已明确批准进入 P1，当前只执行 P1-1 discussion session foundation。
 
 ## 2. 开发阶段
 
 | 阶段 | 目标摘要 | 当前状态 |
 |---|---|---|
 | P0 项目基础 | 仓库、规范、环境、认证、数据库基础、监控日志和决策记录 | DONE |
-| P1 文字版讨论闭环 | 题目模型、角色参数、状态机、调度、记忆、文字模拟和基础报告 | NOT_STARTED |
+| P1 文字版讨论闭环 | 题目模型、角色参数、状态机、调度、记忆、文字模拟和基础报告 | IN_PROGRESS |
 | P2 语音与真实交互 | 麦克风、ASR、TTS、打断恢复、延迟监控和音频生命周期 | NOT_STARTED |
 | P3 评分与专项训练 | 客观指标、证据、六维评分、报告、专项训练和用户反馈 | NOT_STARTED |
 | P4 商业化 | 商品、订单、权益、支付、免费限制、故障返还和运营配置 | NOT_STARTED |
@@ -46,15 +48,27 @@
 | P0-6 CI、日志与基础可观测性 | 建立自动检查、日志和基础监控能力 | DONE — P0-6A～P0-6E completed；cross-layer closeout 与 actual-source review PASS |
 | P0-7 P0 独立验收 | 独立确认 P0 是否满足进入 P1 的条件 | DONE — initial BLOCKED；2 documentation findings remediated；finding-only recheck PASS；P1 READY |
 
-任务细节及验收条件见 [`TASKS.md`](TASKS.md)。P0-1～P0-7 均已完成，P0 整体已转为 `DONE`。P0-7 independent final acceptance initial verdict 为 `BLOCKED`，两个 documentation findings 已 remediation，finding-only independent recheck `PASS`，new blockers none，P1 readiness `READY`；P1 仍为 `NOT_STARTED` 并等待用户明确批准。
+任务细节及验收条件见 [`TASKS.md`](TASKS.md)。P0-1～P0-7 均已完成，P0 整体已转为 `DONE`。P0-7 independent final acceptance initial verdict 为 `BLOCKED`，两个 documentation findings 已 remediation，finding-only independent recheck `PASS`，new blockers none，P1 readiness `READY`；其后用户已明确批准进入 P1。
 
 P0-5 固定采用五阶段执行：P0-5A identity preflight（completed）、P0-5B identity persistence/migration/security primitives（completed）、P0-5C backend auth runtime/API（completed）、P0-5D Web/CORS/CSRF cross-layer validation（completed）、P0-5E independent final review（completed；PASS after findings remediation and independent recheck）。
 
-P0-6 固定采用五阶段执行：P0-6A preflight/scope freeze/execution plan（completed；actual-source final review `PASS`）、P0-6B GitHub Actions CI baseline（completed；remote CI `PASS`）、P0-6C structured logging hardening（completed；actual-source review、finding remediation/re-review 与 remote CI `PASS`）、P0-6D OpenTelemetry tracing foundation（completed；actual-source review、findings remediation/re-review 与 remote CI run #6 `PASS`）、P0-6E cross-layer validation/P0-6 closeout（completed；final gates 与 7-file docs-only actual-source review `PASS`，无 blocker）。P0-7 仍为 `NOT_STARTED` 的独立 P0 final acceptance，不并入 P0-6E。详细计划见 [`exec-plans/P0-6_ci-observability.md`](exec-plans/P0-6_ci-observability.md)。
+P0-6 固定采用五阶段执行：P0-6A preflight/scope freeze/execution plan（completed；actual-source final review `PASS`）、P0-6B GitHub Actions CI baseline（completed；remote CI `PASS`）、P0-6C structured logging hardening（completed；actual-source review、finding remediation/re-review 与 remote CI `PASS`）、P0-6D OpenTelemetry tracing foundation（completed；actual-source review、findings remediation/re-review 与 remote CI run #6 `PASS`）、P0-6E cross-layer validation/P0-6 closeout（completed；final gates 与 7-file docs-only actual-source review `PASS`，无 blocker）。P0-7 独立 P0 final acceptance 已在其后完成，不并入 P0-6E。详细计划见 [`exec-plans/P0-6_ci-observability.md`](exec-plans/P0-6_ci-observability.md)。
 
 P0-2 已 Accepted PostgreSQL、SQLAlchemy 2.x 和 Alembic；P0-4 实施基线为 PostgreSQL 18.x，且 Redis 不进入默认 Compose。完整决策和重新评估条件见 [`DECISIONS.md`](DECISIONS.md)。
 
-## 4. 产品版本
+## 4. P1 当前执行拆分
+
+P1 已正式启动，但当前只展开 `P1-1 — Discussion session foundation`。P1-1 建立 session create/snapshot、versioned WebSocket、durable action idempotency、monotonic event sequence 和 reconnect 基础；它不等于 P1 全部文字讨论闭环。
+
+- `P1-1A — Preflight / scope freeze / execution plan`：completed；
+- `P1-1B — Session persistence + migration foundation`：not started / awaiting explicit approval；
+- `P1-1C — Backend REST + WebSocket vertical slice`：not started；
+- `P1-1D — Web realtime caller + reconnect cross-layer validation`：not started；
+- `P1-1E — Independent final review / P1-1 closeout`：not started。
+
+P1-1A 只完成 docs-only plan/scope freeze，没有实现 runtime feature。详细计划见 [`exec-plans/P1-1_discussion-session-foundation.md`](exec-plans/P1-1_discussion-session-foundation.md)。题目、participant/utterance、完整状态机/调度/记忆、AI 和基础报告需要后续分别批准，不因 P1-1A 自动开始。
+
+## 5. 产品版本
 
 ### V0.1 — Internal Validation
 
@@ -72,7 +86,7 @@ P0-2 已 Accepted PostgreSQL、SQLAlchemy 2.x 和 Alembic；P0-4 实施基线为
 
 目标是形成稳定商业产品。新增压力模式、6～8 种角色、40～60 道精品题、7 天冲刺计划、成长趋势、报告音频跳转、题目 AI 变体、更完善的模型路由和成本控制、评价申诉、邀请奖励及移动端短训练优化。
 
-## 5. 阶段与版本的关系
+## 6. 阶段与版本的关系
 
 - P0、P1 为 V0.1 奠定项目基础和文字讨论闭环。
 - P2～P5 逐步补齐公开 V0.5 所需的语音、评分训练、商业化和公开测试能力。
@@ -80,7 +94,7 @@ P0-2 已 Accepted PostgreSQL、SQLAlchemy 2.x 和 Alembic；P0-4 实施基线为
 
 该关系用于执行导航，不表示每个版本只对应一个阶段；版本验收仍以 [`RELEASE_CHECKLIST.md`](RELEASE_CHECKLIST.md) 和总纲范围为准。
 
-## 6. 变更规则
+## 7. 变更规则
 
 - 阶段状态变化时更新本文件，并同步 `TASKS.md`。
 - 产品版本范围变化必须先形成正式决策。
