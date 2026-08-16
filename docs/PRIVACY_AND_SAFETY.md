@@ -132,7 +132,7 @@ P0-5B 已实现显式参数的 Argon2id hash/verify/verify-and-update、username
 
 - P0-2：在架构决策中记录基础信任边界；完整威胁建模随实际接口、数据和 Provider 逐步细化。
 - P0-5C～P0-5E：backend/browser authentication、Cookie/CORS/CSRF 与最小日志边界已实现；P0-5E final outcome 为 `PASS after findings remediation and independent recheck`，P0-5 已转为 `DONE`。
-- P0-6：`DONE`；P0-6A～P0-6E completed，logging/tracing cross-layer security/privacy acceptance `PASS`；P0-7 保持 `NOT_STARTED`。
+- P0：`DONE`；P0-1～P0-7 completed；P0-7 finding-only independent recheck `PASS`，new blockers none，P1 readiness `READY`；P1 保持 `NOT_STARTED` 并等待用户明确批准。
 - P2：完成语音同意、上传、保存和删除设计。
 - P4/P5：完成支付审计、公开隐私设置、投诉和发布合规检查。
 

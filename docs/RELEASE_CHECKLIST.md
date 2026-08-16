@@ -1,7 +1,8 @@
 # 发布与阶段验收清单骨架
 
 - Status: Skeleton / Baseline
-- Current phase: P0
+- Most recently completed phase: P0 — DONE
+- Next phase: P1 — NOT_STARTED / awaiting explicit user approval
 - Target version: V0.1 Internal Validation
 - Detailed design: Not started
 - Detailed operational checklist: Not started
@@ -17,7 +18,7 @@
 
 ## 当前版本范围
 
-P0-2 技术架构决策、P0-3 前后端项目骨架、P0-4 数据库及迁移基础、P0-5 最小身份边界与 P0-6 CI/日志/基础可观测性均已完成。P0-4A～P0-4F 均已完成，P0-4 已通过独立最终验收并转为 `DONE`。P0-5A/P0-5B/P0-5C/P0-5D completed；P0-5E initial independent review verdict 为 `BLOCKED`，两个 findings 已完成 remediation，并通过 findings-only independent recheck；P0-5E final outcome 为 `PASS`，P0-5 已转为 `DONE`。P0 尚未完成；P0-6A～P0-6E completed，P0-6 已转为 `DONE`；P0-7 `NOT_STARTED`。P0-6B local parity、actual-source review、findings remediation 与 remote GitHub Actions run #1 均 `PASS`；P0-6C logging/security/API gates、actual-source review、`JsonFormatter` safe fallback remediation/re-review 与 remote GitHub Actions run #4 均 `PASS`；P0-6D tracing/config/security/lifecycle gates、actual-source review、tracestate/Resource 与 ambient SDK/exporter config remediation/re-review、remote GitHub Actions run #6 均 `PASS`；P0-6E final cross-layer API/Web/PostgreSQL/Chromium/CI、security/privacy、cleanup gates 与 7-file docs-only actual-source review 均 `PASS`，无 blocker。下方 P0 exit 与产品版本复选框仍表示完整阶段/版本验收，不能由单个子任务替代。
+P0-1～P0-7 均已完成，P0 整体已转为 `DONE`。P0-4 已通过独立最终验收；P0-5E final outcome 为 `PASS after findings remediation and independent recheck`；P0-6B remote CI run #1、P0-6C run #4、P0-6D run #6 与 P0-6E cross-layer/actual-source review 均 `PASS`。P0-7 independent final acceptance initial verdict 为 `BLOCKED`，两个 documentation current-state findings 已 remediation，finding-only independent recheck `PASS`，new blockers none，P1 readiness `READY`。P1 仍为 `NOT_STARTED`，等待用户明确批准。
 
 ## Implementation guidance
 
@@ -228,14 +229,15 @@ P0-5D actual-source final review 已 PASS 并转为 completed；P0-5E initial in
 
 来源：总纲 P0 路线图及 P0 基础职责。
 
-- [ ] 项目仓库和开发规范可供后续任务使用；
-- [ ] 环境配置方式已由正式技术决策确定并验证；
+- [x] 项目仓库和开发规范可供后续任务使用；
+- [x] 环境配置方式已由正式技术决策确定并验证；
 - [x] V0.1 所需的最小身份边界已验证，且生产环境不会误启不安全的开发身份；
 - [x] 已依据 P0-2 批准的技术决策验证 V0.1 所需的关系型数据库、数据访问层和 migration 基础；
 - [x] 自动检查、日志和基础监控已验证；
-- [ ] 产品及技术决策记录完整可追溯；
+- [x] 产品及技术决策记录完整可追溯；
 - [x] P0-1～P0-6 均满足各自验收条件；
-- [ ] 已完成 P0-7 独立验收并获得进入 P1 的明确批准。
+- [x] 已完成 P0-7 独立验收；initial blockers 已 remediation，finding-only independent recheck `PASS`，P1 readiness `READY`。
+- [ ] 已获得进入 P1 的明确用户批准。
 
 P0-2 已 Accepted PostgreSQL、SQLAlchemy 2.x 和 Alembic，P0-4 实施基线为 PostgreSQL 18.x，并要求真实 PostgreSQL integration/migration checks。`ADR-015` 已确认 P0/V0.1 initial identity boundary；email/phone/WeChat/OAuth、verified recovery 与完整公开账号产品继续 Deferred，不是 P0-5B 的前置实现范围。
 
@@ -344,7 +346,8 @@ P0-2 已 Accepted PostgreSQL、SQLAlchemy 2.x 和 Alembic，P0-4 实施基线为
 
 - P0-5D：completed；P0-5E completed；final outcome `PASS after findings remediation and independent recheck`。
 - P0-6：`DONE`；P0-6A～P0-6E completed，cross-layer validation/closeout `PASS`。
-- P0-7：执行并记录 P0 exit 验收。
+- P0-7：completed；initial verdict `BLOCKED`，2 documentation findings remediated，finding-only independent recheck `PASS`，P1 readiness `READY`。
+- P1：`NOT_STARTED`；awaiting explicit user approval。
 - 各版本发布任务：补充负责人、环境、命令、证据和发布/回滚步骤。
 
 ## 与其他文档关系

@@ -1,11 +1,11 @@
 # 项目路线图
 
 - Status: Active baseline
-- Current development phase: P0 — 项目基础
-- Most recently completed task: P0-6 — `DONE`
-- Most recently completed substep: P0-6E — cross-layer validation, P0-6 closeout and actual-source review `PASS`
-- Next independent gate: P0-7 — `NOT_STARTED`
-- P0-6 status: `DONE`; P0-6A/P0-6B/P0-6C/P0-6D/P0-6E completed
+- Most recently completed development phase: P0 — `DONE`
+- Most recently completed task: P0-7 — `DONE`
+- P0-7 final outcome: initial `BLOCKED`; two documentation findings remediated; finding-only independent recheck `PASS`; P1 readiness `READY`
+- Next phase gate: P1 — `NOT_STARTED` / awaiting explicit user approval
+- P0 status: `DONE`; P0-1 through P0-7 completed
 - Target product version: V0.1 — Internal Validation
 - Source: [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) §30–31
 
@@ -16,13 +16,13 @@
 - `P0～P6`：研发推进阶段，描述按什么顺序建立能力；
 - `V0.1 / V0.5 / V1.0`：产品交付版本，描述某个可验证版本包含什么。
 
-阶段不是版本，P0-x 也不是新增产品版本。当前处于 P0，不代表当前需要实现 V0.1 的全部业务能力。
+阶段不是版本，P0-x 也不是新增产品版本。P0 已完成不代表 V0.1 的全部业务能力已经实现；P1 尚未开始并等待用户明确批准。
 
 ## 2. 开发阶段
 
 | 阶段 | 目标摘要 | 当前状态 |
 |---|---|---|
-| P0 项目基础 | 仓库、规范、环境、认证、数据库基础、监控日志和决策记录 | IN_PROGRESS |
+| P0 项目基础 | 仓库、规范、环境、认证、数据库基础、监控日志和决策记录 | DONE |
 | P1 文字版讨论闭环 | 题目模型、角色参数、状态机、调度、记忆、文字模拟和基础报告 | NOT_STARTED |
 | P2 语音与真实交互 | 麦克风、ASR、TTS、打断恢复、延迟监控和音频生命周期 | NOT_STARTED |
 | P3 评分与专项训练 | 客观指标、证据、六维评分、报告、专项训练和用户反馈 | NOT_STARTED |
@@ -44,9 +44,9 @@
 | P0-4 数据库与迁移基础 | 使用 Docker Compose、PostgreSQL 18.x、SQLAlchemy 2.x 和 Alembic 建立数据与 migration 基础及数据库集成验证 | DONE |
 | P0-5 最小身份边界 | 建立 V0.1 username/password、稳定 user_id 与服务端 Cookie session 身份边界，不做完整公开账号产品 | DONE |
 | P0-6 CI、日志与基础可观测性 | 建立自动检查、日志和基础监控能力 | DONE — P0-6A～P0-6E completed；cross-layer closeout 与 actual-source review PASS |
-| P0-7 P0 独立验收 | 独立确认 P0 是否满足进入 P1 的条件 | NOT_STARTED |
+| P0-7 P0 独立验收 | 独立确认 P0 是否满足进入 P1 的条件 | DONE — initial BLOCKED；2 documentation findings remediated；finding-only recheck PASS；P1 READY |
 
-任务细节及验收条件见 [`TASKS.md`](TASKS.md)。P0-1～P0-6 均已完成并转为 `DONE`。P0 整体仍为 `IN_PROGRESS`；P0-6B remote GitHub Actions run #1、P0-6C remote GitHub Actions run #4、P0-6D actual-source review/remediation/re-review 与 remote GitHub Actions run #6，以及 P0-6E cross-layer closeout 均 `PASS`；P0-7 `NOT_STARTED`。
+任务细节及验收条件见 [`TASKS.md`](TASKS.md)。P0-1～P0-7 均已完成，P0 整体已转为 `DONE`。P0-7 independent final acceptance initial verdict 为 `BLOCKED`，两个 documentation findings 已 remediation，finding-only independent recheck `PASS`，new blockers none，P1 readiness `READY`；P1 仍为 `NOT_STARTED` 并等待用户明确批准。
 
 P0-5 固定采用五阶段执行：P0-5A identity preflight（completed）、P0-5B identity persistence/migration/security primitives（completed）、P0-5C backend auth runtime/API（completed）、P0-5D Web/CORS/CSRF cross-layer validation（completed）、P0-5E independent final review（completed；PASS after findings remediation and independent recheck）。
 

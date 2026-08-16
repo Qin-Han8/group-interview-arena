@@ -10,20 +10,22 @@ AI 群面训练场让用户无需临时召集真人，即可与具有不同性�
 
 ## 当前状态
 
-- 当前开发阶段：`P0 — 项目基础`
+- 最近完成开发阶段：`P0 — 项目基础（DONE）`
 - 已完成任务：
   - `P0-1 — 仓库与文档治理`
   - `P0-2 — 技术架构决策`
   - `P0-3 — 前后端项目骨架`
   - `P0-4 — 数据库与迁移基础`
   - `P0-5 — 最小身份边界`
+  - `P0-6 — CI、日志与基础可观测性`
+  - `P0-7 — P0 独立验收`
 - 已完成子步骤：`P0-4A`～`P0-4F`、`P0-5A`～`P0-5E`、`P0-6A`～`P0-6E`
-- 最近完成任务：`P0-6 — CI、日志与基础可观测性（DONE）`
-- 后续独立门禁：`P0-7 — P0 独立验收（NOT_STARTED）`
+- 最近完成任务：`P0-7 — P0 独立验收（DONE；PASS after two documentation findings remediation and finding-only independent recheck）`
+- 下一阶段门禁：`P1 — 文字版讨论闭环（NOT_STARTED；awaiting explicit user approval）`
 - 当前目标版本：`V0.1 — Internal Validation / 内部技术验证版`
 - 当前实现状态：Web/API 技术骨架、本地 PostgreSQL 18.4、SQLAlchemy async/psycopg 3、Alembic 与 reusable PostgreSQL integration harness 已建立；P0-5 identity/browser boundary 与 P0-6 CI、structured logging、默认关闭且 app-owned 的 provider-neutral tracing 及 cross-layer closeout 均已完成
 
-> P0-1～P0-6 均已完成并转为 `DONE`。P0 整体仍为 `IN_PROGRESS`；P0-7 独立最终验收保持 `NOT_STARTED`。
+> P0-1～P0-7 均已完成，P0 整体已转为 `DONE`。P1 readiness 为 `READY`，但 P1 仍为 `NOT_STARTED`，等待用户明确批准后才能进入。
 
 ## 核心原则摘要
 

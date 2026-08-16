@@ -1,15 +1,15 @@
 # 当前任务清单
 
-- Status: Active
-- Managed scope: P0 only
-- Most recently completed task: P0-6 — `DONE`
-- Most recently completed substep: P0-6E — cross-layer validation, P0-6 closeout and actual-source review `PASS`
-- Next independent gate: P0-7 — `TODO` / not started
-- P0-6 status: `DONE`; P0-6A/P0-6B/P0-6C/P0-6D/P0-6E completed
+- Status: P0 complete; awaiting explicit approval for P1
+- Managed scope: completed P0 only; P1 not approved
+- Most recently completed task: P0-7 — `DONE`
+- P0-7 final outcome: initial verdict `BLOCKED` with two documentation findings; remediation completed; finding-only independent recheck `PASS`; new blockers none; P1 readiness `READY`
+- Next phase gate: P1 — `TODO` / not started / awaiting explicit user approval
+- P0 status: `DONE`; P0-1 through P0-7 completed
 - Allowed status values: `TODO` / `IN_PROGRESS` / `BLOCKED` / `DONE`
 - Related roadmap: [`ROADMAP.md`](ROADMAP.md)
 
-本文件只拆分当前 P0，不提前把 P1～P6 展开成大量任务。任务必须经用户明确批准后才能从 `TODO` 转为 `IN_PROGRESS`。
+本文件记录已完成的 P0 拆分，不提前把 P1～P6 展开成大量任务。P1 仍须用户明确批准后才能从 `TODO` 转为 `IN_PROGRESS`。
 
 ## P0-1 — 仓库与文档治理
 
@@ -322,12 +322,19 @@
 
 - ID: `P0-7`
 - 名称：P0 独立验收
-- Status: `TODO` — not started
+- Status: `DONE`
+- Approval state：independent final acceptance initial verdict `BLOCKED`；两个 documentation current-state findings 已 remediation；finding-only independent recheck `PASS`；new blockers none；P1 readiness `READY`。
 - 目标：独立确认 P0 的基础能力和治理是否足以进入 P1。
 - In scope：仓库、规范、架构、骨架、数据库基础、身份边界、CI/日志和决策记录验收。
 - Out of scope：提前实现 P1 文字讨论闭环。
 - Dependencies：P0-1～P0-6 完成。
-- Acceptance criteria：P0 所有验收项有证据，遗留风险和 TBD 已记录，并由用户明确批准进入 P1。
+- Acceptance criteria：P0 所有验收项有证据，遗留风险和 TBD 已记录，并通过独立最终验收；进入 P1 仍需单独获得用户明确批准。
+
+### P0-7 closeout note
+
+- initial independent verdict 为 `BLOCKED`：`ARCHITECTURE.md` 的 Alembic current head 描述错误，`DATABASE.md` 的 P0-5D browser-boundary status 过期；
+- 两个 findings 均已完成 docs-only remediation；finding-only independent recheck `PASS`，new blockers none；
+- P0-1～P0-7 completed，P0 转为 `DONE`；P1 readiness `READY`，但 P1 保持 `TODO` / not started / awaiting explicit user approval。
 
 ## 任务更新规则
 
