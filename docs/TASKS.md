@@ -1,17 +1,17 @@
 # 当前任务清单
 
-- Status: P1 in progress; P1-1 completed; P1-2 design freeze in progress
-- Managed scope: P1-2 only; P1-2A completed docs-only; P1-2B not started and requires separate explicit approval
-- Most recently completed subphase: P1-2A — `DONE`
+- Status: P1 in progress; P1-1 completed; P1-2 persistence/domain foundation in progress
+- Managed scope: P1-2 only; P1-2A completed docs-only; P1-2B completed; P1-2C not started and requires separate explicit approval
+- Most recently completed subphase: P1-2B — `DONE`
 - P0-7 final outcome: initial verdict `BLOCKED` with two documentation findings; remediation completed; finding-only independent recheck `PASS`; new blockers none; P1 readiness `READY`
 - Current phase: P1 — `IN_PROGRESS`
 - Current task: P1-2 — `IN_PROGRESS`
-- Next subphase gate: P1-2B — `TODO` / not started / awaiting explicit user approval
+- Next subphase gate: P1-2C — `TODO` / not started / awaiting explicit user approval
 - P0 status: `DONE`; P0-1 through P0-7 completed
 - Allowed status values: `TODO` / `IN_PROGRESS` / `BLOCKED` / `DONE`
 - Related roadmap: [`ROADMAP.md`](ROADMAP.md)
 
-用户已明确批准正式进入 P1，并已明确批准 P1-2A Question & Persona design freeze。本文件当前展开 P1-2 的获准设计冻结和后续审批门；P1-2B～D 不因本次计划创建而自动获准，也不提前展开完整状态机、调度、记忆、报告或 P2～P6。
+用户已明确批准正式进入 P1、P1-2A Question & Persona design freeze 和 P1-2B persistence/domain/seed foundation。P1-2C～D 不因前序完成而自动获准，也不提前展开完整状态机、调度、记忆、报告或 P2～P6。
 
 ## P0-1 — 仓库与文档治理
 
@@ -411,7 +411,7 @@
 - ID: `P1-2`
 - 名称：Question & Persona foundation
 - Status: `IN_PROGRESS`
-- Approval state：用户已明确批准 P1-2A；P1-2A completed docs-only；P1-2B not started / awaiting explicit approval；P1-2C/P1-2D not started。
+- Approval state：用户已明确批准 P1-2A/P1-2B；两者 completed；P1-2C/P1-2D not started / awaiting separate explicit approval。
 - 目标：建立 stable Question Template identity、immutable published Question Version、stable-behavior Persona Template，以及 question-version-specific Persona Assignment / Private Stance，并让后续 session 绑定不可变版本且不泄露私有立场。
 - In scope：P1-2A design freeze；后续经单独批准的 P1-2B persistence/domain/seed、P1-2C safe API/session/Web vertical slice、P1-2D independent acceptance。
 - Out of scope：完整 CMS/RBAC/审批流、AI 自动出题、12 道正式内容生产、LLM/provider、participant/utterance、完整状态机/调度/记忆、scoring/report、Redis/queue/voice 和行业题包插件。
@@ -421,7 +421,7 @@
 ### Substep progress
 
 - `P1-2A — Design freeze`：completed；docs-only；未修改 runtime/tests/schema/migrations/dependencies/lockfiles/CI；
-- `P1-2B — Persistence + Domain + Seed foundation`：not started / awaiting explicit approval；
+- `P1-2B — Persistence + Domain + Seed foundation`：completed；
 - `P1-2C — API + Session integration + minimal Web vertical slice`：not started；
 - `P1-2D — Independent acceptance + closeout`：not started。
 
@@ -433,7 +433,16 @@
 - 冻结 question type/difficulty 可演进 code、closed structured content、numeric parameter validation、private non-disclosure、retirement/restrict deletion 和历史 session traceability；
 - P1-2A domain boundary 由 execution plan 与对应领域文档冻结；不新增 Accepted 或 Proposed ADR；未经单独批准新增的 Accepted ADR 记录已在 governance finding remediation 中删除；
 - 完整 B～D scope、dependency、expected caller、acceptance、testing strategy 和 stop conditions 见 [`exec-plans/P1-2_question-persona-foundation.md`](exec-plans/P1-2_question-persona-foundation.md)；
-- P1-2 保持 `IN_PROGRESS`；P1-2B 未开始并等待单独明确批准。
+- 该 note 记录 P1-2A 当时的交付边界；P1-2B 后续已获明确批准并完成，当前等待 P1-2C 单独批准。
+
+### P1-2B completion note
+
+- 新增五张精确 question/persona tables、nullable `simulation_sessions.question_version_id` 与线性 Alembic head `f1a12b15c002`；历史 revisions 未改写；
+- strict closed domain validation 将 template identity、immutable version、stable Persona behavior 和 version-specific assignment/private stance 分离；type/difficulty/background 使用 validated string registry，无 PostgreSQL native enum 或 catch-all content/parameter blob；
+- application writer 对 published bundle 只允许 insert 或 exact-match no-op；同版本 drift 拒绝，新 version 追加不覆盖旧 version；retirement 和 session `ON DELETE RESTRICT` 保留历史追溯；
+- deterministic seed 精确建立四种 V0.1 Persona Template 和一个明确标记、不计入 12 道正式题的 internal-validation bundle；重复执行 no-op，stable-code drift 在单一事务内失败；
+- exact metadata/catalog、numeric/structured checks、private one-to-one、seed、immutability、retirement、single-head、fresh/repeat/downgrade/re-upgrade 和 P1-1 regression gates 通过；未新增 HTTP/WS/Web/dependency/lockfile/CI；
+- P1-2 保持 `IN_PROGRESS`；P1-2C 未开始并等待单独明确批准。
 
 ## 任务更新规则
 

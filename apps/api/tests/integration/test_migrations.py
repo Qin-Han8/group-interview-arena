@@ -25,10 +25,16 @@ pytestmark = pytest.mark.integration
 API_ROOT = Path(__file__).resolve().parents[2]
 BASELINE_REVISION = "7c6ccd86b3c5"
 IDENTITY_REVISION = "4fe43b42641b"
+SESSION_FOUNDATION_REVISION = "f1a11d15c001"
 EXPECTED_PRODUCT_TABLES = frozenset(
     {
         "auth_sessions",
         "discussion_events",
+        "persona_private_stances",
+        "persona_templates",
+        "question_persona_assignments",
+        "question_templates",
+        "question_versions",
         "session_actions",
         "simulation_sessions",
         "users",
@@ -168,6 +174,42 @@ def test_database_downgrades_to_identity_and_reupgrades_to_head(
         )
 
 
+def test_database_downgrades_to_p1_1_and_reupgrades_to_head(
+    temporary_database: TemporaryDatabaseContext,
+) -> None:
+    config = _alembic_config()
+    head = ScriptDirectory.from_config(config).get_current_head()
+    assert head is not None
+
+    with _temporary_migration_environment(temporary_database):
+        command.upgrade(config, "head")
+        command.downgrade(config, SESSION_FOUNDATION_REVISION)
+
+        assert _migration_state(temporary_database) == MigrationState(
+            revision=SESSION_FOUNDATION_REVISION,
+            version_table_exists=True,
+            product_tables=frozenset(
+                {
+                    "auth_sessions",
+                    "discussion_events",
+                    "session_actions",
+                    "simulation_sessions",
+                    "users",
+                }
+            ),
+        )
+
+        command.upgrade(config, "head")
+        command.current(config, check_heads=True)
+        command.check(config)
+
+        assert _migration_state(temporary_database) == MigrationState(
+            revision=head,
+            version_table_exists=True,
+            product_tables=EXPECTED_PRODUCT_TABLES,
+        )
+
+
 def test_database_downgrades_to_baseline_and_reupgrades_to_head(
     temporary_database: TemporaryDatabaseContext,
 ) -> None:
@@ -283,6 +325,7 @@ def test_head_has_exact_p1_1b_columns_constraints_and_indexes(
         ("simulation_sessions", "last_sequence", "int8", "NO", "0"),
         ("simulation_sessions", "created_at", "timestamptz", "NO", None),
         ("simulation_sessions", "updated_at", "timestamptz", "NO", None),
+        ("simulation_sessions", "question_version_id", "uuid", "YES", None),
     ]
     assert constraints == {
         "ck_discussion_events_event_version_positive",
@@ -294,6 +337,7 @@ def test_head_has_exact_p1_1b_columns_constraints_and_indexes(
         "fk_discussion_events_session_id_simulation_sessions",
         "fk_session_actions_session_id_simulation_sessions",
         "fk_simulation_sessions_owner_user_id_users",
+        "fk_simulation_sessions_question_version_id_question_versions",
         "pk_discussion_events",
         "pk_session_actions",
         "pk_simulation_sessions",

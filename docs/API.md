@@ -283,7 +283,7 @@ P0-3D 已完成最小 API、OpenAPI authority、typed config、request correlati
 
 - `IN_PROGRESS`；P1-1A～E 已完成第一条文字会话 scoped contract、persistence、backend REST/WS、Web caller、browser reconnect regression 和 independent acceptance；P1-1 `DONE`；
 - P1-2A safe question/session/private projection design freeze 已完成 docs-only；
-- P1-2B not started / awaiting explicit approval，P1-2C safe API/session/Web contract 尚未实现，不由 P1-2A 自动进入。
+- P1-2B persistence/domain/seed 已完成且未新增 HTTP/WS/Web contract；P1-2C safe API/session/Web contract 尚未实现，等待单独明确批准。
 
 ### P2 and later
 

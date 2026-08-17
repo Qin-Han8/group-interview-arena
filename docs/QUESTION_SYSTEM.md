@@ -1,9 +1,9 @@
 # 题型与题目系统
 
-- Status: P1-2A design frozen; implementation not started
+- Status: P1-2A design frozen; P1-2B persistence/domain/seed implemented
 - Current phase: P1 — IN_PROGRESS
 - Target version: V0.1 Internal Validation
-- Current task: P1-2 IN_PROGRESS；P1-2A completed；P1-2B awaiting explicit approval
+- Current task: P1-2 IN_PROGRESS；P1-2A/P1-2B completed；P1-2C awaiting explicit approval
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -62,7 +62,7 @@ P1-2B 不得用单一 `content` / `payload` JSONB 存整道题，也不得让 ar
 - options：ordered `QuestionOption{key,label,description}`；
 - reference dimensions：ordered `ReferenceDimension{key,name,description}`；
 - hidden conflicts / acceptable outcome patterns：ordered bounded internal text items；
-- phase prompts：只允许已支持 discussion phase keys 的 closed object；
+- phase prompts：显式 frozen `PhasePromptSet`，只允许六个已支持 discussion phase fields；仅在 JSONB persistence adapter boundary 转换为 uppercase-key object；
 - safety tags：unique bounded codes。
 
 每个结构都有 count/length/key uniqueness/unknown-field validation；question-type-specific rules 在 domain publication boundary 验证。P1-2B 不创建 generic extension/metadata JSON escape hatch。
@@ -107,9 +107,9 @@ V0.5 扩展到排序选择、资源分配、方案策划和两难决策，共 20
 
 ## Current implementation status
 
-- P1-1 已实现 `simulation_sessions`、`session_actions`、`discussion_events`，但没有 question/persona schema。
-- P1-2A 只完成 design freeze 和文档同步。
-- P1-2B 才允许增加题目/persona ORM、migration、domain 和 seed；当前尚未开始。
+- P1-2B 已新增五张 question/persona tables、nullable session version FK、revision `f1a12b15c002`、strict closed domain validation 和 insert-or-exact-match publication writer。
+- deterministic seed 精确包含四种 V0.1 Persona Template 与一个明确标记的 internal-validation bundle；它不属于 12 道正式内容。
+- 当前普通 REST/OpenAPI/Browser/WS contract 未新增题目或 persona projection，Private Stance 与 internal calibration fields 保持 server-only。
 - P1-2C 才允许增加 safe question read、version-bound session creation 和最小 Web caller；当前尚未开始。
 
 ## TBD
@@ -125,7 +125,7 @@ V0.5 扩展到排序选择、资源分配、方案策划和两难决策，共 20
 
 ## Deferred / Future work
 
-- P1-2B：经单独批准后建立 persistence/domain/seed foundation；
+- P1-2B：completed；persistence/domain/seed foundation 已建立；
 - P1-2C：经单独批准后建立 safe API/session/Web vertical slice；
 - P3：细化题型对评分权重和证据要求的影响；
 - P5：通过公开测试补充精品题并验证质量指标；

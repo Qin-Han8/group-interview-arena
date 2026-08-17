@@ -1,6 +1,6 @@
 # 数据库技术基线
 
-- Status: P0 Data Architecture Baseline + P1-1 completed + P1-2A schema target frozen
+- Status: P0 Data Architecture Baseline + P1-1 completed + P1-2B schema implemented
 - Current phase: P1 — IN_PROGRESS
 - Data architecture baseline established by: P0-2 — DONE
 - Local PostgreSQL infrastructure: P0-4B — completed
@@ -13,14 +13,14 @@
 - P0-5B identity persistence: completed
 - P0-5C backend auth runtime: completed
 - Target version: V0.1 Internal Validation
-- Business schema: identity plus P1-1 session foundation (`users`, `auth_sessions`, `simulation_sessions`, `session_actions`, `discussion_events`)
+- Business schema: identity, P1-1 session foundation and P1-2B question/persona foundation (ten product tables)
 - P1-1 status: P1-1A～E completed; independent final verdict PASS; P1-1 DONE
-- P1-2 status: IN_PROGRESS; P1-2A docs-only design freeze completed; P1-2B not started / awaiting explicit approval
+- P1-2 status: IN_PROGRESS; P1-2A/P1-2B completed; P1-2C not started / awaiting explicit approval
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
 
-本文件记录 P0-2 已批准的数据技术基线、P0-4 完成状态、P0-5 identity persistence、P1-1 session persistence/transaction callers，以及 P1-2A 冻结但尚未实现的 question/persona persistence target。当前 product tables 仍精确为 `users`、`auth_sessions`、`simulation_sessions`、`session_actions`、`discussion_events`，Alembic single head 仍为 `f1a11d15c001`。
+本文件记录 P0-2 已批准的数据技术基线、P0-4 完成状态、P0-5 identity persistence、P1-1 session persistence/transaction callers，以及已实现的 P1-2B question/persona persistence foundation。迁移目标 product tables 精确为十张，Alembic single head 为 `f1a12b15c002`。
 
 正式决策见 [`DECISIONS.md`](DECISIONS.md) `ADR-005`、`ADR-010`、`ADR-013`、`ADR-015`。
 
@@ -229,20 +229,20 @@ P1-1A 冻结第一条 session foundation 的最小 schema；P1-1B 已按该 scop
 
 完整 columns/constraints/indexes、transaction semantics 和 migration acceptance 见 [`exec-plans/P1-1_discussion-session-foundation.md`](exec-plans/P1-1_discussion-session-foundation.md)。
 
-## P1-2 question/persona persistence — design frozen, not implemented
+## P1-2 question/persona persistence — implemented in P1-2B
 
-P1-2A 只冻结以下 additive persistence target；当前 ORM、migration head 和五张 product tables 均未改变。P1-2B 未获准开始。
+P1-2B 已按 P1-2A 冻结边界实现以下 additive persistence target。revision `f1a12b15c002` 线性接续 P1-1 head，历史 revisions 未改写。
 
-### Planned `question_templates`
+### Implemented `question_templates`
 
 - UUIDv4 `id` primary key；
 - unique bounded stable `code`；
 - `created_at TIMESTAMPTZ NOT NULL`；
-- nullable `retired_at TIMESTAMPTZ`。
+- nullable `retired_at TIMESTAMPTZ`，check 保证 retirement 不早于 creation。
 
 Template 不保存 title/type/difficulty/content/current version。首个 version 发布后的 code immutability 和 retirement 由 application domain boundary 管理。
 
-### Planned `question_versions`
+### Implemented `question_versions`
 
 - UUIDv4 `id` primary key；
 - `question_template_id` foreign key with restrict/no-action history semantics；
@@ -253,16 +253,16 @@ Template 不保存 title/type/difficulty/content/current version。首个 versio
 
 不使用单一 catch-all content blob、generic extension metadata 或 question type/difficulty native PostgreSQL enum。Published payload、template link 和 version number 由 application service append-only；`retired_at` 是发布后唯一允许变化的 availability metadata。
 
-### Planned `persona_templates`
+### Implemented `persona_templates`
 
-- UUIDv4 `id`、unique stable `code`、`display_name`、`speech_style_code`、`created_at`、nullable `retired_at`；
+- UUIDv4 `id`、unique stable `code`、`display_name`、`speech_style_code`、`created_at`、nullable `retired_at`，check 保证 retirement 不早于 creation；
 - explicit `NUMERIC(4,3)` columns with `[0,1]` checks：initiative、interrupt tendency、stance stability、persuasion threshold、novel idea rate、summary tendency、time awareness、detail focus、cooperation、error rate、off-topic rate；
 - `support_user_bias NUMERIC(4,3)` with `[-1,1]` check；
 - `average_turn_seconds SMALLINT` with `[10,90]` check。
 
-Persona behavior parameters 不保存为 JSON。Domain 还必须拒绝 bool、NaN/infinity、out-of-range 和超过三位小数；DB checks 是 defense-in-depth。
+Persona behavior parameters 不保存为 JSON。Domain write boundary 拒绝 bool、NaN/infinity、out-of-range 和超过三位小数。PostgreSQL `NUMERIC(4,3)` 加 range checks 提供 canonical storage 与 defense-in-depth；直接 SQL 写入的过精度 decimal 会按 PostgreSQL 语义 canonicalize，而不是作为 domain rejection。P1-2B 不为 scale rejection 增加 trigger 或 custom type。
 
-### Planned `question_persona_assignments`
+### Implemented `question_persona_assignments`
 
 - UUIDv4 `id` primary key；
 - `question_version_id` foreign key；
@@ -272,7 +272,7 @@ Persona behavior parameters 不保存为 JSON。Domain 还必须拒绝 bool、Na
 
 V0.1 exactly three contiguous slots 是 publication application invariant，不做永久 DB cardinality check。
 
-### Planned `persona_private_stances`
+### Implemented `persona_private_stances`
 
 - `assignment_id` 同时为 primary key 和 one-to-one foreign key；
 - bounded explicit `initial_position`、`concession_conditions`、nullable `private_information`、`red_lines`、nullable `preferred_group_role`；
@@ -280,7 +280,7 @@ V0.1 exactly three contiguous slots 是 publication application invariant，不�
 
 Private Stance 属于具体 version assignment，不属于 Persona Template。Published version 下的 assignment/stance 不可 update/delete，且不进入普通 transport serialization。
 
-### Planned session binding and delete semantics
+### Implemented session binding and delete semantics
 
 - 向既有 `simulation_sessions` additive 增加 nullable `question_version_id` foreign key → `question_versions.id`，使用 restrict/no-action historical semantics；
 - P1-1 legacy rows 可以保持 null；P1-2C 后所有 API-created sessions 由 application invariant 要求 non-null selectable version；
@@ -288,7 +288,9 @@ Private Stance 属于具体 version assignment，不属于 Persona Template。Pu
 - future session deletion 不 cascade 到 shared question/persona source；
 - draft-only cleanup、published retirement 和 CMS authorization 仍 Deferred，但 product service 不 hard-delete published/referenced versions 或 assigned Persona Templates。
 
-P1-2B 预期完成后 table set 是既有五张加上述五张，共十张；不会增加 participant、utterance、memory、provider、report、voice、Redis/queue 或 CMS/RBAC tables。Exact migration acceptance 见 [`exec-plans/P1-2_question-persona-foundation.md`](exec-plans/P1-2_question-persona-foundation.md)。
+P1-2B table set 是既有五张加上述五张，共十张；没有增加 participant、utterance、memory、provider、report、voice、Redis/queue 或 CMS/RBAC tables。Exact catalog、single-head、downgrade-to-P1-1/re-upgrade 和 drift checks 已由 disposable PostgreSQL tests 覆盖。
+
+Publication service 对新 version/new assignment 先拒绝 retired Question Template 或 Persona Template；若 immutable bundle 已经存在且 exact-match，则在后续 retirement 后仍保持 no-op，以保留 deterministic seed 和历史解析语义。
 
 ## Future business schema
 
@@ -303,7 +305,7 @@ P1-2B 预期完成后 table set 是既有五张加上述五张，共十张；不
 
 ## TBD
 
-- Frozen / not implemented：P1-2 question/persona 五表与 nullable session version reference；
+- Implemented：P1-2 question/persona 五表与 nullable session version reference；
 - Deferred：participant、utterance、memory、report 等后续最小实体和正式 Schema；
 - TBD：未来 phone/WeChat identity mapping 的具体 Schema；
 - TBD：verified recovery identity、account recovery 与账号删除的完整数据语义；
@@ -317,7 +319,7 @@ P1-2B 预期完成后 table set 是既有五张加上述五张，共十张；不
 
 - P0-5C：FastAPI lifespan/request dependency 已成为现有 async DB runtime 的第一个 application caller；真实 PostgreSQL auth integration 只使用迁移到 head 的隔离临时数据库，development DB 保持 head `4fe43b42641b` 且两张表均为 0 rows；
 - P0-5D：completed；browser closure 已实现，existing Cookie/CORS/CSRF/shared trusted-origin boundary 已生效；P1 不得创建第二套 trusted-origin config；
-- P1：`IN_PROGRESS`；P1-1 `DONE`，development database 保持 `f1a11d15c001`、精确五张 product tables、各表 `0` rows；P1-2A 已冻结 question/persona schema target 但未修改 runtime/migration/schema；P1-2B not started / awaiting explicit approval；participant/utterance、记忆和报告继续留给后续获批任务；
+- P1：`IN_PROGRESS`；P1-1 `DONE`；P1-2A/P1-2B completed，migration target head `f1a12b15c002`、精确十张 product tables；P1-2C not started / awaiting explicit approval；participant/utterance、记忆和报告继续留给后续获批任务；
 - P2～P4：仅随获批范围增加音频、评分训练和商业化数据。
 
 ## 与其他文档关系

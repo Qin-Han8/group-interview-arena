@@ -25,6 +25,11 @@ from group_interview_arena_api.db import (
 EXPECTED_PRODUCT_TABLES = {
     "auth_sessions",
     "discussion_events",
+    "persona_private_stances",
+    "persona_templates",
+    "question_persona_assignments",
+    "question_templates",
+    "question_versions",
     "session_actions",
     "simulation_sessions",
     "users",
@@ -49,6 +54,7 @@ def test_simulation_sessions_has_exact_forward_safe_shape() -> None:
         table.c.last_sequence,
         table.c.created_at,
         table.c.updated_at,
+        table.c.question_version_id,
     ]
     assert isinstance(table.c.id.type, Uuid)
     assert table.c.id.primary_key is True
@@ -71,6 +77,7 @@ def test_simulation_sessions_has_exact_forward_safe_shape() -> None:
     assert _constraint_names(table) == {
         "ck_simulation_sessions_last_sequence_non_negative",
         "fk_simulation_sessions_owner_user_id_users",
+        "fk_simulation_sessions_question_version_id_question_versions",
         "pk_simulation_sessions",
     }
     assert sum(isinstance(item, CheckConstraint) for item in table.constraints) == 1

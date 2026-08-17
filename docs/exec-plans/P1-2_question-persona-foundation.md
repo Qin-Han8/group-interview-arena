@@ -1,6 +1,6 @@
 # P1-2 Question & Persona Foundation Execution Plan
 
-Status: `P1 IN_PROGRESS`; `P1-2 IN_PROGRESS`; `P1-2A completed`; `P1-2B not started / awaiting explicit approval`; `P1-2C` and `P1-2D` not started
+Status: `P1 IN_PROGRESS`; `P1-2 IN_PROGRESS`; `P1-2A completed`; `P1-2B completed`; `P1-2C not started / awaiting explicit approval`; `P1-2D` not started
 
 Target version: `V0.1 Internal Validation`
 
@@ -29,7 +29,7 @@ P1-2 只建立题目/人格的 persistence、domain、最小 authenticated read/
 ## Four-stage decomposition
 
 1. **P1-2A — Design freeze**：`completed`。本轮 docs-only；冻结 domain、lifecycle、security、B～D scope/callers/acceptance/testing，并同步必要文档。不修改 runtime、tests、schema/migrations、dependencies/lockfiles 或 CI。
-2. **P1-2B — Persistence + Domain + Seed foundation**：`not started / awaiting explicit approval`。新增最小 ORM/migration、纯 domain validation、application-owned idempotent seed 和真实 PostgreSQL tests；不新增 HTTP/WS/Web caller。
+2. **P1-2B — Persistence + Domain + Seed foundation**：`completed`。新增最小 ORM/migration、纯 domain validation、application-owned idempotent seed 和真实 PostgreSQL tests；未新增 HTTP/WS/Web caller。
 3. **P1-2C — API + Session integration + minimal Web vertical slice**：`not started`。增加 authenticated safe question reads，使新 session 绑定 immutable version，并增加最小 Web 选题/题面展示；不创建 participant/utterance/AI loop。
 4. **P1-2D — Independent acceptance + closeout**：`not started`。从 committed source 独立复核 P1-2B/C 的 schema、immutability、non-disclosure、history traceability 和 browser vertical slice；不增加新业务能力。
 
@@ -95,7 +95,7 @@ Fields are explicit columns, not a generic parameter blob：
 - signed parameter in `[-1.000, 1.000]`：`support_user_bias`；V0.1 seeds keep it `0.000` so personas do not help the user刷分；
 - bounded integer：`average_turn_seconds` in `[10, 90]`。
 
-API/domain validation rejects bool-as-number、NaN/infinity、out-of-range values and precision beyond three decimal places；domain uses canonical `Decimal` values，ORM uses `NUMERIC(4,3)` with matching DB checks. `average_turn_seconds` uses `SMALLINT` with a DB range check。Database constraints are defense-in-depth；domain validation is the write boundary。
+API/domain validation rejects bool-as-number、NaN/infinity、out-of-range values and precision beyond three decimal places；domain uses canonical `Decimal` values，ORM uses `NUMERIC(4,3)` plus matching range checks for canonical storage. Direct SQL overprecision follows PostgreSQL numeric canonicalization；P1-2B adds no trigger/custom type for scale rejection. `average_turn_seconds` uses `SMALLINT` with a DB range check。Database constraints are defense-in-depth；domain validation is the write boundary。
 
 Seeded/assigned V0.1 persona templates are immutable behavior records. Calibration that changes their parameters creates a successor template record/code rather than silently rewriting historical behavior. `retired_at` only removes a template from future assignment choices。
 
@@ -143,6 +143,8 @@ The 12 formal V0.1 questions are Deferred. To give P1-2C a real caller, P1-2B ma
 - No ordinary update service exists for a published payload. Any future CMS mutation path must call the same domain publication/immutability boundary。
 - `simulation_sessions.question_version_id` references the immutable version with `ON DELETE RESTRICT`/default no-action semantics. P1-1 legacy rows remain nullable；P1-2C application creation requires a non-null selectable version。
 - Template/version/persona “下线” is retirement, not destructive deletion. Retirement changes discovery/selection only；it does not cascade into sessions or reports。
+- Template/Persona Template retirement cannot precede creation；Question Version retirement requires publication and cannot precede `published_at`。
+- New version publication rejects a retired Question Template；new assignment rejects a retired Persona Template。An already-persisted exact-match immutable bundle remains a no-op after later retirement so historical rows stay resolvable and deterministic seed reruns do not mutate them。
 - Draft versions with no session reference may be hard-deleted by a future authorized CMS workflow；that workflow is Deferred. Published versions and any version referenced by a session are never hard-deleted through product services。
 - Persona templates referenced by any assignment are not hard-deleted. Assignments/stances attached to a published version are not edited or deleted。
 - Deleting a user-owned training session may delete that session aggregate under the future approved retention workflow, but never deletes shared question/persona source records。
@@ -180,7 +182,7 @@ The 12 formal V0.1 questions are Deferred. To give P1-2C a real caller, P1-2B ma
 
 - Exact schema、FK/delete behavior、generic checks、indexes and nullable legacy session reference match this plan；no native DB enum or catch-all question/persona blob。
 - Published bundle mutation/replacement is rejected by application service；new version insertion succeeds without changing the old version。
-- Domain and DB both reject invalid numeric ranges/precision and malformed structured content。
+- Domain rejects invalid numeric range/precision and malformed structured content；DB range checks reject out-of-range values while `NUMERIC(4,3)` provides canonical storage rather than a separate overprecision rejection mechanism。
 - Seed is deterministic/idempotent, creates exactly four persona codes, refuses drift and never logs private stance/content。
 - Fresh/repeat upgrade、single head、`alembic check`、downgrade to P1-1 head、re-upgrade and exact PostgreSQL catalog tests pass in disposable databases。
 - Existing P1-1 session/action/event behavior remains green；no route/OpenAPI/Web/dependency/lockfile/CI changes。
@@ -299,6 +301,6 @@ The 12 formal V0.1 questions are Deferred. To give P1-2C a real caller, P1-2B ma
 - [x] Publication、retirement、deletion、numeric validation、private isolation and future AI caller boundaries frozen。
 - [x] P1-2B～D scope、dependencies、expected callers、acceptance and testing strategies frozen。
 - [x] P1-2A docs-only synchronization and validation completed。
-- [ ] P1-2B not started / awaiting explicit approval。
+- [x] P1-2B implementation and risk-matched validation completed；P1-2C not started / awaiting explicit approval。
 - [ ] P1-2C not started。
 - [ ] P1-2D not started。

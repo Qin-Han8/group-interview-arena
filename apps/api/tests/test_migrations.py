@@ -11,6 +11,7 @@ ALEMBIC_CONFIG_PATH = API_ROOT / "alembic.ini"
 BASELINE_REVISION = "7c6ccd86b3c5"
 IDENTITY_REVISION = "4fe43b42641b"
 SESSION_FOUNDATION_REVISION = "f1a11d15c001"
+QUESTION_PERSONA_FOUNDATION_REVISION = "f1a12b15c002"
 
 
 def _alembic_config() -> Config:
@@ -27,14 +28,16 @@ def test_alembic_config_uses_project_migration_directory_without_url() -> None:
     assert config.get_main_option("sqlalchemy.url") is None
 
 
-def test_migration_history_is_linear_with_single_session_foundation_head() -> None:
+def test_migration_history_is_linear_with_single_question_persona_head() -> None:
     script = ScriptDirectory.from_config(_alembic_config())
     baseline = script.get_revision(BASELINE_REVISION)
     identity = script.get_revision(IDENTITY_REVISION)
     session_foundation = script.get_revision(SESSION_FOUNDATION_REVISION)
+    question_persona = script.get_revision(QUESTION_PERSONA_FOUNDATION_REVISION)
 
-    assert script.get_heads() == [SESSION_FOUNDATION_REVISION]
+    assert script.get_heads() == [QUESTION_PERSONA_FOUNDATION_REVISION]
     assert [revision.revision for revision in script.walk_revisions()] == [
+        QUESTION_PERSONA_FOUNDATION_REVISION,
         SESSION_FOUNDATION_REVISION,
         IDENTITY_REVISION,
         BASELINE_REVISION,
@@ -51,6 +54,10 @@ def test_migration_history_is_linear_with_single_session_foundation_head() -> No
     assert session_foundation.down_revision == IDENTITY_REVISION
     assert session_foundation.branch_labels == set()
     assert session_foundation.dependencies is None
+    assert question_persona.revision == QUESTION_PERSONA_FOUNDATION_REVISION
+    assert question_persona.down_revision == SESSION_FOUNDATION_REVISION
+    assert question_persona.branch_labels == set()
+    assert question_persona.dependencies is None
 
 
 def test_baseline_upgrade_and_downgrade_are_zero_op() -> None:
@@ -76,6 +83,11 @@ def test_migration_target_metadata_has_exact_product_tables() -> None:
     assert set(Base.metadata.tables) == {
         "auth_sessions",
         "discussion_events",
+        "persona_private_stances",
+        "persona_templates",
+        "question_persona_assignments",
+        "question_templates",
+        "question_versions",
         "session_actions",
         "simulation_sessions",
         "users",

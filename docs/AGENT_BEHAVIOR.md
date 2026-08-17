@@ -1,9 +1,9 @@
 # AI 候选人与讨论编排骨架
 
-- Status: P1-2A persona design frozen; P1-1 session foundation implemented
+- Status: P1-2A persona design frozen; P1-2B persona persistence/domain/seed implemented
 - Current phase: P1 — IN_PROGRESS
 - Target version: V0.1 Internal Validation
-- Detailed orchestrator/agent design: Not started; P1-1A～E completed; P1-2A design freeze completed; P1-2B awaiting explicit approval
+- Detailed orchestrator/agent design: Not started; P1-1A～E and P1-2A/B completed; P1-2C awaiting explicit approval
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -93,7 +93,7 @@ Persona Template 只拥有跨题稳定的行为参数和展示 metadata：initia
 
 它不得拥有具体题目的答案、初始偏好、支持的 option、隐藏事实、让步条件或底线。同一 Persona Template 在不同 Question Version 中可以获得完全不同的 Private Stance；强势控场者不能永久绑定某一种观点。
 
-P1-2B numeric write boundary 使用 strict finite Decimal/integer validation，并由 PostgreSQL range/precision checks 防御：概率 `[0,1]`、support-user bias `[-1,1]`、average turn seconds `[10,90]`、最多三位小数；bool、NaN、infinity、越界和过精度值必须拒绝。参数使用显式 columns，不保存为 generic JSON parameter blob。
+P1-2B numeric write boundary 使用 strict finite Decimal/integer validation：概率 `[0,1]`、support-user bias `[-1,1]`、average turn seconds `[10,90]`，且 Decimal 最多三位小数；bool、NaN、infinity、越界和过精度值在 domain write boundary 拒绝。PostgreSQL 以 `NUMERIC(4,3)` 加 range checks 保存 canonical values；直接 SQL 的过精度输入按 PostgreSQL 语义 canonicalize，不另造 trigger/custom type。参数使用显式 columns，不保存为 generic JSON parameter blob。
 
 Seeded/assigned V0.1 templates 的行为参数不原地改写。需要重新校准时创建 successor template identity；retirement 只阻止未来 assignment，不能删除历史 version 引用。
 
@@ -127,7 +127,7 @@ Assignment 和 Private Stance 与发布后的 Question Version 一起不可覆�
 - `GENTLE_COORDINATOR` — 温和协调者；
 - `ASSERTIVE_FACILITATOR` — 强势控场者。
 
-P1-2B seed 必须为每个 code 显式提供完整参数；重复执行 exact-match no-op，已有 code drift 必须 fail，不得静默 overwrite。
+P1-2B seed 已为每个 code 显式提供完整参数；重复执行 exact-match no-op，已有 code drift 在单一事务内 fail，不静默 overwrite。Persona Template 不含题目观点；internal-validation bundle 的三席 Private Stance 只保存在 assignment-specific server-side persistence 中。
 
 ## P1-1 foundation boundary — backend and Web caller implemented
 
@@ -160,7 +160,7 @@ P1-1A 冻结、P1-1B～D 已实现讨论会话的 persistence/backend transport 
 
 ## Future work
 
-- P1：`IN_PROGRESS`；P1-1 session foundation `DONE`；P1-2A persona/stance boundary completed docs-only；P1-2B awaiting explicit approval。完整状态机、调度、记忆和 AI runtime 仍未开始并需后续批准。
+- P1：`IN_PROGRESS`；P1-1 session foundation `DONE`；P1-2A persona/stance boundary 与 P1-2B persistence/domain/seed completed；P1-2C awaiting explicit approval。完整状态机、调度、记忆和 AI runtime 仍未开始并需后续批准。
 - P2：加入语音、打断、播放停止和恢复语义。
 - P3：建立角色行为与评分证据之间的校准边界。
 - P6/V1.0：扩展到 6～8 种角色和压力模式。

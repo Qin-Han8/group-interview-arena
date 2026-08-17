@@ -8,7 +8,7 @@
 - P0-5 identity boundary status: DONE
 - Most recently completed task: P0-7 independent final acceptance — PASS after two documentation findings remediation and finding-only recheck
 - P0 status: DONE; P0-1 through P0-7 completed
-- P1 status: IN_PROGRESS; P1-1 DONE; P1-2 IN_PROGRESS; P1-2A completed; P1-2B awaiting explicit approval
+- P1 status: IN_PROGRESS; P1-1 DONE; P1-2 IN_PROGRESS; P1-2A/P1-2B completed; P1-2C awaiting explicit approval
 - Target version: V0.1 Internal Validation
 - Business architecture detail: P1-1 runtime completed; P1-2 question/persona boundary frozen docs-only and not implemented
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
