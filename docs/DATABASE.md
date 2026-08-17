@@ -1,6 +1,6 @@
 # 数据库技术基线
 
-- Status: P0 Data Architecture Baseline + P1-1 session foundation completed
+- Status: P0 Data Architecture Baseline + P1-1 completed + P1-2A schema target frozen
 - Current phase: P1 — IN_PROGRESS
 - Data architecture baseline established by: P0-2 — DONE
 - Local PostgreSQL infrastructure: P0-4B — completed
@@ -15,11 +15,12 @@
 - Target version: V0.1 Internal Validation
 - Business schema: identity plus P1-1 session foundation (`users`, `auth_sessions`, `simulation_sessions`, `session_actions`, `discussion_events`)
 - P1-1 status: P1-1A～E completed; independent final verdict PASS; P1-1 DONE
+- P1-2 status: IN_PROGRESS; P1-2A docs-only design freeze completed; P1-2B not started / awaiting explicit approval
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
 
-本文件记录 P0-2 已批准的数据技术基线、P0-4 完成状态、P0-5 identity persistence，以及 P1-1B～C session persistence 与真实 transaction callers。当前 product tables 精确为 `users`、`auth_sessions`、`simulation_sessions`、`session_actions`、`discussion_events`，Alembic single head 保持 `f1a11d15c001`。
+本文件记录 P0-2 已批准的数据技术基线、P0-4 完成状态、P0-5 identity persistence、P1-1 session persistence/transaction callers，以及 P1-2A 冻结但尚未实现的 question/persona persistence target。当前 product tables 仍精确为 `users`、`auth_sessions`、`simulation_sessions`、`session_actions`、`discussion_events`，Alembic single head 仍为 `f1a11d15c001`。
 
 正式决策见 [`DECISIONS.md`](DECISIONS.md) `ADR-005`、`ADR-010`、`ADR-013`、`ADR-015`。
 
@@ -228,6 +229,67 @@ P1-1A 冻结第一条 session foundation 的最小 schema；P1-1B 已按该 scop
 
 完整 columns/constraints/indexes、transaction semantics 和 migration acceptance 见 [`exec-plans/P1-1_discussion-session-foundation.md`](exec-plans/P1-1_discussion-session-foundation.md)。
 
+## P1-2 question/persona persistence — design frozen, not implemented
+
+P1-2A 只冻结以下 additive persistence target；当前 ORM、migration head 和五张 product tables 均未改变。P1-2B 未获准开始。
+
+### Planned `question_templates`
+
+- UUIDv4 `id` primary key；
+- unique bounded stable `code`；
+- `created_at TIMESTAMPTZ NOT NULL`；
+- nullable `retired_at TIMESTAMPTZ`。
+
+Template 不保存 title/type/difficulty/content/current version。首个 version 发布后的 code immutability 和 retirement 由 application domain boundary 管理。
+
+### Planned `question_versions`
+
+- UUIDv4 `id` primary key；
+- `question_template_id` foreign key with restrict/no-action history semantics；
+- positive `version_number`，unique `(question_template_id, version_number)`；
+- bounded scalar `title`、`question_type_code`、`background_domain_code`、`difficulty_code`、`scenario`、`objective`、positive bounded `estimated_minutes`；
+- separately named JSONB fields for hard/soft constraints、stakeholders、options、reference dimensions、hidden conflicts、acceptable outcome patterns、phase prompts and safety tags；每列有 JSON array/object shape check，并且值只通过 closed domain schemas 写入；
+- `created_at`、nullable `published_at`、nullable `retired_at`，check 保证 retired version 已发布且 retirement 不早于 publication。
+
+不使用单一 catch-all content blob、generic extension metadata 或 question type/difficulty native PostgreSQL enum。Published payload、template link 和 version number 由 application service append-only；`retired_at` 是发布后唯一允许变化的 availability metadata。
+
+### Planned `persona_templates`
+
+- UUIDv4 `id`、unique stable `code`、`display_name`、`speech_style_code`、`created_at`、nullable `retired_at`；
+- explicit `NUMERIC(4,3)` columns with `[0,1]` checks：initiative、interrupt tendency、stance stability、persuasion threshold、novel idea rate、summary tendency、time awareness、detail focus、cooperation、error rate、off-topic rate；
+- `support_user_bias NUMERIC(4,3)` with `[-1,1]` check；
+- `average_turn_seconds SMALLINT` with `[10,90]` check。
+
+Persona behavior parameters 不保存为 JSON。Domain 还必须拒绝 bool、NaN/infinity、out-of-range 和超过三位小数；DB checks 是 defense-in-depth。
+
+### Planned `question_persona_assignments`
+
+- UUIDv4 `id` primary key；
+- `question_version_id` foreign key；
+- positive `slot_number SMALLINT`；
+- `persona_template_id` foreign key with restrict/no-action semantics；
+- unique `(question_version_id, slot_number)` and `(question_version_id, persona_template_id)`。
+
+V0.1 exactly three contiguous slots 是 publication application invariant，不做永久 DB cardinality check。
+
+### Planned `persona_private_stances`
+
+- `assignment_id` 同时为 primary key 和 one-to-one foreign key；
+- bounded explicit `initial_position`、`concession_conditions`、nullable `private_information`、`red_lines`、nullable `preferred_group_role`；
+- `priority_dimensions JSONB` 只保存 closed ordered `{code,weight}` list，并有 JSON array shape check；codes unique，weights 为 finite `[0,1]` Decimal。
+
+Private Stance 属于具体 version assignment，不属于 Persona Template。Published version 下的 assignment/stance 不可 update/delete，且不进入普通 transport serialization。
+
+### Planned session binding and delete semantics
+
+- 向既有 `simulation_sessions` additive 增加 nullable `question_version_id` foreign key → `question_versions.id`，使用 restrict/no-action historical semantics；
+- P1-1 legacy rows 可以保持 null；P1-2C 后所有 API-created sessions 由 application invariant 要求 non-null selectable version；
+- 新 version 或 retirement 不修改既有 session foreign key；
+- future session deletion 不 cascade 到 shared question/persona source；
+- draft-only cleanup、published retirement 和 CMS authorization 仍 Deferred，但 product service 不 hard-delete published/referenced versions 或 assigned Persona Templates。
+
+P1-2B 预期完成后 table set 是既有五张加上述五张，共十张；不会增加 participant、utterance、memory、provider、report、voice、Redis/queue 或 CMS/RBAC tables。Exact migration acceptance 见 [`exec-plans/P1-2_question-persona-foundation.md`](exec-plans/P1-2_question-persona-foundation.md)。
+
 ## Future business schema
 
 总纲提到 `users`、题目版本、角色模板、会话、参与者、阶段、发言、讨论事件、结构化记忆、报告、证据、训练、反馈、模型调用和审计等未来领域概念。
@@ -241,7 +303,8 @@ P1-1A 冻结第一条 session foundation 的最小 schema；P1-1B 已按该 scop
 
 ## TBD
 
-- Deferred：P1-1 之后的 question、participant、utterance、memory、report 等最小实体和正式 Schema；
+- Frozen / not implemented：P1-2 question/persona 五表与 nullable session version reference；
+- Deferred：participant、utterance、memory、report 等后续最小实体和正式 Schema；
 - TBD：未来 phone/WeChat identity mapping 的具体 Schema；
 - TBD：verified recovery identity、account recovery 与账号删除的完整数据语义；
 - TBD：原始音频是否默认完全不保存（总纲第 37 节）；
@@ -254,7 +317,7 @@ P1-1A 冻结第一条 session foundation 的最小 schema；P1-1B 已按该 scop
 
 - P0-5C：FastAPI lifespan/request dependency 已成为现有 async DB runtime 的第一个 application caller；真实 PostgreSQL auth integration 只使用迁移到 head 的隔离临时数据库，development DB 保持 head `4fe43b42641b` 且两张表均为 0 rows；
 - P0-5D：completed；browser closure 已实现，existing Cookie/CORS/CSRF/shared trusted-origin boundary 已生效；P1 不得创建第二套 trusted-origin config；
-- P1：`IN_PROGRESS`；P1-1A～E 已完成 session/action/event scope freeze、persistence/migration foundation、transaction callers、Web reconnect cross-layer validation 与 independent final review，verdict `PASS`、findings none；development database 保持 `f1a11d15c001`、精确五张 product tables、各表 `0` rows，P1-1D/E 无 schema/migration 变化；P1-1 现为 `DONE`，P1-2 未开始，题目、角色、participant/utterance、记忆和报告数据留给后续获批任务；
+- P1：`IN_PROGRESS`；P1-1 `DONE`，development database 保持 `f1a11d15c001`、精确五张 product tables、各表 `0` rows；P1-2A 已冻结 question/persona schema target 但未修改 runtime/migration/schema；P1-2B not started / awaiting explicit approval；participant/utterance、记忆和报告继续留给后续获批任务；
 - P2～P4：仅随获批范围增加音频、评分训练和商业化数据。
 
 ## 与其他文档关系

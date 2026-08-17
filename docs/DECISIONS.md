@@ -1,9 +1,9 @@
 # 产品与技术决策记录
 
 - Status: Active governance baseline
-- Current phase: P0
+- Current phase: P1
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md)，高于领域文档和代码实现
-- Last established by task: P0-5A decision closeout — approved
+- Last accepted decision established by task: P0-5A decision closeout — approved
 
 ## 1. 文档规则
 
@@ -334,7 +334,6 @@ ADR-007 在 P0-2 建立时将具体 OpenAPI generator package 保持 Deferred；
 - TBD：UI primitives/component library；
 - TBD：WebSocket schema generator package 和 P1 完整事件 Schema；
 - TBD：PWA production strategy；
-- TBD：V0.1 四种基础角色的具体组合。
 
 ## 5. 决策变更流程
 

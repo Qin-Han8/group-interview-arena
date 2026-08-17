@@ -1,9 +1,9 @@
 # AI 候选人与讨论编排骨架
 
-- Status: Skeleton / Baseline + P1-1 foundation boundary
+- Status: P1-2A persona design frozen; P1-1 session foundation implemented
 - Current phase: P1 — IN_PROGRESS
 - Target version: V0.1 Internal Validation
-- Detailed orchestrator/agent design: Not started; P1-1A～E session foundation completed; P1-2 awaiting explicit approval
+- Detailed orchestrator/agent design: Not started; P1-1A～E completed; P1-2A design freeze completed; P1-2B awaiting explicit approval
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -81,9 +81,53 @@ CREATED
 ## 当前版本范围
 
 - V0.1 每场固定 3 名 AI 候选人；
-- V0.1 共需 4 种基础角色模板，但具体选择仍是 TBD；
+- V0.1 四种基础 Persona Template 已确认为：逻辑分析者、创意发散者、温和协调者、强势控场者；
 - 使用文字输入输出验证准备、陈述、讨论和总结闭环；
 - 目标是验证角色差异、状态机、调度和记忆，而不是语音或视觉拟真。
+
+## P1-2A frozen persona boundary
+
+### Persona Template is stable behavior, not a stance
+
+Persona Template 只拥有跨题稳定的行为参数和展示 metadata：initiative、interrupt tendency、average turn seconds、stance stability、persuasion threshold、novel idea rate、summary tendency、time awareness、detail focus、cooperation、support-user bias、error rate、off-topic rate 和 speech style。
+
+它不得拥有具体题目的答案、初始偏好、支持的 option、隐藏事实、让步条件或底线。同一 Persona Template 在不同 Question Version 中可以获得完全不同的 Private Stance；强势控场者不能永久绑定某一种观点。
+
+P1-2B numeric write boundary 使用 strict finite Decimal/integer validation，并由 PostgreSQL range/precision checks 防御：概率 `[0,1]`、support-user bias `[-1,1]`、average turn seconds `[10,90]`、最多三位小数；bool、NaN、infinity、越界和过精度值必须拒绝。参数使用显式 columns，不保存为 generic JSON parameter blob。
+
+Seeded/assigned V0.1 templates 的行为参数不原地改写。需要重新校准时创建 successor template identity；retirement 只阻止未来 assignment，不能删除历史 version 引用。
+
+### Version-specific Assignment and Private Stance
+
+QuestionPersonaAssignment 属于一个 immutable Question Version，并引用一个 Persona Template。V0.1 发布校验要求三个不同 Persona、连续 slots `1..3`，但数据库不把“3”做成永久封闭 constraint。
+
+Private Stance 是 assignment 的 required one-to-one child，显式表达：
+
+- initial position；
+- weighted priority dimensions；
+- concession conditions；
+- optional private information；
+- red lines；
+- optional preferred group role。
+
+Assignment 和 Private Stance 与发布后的 Question Version 一起不可覆盖修改。修订 stance 必须发布新 Question Version，不能修改历史 session 使用的版本。
+
+### Private isolation and future AI caller
+
+- Private Stance、Persona parameters、assignments、reference dimensions、hidden conflicts、acceptable outcome patterns 和 phase prompts 不进入普通 REST/OpenAPI/Browser/WebSocket/session snapshot/log/trace/error。
+- P1-2B 只建立 server-side domain/persistence types，不创建 public schema、provider、prompt runtime 或 unused AI interface。
+- P1-2C session create 只验证 version assignment completeness，并返回 safe `question_version_id`/public question projection；participant 尚未存在，因此不向 Browser 下发 Persona Template label/parameters。
+- 未来获批 orchestrator/AI caller 只能按 session-bound `question_version_id` + its own assignment 加载单一 Persona behavior 和本席 Private Stance；不得把其他席位 stance 注入候选人上下文，也不得交给 browser/provider logs。
+- 以上只是 future caller contract。LLMProvider 必须等真实 LLM caller 获批出现后再建立。
+
+### V0.1 seed identities
+
+- `LOGIC_ANALYST` — 逻辑分析者；
+- `CREATIVE_DIVERGER` — 创意发散者；
+- `GENTLE_COORDINATOR` — 温和协调者；
+- `ASSERTIVE_FACILITATOR` — 强势控场者。
+
+P1-2B seed 必须为每个 code 显式提供完整参数；重复执行 exact-match no-op，已有 code drift 必须 fail，不得静默 overwrite。
 
 ## P1-1 foundation boundary — backend and Web caller implemented
 
@@ -105,10 +149,9 @@ P1-1A 冻结、P1-1B～D 已实现讨论会话的 persistence/backend transport 
 
 ## TBD
 
-- TBD：V0.1 四种基础角色的具体组合；
 - TBD：标准模式 AI 发言人数和总时长（总纲第 37 节）；
 - TBD：具体 LLM 供应商（总纲第 37 节）；
-- TBD：角色参数默认值和校准方法；
+- TBD：P1-2B initial numeric seed 经过真实讨论后的校准方法和 blind-test threshold；
 - TBD：状态转换条件、调度公式和冲突循环阈值；
 - TBD：结构化记忆和模型输出的正式 Schema；
 - TBD：角色盲测样本及通过标准的执行细节。
@@ -117,7 +160,7 @@ P1-1A 冻结、P1-1B～D 已实现讨论会话的 persistence/backend transport 
 
 ## Future work
 
-- P1：`IN_PROGRESS`；P1-1A 已完成 session foundation scope freeze，角色、完整状态机、调度和记忆详细设计仍未开始并需后续批准。
+- P1：`IN_PROGRESS`；P1-1 session foundation `DONE`；P1-2A persona/stance boundary completed docs-only；P1-2B awaiting explicit approval。完整状态机、调度、记忆和 AI runtime 仍未开始并需后续批准。
 - P2：加入语音、打断、播放停止和恢复语义。
 - P3：建立角色行为与评分证据之间的校准边界。
 - P6/V1.0：扩展到 6～8 种角色和压力模式。

@@ -1,6 +1,6 @@
 # P0 技术架构基线
 
-- Status: P0 Architecture Baseline + P1-1 session foundation completed
+- Status: P0 Architecture Baseline + P1-1 completed + P1-2A design frozen
 - Current phase: P1 — IN_PROGRESS
 - Architecture baseline established by: P0-2 — DONE
 - P0-3 foundation status: DONE
@@ -8,9 +8,9 @@
 - P0-5 identity boundary status: DONE
 - Most recently completed task: P0-7 independent final acceptance — PASS after two documentation findings remediation and finding-only recheck
 - P0 status: DONE; P0-1 through P0-7 completed
-- P1 status: IN_PROGRESS; P1-1A～E completed; P1-1 independent verdict PASS; P1-1 DONE; P1-2 awaiting explicit user approval
+- P1 status: IN_PROGRESS; P1-1 DONE; P1-2 IN_PROGRESS; P1-2A completed; P1-2B awaiting explicit approval
 - Target version: V0.1 Internal Validation
-- Business architecture detail: P1-1 persistence, backend REST/WS/domain runtime, minimal Web realtime caller and independent final review completed
+- Business architecture detail: P1-1 runtime completed; P1-2 question/persona boundary frozen docs-only and not implemented
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -238,6 +238,19 @@ WebSocket 使用独立版本化事件契约，至少表达 event type、schema v
 - 真实 disposable PostgreSQL + Next/Chromium/Uvicorn E2E 已验证 create、sequence `1` catch-up、abort sequence `2`、duplicate action replay、REST reload restore、单一 durable action 与资源 cleanup。
 - P1-1 不运行 Redis、queue，不创建 provider，且不扩展 WebSocket OTel propagation unless a bounded real caller needs it。
 
+### P1-2 question/persona architecture — design frozen, implementation not started
+
+- P1-2A 冻结 `modules/question_personas` 这一真实业务边界；P1-2B 才可在获批后创建对应 domain/persistence module，不提前创建 CMS、provider、repository/interface/factory 空壳。
+- `QuestionTemplate` 只拥有 stable identity/lifecycle；immutable `QuestionVersion` 是内容、三个 Persona Assignments 和 Private Stances 的 aggregate/publication boundary。
+- `PersonaTemplate` 是可跨题复用的 stable-behavior record；具体题目观点只存在于 version-specific assignment/stance，不进入 Persona Template。
+- FastAPI domain/application code 是 publication、immutability、selection 和 private projection authority；ORM 只负责 persistence；Browser 只消费 purpose-built safe public question DTO。
+- PostgreSQL persistence 使用 scalar columns、分别命名且 closed-schema-validated 的 structured fields 和 explicit persona numeric columns；不使用单一 arbitrary question/persona JSON blob，也不使用 question type/difficulty native DB enum。
+- P1-2B 以 additive migration 新增题目/persona tables，并向 `simulation_sessions` 添加 nullable legacy-safe `question_version_id`；P1-2C 后新的 API-created session 必须绑定 selectable immutable version。
+- P1-2C 只增加 authenticated safe question reads、version-bound session creation 和最小 Web selection/render caller；不会增加 question mutation/admin、persona/private API、participant/utterance、WS event vocabulary 或 AI runtime。
+- Private Stance/internal calibration fields 不进入 REST OpenAPI、generated Web contract、Browser、WebSocket、logs、traces 或 errors。未来 AI caller 只在获批后由 server-side application service 按 session-bound version 为单一 assignment 加载最小 private context。
+- Published content/assignment/stance 采用 append-only application invariant；retirement 只影响未来 discovery。Session foreign key 使用 restrict/no-action historical semantics，禁止 mutable latest pointer 或 retirement cascade 改写历史。
+- 完整范围、schema、B～D caller/acceptance/testing 见 [`exec-plans/P1-2_question-persona-foundation.md`](exec-plans/P1-2_question-persona-foundation.md)。P1-2A 后 P1-2B 保持 not started / awaiting explicit approval。
+
 ## Configuration, secrets and error boundaries
 
 - 配置采用类型化、启动时校验的方式；
@@ -258,6 +271,7 @@ WebSocket 使用独立版本化事件契约，至少表达 event type、schema v
 - Frontend tests：Vitest、Testing Library；
 - P0-4：真实 PostgreSQL integration/migration tests，不使用 SQLite 代替；
 - P1：WebSocket tests、fake provider tests、deterministic session/orchestrator regression；
+- P1-2：closed domain/schema validation、真实 PostgreSQL immutable-version/seed/history integration、private non-disclosure 和最小 browser vertical-slice regression；fake provider 仍等真实 provider caller；
 - P0-5D 已因真实跨应用 auth flow 加入 `@playwright/test 1.62.1`，只运行 Chromium，并由 test-only 编排器使用迁移后的隔离 `gia_p05d_*` PostgreSQL database；
 - 真实 LLM tests 必须显式执行，不进入默认 CI。
 

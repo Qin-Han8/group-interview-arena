@@ -1,17 +1,17 @@
 # 当前任务清单
 
-- Status: P1 in progress; P1-1 discussion session foundation completed
-- Managed scope: P1-1 only; P1-1A～E completed; P1-2 remains not started and requires separate explicit approval
-- Most recently completed task: P1-1E — `DONE`
+- Status: P1 in progress; P1-1 completed; P1-2 design freeze in progress
+- Managed scope: P1-2 only; P1-2A completed docs-only; P1-2B not started and requires separate explicit approval
+- Most recently completed subphase: P1-2A — `DONE`
 - P0-7 final outcome: initial verdict `BLOCKED` with two documentation findings; remediation completed; finding-only independent recheck `PASS`; new blockers none; P1 readiness `READY`
 - Current phase: P1 — `IN_PROGRESS`
-- Current task: P1-1 — `DONE`
-- Next subphase gate: P1-2 — `TODO` / not started / awaiting explicit user approval
+- Current task: P1-2 — `IN_PROGRESS`
+- Next subphase gate: P1-2B — `TODO` / not started / awaiting explicit user approval
 - P0 status: `DONE`; P0-1 through P0-7 completed
 - Allowed status values: `TODO` / `IN_PROGRESS` / `BLOCKED` / `DONE`
 - Related roadmap: [`ROADMAP.md`](ROADMAP.md)
 
-用户已明确批准正式进入 P1。本文件当前只展开获准的 P1-1 discussion session foundation，不提前展开 P1 的题目、角色、完整状态机、调度、记忆或报告任务，也不提前展开 P2～P6。
+用户已明确批准正式进入 P1，并已明确批准 P1-2A Question & Persona design freeze。本文件当前展开 P1-2 的获准设计冻结和后续审批门；P1-2B～D 不因本次计划创建而自动获准，也不提前展开完整状态机、调度、记忆、报告或 P2～P6。
 
 ## P0-1 — 仓库与文档治理
 
@@ -405,6 +405,35 @@
 - `uv sync --frozen`、`uv lock --check`、Ruff、format、Pyright、API non-integration `201`、PostgreSQL integration `39`、API full `240`、Web lint/format/typecheck、Vitest `37`、production build、OpenAPI drift、Alembic single-head/current/drift 全部通过；
 - disposable `gia_p11d_*` PostgreSQL + 真实 Next/Chromium/Uvicorn E2E 为 `2 passed` / zero skips，并复证一个 durable action、events `[1, 2]`、REST reload restore；测试后临时数据库残留为 `0`、端口 `3000`/`8000` clean、生成测试产物已清理；
 - development PostgreSQL 在独立验收前后均为 revision `f1a11d15c001`、精确五张 product tables、各表 `0` rows；P1-1 转为 `DONE`，P1 保持 `IN_PROGRESS`，P1-2 未开始并等待用户明确批准。
+
+## P1-2 — Question & Persona foundation
+
+- ID: `P1-2`
+- 名称：Question & Persona foundation
+- Status: `IN_PROGRESS`
+- Approval state：用户已明确批准 P1-2A；P1-2A completed docs-only；P1-2B not started / awaiting explicit approval；P1-2C/P1-2D not started。
+- 目标：建立 stable Question Template identity、immutable published Question Version、stable-behavior Persona Template，以及 question-version-specific Persona Assignment / Private Stance，并让后续 session 绑定不可变版本且不泄露私有立场。
+- In scope：P1-2A design freeze；后续经单独批准的 P1-2B persistence/domain/seed、P1-2C safe API/session/Web vertical slice、P1-2D independent acceptance。
+- Out of scope：完整 CMS/RBAC/审批流、AI 自动出题、12 道正式内容生产、LLM/provider、participant/utterance、完整状态机/调度/记忆、scoring/report、Redis/queue/voice 和行业题包插件。
+- Dependencies：P1-1 `DONE`；Accepted `D-007`、`D-012`～`D-014`、`ADR-003`、`ADR-005`～`ADR-007`、`ADR-011`～`ADR-015`；每个实施子步骤仍需用户明确批准。
+- Acceptance criteria：P1-2A～D 全部完成并经独立验收后，published question bundle append-only、历史 session 精确绑定原 version、Persona Template 不绑定题目观点、Private Stance 保持 server-only、类型/难度可演进、结构化内容和 numeric parameters 有明确 validation boundary，且 retirement/deletion 不破坏历史追溯。
+
+### Substep progress
+
+- `P1-2A — Design freeze`：completed；docs-only；未修改 runtime/tests/schema/migrations/dependencies/lockfiles/CI；
+- `P1-2B — Persistence + Domain + Seed foundation`：not started / awaiting explicit approval；
+- `P1-2C — API + Session integration + minimal Web vertical slice`：not started；
+- `P1-2D — Independent acceptance + closeout`：not started。
+
+### P1-2A completion note
+
+- 从 clean committed `main` HEAD `895a1d432150af198373f43dedd5a97af23f1ea9` 恢复总纲、Accepted Decisions、P1-1 actual source 和题目/角色/数据库/API 文档；总纲 SHA-256 保持 `2388A9660320406CB35D5354126AD71C6849A98DB7C4A356796CA951BF372F26`；
+- 冻结 Question Template stable identity 与 immutable Question Version 边界；session 后续只绑定 version UUID，不绑定 template/latest/current pointer；
+- 冻结 Persona Template 只承载稳定行为、Assignment/Private Stance 属于具体 question version，V0.1 四种基础模板为逻辑分析者、创意发散者、温和协调者、强势控场者；
+- 冻结 question type/difficulty 可演进 code、closed structured content、numeric parameter validation、private non-disclosure、retirement/restrict deletion 和历史 session traceability；
+- P1-2A domain boundary 由 execution plan 与对应领域文档冻结；不新增 Accepted 或 Proposed ADR；未经单独批准新增的 Accepted ADR 记录已在 governance finding remediation 中删除；
+- 完整 B～D scope、dependency、expected caller、acceptance、testing strategy 和 stop conditions 见 [`exec-plans/P1-2_question-persona-foundation.md`](exec-plans/P1-2_question-persona-foundation.md)；
+- P1-2 保持 `IN_PROGRESS`；P1-2B 未开始并等待单独明确批准。
 
 ## 任务更新规则
 

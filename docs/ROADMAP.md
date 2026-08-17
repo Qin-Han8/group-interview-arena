@@ -2,11 +2,11 @@
 
 - Status: Active baseline
 - Most recently completed development phase: P0 — `DONE`
-- Most recently completed task: P1-1E / P1-1 — `DONE`
+- Most recently completed subphase: P1-2A — `DONE`
 - P0-7 final outcome: initial `BLOCKED`; two documentation findings remediated; finding-only independent recheck `PASS`; P1 readiness `READY`
 - Current phase: P1 — `IN_PROGRESS`
-- Current task: P1-1 — `DONE`
-- Next subphase gate: P1-2 — `NOT_STARTED` / awaiting explicit user approval
+- Current task: P1-2 — `IN_PROGRESS`
+- Next subphase gate: P1-2B — `NOT_STARTED` / awaiting explicit user approval
 - P0 status: `DONE`; P0-1 through P0-7 completed
 - Target product version: V0.1 — Internal Validation
 - Source: [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) §30–31
@@ -18,7 +18,7 @@
 - `P0～P6`：研发推进阶段，描述按什么顺序建立能力；
 - `V0.1 / V0.5 / V1.0`：产品交付版本，描述某个可验证版本包含什么。
 
-阶段不是版本，P0-x/P1-x 也不是新增产品版本。P0 已完成不代表 V0.1 的全部业务能力已经实现；用户已明确批准进入 P1，当前只执行 P1-1 discussion session foundation。
+阶段不是版本，P0-x/P1-x 也不是新增产品版本。P0 已完成不代表 V0.1 的全部业务能力已经实现；用户已明确批准进入 P1 和 P1-2A，当前 P1-2 只完成 Question & Persona design freeze，P1-2B 尚未获准开始。
 
 ## 2. 开发阶段
 
@@ -58,7 +58,7 @@ P0-2 已 Accepted PostgreSQL、SQLAlchemy 2.x 和 Alembic；P0-4 实施基线为
 
 ## 4. P1 当前执行拆分
 
-P1 已正式启动，但当前只展开 `P1-1 — Discussion session foundation`。P1-1 建立 session create/snapshot、versioned WebSocket、durable action idempotency、monotonic event sequence 和 reconnect 基础；它不等于 P1 全部文字讨论闭环。
+P1 已正式启动。`P1-1 — Discussion session foundation` 已建立 session create/snapshot、versioned WebSocket、durable action idempotency、monotonic event sequence 和 reconnect 基础；它不等于 P1 全部文字讨论闭环。
 
 - `P1-1A — Preflight / scope freeze / execution plan`：completed；
 - `P1-1B — Session persistence + migration foundation`：completed；
@@ -66,7 +66,16 @@ P1 已正式启动，但当前只展开 `P1-1 — Discussion session foundation`
 - `P1-1D — Web realtime caller + reconnect cross-layer validation`：completed；
 - `P1-1E — Independent final review / P1-1 closeout`：completed；independent verdict `PASS`；findings none。
 
-P1-1A 完成 docs-only plan/scope freeze；P1-1B 完成三表 ORM/migration 与真实 PostgreSQL persistence foundation；P1-1C 完成 authenticated REST create/snapshot、versioned WS v1、durable action idempotency、locked-row sequence allocation、ordered catch-up/reconnect 与安全 realtime errors/logging；P1-1D 完成最小 Web realtime caller、strict sequence/gap recovery、stable action retry 与真实 PostgreSQL Chromium cross-layer validation；P1-1E 从 committed source 独立复核 migration、transaction、auth、WS、browser、privacy 和真实 Chromium → Uvicorn → PostgreSQL 路径，verdict `PASS`、findings none。P1-1 现为 `DONE`，P1 仍为 `IN_PROGRESS`。详细计划见 [`exec-plans/P1-1_discussion-session-foundation.md`](exec-plans/P1-1_discussion-session-foundation.md)。题目、participant/utterance、完整状态机/调度/记忆、AI 和基础报告仍需后续分别批准；P1-2 未开始，不自动进入。
+P1-1A 完成 docs-only plan/scope freeze；P1-1B 完成三表 ORM/migration 与真实 PostgreSQL persistence foundation；P1-1C 完成 authenticated REST create/snapshot、versioned WS v1、durable action idempotency、locked-row sequence allocation、ordered catch-up/reconnect 与安全 realtime errors/logging；P1-1D 完成最小 Web realtime caller、strict sequence/gap recovery、stable action retry 与真实 PostgreSQL Chromium cross-layer validation；P1-1E 从 committed source 独立复核 migration、transaction、auth、WS、browser、privacy 和真实 Chromium → Uvicorn → PostgreSQL 路径，verdict `PASS`、findings none。P1-1 现为 `DONE`。详细计划见 [`exec-plans/P1-1_discussion-session-foundation.md`](exec-plans/P1-1_discussion-session-foundation.md)。
+
+`P1-2 — Question & Persona foundation` 固定为四阶段：
+
+- `P1-2A — Design freeze`：completed；docs-only；
+- `P1-2B — Persistence + Domain + Seed foundation`：not started / awaiting explicit approval；
+- `P1-2C — API + Session integration + minimal Web vertical slice`：not started；
+- `P1-2D — Independent acceptance + closeout`：not started。
+
+P1-2A 已冻结 stable Question Template、immutable published Question Version、stable-behavior Persona Template、version-specific Assignment/Private Stance、session version binding、private non-disclosure、numeric validation、retirement/deletion 和历史追溯边界，并确认 V0.1 四种基础角色为逻辑分析者、创意发散者、温和协调者、强势控场者。P1-2 现为 `IN_PROGRESS`；P1-2B 未获准，不自动开始。完整 B～D scope/gates 见 [`exec-plans/P1-2_question-persona-foundation.md`](exec-plans/P1-2_question-persona-foundation.md)。Participant/utterance、完整状态机/调度/记忆、LLM/provider 和基础报告继续留给后续获批任务。
 
 ## 5. 产品版本
 
