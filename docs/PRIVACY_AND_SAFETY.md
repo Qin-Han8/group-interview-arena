@@ -106,6 +106,13 @@ P0-5B 已实现显式参数的 Argon2id hash/verify/verify-and-update、username
 - exporter flush/shutdown failure 只产生固定 `telemetry.export.failed` 与安全 category，不记录 endpoint、credential、response body 或异常消息；失败不影响 request handling 或 database cleanup；
 - sentinel negative tests 已覆盖 query/header/body/Cookie/Authorization/CSRF/dynamic path/exception/database URL，exported spans、application logs 与 error response 均不包含这些值。
 
+## P1-2C question/private-data transport boundary — completed
+
+- Ordinary authenticated `GET /questions`、detail、session snapshot、OpenAPI derivative、WebSocket 和 browser DOM 只使用 closed public DTO allowlist；不序列化 ORM/domain 私有对象。
+- Private Stance、Persona Template behavior parameters、reference dimensions、hidden conflicts、acceptable outcome patterns、phase prompts 和 safety/internal calibration fields 不进入普通 transport、日志或错误。
+- Session creation 只返回 safe `question_version_id`；assignment/private completeness 仅在 server-side transaction 内验证，没有为了未来 LLM caller 创建内部 endpoint。
+- PostgreSQL/REST/OpenAPI/Web/Chromium negative sentinel tests 验证内部私有值不会出现在 JSON、generated contract、日志或 DOM；owner、CSRF/CORS/Origin 与 WebSocket safe-error 边界保持不变。
+
 ## Implementation guidance
 
 - 每个新数据字段都应说明目的、保留、删除、访问和日志处理。

@@ -186,6 +186,8 @@ def test_openapi_generation_is_database_environment_independent(
         "/auth/me",
         "/auth/register",
         "/health",
+        "/questions",
+        "/questions/{question_version_id}",
         "/sessions",
         "/sessions/{session_id}",
     }

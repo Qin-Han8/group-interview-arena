@@ -20,6 +20,11 @@ from group_interview_arena_api.modules.discussion_sessions.domain import (
     StoredEvent,
     decide_session_command,
 )
+from group_interview_arena_api.modules.question_personas.service import (
+    QuestionNotFoundError,
+    QuestionPersistenceError,
+    require_selectable_question_version,
+)
 
 
 class SessionNotFoundError(Exception):
@@ -49,6 +54,7 @@ def _raise_persistence_error() -> Never:
 def _snapshot(row: SimulationSession) -> SessionSnapshot:
     return SessionSnapshot(
         session_id=row.id,
+        question_version_id=row.question_version_id,
         status=SessionStatus(row.status),
         created_at=row.created_at,
         updated_at=row.updated_at,
@@ -87,11 +93,13 @@ async def create_session(
     session: AsyncSession,
     *,
     owner_id: UUID,
+    question_version_id: UUID,
 ) -> SessionSnapshot:
     now = _utc_now()
     row = SimulationSession(
         id=uuid4(),
         owner_user_id=owner_id,
+        question_version_id=question_version_id,
         status=SessionStatus.CREATED.value,
         last_sequence=1,
         created_at=now,
@@ -108,11 +116,14 @@ async def create_session(
     )
     try:
         async with session.begin():
+            await require_selectable_question_version(session, question_version_id)
             session.add(row)
             await session.flush()
             session.add(event)
             await session.flush()
-    except SQLAlchemyError:
+    except QuestionNotFoundError:
+        raise
+    except QuestionPersistenceError, SQLAlchemyError:
         _raise_persistence_error()
     return _snapshot(row)
 

@@ -13,6 +13,7 @@ from group_interview_arena_api.identity.csrf import (
 )
 from group_interview_arena_api.identity.dependencies import CurrentUserDependency
 from group_interview_arena_api.modules.discussion_sessions.contracts import (
+    SessionCreateRequest,
     SessionSnapshotResponse,
 )
 from group_interview_arena_api.modules.discussion_sessions.domain import SessionSnapshot
@@ -21,6 +22,9 @@ from group_interview_arena_api.modules.discussion_sessions.service import (
     SessionPersistenceError,
     create_session,
     get_session_snapshot,
+)
+from group_interview_arena_api.modules.question_personas.service import (
+    QuestionNotFoundError,
 )
 
 DatabaseSessionFactory = Annotated[
@@ -32,6 +36,7 @@ DatabaseSessionFactory = Annotated[
 def _response(snapshot: SessionSnapshot) -> SessionSnapshotResponse:
     return SessionSnapshotResponse(
         id=snapshot.session_id,
+        question_version_id=snapshot.question_version_id,
         status=snapshot.status,
         created_at=snapshot.created_at,
         updated_at=snapshot.updated_at,
@@ -55,6 +60,14 @@ def _not_found() -> ApiError:
     )
 
 
+def _question_not_found() -> ApiError:
+    return ApiError(
+        status_code=status.HTTP_404_NOT_FOUND,
+        code=ErrorCode.QUESTION_NOT_FOUND,
+        message="Question not found.",
+    )
+
+
 def create_discussion_session_router(settings: Settings) -> APIRouter:
     router = APIRouter(prefix="/sessions", tags=["sessions"])
     require_browser_csrf = create_browser_csrf_guard(settings.cors_origins)
@@ -66,6 +79,7 @@ def create_discussion_session_router(settings: Settings) -> APIRouter:
         responses={
             401: {"model": ErrorResponse},
             403: {"model": ErrorResponse},
+            404: {"model": ErrorResponse},
             422: {"model": ErrorResponse},
             500: {"model": ErrorResponse},
         },
@@ -73,12 +87,19 @@ def create_discussion_session_router(settings: Settings) -> APIRouter:
         openapi_extra=CSRF_OPENAPI_EXTRA,
     )
     async def create(  # pyright: ignore[reportUnusedFunction]
+        request: SessionCreateRequest,
         user: CurrentUserDependency,
         session_factory: DatabaseSessionFactory,
     ) -> SessionSnapshotResponse:
         try:
             async with session_factory() as session:
-                snapshot = await create_session(session, owner_id=user.user_id)
+                snapshot = await create_session(
+                    session,
+                    owner_id=user.user_id,
+                    question_version_id=request.question_version_id,
+                )
+        except QuestionNotFoundError:
+            raise _question_not_found() from None
         except SessionPersistenceError:
             raise _internal_error() from None
         return _response(snapshot)

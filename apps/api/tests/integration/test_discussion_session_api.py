@@ -21,6 +21,10 @@ from group_interview_arena_api.db.dependencies import (
     DATABASE_SESSION_FACTORY_STATE_KEY,
 )
 from group_interview_arena_api.db.models import DiscussionEvent, SimulationSession
+from group_interview_arena_api.modules.question_personas.seed import (
+    INTERNAL_VALIDATION_BUNDLE,
+    seed_question_persona_foundation,
+)
 
 pytestmark = pytest.mark.integration
 
@@ -58,6 +62,7 @@ async def _application(
         temporary_database.database_settings(),
     )
     async with application.router.lifespan_context(application):
+        await seed_question_persona_foundation(_factory(application))
         yield application
 
 
@@ -91,6 +96,9 @@ async def _verify_rest_contract(
             missing_auth = await unauthenticated.post(
                 "/sessions",
                 headers=AUTH_HEADERS,
+                json={
+                    "question_version_id": str(INTERNAL_VALIDATION_BUNDLE.version_id)
+                },
             )
             _assert_safe_error(missing_auth, 401, "AUTHENTICATION_REQUIRED")
 
@@ -99,10 +107,21 @@ async def _verify_rest_contract(
             base_url="http://testserver",
         ) as owner:
             owner_id = await _register(owner, "session_owner")
-            missing_csrf = await owner.post("/sessions")
+            missing_csrf = await owner.post(
+                "/sessions",
+                json={
+                    "question_version_id": str(INTERNAL_VALIDATION_BUNDLE.version_id)
+                },
+            )
             _assert_safe_error(missing_csrf, 403, "CSRF_REJECTED")
 
-            created = await owner.post("/sessions", headers=AUTH_HEADERS)
+            created = await owner.post(
+                "/sessions",
+                headers=AUTH_HEADERS,
+                json={
+                    "question_version_id": str(INTERNAL_VALIDATION_BUNDLE.version_id)
+                },
+            )
             assert created.status_code == 201
             snapshot = created.json()
             session_id = UUID(snapshot["id"])
@@ -111,11 +130,15 @@ async def _verify_rest_contract(
             assert snapshot["last_sequence"] == 1
             assert set(snapshot) == {
                 "id",
+                "question_version_id",
                 "status",
                 "created_at",
                 "updated_at",
                 "last_sequence",
             }
+            assert snapshot["question_version_id"] == str(
+                INTERNAL_VALIDATION_BUNDLE.version_id
+            )
             assert snapshot["created_at"] == snapshot["updated_at"]
             assert re.fullmatch(
                 r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z",
@@ -145,6 +168,7 @@ async def _verify_rest_contract(
             stored = await session.get(SimulationSession, session_id)
             assert stored is not None
             assert stored.owner_user_id == owner_id
+            assert stored.question_version_id == INTERNAL_VALIDATION_BUNDLE.version_id
             assert stored.last_sequence == 1
             assert (
                 await session.scalar(

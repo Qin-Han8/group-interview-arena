@@ -1,9 +1,9 @@
 # 题型与题目系统
 
-- Status: P1-2A design frozen; P1-2B persistence/domain/seed implemented
+- Status: P1-2A design frozen; P1-2B persistence/domain/seed and P1-2C safe caller implemented
 - Current phase: P1 — IN_PROGRESS
 - Target version: V0.1 Internal Validation
-- Current task: P1-2 IN_PROGRESS；P1-2A/P1-2B completed；P1-2C awaiting explicit approval
+- Current task: P1-2 IN_PROGRESS；P1-2A/P1-2B/P1-2C completed；P1-2D awaiting explicit approval
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -109,8 +109,8 @@ V0.5 扩展到排序选择、资源分配、方案策划和两难决策，共 20
 
 - P1-2B 已新增五张 question/persona tables、nullable session version FK、revision `f1a12b15c002`、strict closed domain validation 和 insert-or-exact-match publication writer。
 - deterministic seed 精确包含四种 V0.1 Persona Template 与一个明确标记的 internal-validation bundle；它不属于 12 道正式内容。
-- 当前普通 REST/OpenAPI/Browser/WS contract 未新增题目或 persona projection，Private Stance 与 internal calibration fields 保持 server-only。
-- P1-2C 才允许增加 safe question read、version-bound session creation 和最小 Web caller；当前尚未开始。
+- P1-2C 已新增面向普通用户的 safe question projection，用于题目发现、读取及 version-bound session creation；普通 REST/OpenAPI/Browser/WS surface 仍不暴露 persona assignment、persona behavior parameters、Private Stance、internal calibration 或其他 server-only 内部数据。
+- P1-2C 已增加 safe question read、version-bound session creation 和最小 Web caller；公开 DTO 使用显式 allowlist，历史 session 按 snapshot 中 exact version ID 解析 retired published content。
 
 ## TBD
 
@@ -126,7 +126,8 @@ V0.5 扩展到排序选择、资源分配、方案策划和两难决策，共 20
 ## Deferred / Future work
 
 - P1-2B：completed；persistence/domain/seed foundation 已建立；
-- P1-2C：经单独批准后建立 safe API/session/Web vertical slice；
+- P1-2C：completed；safe API/session/Web vertical slice 已建立并通过真实 Chromium/PostgreSQL 验证；
+- P1-2D：not started / awaiting explicit approval；
 - P3：细化题型对评分权重和证据要求的影响；
 - P5：通过公开测试补充精品题并验证质量指标；
 - V1.0：按已批准范围扩展更多题型和 AI 变体能力。

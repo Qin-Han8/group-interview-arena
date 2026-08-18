@@ -10,6 +10,8 @@ export type CurrentUser = components["schemas"]["CurrentUserResponse"];
 export type ErrorResponse = components["schemas"]["ErrorResponse"];
 export type LoginRequest = components["schemas"]["LoginRequest"];
 export type RegisterRequest = components["schemas"]["RegisterRequest"];
+export type QuestionDetail = components["schemas"]["QuestionDetailResponse"];
+export type QuestionSummary = components["schemas"]["QuestionSummaryResponse"];
 export type SessionSnapshot = components["schemas"]["SessionSnapshotResponse"];
 
 export function createApiClient(baseUrl: string) {
@@ -46,8 +48,19 @@ export function logoutUser(client: ApiClient) {
   });
 }
 
-export function createSession(client: ApiClient) {
+export function listQuestions(client: ApiClient) {
+  return client.GET("/questions");
+}
+
+export function getQuestion(client: ApiClient, questionVersionId: string) {
+  return client.GET("/questions/{question_version_id}", {
+    params: { path: { question_version_id: questionVersionId } },
+  });
+}
+
+export function createSession(client: ApiClient, questionVersionId: string) {
   return client.POST("/sessions", {
+    body: { question_version_id: questionVersionId },
     params: { header: { [CSRF_HEADER_NAME]: CSRF_HEADER_VALUE } },
   });
 }

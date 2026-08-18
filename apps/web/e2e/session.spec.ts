@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 const API_BASE_URL = "http://localhost:8000";
+const PRIVATE_SENTINEL = "P1_2C_PRIVATE_SENTINEL_DO_NOT_DISCLOSE";
 
 test("browser session uses durable ordered WebSocket events and REST reload", async ({
   page,
@@ -23,6 +24,20 @@ test("browser session uses durable ordered WebSocket events and REST reload", as
   await page.getByLabel("密码").fill(password);
   await page.getByRole("button", { name: "创建账户" }).click();
   await expect(page.getByRole("heading", { name: "讨论会话" })).toBeVisible();
+  await expect(page.getByLabel("选择训练题目")).toContainText(
+    "内部验证：社区活动资源安排",
+  );
+
+  const discovery = await page.evaluate(async (apiBaseUrl) => {
+    const response = await fetch(`${apiBaseUrl}/questions`, {
+      credentials: "include",
+    });
+    return { status: response.status, body: await response.json() };
+  }, API_BASE_URL);
+  expect(discovery.status).toBe(200);
+  expect(discovery.body).toHaveLength(1);
+  const questionVersionId = discovery.body[0].id as string;
+  expect(JSON.stringify(discovery)).not.toContain(PRIVATE_SENTINEL);
 
   const createResponsePromise = page.waitForResponse(
     (response) =>
@@ -33,10 +48,22 @@ test("browser session uses durable ordered WebSocket events and REST reload", as
   const createResponse = await createResponsePromise;
   expect(createResponse.status()).toBe(201);
   expect((await createResponse.request().allHeaders())["x-gia-csrf"]).toBe("1");
+  expect(createResponse.request().postDataJSON()).toEqual({
+    question_version_id: questionVersionId,
+  });
 
   await expect(page.getByText("实时连接已建立")).toBeVisible();
   await expect(page.getByText("已创建")).toBeVisible();
   await expect(page.getByTestId("session-sequence")).toHaveText("1");
+  await expect(page.getByTestId("question-version-id")).toContainText(
+    questionVersionId,
+  );
+  await expect(
+    page.getByText("内部工程验证题：团队需要在有限资源下安排三类社区活动。"),
+  ).toBeVisible();
+  await expect(
+    page.getByText("形成满足硬约束、说明取舍且可执行的资源安排。"),
+  ).toBeVisible();
   const sessionId = (
     (await page.getByTestId("session-id").textContent()) ?? ""
   ).replace("会话 ID：", "");
@@ -90,6 +117,7 @@ test("browser session uses durable ordered WebSocket events and REST reload", as
     action_id: parsedCommand.action_id,
     payload: { previous_status: "CREATED", status: "ABORTED_USER" },
   });
+  expect(JSON.stringify(duplicate)).not.toContain(PRIVATE_SENTINEL);
 
   const authoritative = await page.evaluate(
     async ({ apiBaseUrl, session }) => {
@@ -102,8 +130,17 @@ test("browser session uses durable ordered WebSocket events and REST reload", as
   );
   expect(authoritative).toMatchObject({
     status: 200,
-    body: { id: sessionId, status: "ABORTED_USER", last_sequence: 2 },
+    body: {
+      id: sessionId,
+      question_version_id: questionVersionId,
+      status: "ABORTED_USER",
+      last_sequence: 2,
+    },
   });
+  expect(JSON.stringify(authoritative)).not.toContain(PRIVATE_SENTINEL);
+  expect(await page.locator("body").textContent()).not.toContain(
+    PRIVATE_SENTINEL,
+  );
 
   const browserStorage = await page.evaluate(() => ({
     local: Object.entries(localStorage),
@@ -119,5 +156,11 @@ test("browser session uses durable ordered WebSocket events and REST reload", as
   );
   await expect(page.getByText("已由用户结束")).toBeVisible();
   await expect(page.getByTestId("session-sequence")).toHaveText("2");
+  await expect(page.getByTestId("question-version-id")).toContainText(
+    questionVersionId,
+  );
+  await expect(
+    page.getByText("内部工程验证题：团队需要在有限资源下安排三类社区活动。"),
+  ).toBeVisible();
   await expect(page.getByText("实时连接已建立")).toBeVisible();
 });

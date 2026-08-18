@@ -72,6 +72,7 @@ def test_snapshot_and_formal_events_emit_exact_utc_z_contracts() -> None:
     occurred_at = datetime(2026, 8, 16, 1, 2, 3, tzinfo=UTC)
     snapshot = SessionSnapshotResponse(
         id=session_id,
+        question_version_id=None,
         status=SessionStatus.CREATED,
         created_at=occurred_at,
         updated_at=occurred_at,
@@ -92,6 +93,7 @@ def test_snapshot_and_formal_events_emit_exact_utc_z_contracts() -> None:
 
     assert snapshot.model_dump(mode="json") == {
         "id": str(session_id),
+        "question_version_id": None,
         "status": "CREATED",
         "created_at": "2026-08-16T01:02:03Z",
         "updated_at": "2026-08-16T01:02:03Z",

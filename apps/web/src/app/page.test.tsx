@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import Home from "./page";
 
 describe("Home", () => {
-  it("renders the P0 technical foundation copy", () => {
+  it("renders the P1 internal validation foundation copy", () => {
     render(<Home />);
 
     expect(
@@ -12,9 +12,9 @@ describe("Home", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("Group Interview Arena")).toBeInTheDocument();
     expect(
-      screen.getByText("Internal technical foundation"),
+      screen.getByText("Internal validation foundation"),
     ).toBeInTheDocument();
-    expect(screen.getByText("Current phase: P0")).toBeInTheDocument();
+    expect(screen.getByText("Current phase: P1")).toBeInTheDocument();
     expect(
       screen.getByText("Target: V0.1 Internal Validation"),
     ).toBeInTheDocument();
@@ -22,7 +22,9 @@ describe("Home", () => {
       screen.getByText("AI candidates are virtual characters."),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("Business simulation has not been implemented yet."),
+      screen.getByText(
+        "Question-bound text sessions are available for internal validation.",
+      ),
     ).toBeInTheDocument();
   });
 });

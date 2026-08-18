@@ -27,6 +27,7 @@ class SessionCommand:
 @dataclass(frozen=True)
 class SessionSnapshot:
     session_id: UUID
+    question_version_id: UUID | None
     status: SessionStatus
     created_at: datetime
     updated_at: datetime

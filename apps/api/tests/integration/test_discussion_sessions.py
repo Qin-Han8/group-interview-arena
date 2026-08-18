@@ -35,6 +35,10 @@ from group_interview_arena_api.modules.discussion_sessions.service import (
     create_session,
     get_session_snapshot,
 )
+from group_interview_arena_api.modules.question_personas.seed import (
+    INTERNAL_VALIDATION_BUNDLE,
+    seed_question_persona_foundation,
+)
 
 pytestmark = pytest.mark.integration
 
@@ -57,6 +61,7 @@ async def _session_factory(
     engine = create_database_engine(temporary_database.database_settings())
     session_factory = create_database_session_factory(engine)
     try:
+        await seed_question_persona_foundation(session_factory)
         yield session_factory
     finally:
         await dispose_database_engine(engine)
@@ -94,10 +99,15 @@ async def _verify_creation_and_owner_snapshot(
         other_user_id = await _seed_user(session_factory)
 
         async with session_factory() as session:
-            snapshot = await create_session(session, owner_id=owner_id)
+            snapshot = await create_session(
+                session,
+                owner_id=owner_id,
+                question_version_id=INTERNAL_VALIDATION_BUNDLE.version_id,
+            )
 
         assert snapshot.status is SessionStatus.CREATED
         assert snapshot.last_sequence == 1
+        assert snapshot.question_version_id == INTERNAL_VALIDATION_BUNDLE.version_id
         assert snapshot.created_at == snapshot.updated_at
 
         async with session_factory() as session:
@@ -139,7 +149,11 @@ async def _verify_idempotency_conflict_and_invalid_state(
     async with _session_factory(temporary_database) as session_factory:
         owner_id = await _seed_user(session_factory)
         async with session_factory() as session:
-            snapshot = await create_session(session, owner_id=owner_id)
+            snapshot = await create_session(
+                session,
+                owner_id=owner_id,
+                question_version_id=INTERNAL_VALIDATION_BUNDLE.version_id,
+            )
 
         action_id = uuid4()
         command = _abort(snapshot.session_id, action_id)
@@ -218,7 +232,11 @@ async def _verify_concurrent_commands(
     async with _session_factory(temporary_database) as session_factory:
         owner_id = await _seed_user(session_factory)
         async with session_factory() as session:
-            same_snapshot = await create_session(session, owner_id=owner_id)
+            same_snapshot = await create_session(
+                session,
+                owner_id=owner_id,
+                question_version_id=INTERNAL_VALIDATION_BUNDLE.version_id,
+            )
         same_command = _abort(same_snapshot.session_id)
 
         async def apply(command: SessionCommand):
@@ -234,7 +252,11 @@ async def _verify_concurrent_commands(
         assert [event.sequence for event in same_results[0]] == [2]
 
         async with session_factory() as session:
-            distinct_snapshot = await create_session(session, owner_id=owner_id)
+            distinct_snapshot = await create_session(
+                session,
+                owner_id=owner_id,
+                question_version_id=INTERNAL_VALIDATION_BUNDLE.version_id,
+            )
         distinct_results = await asyncio.gather(
             apply(_abort(distinct_snapshot.session_id)),
             apply(_abort(distinct_snapshot.session_id)),
@@ -276,7 +298,11 @@ async def _verify_multi_event_reservation_and_rollback(
     async with _session_factory(temporary_database) as session_factory:
         owner_id = await _seed_user(session_factory)
         async with session_factory() as session:
-            multi_snapshot = await create_session(session, owner_id=owner_id)
+            multi_snapshot = await create_session(
+                session,
+                owner_id=owner_id,
+                question_version_id=INTERNAL_VALIDATION_BUNDLE.version_id,
+            )
 
         def two_event_outcome(
             _status: SessionStatus,
@@ -313,7 +339,11 @@ async def _verify_multi_event_reservation_and_rollback(
         assert len({event.action_id for event in events}) == 1
 
         async with session_factory() as session:
-            rollback_snapshot = await create_session(session, owner_id=owner_id)
+            rollback_snapshot = await create_session(
+                session,
+                owner_id=owner_id,
+                question_version_id=INTERNAL_VALIDATION_BUNDLE.version_id,
+            )
 
         def unserializable_outcome(
             _status: SessionStatus,

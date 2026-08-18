@@ -15,7 +15,7 @@
 - Target version: V0.1 Internal Validation
 - Business schema: identity, P1-1 session foundation and P1-2B question/persona foundation (ten product tables)
 - P1-1 status: P1-1A～E completed; independent final verdict PASS; P1-1 DONE
-- P1-2 status: IN_PROGRESS; P1-2A/P1-2B completed; P1-2C not started / awaiting explicit approval
+- P1-2 status: IN_PROGRESS; P1-2A/P1-2B/P1-2C completed; P1-2D not started / awaiting explicit approval
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -288,7 +288,7 @@ Private Stance 属于具体 version assignment，不属于 Persona Template。Pu
 - future session deletion 不 cascade 到 shared question/persona source；
 - draft-only cleanup、published retirement 和 CMS authorization 仍 Deferred，但 product service 不 hard-delete published/referenced versions 或 assigned Persona Templates。
 
-P1-2B table set 是既有五张加上述五张，共十张；没有增加 participant、utterance、memory、provider、report、voice、Redis/queue 或 CMS/RBAC tables。Exact catalog、single-head、downgrade-to-P1-1/re-upgrade 和 drift checks 已由 disposable PostgreSQL tests 覆盖。
+P1-2B table set 是既有五张加上述五张，共十张；没有增加 participant、utterance、memory、provider、report、voice、Redis/queue 或 CMS/RBAC tables。Exact catalog、single-head、downgrade-to-P1-1/re-upgrade 和 drift checks 已由 disposable PostgreSQL tests 覆盖。P1-2C 没有 schema/migration 变更；application creation transaction 已强制 exact version FK，历史读取不按 template/latest 重解析。开发库经 exact-name、P1-1-head、五表、全零行只读 preflight 后仅向前迁移到 `f1a12b15c002`；repeat upgrade、head/drift 和十表全零行检查通过，未 downgrade 或写入 seed。
 
 Publication service 对新 version/new assignment 先拒绝 retired Question Template 或 Persona Template；若 immutable bundle 已经存在且 exact-match，则在后续 retirement 后仍保持 no-op，以保留 deterministic seed 和历史解析语义。
 
@@ -319,7 +319,7 @@ Publication service 对新 version/new assignment 先拒绝 retired Question Tem
 
 - P0-5C：FastAPI lifespan/request dependency 已成为现有 async DB runtime 的第一个 application caller；真实 PostgreSQL auth integration 只使用迁移到 head 的隔离临时数据库，development DB 保持 head `4fe43b42641b` 且两张表均为 0 rows；
 - P0-5D：completed；browser closure 已实现，existing Cookie/CORS/CSRF/shared trusted-origin boundary 已生效；P1 不得创建第二套 trusted-origin config；
-- P1：`IN_PROGRESS`；P1-1 `DONE`；P1-2A/P1-2B completed，migration target head `f1a12b15c002`、精确十张 product tables；P1-2C not started / awaiting explicit approval；participant/utterance、记忆和报告继续留给后续获批任务；
+- P1：`IN_PROGRESS`；P1-1 `DONE`；P1-2A/P1-2B/P1-2C completed，current migration head `f1a12b15c002`、精确十张 product tables；P1-2D not started / awaiting explicit approval；participant/utterance、记忆和报告继续留给后续获批任务；
 - P2～P4：仅随获批范围增加音频、评分训练和商业化数据。
 
 ## 与其他文档关系

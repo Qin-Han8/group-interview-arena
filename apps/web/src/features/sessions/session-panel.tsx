@@ -4,8 +4,12 @@ import { useEffect, useRef, useState } from "react";
 
 import {
   createSession,
+  getQuestion,
   getSessionSnapshot,
+  listQuestions,
   type ApiClient,
+  type QuestionDetail,
+  type QuestionSummary,
   type SessionSnapshot,
 } from "@/lib/api/client";
 import {
@@ -60,6 +64,9 @@ export default function SessionPanel({
   baseUrl,
 }: SessionPanelProps) {
   const [snapshot, setSnapshot] = useState<SessionSnapshot>();
+  const [questions, setQuestions] = useState<QuestionSummary[]>();
+  const [selectedQuestionId, setSelectedQuestionId] = useState("");
+  const [question, setQuestion] = useState<QuestionDetail>();
   const [connectionSeed, setConnectionSeed] = useState<SessionSnapshot>();
   const [checkingUrl, setCheckingUrl] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -75,9 +82,24 @@ export default function SessionPanel({
       "session_id",
     );
     if (!sessionId) {
-      queueMicrotask(() => {
-        if (active) setCheckingUrl(false);
-      });
+      async function discover() {
+        try {
+          const result = await listQuestions(apiClient);
+          if (!active) return;
+          if (!result.data) {
+            setErrorMessage("无法加载训练题目，请稍后重试。");
+            return;
+          }
+          setQuestions(result.data);
+          setSelectedQuestionId(result.data[0]?.id ?? "");
+        } catch {
+          if (active) setErrorMessage("无法加载训练题目，请稍后重试。");
+        } finally {
+          if (active) setCheckingUrl(false);
+        }
+      }
+
+      void discover();
       return () => {
         active = false;
       };
@@ -93,6 +115,18 @@ export default function SessionPanel({
         }
         setSnapshot(result.data);
         setConnectionSeed(result.data);
+        if (result.data.question_version_id) {
+          const questionResult = await getQuestion(
+            apiClient,
+            result.data.question_version_id,
+          );
+          if (!active) return;
+          if (!questionResult.data) {
+            setErrorMessage("无法加载会话题目，请稍后重试。");
+            return;
+          }
+          setQuestion(questionResult.data);
+        }
       } catch {
         if (active) setErrorMessage("无法加载会话，请稍后重试。");
       } finally {
@@ -147,11 +181,11 @@ export default function SessionPanel({
   }, [apiClient, baseUrl, connectionSeed]);
 
   async function create() {
-    if (creating) return;
+    if (creating || !selectedQuestionId) return;
     setCreating(true);
     setErrorMessage(undefined);
     try {
-      const result = await createSession(apiClient);
+      const result = await createSession(apiClient, selectedQuestionId);
       if (!result.data) {
         setErrorMessage("无法创建会话，请稍后重试。");
         return;
@@ -159,6 +193,20 @@ export default function SessionPanel({
       putSessionInUrl(result.data.id);
       setSnapshot(result.data);
       setConnectionSeed(result.data);
+      const authoritativeQuestionId = result.data.question_version_id;
+      if (!authoritativeQuestionId) {
+        setErrorMessage("会话已创建，但未绑定题目版本，请刷新后重试。");
+        return;
+      }
+      const questionResult = await getQuestion(
+        apiClient,
+        authoritativeQuestionId,
+      );
+      if (questionResult.data) {
+        setQuestion(questionResult.data);
+      } else {
+        setErrorMessage("会话已创建，但题目暂时无法显示，请刷新后重试。");
+      }
     } catch {
       setErrorMessage("无法创建会话，请稍后重试。");
     } finally {
@@ -178,14 +226,46 @@ export default function SessionPanel({
     <section className="mt-8 border-t border-neutral-300 pt-6">
       <h2 className="text-lg font-medium">讨论会话</h2>
       {!snapshot ? (
-        <button
-          className="mt-4 bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-          disabled={creating}
-          onClick={() => void create()}
-          type="button"
-        >
-          {creating ? "正在创建…" : "创建文字会话"}
-        </button>
+        <div className="mt-4 space-y-4">
+          {questions?.length ? (
+            <>
+              <label
+                className="grid gap-1 text-sm"
+                htmlFor="question-selection"
+              >
+                选择训练题目
+                <select
+                  className="border border-neutral-300 bg-white px-3 py-2"
+                  id="question-selection"
+                  onChange={(event) =>
+                    setSelectedQuestionId(event.target.value)
+                  }
+                  value={selectedQuestionId}
+                >
+                  {questions.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.title} · {item.question_type} · {item.difficulty}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                className="bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                disabled={creating || !selectedQuestionId}
+                onClick={() => void create()}
+                type="button"
+              >
+                {creating ? "正在创建…" : "创建文字会话"}
+              </button>
+            </>
+          ) : questions ? (
+            <p className="text-sm text-neutral-600">
+              当前没有可用于新训练的题目。
+            </p>
+          ) : (
+            <p className="text-sm text-neutral-600">正在加载训练题目…</p>
+          )}
+        </div>
       ) : (
         <div className="mt-4 space-y-2 text-sm">
           <p>
@@ -194,6 +274,16 @@ export default function SessionPanel({
           <p className="break-all text-neutral-600" data-testid="session-id">
             会话 ID：{snapshot.id}
           </p>
+          {snapshot.question_version_id ? (
+            <p
+              className="break-all text-neutral-600"
+              data-testid="question-version-id"
+            >
+              题目版本 ID：{snapshot.question_version_id}
+            </p>
+          ) : (
+            <p className="text-neutral-600">此历史会话未绑定题目版本。</p>
+          )}
           <p className="text-neutral-600">
             当前序号：
             <span data-testid="session-sequence">{snapshot.last_sequence}</span>
@@ -214,6 +304,49 @@ export default function SessionPanel({
           ) : null}
         </div>
       )}
+      {question ? (
+        <article className="mt-6 space-y-4 border-t border-neutral-200 pt-5 text-sm">
+          <div>
+            <p className="text-xs font-medium tracking-wide text-neutral-500 uppercase">
+              {question.question_type} · {question.difficulty} ·{" "}
+              {question.estimated_minutes} 分钟
+            </p>
+            <h3 className="mt-1 text-base font-semibold">{question.title}</h3>
+          </div>
+          <div>
+            <h4 className="font-medium">情境</h4>
+            <p className="mt-1 leading-6 text-neutral-700">
+              {question.scenario}
+            </p>
+          </div>
+          <div>
+            <h4 className="font-medium">讨论目标</h4>
+            <p className="mt-1 leading-6 text-neutral-700">
+              {question.objective}
+            </p>
+          </div>
+          <div>
+            <h4 className="font-medium">硬约束</h4>
+            <ul className="mt-1 list-disc space-y-1 pl-5 text-neutral-700">
+              {question.hard_constraints.map((item) => (
+                <li key={item.key}>{item.text}</li>
+              ))}
+            </ul>
+          </div>
+          {question.options.length ? (
+            <div>
+              <h4 className="font-medium">可选方案</h4>
+              <ul className="mt-1 space-y-2 text-neutral-700">
+                {question.options.map((item) => (
+                  <li key={item.key}>
+                    <strong>{item.label}</strong>：{item.description}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </article>
+      ) : null}
       {errorMessage ? (
         <p aria-live="polite" className="mt-3 text-sm text-red-700">
           {errorMessage}

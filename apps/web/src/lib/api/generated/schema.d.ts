@@ -89,6 +89,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/questions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Discover */
+        get: operations["discover_questions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/questions/{question_version_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Detail */
+        get: operations["detail_questions__question_version_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sessions": {
         parameters: {
             query?: never;
@@ -141,7 +175,7 @@ export interface components {
          * ErrorCode
          * @enum {string}
          */
-        ErrorCode: "NOT_FOUND" | "VALIDATION_ERROR" | "INTERNAL_ERROR" | "INVALID_USERNAME" | "INVALID_PASSWORD" | "USERNAME_UNAVAILABLE" | "INVALID_CREDENTIALS" | "AUTHENTICATION_REQUIRED" | "CSRF_REJECTED" | "SESSION_NOT_FOUND";
+        ErrorCode: "NOT_FOUND" | "VALIDATION_ERROR" | "INTERNAL_ERROR" | "INVALID_USERNAME" | "INVALID_PASSWORD" | "USERNAME_UNAVAILABLE" | "INVALID_CREDENTIALS" | "AUTHENTICATION_REQUIRED" | "CSRF_REJECTED" | "SESSION_NOT_FOUND" | "QUESTION_NOT_FOUND";
         /** ErrorDetail */
         ErrorDetail: {
             code: components["schemas"]["ErrorCode"];
@@ -172,6 +206,93 @@ export interface components {
              */
             password: string;
         };
+        /** PublicConstraint */
+        PublicConstraint: {
+            /** Key */
+            key: string;
+            /** Text */
+            text: string;
+        };
+        /** PublicQuestionOption */
+        PublicQuestionOption: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Description */
+            description: string;
+        };
+        /** PublicStakeholder */
+        PublicStakeholder: {
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description: string;
+        };
+        /** QuestionDetailResponse */
+        QuestionDetailResponse: {
+            /**
+             * Id
+             * Format: uuid4
+             */
+            id: string;
+            /**
+             * Question Template Id
+             * Format: uuid4
+             */
+            question_template_id: string;
+            /** Version Number */
+            version_number: number;
+            /** Title */
+            title: string;
+            /** Question Type */
+            question_type: string;
+            /** Background Domain */
+            background_domain: string;
+            /** Difficulty */
+            difficulty: string;
+            /** Estimated Minutes */
+            estimated_minutes: number;
+            /** Scenario */
+            scenario: string;
+            /** Objective */
+            objective: string;
+            /** Hard Constraints */
+            hard_constraints: components["schemas"]["PublicConstraint"][];
+            /** Soft Constraints */
+            soft_constraints: components["schemas"]["PublicConstraint"][];
+            /** Stakeholders */
+            stakeholders: components["schemas"]["PublicStakeholder"][];
+            /** Options */
+            options: components["schemas"]["PublicQuestionOption"][];
+        };
+        /** QuestionSummaryResponse */
+        QuestionSummaryResponse: {
+            /**
+             * Id
+             * Format: uuid4
+             */
+            id: string;
+            /**
+             * Question Template Id
+             * Format: uuid4
+             */
+            question_template_id: string;
+            /** Version Number */
+            version_number: number;
+            /** Title */
+            title: string;
+            /** Question Type */
+            question_type: string;
+            /** Background Domain */
+            background_domain: string;
+            /** Difficulty */
+            difficulty: string;
+            /** Estimated Minutes */
+            estimated_minutes: number;
+        };
         /** RegisterRequest */
         RegisterRequest: {
             /** Username */
@@ -182,6 +303,14 @@ export interface components {
              */
             password: string;
         };
+        /** SessionCreateRequest */
+        SessionCreateRequest: {
+            /**
+             * Question Version Id
+             * Format: uuid4
+             */
+            question_version_id: string;
+        };
         /** SessionSnapshotResponse */
         SessionSnapshotResponse: {
             /**
@@ -189,6 +318,8 @@ export interface components {
              * Format: uuid4
              */
             id: string;
+            /** Question Version Id */
+            question_version_id: string | null;
             status: components["schemas"]["SessionStatus"];
             /**
              * Created At
@@ -413,6 +544,102 @@ export interface operations {
             };
         };
     };
+    discover_questions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestionSummaryResponse"][];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    detail_questions__question_version_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                question_version_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestionDetailResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     create_sessions_post: {
         parameters: {
             query?: never;
@@ -423,7 +650,11 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SessionCreateRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             201: {
@@ -445,6 +676,15 @@ export interface operations {
             };
             /** @description Forbidden */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

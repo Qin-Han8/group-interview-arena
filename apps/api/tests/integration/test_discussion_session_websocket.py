@@ -22,11 +22,20 @@ from group_interview_arena_api.core.config import (
     Environment,
     Settings,
 )
+from group_interview_arena_api.db.runtime import (
+    create_database_engine,
+    create_database_session_factory,
+    dispose_database_engine,
+)
 from group_interview_arena_api.identity.cookies import SESSION_COOKIE_NAME
 from group_interview_arena_api.modules.discussion_sessions import realtime
 from group_interview_arena_api.modules.discussion_sessions.domain import StoredEvent
 from group_interview_arena_api.modules.discussion_sessions.service import (
     ActionIdConflictError,
+)
+from group_interview_arena_api.modules.question_personas.seed import (
+    INTERNAL_VALIDATION_BUNDLE,
+    seed_question_persona_foundation,
 )
 
 pytestmark = pytest.mark.integration
@@ -67,6 +76,16 @@ class SyncTestClient(Protocol):
 
 
 def _application(temporary_database: TemporaryDatabaseContext) -> FastAPI:
+    async def seed() -> None:
+        engine = create_database_engine(temporary_database.database_settings())
+        try:
+            await seed_question_persona_foundation(
+                create_database_session_factory(engine)
+            )
+        finally:
+            await dispose_database_engine(engine)
+
+    asyncio.run(seed(), loop_factory=asyncio.SelectorEventLoop)
     return create_app(
         Settings(
             environment=Environment.TEST,
@@ -98,7 +117,11 @@ def _register(client: SyncTestClient, username: str) -> str:
 
 
 def _create_session(client: SyncTestClient) -> dict[str, object]:
-    response = client.post("/sessions", headers=AUTH_HEADERS)
+    response = client.post(
+        "/sessions",
+        headers=AUTH_HEADERS,
+        json={"question_version_id": str(INTERNAL_VALIDATION_BUNDLE.version_id)},
+    )
     assert response.status_code == 201
     return response.json()  # pyright: ignore[reportAny]
 

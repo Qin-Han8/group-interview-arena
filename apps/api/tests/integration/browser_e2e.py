@@ -1,3 +1,4 @@
+import asyncio
 import os
 import shutil
 import socket
@@ -13,11 +14,23 @@ from urllib.request import urlopen
 
 import psycopg
 from conftest import (
-    SESSION_BROWSER_DATABASE_PREFIX,
+    QUESTION_BROWSER_DATABASE_PREFIX,
     IntegrationDatabaseSettings,
     TemporaryDatabase,
     migrate_database,
     temporary_database_context,
+)
+from sqlalchemy import update
+
+from group_interview_arena_api.db import PersonaPrivateStance, QuestionVersion
+from group_interview_arena_api.db.runtime import (
+    create_database_engine,
+    create_database_session_factory,
+    dispose_database_engine,
+)
+from group_interview_arena_api.modules.question_personas.seed import (
+    INTERNAL_VALIDATION_BUNDLE,
+    seed_question_persona_foundation,
 )
 
 API_ORIGIN = "http://localhost:8000"
@@ -30,6 +43,7 @@ SHUTDOWN_TIMEOUT_SECONDS = 15.0
 API_ROOT = Path(__file__).resolve().parents[2]
 REPOSITORY_ROOT = API_ROOT.parents[1]
 WEB_ROOT = REPOSITORY_ROOT / "apps" / "web"
+PRIVATE_SENTINEL = "P1_2C_PRIVATE_SENTINEL_DO_NOT_DISCLOSE"
 
 
 def _port_is_available(port: int) -> bool:
@@ -169,7 +183,7 @@ def _run_browser_flow(temporary_database: TemporaryDatabase) -> None:
         )
 
     database_url = temporary_database.database_settings().database_url
-    with tempfile.TemporaryDirectory(prefix="gia_p11d_e2e_") as temp_directory:
+    with tempfile.TemporaryDirectory(prefix="gia_p12c_e2e_") as temp_directory:
         temporary_path = Path(temp_directory)
         api_log = temporary_path / "api.log"
         web_log = temporary_path / "web.log"
@@ -229,7 +243,7 @@ def _verify_session_persistence(temporary_database: TemporaryDatabase) -> None:
         password=database_url.password,
     ) as connection:
         session_rows = connection.execute(
-            "SELECT status, last_sequence FROM simulation_sessions"
+            "SELECT status, last_sequence, question_version_id FROM simulation_sessions"
         ).fetchall()
         action_count = connection.execute(
             "SELECT count(*) FROM session_actions"
@@ -238,7 +252,7 @@ def _verify_session_persistence(temporary_database: TemporaryDatabase) -> None:
             "SELECT sequence FROM discussion_events ORDER BY sequence"
         ).fetchall()
 
-    if session_rows != [("ABORTED_USER", 2)]:
+    if session_rows != [("ABORTED_USER", 2, INTERNAL_VALIDATION_BUNDLE.version_id)]:
         raise RuntimeError("Browser E2E session state was not persisted exactly.")
     if action_count is None or action_count[0] != 1:
         raise RuntimeError("Browser E2E action idempotency row count was not one.")
@@ -246,18 +260,68 @@ def _verify_session_persistence(temporary_database: TemporaryDatabase) -> None:
         raise RuntimeError("Browser E2E formal event sequences were not [1, 2].")
 
 
+async def _seed_browser_question_async(
+    temporary_database: TemporaryDatabase,
+) -> None:
+    engine = create_database_engine(temporary_database.database_settings())
+    session_factory = create_database_session_factory(engine)
+    try:
+        await seed_question_persona_foundation(session_factory)
+        async with session_factory() as session:
+            async with session.begin():
+                await session.execute(
+                    update(QuestionVersion)
+                    .where(QuestionVersion.id == INTERNAL_VALIDATION_BUNDLE.version_id)
+                    .values(
+                        reference_dimensions=[
+                            {
+                                "key": "PRIVATE_SENTINEL",
+                                "name": PRIVATE_SENTINEL,
+                                "description": PRIVATE_SENTINEL,
+                            }
+                        ],
+                        hidden_conflicts=[
+                            {"key": "PRIVATE_SENTINEL", "text": PRIVATE_SENTINEL}
+                        ],
+                        acceptable_outcome_patterns=[
+                            {"key": "PRIVATE_SENTINEL", "text": PRIVATE_SENTINEL}
+                        ],
+                        phase_prompts={"PREPARATION": PRIVATE_SENTINEL},
+                        safety_tags=[PRIVATE_SENTINEL],
+                    )
+                )
+                await session.execute(
+                    update(PersonaPrivateStance).values(
+                        initial_position=PRIVATE_SENTINEL,
+                        private_information=PRIVATE_SENTINEL,
+                        preferred_group_role=PRIVATE_SENTINEL,
+                    )
+                )
+    finally:
+        await dispose_database_engine(engine)
+
+
+def _seed_browser_question(temporary_database: TemporaryDatabase) -> None:
+    asyncio.run(
+        _seed_browser_question_async(temporary_database),
+        loop_factory=asyncio.SelectorEventLoop,
+    )
+
+
 def main() -> int:
     database_settings = IntegrationDatabaseSettings()  # pyright: ignore[reportCallIssue]
     with temporary_database_context(
         database_settings,
-        SESSION_BROWSER_DATABASE_PREFIX,
+        QUESTION_BROWSER_DATABASE_PREFIX,
     ) as temporary_database:
         migrate_database(temporary_database)
+        _seed_browser_question(temporary_database)
         _run_browser_flow(temporary_database)
         _verify_session_persistence(temporary_database)
 
     print(
-        "P1-1D browser E2E passed with one durable action and sequences [1, 2]; "
+        "P1-2C browser E2E passed with immutable question binding, one durable "
+        "action, sequences [1, 2], and private sentinel isolation; "
         "temporary database and servers were cleaned."
     )
     return 0

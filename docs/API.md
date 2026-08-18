@@ -1,19 +1,19 @@
 # API 与事件技术基线
 
-- Status: P0 API Architecture Baseline + P1-1 completed + P1-2A contract target frozen
+- Status: P0 API Architecture Baseline + P1-1 completed + P1-2C implemented
 - Current phase: P1 — IN_PROGRESS
 - API architecture baseline established by: P0-2 — DONE
 - Target version: V0.1 Internal Validation
-- Implemented REST contracts: `GET /health`, `POST /auth/register`, `POST /auth/login`, `POST /auth/logout`, `GET /auth/me`, `POST /sessions`, `GET /sessions/{session_id}`
+- Implemented REST contracts: `GET /health`, `POST /auth/register`, `POST /auth/login`, `POST /auth/logout`, `GET /auth/me`, `GET /questions`, `GET /questions/{question_version_id}`, `POST /sessions`, `GET /sessions/{session_id}`
 - Implemented realtime contract: `/ws/sessions/{session_id}?after_sequence=` v1 scoped session channel
 - P0-5 browser CORS/CSRF/Web closure: P0-5D completed
 - P1-1 contract: scoped/frozen by P1-1A; P1-1B persistence, P1-1C REST/WebSocket runtime, P1-1D Web realtime caller and P1-1E independent final review completed
-- P1-2 contract: P1-2A safe question/version-bound session design frozen docs-only; P1-2B/C not implemented
+- P1-2 contract: P1-2A/B/C completed; safe question reads and immutable version-bound session creation implemented
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
 
-本文件记录 P0-2 已批准的 REST、WebSocket、契约生成、恢复和错误语义基线，同步 P0/P1-1 已实现的 REST/browser/session 技术契约，并记录 P1-2A 冻结但尚未实现的 safe question/version-bound session target。P1-1/P1-2 scoped contracts 不等于完整 P1/P2 事件集合。
+本文件记录 P0-2 已批准的 REST、WebSocket、契约生成、恢复和错误语义基线，同步 P0/P1-1 与 P1-2C 已实现的 REST/browser/session 技术契约。P1-1/P1-2 scoped contracts 不等于完整 P1/P2 事件集合。
 
 正式决策见 [`DECISIONS.md`](DECISIONS.md) `ADR-006`、`ADR-007`、`ADR-013`、`ADR-015`。
 
@@ -181,9 +181,9 @@ Backend Pydantic v2 models 是 WS v1 contract authority；P1-1D 的 TypeScript d
 - P1-1D caller 同时只拥有一个 live socket，自动 reconnect 有界；URL 只携带非秘密 `session_id` 以支持 reload 后重新获取 server truth。
 - 真实 Next/Chromium → Uvicorn WebSocket → PostgreSQL E2E 已验证 opaque Cookie、trusted Origin、created/abort ordered events、相同 action replay、REST reload restore、单一 durable action 与完整临时资源清理。
 
-## P1-2 safe question/session contract — design frozen, not implemented
+## P1-2 safe question/session contract — P1-2C implemented
 
-P1-2A 冻结以下 P1-2C contract target；P1-2B/C 尚未开始，当前 OpenAPI、generated Web derivative 和 P1-1 routes 均未改变。
+P1-2C 已按 P1-2A 冻结 contract 实现以下边界；FastAPI OpenAPI 与 generated Web derivative 已同步，既有 P1-1 WebSocket vocabulary 未改变。
 
 ### `GET /questions`
 
@@ -201,7 +201,7 @@ P1-2A 冻结以下 P1-2C contract target；P1-2B/C 尚未开始，当前 OpenAPI
 
 ### Version-bound `POST /sessions`
 
-- P1-2C 将当前无 body 的 create contract 改为 closed request `{ "question_version_id": "<uuidv4>" }`；继续 requires authenticated Cookie、exact trusted Origin 和 `X-GIA-CSRF: 1`。
+- Create contract 已改为 closed request `{ "question_version_id": "<uuidv4>" }`；继续 requires authenticated Cookie、exact trusted Origin 和 `X-GIA-CSRF: 1`。
 - Server 在 creation transaction 内验证 version exists、published、non-retired and assignment-complete；只接受 immutable version identity，不接受 template ID、title、code 或 `latest` alias。
 - Success 仍为 `201 SessionSnapshotResponse`、`CREATED` 和 sequence `1` `session.created`；snapshot additive 增加 nullable `question_version_id` 以真实表示 P1-1 legacy rows，新 API-created rows 必须 non-null。
 - Invalid/unselectable version 使用 safe stable error/non-disclosing not-found semantics；不返回内部 publication failure detail。
@@ -283,7 +283,7 @@ P0-3D 已完成最小 API、OpenAPI authority、typed config、request correlati
 
 - `IN_PROGRESS`；P1-1A～E 已完成第一条文字会话 scoped contract、persistence、backend REST/WS、Web caller、browser reconnect regression 和 independent acceptance；P1-1 `DONE`；
 - P1-2A safe question/session/private projection design freeze 已完成 docs-only；
-- P1-2B persistence/domain/seed 已完成且未新增 HTTP/WS/Web contract；P1-2C safe API/session/Web contract 尚未实现，等待单独明确批准。
+- P1-2B persistence/domain/seed 与 P1-2C safe API/session/Web vertical slice 均已完成；P1-2D 未开始并等待单独明确批准。
 
 ### P2 and later
 
@@ -294,7 +294,7 @@ P0-3D 已完成最小 API、OpenAPI authority、typed config、request correlati
 ## TBD
 
 - TBD：WebSocket schema generator package；
-- Frozen / not implemented：P1-2 safe question reads 和 version-bound session create contract；
+- Implemented：P1-2 safe question reads 和 version-bound session create contract；
 - Deferred：P1-2 之后的完整 REST endpoint / WebSocket command/event 集合；
 - Deferred：event retention/compaction、large replay pagination、multi-tab/cross-process delivery 和长期 compatibility policy；
 - TBD：V0.1 之后的 identity expansion、verified recovery flow 与 authorization；

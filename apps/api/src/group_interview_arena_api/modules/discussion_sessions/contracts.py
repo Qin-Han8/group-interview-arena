@@ -27,6 +27,10 @@ class EmptyPayload(_ClosedModel):
     pass
 
 
+class SessionCreateRequest(_ClosedModel):
+    question_version_id: UUID4
+
+
 class SessionAbortCommand(_ClosedModel):
     schema_version: Literal[1]
     type: Literal["session.abort"]
@@ -44,6 +48,7 @@ class SessionAbortCommand(_ClosedModel):
 
 class SessionSnapshotResponse(_ClosedModel):
     id: UUID4
+    question_version_id: UUID4 | None
     status: SessionStatus
     created_at: datetime
     updated_at: datetime

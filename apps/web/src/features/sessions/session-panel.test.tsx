@@ -9,8 +9,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   createSession,
+  getQuestion,
   getSessionSnapshot,
+  listQuestions,
   type ApiClient,
+  type QuestionDetail,
+  type QuestionSummary,
   type SessionSnapshot,
 } from "@/lib/api/client";
 import {
@@ -23,7 +27,9 @@ import SessionPanel from "./session-panel";
 
 vi.mock("@/lib/api/client", () => ({
   createSession: vi.fn(),
+  getQuestion: vi.fn(),
   getSessionSnapshot: vi.fn(),
+  listQuestions: vi.fn(),
 }));
 vi.mock("@/lib/realtime/client", () => ({
   createSessionRealtimeClient: vi.fn(),
@@ -31,8 +37,32 @@ vi.mock("@/lib/realtime/client", () => ({
 
 const SESSION_ID = "00000000-0000-4000-8000-000000000010";
 const ACTION_ID = "00000000-0000-4000-8000-000000000011";
+const QUESTION_VERSION_ID = "21000000-0000-4000-8000-000000000001";
+const QUESTION_TEMPLATE_ID = "20000000-0000-4000-8000-000000000001";
+const QUESTION_SUMMARY: QuestionSummary = {
+  id: QUESTION_VERSION_ID,
+  question_template_id: QUESTION_TEMPLATE_ID,
+  version_number: 1,
+  title: "内部验证：社区活动资源安排",
+  question_type: "RESOURCE_ALLOCATION",
+  background_domain: "GENERAL",
+  difficulty: "STANDARD",
+  estimated_minutes: 25,
+};
+const QUESTION_DETAIL: QuestionDetail = {
+  ...QUESTION_SUMMARY,
+  scenario: "团队需要在有限资源下安排三类社区活动。",
+  objective: "形成满足硬约束、说明取舍且可执行的资源安排。",
+  hard_constraints: [{ key: "BUDGET", text: "总资源不得超过 100 个单位。" }],
+  soft_constraints: [],
+  stakeholders: [
+    { key: "RESIDENTS", name: "社区居民", description: "活动服务对象。" },
+  ],
+  options: [{ key: "A", label: "基础服务", description: "保障最大覆盖面。" }],
+};
 const CREATED: SessionSnapshot = {
   id: SESSION_ID,
+  question_version_id: QUESTION_VERSION_ID,
   status: "CREATED",
   created_at: "2026-08-16T00:00:00Z",
   updated_at: "2026-08-16T00:00:00Z",
@@ -47,7 +77,9 @@ const ABORTED: SessionSnapshot = {
 const API_CLIENT = { unit: true } as unknown as ApiClient;
 
 const mockedCreateSession = vi.mocked(createSession);
+const mockedGetQuestion = vi.mocked(getQuestion);
 const mockedGetSessionSnapshot = vi.mocked(getSessionSnapshot);
+const mockedListQuestions = vi.mocked(listQuestions);
 const mockedCreateRealtime = vi.mocked(createSessionRealtimeClient);
 
 function installRealtimeDouble() {
@@ -70,6 +102,19 @@ function installRealtimeDouble() {
   };
 }
 
+function installQuestionDiscovery(
+  questions: QuestionSummary[] = [QUESTION_SUMMARY],
+) {
+  mockedListQuestions.mockResolvedValue({
+    data: questions,
+    response: new Response(null, { status: 200 }),
+  });
+  mockedGetQuestion.mockResolvedValue({
+    data: QUESTION_DETAIL,
+    response: new Response(null, { status: 200 }),
+  });
+}
+
 describe("SessionPanel", () => {
   afterEach(() => {
     cleanup();
@@ -78,6 +123,7 @@ describe("SessionPanel", () => {
   });
 
   it("creates, connects, and aborts a minimal session", async () => {
+    installQuestionDiscovery();
     mockedCreateSession.mockResolvedValue({
       data: CREATED,
       response: new Response(null, { status: 201 }),
@@ -91,7 +137,20 @@ describe("SessionPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "创建文字会话" }));
 
     expect(await screen.findByText("已创建")).toBeInTheDocument();
-    expect(mockedCreateSession).toHaveBeenCalledWith(API_CLIENT);
+    expect(mockedCreateSession).toHaveBeenCalledWith(
+      API_CLIENT,
+      QUESTION_VERSION_ID,
+    );
+    expect(mockedGetQuestion).toHaveBeenCalledWith(
+      API_CLIENT,
+      QUESTION_VERSION_ID,
+    );
+    expect(
+      await screen.findByText(QUESTION_DETAIL.scenario),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("question-version-id")).toHaveTextContent(
+      QUESTION_VERSION_ID,
+    );
     expect(new URL(window.location.href).searchParams.get("session_id")).toBe(
       SESSION_ID,
     );
@@ -122,6 +181,10 @@ describe("SessionPanel", () => {
       data: ABORTED,
       response: new Response(null, { status: 200 }),
     });
+    mockedGetQuestion.mockResolvedValue({
+      data: QUESTION_DETAIL,
+      response: new Response(null, { status: 200 }),
+    });
     const realtime = installRealtimeDouble();
 
     render(
@@ -137,9 +200,15 @@ describe("SessionPanel", () => {
       expect.objectContaining({ snapshot: ABORTED }),
     );
     expect(realtime.start).toHaveBeenCalledOnce();
+    expect(mockedGetQuestion).toHaveBeenCalledWith(
+      API_CLIENT,
+      QUESTION_VERSION_ID,
+    );
+    expect(screen.getByText(QUESTION_DETAIL.objective)).toBeInTheDocument();
   });
 
   it("shows safe realtime errors and closes the connection on unmount", async () => {
+    installQuestionDiscovery();
     mockedCreateSession.mockResolvedValue({
       data: CREATED,
       response: new Response(null, { status: 201 }),
@@ -159,5 +228,81 @@ describe("SessionPanel", () => {
 
     rendered.unmount();
     expect(realtime.stop).toHaveBeenCalledOnce();
+  });
+
+  it("shows an explicit empty state when no selectable questions exist", async () => {
+    installQuestionDiscovery([]);
+    render(
+      <SessionPanel apiClient={API_CLIENT} baseUrl="http://localhost:8000" />,
+    );
+
+    expect(
+      await screen.findByText("当前没有可用于新训练的题目。"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "创建文字会话" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("uses the exact explicitly selected immutable version", async () => {
+    const second = {
+      ...QUESTION_SUMMARY,
+      id: "21000000-0000-4000-8000-000000000002",
+      version_number: 2,
+      title: "第二版本",
+    };
+    installQuestionDiscovery([QUESTION_SUMMARY, second]);
+    mockedCreateSession.mockResolvedValue({
+      data: { ...CREATED, question_version_id: second.id },
+      response: new Response(null, { status: 201 }),
+    });
+    installRealtimeDouble();
+    render(
+      <SessionPanel apiClient={API_CLIENT} baseUrl="http://localhost:8000" />,
+    );
+
+    fireEvent.change(await screen.findByLabelText("选择训练题目"), {
+      target: { value: second.id },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "创建文字会话" }));
+
+    await waitFor(() =>
+      expect(mockedCreateSession).toHaveBeenCalledWith(API_CLIENT, second.id),
+    );
+  });
+
+  it("shows a safe error when question discovery fails", async () => {
+    mockedListQuestions.mockRejectedValue(
+      new Error("private failure sentinel"),
+    );
+    render(
+      <SessionPanel apiClient={API_CLIENT} baseUrl="http://localhost:8000" />,
+    );
+
+    expect(
+      await screen.findByText("无法加载训练题目，请稍后重试。"),
+    ).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain("private failure sentinel");
+  });
+
+  it("renders only safe public question content", async () => {
+    installQuestionDiscovery();
+    mockedCreateSession.mockResolvedValue({
+      data: CREATED,
+      response: new Response(null, { status: 201 }),
+    });
+    installRealtimeDouble();
+    const rendered = render(
+      <SessionPanel apiClient={API_CLIENT} baseUrl="http://localhost:8000" />,
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "创建文字会话" }),
+    );
+
+    expect(await screen.findByText("情境")).toBeInTheDocument();
+    expect(screen.getByText("可选方案")).toBeInTheDocument();
+    expect(rendered.container.textContent).not.toContain(
+      "P1_2C_PRIVATE_SENTINEL_DO_NOT_DISCLOSE",
+    );
   });
 });
