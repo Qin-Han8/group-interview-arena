@@ -13,6 +13,7 @@ IDENTITY_REVISION = "4fe43b42641b"
 SESSION_FOUNDATION_REVISION = "f1a11d15c001"
 QUESTION_PERSONA_FOUNDATION_REVISION = "f1a12b15c002"
 SESSION_PHASE_TIMING_REVISION = "f1a13b15c003"
+FLOOR_CONTROL_FOUNDATION_REVISION = "f1a14b15c004"
 
 
 def _alembic_config() -> Config:
@@ -36,9 +37,11 @@ def test_migration_history_is_linear_with_single_session_phase_timing_head() -> 
     session_foundation = script.get_revision(SESSION_FOUNDATION_REVISION)
     question_persona = script.get_revision(QUESTION_PERSONA_FOUNDATION_REVISION)
     session_phase_timing = script.get_revision(SESSION_PHASE_TIMING_REVISION)
+    floor_control = script.get_revision(FLOOR_CONTROL_FOUNDATION_REVISION)
 
-    assert script.get_heads() == [SESSION_PHASE_TIMING_REVISION]
+    assert script.get_heads() == [FLOOR_CONTROL_FOUNDATION_REVISION]
     assert [revision.revision for revision in script.walk_revisions()] == [
+        FLOOR_CONTROL_FOUNDATION_REVISION,
         SESSION_PHASE_TIMING_REVISION,
         QUESTION_PERSONA_FOUNDATION_REVISION,
         SESSION_FOUNDATION_REVISION,
@@ -65,6 +68,10 @@ def test_migration_history_is_linear_with_single_session_phase_timing_head() -> 
     assert session_phase_timing.down_revision == QUESTION_PERSONA_FOUNDATION_REVISION
     assert session_phase_timing.branch_labels == set()
     assert session_phase_timing.dependencies is None
+    assert floor_control.revision == FLOOR_CONTROL_FOUNDATION_REVISION
+    assert floor_control.down_revision == SESSION_PHASE_TIMING_REVISION
+    assert floor_control.branch_labels == set()
+    assert floor_control.dependencies is None
 
 
 def test_baseline_upgrade_and_downgrade_are_zero_op() -> None:
@@ -90,12 +97,18 @@ def test_migration_target_metadata_has_exact_product_tables() -> None:
     assert set(Base.metadata.tables) == {
         "auth_sessions",
         "discussion_events",
+        "floor_decisions",
+        "floor_grants",
+        "floor_interventions",
+        "floor_releases",
         "persona_private_stances",
         "persona_templates",
         "question_persona_assignments",
         "question_templates",
         "question_versions",
         "session_actions",
+        "session_participants",
         "simulation_sessions",
+        "speaking_opportunities",
         "users",
     }

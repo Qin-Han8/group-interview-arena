@@ -7,6 +7,7 @@ from logging import getLogger
 from pathlib import Path
 from typing import Protocol
 from unittest.mock import patch
+from uuid import UUID, uuid4
 
 import pytest
 from alembic import command
@@ -15,9 +16,18 @@ from alembic.script import ScriptDirectory
 from sqlalchemy import URL, text
 
 from group_interview_arena_api.core.config import DatabaseSettings
+from group_interview_arena_api.db.models import User
 from group_interview_arena_api.db.runtime import (
     create_database_engine,
+    create_database_session_factory,
     dispose_database_engine,
+)
+from group_interview_arena_api.modules.discussion_sessions.service import (
+    create_session,
+)
+from group_interview_arena_api.modules.question_personas.seed import (
+    INTERNAL_VALIDATION_BUNDLE,
+    seed_question_persona_foundation,
 )
 
 pytestmark = pytest.mark.integration
@@ -27,7 +37,8 @@ BASELINE_REVISION = "7c6ccd86b3c5"
 IDENTITY_REVISION = "4fe43b42641b"
 SESSION_FOUNDATION_REVISION = "f1a11d15c001"
 QUESTION_PERSONA_REVISION = "f1a12b15c002"
-EXPECTED_PRODUCT_TABLES = frozenset(
+SESSION_PHASE_TIMING_REVISION = "f1a13b15c003"
+P1_2_PRODUCT_TABLES = frozenset(
     {
         "auth_sessions",
         "discussion_events",
@@ -41,6 +52,14 @@ EXPECTED_PRODUCT_TABLES = frozenset(
         "users",
     }
 )
+EXPECTED_PRODUCT_TABLES = P1_2_PRODUCT_TABLES | {
+    "floor_decisions",
+    "floor_grants",
+    "floor_interventions",
+    "floor_releases",
+    "session_participants",
+    "speaking_opportunities",
+}
 
 
 class TemporaryDatabaseContext(Protocol):
@@ -225,7 +244,7 @@ def test_database_downgrades_to_p1_2_and_reupgrades_to_head(
         assert _migration_state(temporary_database) == MigrationState(
             revision=QUESTION_PERSONA_REVISION,
             version_table_exists=True,
-            product_tables=EXPECTED_PRODUCT_TABLES,
+            product_tables=P1_2_PRODUCT_TABLES,
         )
 
         command.upgrade(config, "head")
@@ -237,6 +256,110 @@ def test_database_downgrades_to_p1_2_and_reupgrades_to_head(
             version_table_exists=True,
             product_tables=EXPECTED_PRODUCT_TABLES,
         )
+
+
+def test_database_downgrades_to_p1_3_and_reupgrades_to_head(
+    temporary_database: TemporaryDatabaseContext,
+) -> None:
+    config = _alembic_config()
+    head = ScriptDirectory.from_config(config).get_current_head()
+    assert head is not None
+
+    with _temporary_migration_environment(temporary_database):
+        command.upgrade(config, "head")
+        command.downgrade(config, SESSION_PHASE_TIMING_REVISION)
+
+        assert _migration_state(temporary_database) == MigrationState(
+            revision=SESSION_PHASE_TIMING_REVISION,
+            version_table_exists=True,
+            product_tables=P1_2_PRODUCT_TABLES,
+        )
+
+        command.upgrade(config, "head")
+        command.current(config, check_heads=True)
+        command.check(config)
+
+        assert _migration_state(temporary_database) == MigrationState(
+            revision=head,
+            version_table_exists=True,
+            product_tables=EXPECTED_PRODUCT_TABLES,
+        )
+
+
+async def _create_backfill_source_session(
+    temporary_database: TemporaryDatabaseContext,
+) -> UUID:
+    engine = create_database_engine(temporary_database.database_settings())
+    session_factory = create_database_session_factory(engine)
+    try:
+        await seed_question_persona_foundation(session_factory)
+        owner_id = uuid4()
+        async with session_factory() as session:
+            async with session.begin():
+                session.add(
+                    User(
+                        id=owner_id,
+                        username=f"backfill_{uuid4().hex[:10]}",
+                        password_hash="not-used",
+                    )
+                )
+        async with session_factory() as session:
+            snapshot = await create_session(
+                session,
+                owner_id=owner_id,
+                question_version_id=INTERNAL_VALIDATION_BUNDLE.version_id,
+            )
+        return snapshot.session_id
+    finally:
+        await dispose_database_engine(engine)
+
+
+async def _load_backfilled_roster(
+    temporary_database: TemporaryDatabaseContext,
+    session_id: UUID,
+) -> list[tuple[str, str, int]]:
+    engine = create_database_engine(temporary_database.database_settings())
+    try:
+        async with engine.connect() as connection:
+            result = await connection.execute(
+                text(
+                    "SELECT actor_kind, participation_role, seat_order "
+                    "FROM session_participants WHERE session_id = :session_id "
+                    "ORDER BY seat_order"
+                ),
+                {"session_id": session_id},
+            )
+            return [
+                (str(row.actor_kind), str(row.participation_role), int(row.seat_order))
+                for row in result
+            ]
+    finally:
+        await dispose_database_engine(engine)
+
+
+def test_p1_4_upgrade_backfills_bound_existing_session_roster(
+    temporary_database: TemporaryDatabaseContext,
+) -> None:
+    config = _alembic_config()
+    with _temporary_migration_environment(temporary_database):
+        command.upgrade(config, "head")
+        session_id = asyncio.run(
+            _create_backfill_source_session(temporary_database),
+            loop_factory=asyncio.SelectorEventLoop,
+        )
+        command.downgrade(config, SESSION_PHASE_TIMING_REVISION)
+        command.upgrade(config, "head")
+
+    roster = asyncio.run(
+        _load_backfilled_roster(temporary_database, session_id),
+        loop_factory=asyncio.SelectorEventLoop,
+    )
+    assert roster == [
+        ("HUMAN", "CANDIDATE", 1),
+        ("AI", "CANDIDATE", 2),
+        ("AI", "CANDIDATE", 3),
+        ("AI", "CANDIDATE", 4),
+    ]
 
 
 def test_database_downgrades_to_baseline_and_reupgrades_to_head(
@@ -358,6 +481,7 @@ def test_head_has_exact_p1_1b_columns_constraints_and_indexes(
         ("simulation_sessions", "phase_started_at", "timestamptz", "YES", None),
         ("simulation_sessions", "phase_deadline_at", "timestamptz", "YES", None),
         ("simulation_sessions", "phase_duration_plan", "jsonb", "YES", None),
+        ("simulation_sessions", "current_floor_grant_id", "uuid", "YES", None),
     ]
     assert constraints == {
         "ck_discussion_events_event_version_positive",
@@ -373,6 +497,7 @@ def test_head_has_exact_p1_1b_columns_constraints_and_indexes(
         "fk_session_actions_session_id_simulation_sessions",
         "fk_simulation_sessions_owner_user_id_users",
         "fk_simulation_sessions_question_version_id_question_versions",
+        "fk_simulation_sessions_current_floor_grant",
         "pk_discussion_events",
         "pk_session_actions",
         "pk_simulation_sessions",

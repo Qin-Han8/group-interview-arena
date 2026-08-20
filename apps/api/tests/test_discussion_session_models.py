@@ -25,13 +25,19 @@ from group_interview_arena_api.db import (
 EXPECTED_PRODUCT_TABLES = {
     "auth_sessions",
     "discussion_events",
+    "floor_decisions",
+    "floor_grants",
+    "floor_interventions",
+    "floor_releases",
     "persona_private_stances",
     "persona_templates",
     "question_persona_assignments",
     "question_templates",
     "question_versions",
     "session_actions",
+    "session_participants",
     "simulation_sessions",
+    "speaking_opportunities",
     "users",
 }
 
@@ -58,6 +64,7 @@ def test_simulation_sessions_has_exact_forward_safe_shape() -> None:
         table.c.phase_started_at,
         table.c.phase_deadline_at,
         table.c.phase_duration_plan,
+        table.c.current_floor_grant_id,
     ]
     assert isinstance(table.c.id.type, Uuid)
     assert table.c.id.primary_key is True
@@ -85,6 +92,8 @@ def test_simulation_sessions_has_exact_forward_safe_shape() -> None:
     assert table.c.phase_deadline_at.nullable is True
     assert isinstance(table.c.phase_duration_plan.type, JSONB)
     assert table.c.phase_duration_plan.nullable is True
+    assert isinstance(table.c.current_floor_grant_id.type, Uuid)
+    assert table.c.current_floor_grant_id.nullable is True
     assert _constraint_names(table) == {
         "ck_simulation_sessions_phase_duration_plan_required_keys",
         "ck_simulation_sessions_phase_timing_pair_valid",
@@ -92,6 +101,7 @@ def test_simulation_sessions_has_exact_forward_safe_shape() -> None:
         "ck_simulation_sessions_last_sequence_non_negative",
         "fk_simulation_sessions_owner_user_id_users",
         "fk_simulation_sessions_question_version_id_question_versions",
+        "fk_simulation_sessions_current_floor_grant",
         "pk_simulation_sessions",
     }
     assert sum(isinstance(item, CheckConstraint) for item in table.constraints) == 4

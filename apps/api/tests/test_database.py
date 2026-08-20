@@ -44,13 +44,19 @@ def test_base_metadata_has_exact_product_tables() -> None:
     assert set(Base.metadata.tables) == {
         "auth_sessions",
         "discussion_events",
+        "floor_decisions",
+        "floor_grants",
+        "floor_interventions",
+        "floor_releases",
         "persona_private_stances",
         "persona_templates",
         "question_persona_assignments",
         "question_templates",
         "question_versions",
         "session_actions",
+        "session_participants",
         "simulation_sessions",
+        "speaking_opportunities",
         "users",
     }
 

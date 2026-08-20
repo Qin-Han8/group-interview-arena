@@ -1,6 +1,6 @@
 # 数据库技术基线
 
-- Status: P0 Data Architecture Baseline + P1-1/P1-2 schema implemented + P1-3B durable phase schema implemented; P1-3C no schema change
+- Status: P0 Data Architecture Baseline + P1-1/P1-2/P1-3 schema implemented + P1-4B floor persistence implemented
 - Current phase: P1 — IN_PROGRESS
 - Data architecture baseline established by: P0-2 — DONE
 - Local PostgreSQL infrastructure: P0-4B — completed
@@ -13,14 +13,14 @@
 - P0-5B identity persistence: completed
 - P0-5C backend auth runtime: completed
 - Target version: V0.1 Internal Validation
-- Business schema: identity, P1-1 session foundation, P1-2B question/persona foundation, and P1-3B additive session timing fields (ten product tables)
+- Business schema: identity, session, question/persona, durable phase timing, and P1-4B participant/floor audit foundation (sixteen product tables)
 - P1-1 status: P1-1A～E completed; independent final verdict PASS; P1-1 DONE
-- P1-2/P1-3 status: DONE; P1-3A～D completed; P1-3 independent verdict `PASS`; P1-4 not started / awaiting explicit approval
+- P1-2/P1-3 status: DONE; P1-4 IN_PROGRESS; P1-4A/P1-4B completed; P1-4C awaiting explicit approval
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
 
-本文件记录 P0-2 已批准的数据技术基线、P0-4 完成状态、P0-5 identity persistence、P1-1 session persistence/transaction callers、P1-2B question/persona persistence foundation，以及 P1-3B additive durable phase/timing fields。P1-3C 使用既有 durable deadline fields 做 startup/connected recovery，不增加 schema。迁移目标 product tables 精确为十张，Alembic single head 为 `f1a13b15c003`。
+本文件记录 P0-2 已批准的数据技术基线、P0-4 完成状态、P0-5 identity persistence、P1-1 session persistence/transaction callers、P1-2B question/persona persistence foundation、P1-3B durable phase/timing fields，以及 P1-4B participant/floor persistence。迁移目标 product tables 精确为十六张，Alembic single head 为 `f1a14b15c004`。
 
 正式决策见 [`DECISIONS.md`](DECISIONS.md) `ADR-005`、`ADR-010`、`ADR-013`、`ADR-015`。
 
@@ -312,13 +312,34 @@ Deadline transition 继续锁定 `simulation_sessions` row，并在同一 transa
 
 完整 migration、catalog、rollback、concurrency、restart recovery 和 B～D acceptance 见 [`exec-plans/P1-3_session-state-machine.md`](exec-plans/P1-3_session-state-machine.md)。
 
+## P1-4 floor-control data — P1-4B implemented
+
+Linear revision `f1a14b15c004` preserves all historical revisions and additively creates six session-scoped product tables:
+
+- `session_participants`：generalized `AI` / `HUMAN` / `SYSTEM` identity with `CANDIDATE` / `MODERATOR` role、positive stable seat order and `AVAILABLE` / `UNAVAILABLE` lifecycle. Closed checks enforce AI assignment、human user and system moderator identity shapes；same-session seat/user/assignment uniqueness prevents ambiguous roster identity；
+- `speaking_opportunities`：durable participant + phase + closed opportunity kind (`PHASE_MANDATED` / `EXPLICIT_REQUEST` / `NOMINATION` / `FAIRNESS`) and accepted timestamp；
+- `floor_decisions`：immutable causal audit facts with expected sequence、phase、closed outcome target shape、policy version、primary/supporting safe reasons、allowlisted JSONB metadata and decision timestamp；
+- `floor_grants`：immutable participant/decision/opportunity/phase grant fact；one decision and one opportunity can cause at most one grant；
+- `floor_releases`：one-to-one immutable end fact keyed by grant, with optional causal session action、safe reason and release timestamp；
+- `floor_interventions`：one-to-one immutable intervention request fact tied to its decision and typed intervention kind。
+
+`simulation_sessions.current_floor_grant_id` is nullable and constrained together with session `id` to a grant belonging to that same session. The aggregate row lock serializes mutations of this pointer, so a session has zero or one current grant even under concurrent grant requests. The historical rows are not updated to derive current state；grant release inserts `floor_releases` and clears only the current pointer.
+
+All cross-session domain references use composite foreign keys. Historical decision/grant/release/intervention references use deferred no-action semantics so referenced facts cannot be independently removed while complete session/user deletion still cascades without circular-order failure. Supporting indexes cover session + phase/order/time access and causal action lookup.
+
+The migration backfills the same four-seat roster for existing sessions that already reference a question version；legacy null-question sessions remain without fabricated participants. API session creation persists one human owner candidate and the three immutable question Persona Assignment candidates in the same transaction as `session.created`. The schema can represent a future `SYSTEM` moderator, but P1-4B does not create participant presence/provider/audio/video runtime.
+
+Floor mutation reuses `session_actions` command identity and SHA-256 semantic digest, the locked session aggregate, contiguous `discussion_events` allocation and atomic commit. The durable facts are sufficient to reconstruct the single current owner and observable floor history after restart；candidate lists、derived fairness counters、timer calculations and ranking alternatives remain runtime calculations. Private Stance、persona calibration、prompt/provider internals、hidden weights and future scoring data have no floor columns or persisted metadata keys.
+
+The exact schema, migration and concurrency gates are in [`exec-plans/P1-4_floor-control.md`](exec-plans/P1-4_floor-control.md)。
+
 ## Future business schema
 
 总纲提到 `users`、题目版本、角色模板、会话、参与者、阶段、发言、讨论事件、结构化记忆、报告、证据、训练、反馈、模型调用和审计等未来领域概念。
 
-除上述 P0-5 identity schema 与 P1-1B 三表外，其余仍只是长期领域导航：
+除上述已实现 identity/session/question/persona/phase/floor schema 外，其余仍只是长期领域导航：
 
-- P1-1 之外实体的表名、字段、关系、索引和删除策略尚未冻结；
+- utterance、memory、report、evidence、training、feedback 和 model-call 等实体的表名、字段、关系、索引和删除策略尚未冻结；
 - V0.1 最小实体集合仍需在 P1 业务设计中确认；
 - 支付、权益、语音和成长数据不得提前进入 V0.1 Schema；
 - P0/V0.1 initial identity boundary 已由 `ADR-015` 确认；公开身份扩展与 recovery 仍 Deferred。
@@ -326,7 +347,8 @@ Deadline transition 继续锁定 `simulation_sessions` row，并在同一 transa
 ## TBD
 
 - Implemented：P1-2 question/persona 五表与 nullable session version reference；
-- Deferred：participant、utterance、memory、report 等后续最小实体和正式 Schema；
+- Implemented：P1-4B generalized participant、opportunity、decision、grant、release 与 intervention schema；
+- Deferred：participant runtime/presence、utterance、memory、report 等后续最小实体和正式 Schema；
 - TBD：未来 phone/WeChat identity mapping 的具体 Schema；
 - TBD：verified recovery identity、account recovery 与账号删除的完整数据语义；
 - TBD：原始音频是否默认完全不保存（总纲第 37 节）；
@@ -339,7 +361,7 @@ Deadline transition 继续锁定 `simulation_sessions` row，并在同一 transa
 
 - P0-5C：FastAPI lifespan/request dependency 已成为现有 async DB runtime 的第一个 application caller；真实 PostgreSQL auth integration 只使用迁移到 head 的隔离临时数据库，development DB 保持 head `4fe43b42641b` 且两张表均为 0 rows；
 - P0-5D：completed；browser closure 已实现，existing Cookie/CORS/CSRF/shared trusted-origin boundary 已生效；P1 不得创建第二套 trusted-origin config；
-- P1：`IN_PROGRESS`；P1-1/P1-2/P1-3 `DONE`；current migration head `f1a13b15c003`、精确十张 product tables，P1-3 durable phase/recovery/realtime/Web flow 已独立验收 `PASS`；P1-3C/D 无 schema change；P1-4、participant/utterance、记忆和报告未开始并继续留给后续获批任务；
+- P1：`IN_PROGRESS`；P1-1/P1-2/P1-3 `DONE`；P1-4A/P1-4B completed；current migration head `f1a14b15c004`、精确十六张 product tables，P1-4B participant/floor persistence and domain foundation 已通过 migration/catalog/concurrency gates；P1-4C scheduler engine 尚未开始并等待明确批准，utterance、记忆和报告继续 Deferred；
 - P2～P4：仅随获批范围增加音频、评分训练和商业化数据。
 
 ## 与其他文档关系

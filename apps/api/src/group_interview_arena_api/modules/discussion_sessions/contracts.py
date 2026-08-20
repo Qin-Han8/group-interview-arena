@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import Literal, Self
+from uuid import UUID
 
 from pydantic import (
     UUID4,
@@ -11,6 +12,12 @@ from pydantic import (
 )
 
 from group_interview_arena_api.modules.discussion_sessions.domain import SessionStatus
+from group_interview_arena_api.modules.floor_control.domain import (
+    FLOOR_ENABLED_PHASES,
+    FloorInterventionKind,
+    FloorPolicyReason,
+    FloorReleaseReason,
+)
 
 
 def _require_aware(value: datetime | None) -> datetime | None:
@@ -92,7 +99,13 @@ class SessionSnapshotResponse(_ClosedModel):
 
 class FormalEventEnvelope(_ClosedModel):
     schema_version: Literal[1, 2]
-    type: Literal["session.created", "session.state_changed"]
+    type: Literal[
+        "session.created",
+        "session.state_changed",
+        "floor.granted",
+        "floor.released",
+        "floor.intervention_requested",
+    ]
     session_id: UUID4
     sequence: int = Field(gt=0)
     occurred_at: datetime
@@ -101,7 +114,9 @@ class FormalEventEnvelope(_ClosedModel):
 
     @model_validator(mode="after")
     def validate_event_shape(self) -> Self:
-        if self.type == "session.created":
+        if self.type.startswith("floor."):
+            self._validate_floor_event()
+        elif self.type == "session.created":
             if (
                 self.schema_version != 1
                 or self.action_id is not None
@@ -146,7 +161,72 @@ class FormalEventEnvelope(_ClosedModel):
                 raise ValueError("State change must change status.")
         return self
 
+    def _validate_floor_event(self) -> None:
+        if self.schema_version != 1:
+            raise ValueError("Floor events require schema version 1.")
+        if self.type == "floor.granted":
+            if self.action_id is None or set(self.payload) != {
+                "grant_id",
+                "decision_id",
+                "participant_id",
+                "phase",
+                "opportunity_id",
+                "reason_code",
+                "policy_version",
+            }:
+                raise ValueError("Invalid floor.granted event.")
+            _require_uuid4(self.payload["grant_id"])
+            _require_uuid4(self.payload["decision_id"])
+            _require_uuid4(self.payload["participant_id"])
+            opportunity_id = self.payload["opportunity_id"]
+            if opportunity_id is not None:
+                _require_uuid4(opportunity_id)
+            FloorPolicyReason(str(self.payload["reason_code"]))
+            _require_policy_version(self.payload["policy_version"])
+        elif self.type == "floor.released":
+            if set(self.payload) != {
+                "grant_id",
+                "participant_id",
+                "phase",
+                "reason_code",
+            }:
+                raise ValueError("Invalid floor.released event.")
+            _require_uuid4(self.payload["grant_id"])
+            _require_uuid4(self.payload["participant_id"])
+            FloorReleaseReason(str(self.payload["reason_code"]))
+        else:
+            if self.action_id is None or set(self.payload) != {
+                "intervention_id",
+                "decision_id",
+                "phase",
+                "intervention_kind",
+                "reason_code",
+                "policy_version",
+            }:
+                raise ValueError("Invalid floor.intervention_requested event.")
+            _require_uuid4(self.payload["intervention_id"])
+            _require_uuid4(self.payload["decision_id"])
+            FloorInterventionKind(str(self.payload["intervention_kind"]))
+            FloorPolicyReason(str(self.payload["reason_code"]))
+            _require_policy_version(self.payload["policy_version"])
+        if SessionStatus(str(self.payload["phase"])) not in FLOOR_ENABLED_PHASES:
+            raise ValueError("Floor event phase is not floor-enabled.")
+
     _validate_timestamp = field_validator("occurred_at")(_require_aware)
+
+
+def _require_uuid4(value: object) -> UUID:
+    parsed = UUID(str(value))
+    if parsed.version != 4:
+        raise ValueError("Floor event identities must be UUIDv4.")
+    return parsed
+
+
+def _require_policy_version(value: object) -> str:
+    parsed = str(value)
+    if not parsed or len(parsed) > 64:
+        raise ValueError("Floor policy version is invalid.")
+    return parsed
 
 
 RealtimeErrorCode = Literal[

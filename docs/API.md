@@ -1,6 +1,6 @@
 # API 与事件技术基线
 
-- Status: P0 API Architecture Baseline + P1-1/P1-2/P1-3 completed + P1-4A floor contract frozen
+- Status: P0 API Architecture Baseline + P1-1/P1-2/P1-3 completed + P1-4A/P1-4B floor foundation completed
 - Current phase: P1 — IN_PROGRESS
 - API architecture baseline established by: P0-2 — DONE
 - Target version: V0.1 Internal Validation
@@ -10,7 +10,7 @@
 - P1-1 contract: scoped/frozen by P1-1A; P1-1B persistence, P1-1C REST/WebSocket runtime, P1-1D Web realtime caller and P1-1E independent final review completed
 - P1-2 contract: P1-2A/B/C completed; safe question reads and immutable version-bound session creation implemented
 - P1-3 contract: P1-3A～D completed; independent verdict `PASS`; P1-3 `DONE`
-- P1-4 contract: P1-4A docs-only design freeze completed; persistence/runtime/Realtime/Web not implemented; P1-4B awaiting explicit approval
+- P1-4 contract: P1-4A design freeze and P1-4B persistence/domain foundation completed; no public floor commands/snapshot/Web caller; P1-4C awaiting explicit approval
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -247,19 +247,19 @@ P1-3C Browser renders a local display countdown from authoritative UTC values bu
 
 The exact state matrix、deadline arithmetic、historical version compatibility and P1-3B～D gates are in [`exec-plans/P1-3_session-state-machine.md`](exec-plans/P1-3_session-state-machine.md)。
 
-## P1-4 floor-control contract — design frozen, not implemented
+## P1-4 floor-control contract — persistence/domain foundation implemented
 
-P1-4A freezes the following future contract boundary. It does not add an endpoint, command, event parser, OpenAPI field, migration or Web caller.
+P1-4A froze the boundary below. P1-4B now implements internal typed commands, strict server formal-event envelopes and durable records, but deliberately adds no REST endpoint、WebSocket inbound command、snapshot/OpenAPI field or Web caller. Therefore the public OpenAPI contract and generated Browser client remain unchanged.
 
 ### Authority and command boundary
 
 - P1-3 phase/status/deadline remains authoritative. Floor commands can express participant intent or release/interruption intent only；Browser cannot select the winning speaker, provide a rank/reason/fairness value, set current owner or modify phase/timing.
-- Future command vocabulary must retain stable UUIDv4 `action_id`, owner authorization, exact closed payloads and existing durable retry/conflict semantics. P1-4D must document the exact commands before implementing them.
+- The internal P1-4B command vocabulary retains stable UUIDv4 `action_id`, owner authorization, exact closed typed payloads and existing durable retry/conflict semantics. It is not a public network contract；P1-4D must document the exact client commands before exposing any.
 - Scheduler evaluation and silence/deadline intervention are server-owned operations. They are not fake Browser commands and do not depend on prompt/LLM output.
 
 ### Minimum formal event vocabulary
 
-P1-4 adds exactly three planned formal fact types:
+The strict server event envelope now accepts exactly three P1-4 formal fact types at version 1:
 
 - `floor.granted`：a participant acquired a specific grant in the authoritative current phase；
 - `floor.released`：that exact current grant ended for a closed safe reason；
@@ -267,18 +267,18 @@ P1-4 adds exactly three planned formal fact types:
 
 An event states what happened. Its causal scheduler decision separately retains safe policy version/reason/audit metadata. A future utterance or LLM output occurs after grant and is not embedded in these floor events.
 
-The eventual closed payloads may expose only identities needed for recovery/projection (`participant_id`、`grant_id`、phase、opportunity/decision reference where needed), safe reason code and ordered event envelope. They must not expose Private Stance、persona parameters/calibration、prompt、provider score/output、candidate ranking vector or scoring data.
+Their closed payloads expose only identities needed for future recovery/projection (`participant_id`、`grant_id`、phase、opportunity/decision reference where needed), safe reason code、policy version where causal explanation requires it, and the existing ordered event envelope. They do not expose Private Stance、persona parameters/calibration、prompt、provider score/output、candidate ranking vector、internal weights or scoring data.
 
 Hand raises/opportunities、candidate lists、fairness calculations、timer ticks and provider thinking states are not automatically formal events. Adding any event beyond the three above requires a demonstrated recovery/client caller and a prior plan update.
 
 ### Snapshot and recovery boundary
 
-- The owner-authorized server snapshot or a purpose-built floor load boundary must eventually identify the current grant/owner, phase association, safe explanation and event watermark needed for reload/gap/reconnect recovery.
+- P1-4B persists the current grant/owner、phase association、safe causal decision and event watermark needed for future recovery. P1-4D must expose the minimum owner-authorized snapshot/load projection before Browser floor UI exists.
 - Browser projects server truth only. It cannot infer ownership from a local queue, local countdown, audio playback or generated text.
 - Replacement is ordered release then grant in one locked transaction；duplicate/stale/concurrent operations must preserve zero-or-one current owner and contiguous event sequence；all durable mutation commits before send.
 - Phase change/abort/completion invalidates stale floor evaluation and releases any old current grant without allowing floor cleanup to delay or alter the P1-3 transition.
 
-Exact domain/persistence, reason metadata and P1-4B～E gates are in [`exec-plans/P1-4_floor-control.md`](exec-plans/P1-4_floor-control.md)。
+Internal grant/release/intervention commands use the existing session action/digest/aggregate-lock/sequence transaction boundary. Duplicate action IDs replay the same causal events；a changed digest conflicts；stale sequence/phase、wrong current grant、ineligible participant and terminal session reject without mutation. Exact domain/persistence, reason metadata and P1-4C～E gates are in [`exec-plans/P1-4_floor-control.md`](exec-plans/P1-4_floor-control.md)。
 
 ## Unified error semantics
 
@@ -349,7 +349,7 @@ P0-3D 已完成最小 API、OpenAPI authority、typed config、request correlati
 - P1-2A safe question/session/private projection design freeze 已完成 docs-only；
 - P1-2B persistence/domain/seed、P1-2C safe API/session/Web vertical slice 与 P1-2D independent acceptance 均已完成；P1-2 `DONE`。
 - P1-3A～D 已完成；state/timing/command/event/snapshot、backend durable foundation 与 realtime/Web complete phase flow 已独立验收 `PASS`；P1-3 `DONE`，P1 保持 `IN_PROGRESS`。
-- P1-4A 已完成 docs-only floor-control contract freeze；P1-4 `IN_PROGRESS`。P1-4B persistence/domain、P1-4C scheduler、P1-4D Realtime/Web 与 P1-4E independent acceptance 均未实现，P1-4B 等待单独明确批准。
+- P1-4A design freeze 与 P1-4B persistence/domain foundation 已完成；P1-4 `IN_PROGRESS`。Public OpenAPI/WebSocket command/snapshot/Web UI 均未新增；P1-4C scheduler 未开始并等待单独明确批准，P1-4D Realtime/Web 与 P1-4E independent acceptance 未开始。
 
 ### P2 and later
 

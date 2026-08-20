@@ -106,6 +106,14 @@ class SimulationSession(Base):
             "'CONFLICT_AND_EVALUATION', 'CONVERGENCE', 'FINAL_SUMMARY'])",
             name="phase_duration_plan_required_keys",
         ),
+        ForeignKeyConstraint(
+            ["id", "current_floor_grant_id"],
+            ["floor_grants.session_id", "floor_grants.id"],
+            name="fk_simulation_sessions_current_floor_grant",
+            deferrable=True,
+            initially="DEFERRED",
+            use_alter=True,
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
@@ -147,6 +155,10 @@ class SimulationSession(Base):
     )
     phase_duration_plan: Mapped[dict[str, int] | None] = mapped_column(
         JSONB,
+        nullable=True,
+    )
+    current_floor_grant_id: Mapped[UUID | None] = mapped_column(
+        Uuid,
         nullable=True,
     )
 
@@ -387,6 +399,364 @@ class PersonaPrivateStance(Base):
     red_lines: Mapped[list[str]] = mapped_column(JSONB, nullable=False)
     preferred_group_role: Mapped[str | None] = mapped_column(String(200), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utc_now, nullable=False
+    )
+
+
+class SessionParticipant(Base):
+    __tablename__ = "session_participants"
+    __table_args__ = (
+        UniqueConstraint("session_id", "id", name="uq_session_participants_session_id"),
+        UniqueConstraint(
+            "session_id", "seat_order", name="uq_session_participants_session_seat"
+        ),
+        UniqueConstraint(
+            "session_id", "user_id", name="uq_session_participants_session_user"
+        ),
+        UniqueConstraint(
+            "session_id",
+            "question_persona_assignment_id",
+            name="uq_session_participants_session_assignment",
+        ),
+        CheckConstraint("seat_order > 0", name="seat_order_positive"),
+        CheckConstraint(
+            "actor_kind IN ('AI', 'HUMAN', 'SYSTEM')", name="actor_kind_allowed"
+        ),
+        CheckConstraint(
+            "participation_role IN ('CANDIDATE', 'MODERATOR')",
+            name="participation_role_allowed",
+        ),
+        CheckConstraint(
+            "availability IN ('AVAILABLE', 'UNAVAILABLE')",
+            name="availability_allowed",
+        ),
+        CheckConstraint(
+            "(actor_kind = 'AI' AND participation_role = 'CANDIDATE' "
+            "AND user_id IS NULL AND question_persona_assignment_id IS NOT NULL) OR "
+            "(actor_kind = 'HUMAN' AND user_id IS NOT NULL "
+            "AND question_persona_assignment_id IS NULL) OR "
+            "(actor_kind = 'SYSTEM' AND participation_role = 'MODERATOR' "
+            "AND user_id IS NULL AND question_persona_assignment_id IS NULL)",
+            name="actor_identity_consistent",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    session_id: Mapped[UUID] = mapped_column(
+        Uuid,
+        ForeignKey("simulation_sessions.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    actor_kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    participation_role: Mapped[str] = mapped_column(String(16), nullable=False)
+    seat_order: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    availability: Mapped[str] = mapped_column(String(16), nullable=False)
+    user_id: Mapped[UUID | None] = mapped_column(
+        Uuid,
+        ForeignKey("users.id", deferrable=True, initially="DEFERRED"),
+        nullable=True,
+    )
+    question_persona_assignment_id: Mapped[UUID | None] = mapped_column(
+        Uuid,
+        ForeignKey("question_persona_assignments.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utc_now, nullable=False
+    )
+
+
+class SpeakingOpportunity(Base):
+    __tablename__ = "speaking_opportunities"
+    __table_args__ = (
+        Index(
+            "ix_speaking_opportunities_session_phase_created",
+            "session_id",
+            "phase",
+            "created_at",
+            "id",
+        ),
+        UniqueConstraint(
+            "session_id", "id", name="uq_speaking_opportunities_session_id"
+        ),
+        ForeignKeyConstraint(
+            ["session_id", "participant_id"],
+            ["session_participants.session_id", "session_participants.id"],
+            deferrable=True,
+            initially="DEFERRED",
+        ),
+        CheckConstraint(
+            "opportunity_kind IN "
+            "('PHASE_MANDATED', 'EXPLICIT_REQUEST', 'NOMINATION', 'FAIRNESS')",
+            name="opportunity_kind_allowed",
+        ),
+        CheckConstraint(
+            "phase IN ('OPENING_STATEMENTS', 'EXPLORATION', "
+            "'CONFLICT_AND_EVALUATION', 'CONVERGENCE', 'FINAL_SUMMARY')",
+            name="phase_allowed",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    session_id: Mapped[UUID] = mapped_column(
+        Uuid,
+        ForeignKey("simulation_sessions.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    participant_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
+    phase: Mapped[str] = mapped_column(String(32), nullable=False)
+    opportunity_kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utc_now, nullable=False
+    )
+
+
+class FloorDecision(Base):
+    __tablename__ = "floor_decisions"
+    __table_args__ = (
+        Index(
+            "ix_floor_decisions_session_decided",
+            "session_id",
+            "decided_at",
+            "id",
+        ),
+        UniqueConstraint("session_id", "id", name="uq_floor_decisions_session_id"),
+        ForeignKeyConstraint(
+            ["session_id", "selected_participant_id"],
+            ["session_participants.session_id", "session_participants.id"],
+            deferrable=True,
+            initially="DEFERRED",
+        ),
+        ForeignKeyConstraint(
+            ["session_id", "opportunity_id"],
+            ["speaking_opportunities.session_id", "speaking_opportunities.id"],
+            deferrable=True,
+            initially="DEFERRED",
+        ),
+        CheckConstraint(
+            "outcome_kind IN ('GRANT', 'REQUEST_INTERVENTION', 'NO_GRANT')",
+            name="outcome_kind_allowed",
+        ),
+        CheckConstraint("expected_last_sequence >= 0", name="sequence_non_negative"),
+        CheckConstraint(
+            "length(policy_version) > 0",
+            name="explanation_identifiers_non_empty",
+        ),
+        CheckConstraint(
+            "phase IN ('OPENING_STATEMENTS', 'EXPLORATION', "
+            "'CONFLICT_AND_EVALUATION', 'CONVERGENCE', 'FINAL_SUMMARY')",
+            name="phase_allowed",
+        ),
+        CheckConstraint(
+            "primary_reason_code IN ('PHASE_MANDATED_TURN', "
+            "'EXPLICIT_OPPORTUNITY', 'FIRST_OPPORTUNITY', "
+            "'FAIRNESS_RECOVERY', 'MONOPOLY_PREVENTION', "
+            "'PHASE_SUMMARY_OPPORTUNITY', 'SILENCE_RECOVERY', "
+            "'DEADLINE_RECOVERY', 'NO_ELIGIBLE_PARTICIPANT')",
+            name="primary_reason_code_allowed",
+        ),
+        CheckConstraint(
+            "jsonb_typeof(supporting_reason_codes) = 'array'",
+            name="supporting_reason_codes_array",
+        ),
+        CheckConstraint(
+            "supporting_reason_codes <@ "
+            '\'["PHASE_MANDATED_TURN", "EXPLICIT_OPPORTUNITY", '
+            '"FIRST_OPPORTUNITY", "FAIRNESS_RECOVERY", '
+            '"MONOPOLY_PREVENTION", "PHASE_SUMMARY_OPPORTUNITY", '
+            '"SILENCE_RECOVERY", "DEADLINE_RECOVERY", '
+            '"NO_ELIGIBLE_PARTICIPANT"]\'::jsonb',
+            name="supporting_reason_codes_allowed",
+        ),
+        CheckConstraint(
+            "jsonb_typeof(decision_metadata) = 'object'",
+            name="decision_metadata_object",
+        ),
+        CheckConstraint(
+            "decision_metadata ?& ARRAY["
+            "'current_phase_grant_count', 'first_opportunity_unmet', "
+            "'previous_owner_was_selected', 'consecutive_grant_count', "
+            "'tie_break_class'] AND "
+            "decision_metadata - ARRAY["
+            "'current_phase_grant_count', 'first_opportunity_unmet', "
+            "'previous_owner_was_selected', 'consecutive_grant_count', "
+            "'tie_break_class'] = '{}'::jsonb AND "
+            "jsonb_typeof(decision_metadata->'current_phase_grant_count') "
+            "= 'number' AND "
+            "(decision_metadata->>'current_phase_grant_count') "
+            "~ '^(0|[1-9][0-9]*)$' AND "
+            "jsonb_typeof(decision_metadata->'first_opportunity_unmet') "
+            "= 'boolean' AND "
+            "jsonb_typeof(decision_metadata->'previous_owner_was_selected') "
+            "= 'boolean' AND "
+            "jsonb_typeof(decision_metadata->'consecutive_grant_count') "
+            "= 'number' AND "
+            "(decision_metadata->>'consecutive_grant_count') "
+            "~ '^(0|[1-9][0-9]*)$' AND "
+            "decision_metadata->>'tie_break_class' IN "
+            "('NOT_APPLICABLE', 'SEAT_ORDER', 'PARTICIPANT_ID')",
+            name="decision_metadata_safe_shape",
+        ),
+        CheckConstraint(
+            "(outcome_kind = 'GRANT' AND selected_participant_id IS NOT NULL "
+            "AND intervention_kind IS NULL) OR "
+            "(outcome_kind = 'REQUEST_INTERVENTION' "
+            "AND selected_participant_id IS NULL AND intervention_kind IS NOT NULL) OR "
+            "(outcome_kind = 'NO_GRANT' AND selected_participant_id IS NULL "
+            "AND intervention_kind IS NULL)",
+            name="outcome_target_consistent",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    session_id: Mapped[UUID] = mapped_column(
+        Uuid,
+        ForeignKey("simulation_sessions.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    phase: Mapped[str] = mapped_column(String(32), nullable=False)
+    expected_last_sequence: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    outcome_kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    selected_participant_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    opportunity_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    intervention_kind: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    policy_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    primary_reason_code: Mapped[str] = mapped_column(String(64), nullable=False)
+    supporting_reason_codes: Mapped[list[str]] = mapped_column(JSONB, nullable=False)
+    decision_metadata: Mapped[dict[str, object]] = mapped_column(JSONB, nullable=False)
+    decided_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utc_now, nullable=False
+    )
+
+
+class FloorGrant(Base):
+    __tablename__ = "floor_grants"
+    __table_args__ = (
+        Index(
+            "ix_floor_grants_session_granted",
+            "session_id",
+            "granted_at",
+            "id",
+        ),
+        UniqueConstraint("session_id", "id", name="uq_floor_grants_session_id"),
+        UniqueConstraint("decision_id", name="uq_floor_grants_decision"),
+        UniqueConstraint("opportunity_id", name="uq_floor_grants_opportunity"),
+        ForeignKeyConstraint(
+            ["session_id", "participant_id"],
+            ["session_participants.session_id", "session_participants.id"],
+            deferrable=True,
+            initially="DEFERRED",
+        ),
+        CheckConstraint(
+            "phase IN ('OPENING_STATEMENTS', 'EXPLORATION', "
+            "'CONFLICT_AND_EVALUATION', 'CONVERGENCE', 'FINAL_SUMMARY')",
+            name="phase_allowed",
+        ),
+        ForeignKeyConstraint(
+            ["session_id", "decision_id"],
+            ["floor_decisions.session_id", "floor_decisions.id"],
+            deferrable=True,
+            initially="DEFERRED",
+        ),
+        ForeignKeyConstraint(
+            ["session_id", "opportunity_id"],
+            ["speaking_opportunities.session_id", "speaking_opportunities.id"],
+            deferrable=True,
+            initially="DEFERRED",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    session_id: Mapped[UUID] = mapped_column(
+        Uuid,
+        ForeignKey("simulation_sessions.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    participant_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
+    decision_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
+    opportunity_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    phase: Mapped[str] = mapped_column(String(32), nullable=False)
+    granted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utc_now, nullable=False
+    )
+
+
+class FloorRelease(Base):
+    __tablename__ = "floor_releases"
+    __table_args__ = (
+        Index(
+            "ix_floor_releases_session_released",
+            "session_id",
+            "released_at",
+            "grant_id",
+        ),
+        Index(
+            "ix_floor_releases_session_causation",
+            "session_id",
+            "causation_action_id",
+            "grant_id",
+        ),
+        ForeignKeyConstraint(
+            ["session_id", "grant_id"],
+            ["floor_grants.session_id", "floor_grants.id"],
+            deferrable=True,
+            initially="DEFERRED",
+        ),
+        ForeignKeyConstraint(
+            ["session_id", "causation_action_id"],
+            ["session_actions.session_id", "session_actions.action_id"],
+        ),
+        CheckConstraint(
+            "reason_code IN ('SPEAKER_FINISHED', 'INTERRUPTED', "
+            "'PHASE_CHANGED', 'SESSION_TERMINATED')",
+            name="reason_code_allowed",
+        ),
+    )
+
+    grant_id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    session_id: Mapped[UUID] = mapped_column(
+        Uuid,
+        ForeignKey("simulation_sessions.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    causation_action_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    reason_code: Mapped[str] = mapped_column(String(64), nullable=False)
+    released_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utc_now, nullable=False
+    )
+
+
+class FloorIntervention(Base):
+    __tablename__ = "floor_interventions"
+    __table_args__ = (
+        Index(
+            "ix_floor_interventions_session_requested",
+            "session_id",
+            "requested_at",
+            "id",
+        ),
+        UniqueConstraint("decision_id", name="uq_floor_interventions_decision"),
+        ForeignKeyConstraint(
+            ["session_id", "decision_id"],
+            ["floor_decisions.session_id", "floor_decisions.id"],
+            deferrable=True,
+            initially="DEFERRED",
+        ),
+        CheckConstraint(
+            "intervention_kind IN ('SILENCE', 'DEADLINE', 'NO_ELIGIBLE_PARTICIPANT')",
+            name="kind_allowed",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    session_id: Mapped[UUID] = mapped_column(
+        Uuid,
+        ForeignKey("simulation_sessions.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    decision_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
+    intervention_kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    requested_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utc_now, nullable=False
     )
 

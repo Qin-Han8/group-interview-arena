@@ -1,6 +1,6 @@
 # P1-4 Floor Control / Speaker Scheduling Execution Plan
 
-Status: `P1 IN_PROGRESS`; `P1-4 IN_PROGRESS`; `P1-4A completed`; `P1-4B not started / awaiting explicit approval`; `P1-4C not started`; `P1-4D not started`; `P1-4E not started`
+Status: `P1 IN_PROGRESS`; `P1-4 IN_PROGRESS`; `P1-4A completed`; `P1-4B completed`; `P1-4C not started / awaiting explicit approval`; `P1-4D not started`; `P1-4E not started`
 
 Target version: `V0.1 Internal Validation`
 
@@ -9,6 +9,8 @@ Product baseline: [`PROJECT_MASTER_PLAN.md`](../PROJECT_MASTER_PLAN.md)
 Accepted decisions: [`D-003`](../DECISIONS.md#2-已确认产品决策索引), [`D-007`](../DECISIONS.md#2-已确认产品决策索引), [`D-008`](../DECISIONS.md#2-已确认产品决策索引), [`D-013`](../DECISIONS.md#2-已确认产品决策索引), [`ADR-003`](../DECISIONS.md#adr-003--fastapi-作为主要业务后端), [`ADR-005`](../DECISIONS.md#adr-005--postgresqlsqlalchemy-与-alembic-数据基线), [`ADR-006`](../DECISIONS.md#adr-006--rest-与-websocket-通信边界), [`ADR-007`](../DECISIONS.md#adr-007--api-契约生成策略), [`ADR-008`](../DECISIONS.md#adr-008--redis-延后运行), [`ADR-009`](../DECISIONS.md#adr-009--独立后台任务队列延后), [`ADR-011`](../DECISIONS.md#adr-011--轻量领域导向混合模块架构), [`ADR-012`](../DECISIONS.md#adr-012--分阶段测试与质量工具策略), [`ADR-013`](../DECISIONS.md#adr-013--配置错误与结构化日志基线), [`ADR-014`](../DECISIONS.md#adr-014--provider-neutral-ai-与自定义讨论编排), [`ADR-015`](../DECISIONS.md#adr-015--initial-identity-and-browser-session-boundary)
 
 P1-4A baseline: committed `main` at `0fdf2c0034737044efcd986b1915fabe81f8a56c` (`P1-3D: docs: complete session state machine phase`); [`PROJECT_MASTER_PLAN.md`](../PROJECT_MASTER_PLAN.md) SHA-256 `2388A9660320406CB35D5354126AD71C6849A98DB7C4A356796CA951BF372F26`
+
+P1-4B baseline: clean committed `main` at `100646c9d547521fb8fc67430385ebe27572f5c5` (`P1-4A: docs: freeze floor control design`), equal to `origin/main`; master-plan SHA-256 unchanged
 
 ## Goal
 
@@ -27,12 +29,12 @@ P1-4 只决定“谁应该说”，不决定“说什么”。Scheduler 是 proj
 ## Five-stage decomposition
 
 1. **P1-4A — Floor control design freeze**：`completed`。Docs-only 冻结领域模型、phase/floor authority、V0.1 deterministic policy、human compatibility、events、explainability、persistence、B～E scope 和 acceptance。
-2. **P1-4B — Scheduling persistence + domain foundation**：`not started / awaiting explicit approval`。建立通用 participant、speaking opportunity、current floor、decision/audit facts 的最小 persistence/domain 基础与 migration；不实现自动 speaker selection engine、Realtime/Web 或 LLM。
-3. **P1-4C — Deterministic scheduler engine**：`not started`。实现 pure deterministic candidate construction/ranking、fairness、monopoly guard、phase policy、silence/deadline intervention、transactional grant/release 与 deterministic regressions；不生成 utterance。
+2. **P1-4B — Scheduling persistence + domain foundation**：`completed`。已建立通用 participant、speaking opportunity、current floor、decision/audit facts 的最小 persistence/domain 基础与 migration；未实现自动 speaker selection engine、Realtime/Web 或 LLM。
+3. **P1-4C — Deterministic scheduler engine**：`not started / awaiting explicit approval`。实现 pure deterministic candidate construction/ranking、fairness、monopoly guard、phase policy、silence/deadline intervention、transactional grant/release 与 deterministic regressions；不生成 utterance。
 4. **P1-4D — Realtime/Web floor experience**：`not started`。在既有 ordered session channel 上实现最小 floor commands/events/snapshot projection、Browser current-speaker/queue intent 和真实 PostgreSQL Chromium flow；Browser 不拥有 scheduler。
 5. **P1-4E — Independent acceptance + closeout**：`not started`。从 committed source 独立复核 persistence、determinism、race/recovery、phase integration、human compatibility、explainability/non-disclosure、Realtime/Web 和 Deferred absence；通过后才可将 P1-4 标为 `DONE`。
 
-P1-4B 必须获得单独明确批准；P1-4A 完成不授权 migration、schema、runtime、test、dependency、lockfile、CI 或 Web 修改。
+P1-4B 已获得单独明确批准并完成；P1-4C 仍须单独明确批准。P1-4B 完成不授权 scheduler ranking engine、dependency、lockfile、CI、public API 或 Web 修改。
 
 ## Frozen floor ownership model
 
@@ -291,9 +293,18 @@ P1-4 does not implement or prebuild:
 ## Progress
 
 - P1-4A：completed；docs-only floor-control design freeze；validation `PASS`；no blocker。
-- P1-4B：not started / awaiting explicit user approval。
-- P1-4C：not started。
+- P1-4B：completed；linear migration `f1a14b15c004`、participant/floor persistence、internal command lifecycle、durable audit、phase integration and required validation `PASS`；no blocker。
+- P1-4C：not started / awaiting explicit user approval。
 - P1-4D：not started。
 - P1-4E：not started。
 
-Next governance-approved action: review the P1-4A docs diff; only explicit user approval may start P1-4B.
+### P1-4B implementation record
+
+- Added six product tables (`session_participants`、`speaking_opportunities`、`floor_decisions`、`floor_grants`、`floor_releases`、`floor_interventions`), history indexes, a safe-metadata database check and the session-scoped nullable current-grant reference without rewriting prior revisions；bound existing sessions receive a four-seat roster backfill.
+- API-created sessions now atomically materialize one human candidate and three AI candidates；schema supports future system moderators without an AI-only list or full participant runtime.
+- Added closed domain types and an internal floor command service for grant、release and intervention. It reuses P1-1 owner authorization、action UUID + semantic digest replay/conflict、aggregate row lock、contiguous formal-event sequence and atomic rollback.
+- Grant eligibility、single current owner、wrong-grant/stale decision rejection、terminal protection、phase-change/abort release ordering and durable immutable audit history are implemented. P1-3 remains the only status/timing authority.
+- Decision metadata and the three v1 floor event payloads are strictly allowlisted and omit Private Stance、persona calibration、prompt/provider internals、hidden ranking/weights and scoring data. No public REST/WS command、snapshot field or Browser caller was added.
+- Migration downgrade/re-upgrade/catalog check、domain/contract/model tests、real PostgreSQL concurrency/idempotency/rollback/cascade tests、P1-1/P1-3 regressions、OpenAPI drift and repository quality gates passed. No new ADR、dependency or lockfile change.
+
+Next governance-approved action: review the P1-4B diff; only explicit user approval may start P1-4C.

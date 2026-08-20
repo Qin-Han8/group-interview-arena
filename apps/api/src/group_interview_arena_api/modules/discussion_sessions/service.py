@@ -10,7 +10,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from group_interview_arena_api.db.models import (
     DiscussionEvent,
+    QuestionPersonaAssignment,
     SessionAction,
+    SessionParticipant,
     SimulationSession,
 )
 from group_interview_arena_api.modules.discussion_sessions.domain import (
@@ -24,6 +26,10 @@ from group_interview_arena_api.modules.discussion_sessions.domain import (
     StoredEvent,
     decide_session_command,
     reconcile_due_transitions,
+)
+from group_interview_arena_api.modules.floor_control.domain import FloorReleaseReason
+from group_interview_arena_api.modules.floor_control.lifecycle import (
+    release_active_floor_for_lifecycle,
 )
 from group_interview_arena_api.modules.question_personas.service import (
     QuestionNotFoundError,
@@ -109,13 +115,14 @@ def _apply_reconciliation_to_aggregate(
     outcome: DeadlineReconciliationOutcome,
     *,
     now: datetime,
+    event_count: int,
 ) -> None:
     aggregate.status = outcome.status.value
     aggregate.phase_started_at = outcome.phase_started_at
     aggregate.phase_deadline_at = outcome.phase_deadline_at
-    if outcome.events:
+    if event_count:
         aggregate.updated_at = now
-        aggregate.last_sequence += len(outcome.events)
+        aggregate.last_sequence += event_count
 
 
 def _event_rows(
@@ -140,7 +147,8 @@ def _event_rows(
     ]
 
 
-def _reconcile_due_for_locked_aggregate(
+async def reconcile_due_for_locked_aggregate(
+    session: AsyncSession,
     aggregate: SimulationSession,
     *,
     now: datetime,
@@ -155,12 +163,29 @@ def _reconcile_due_for_locked_aggregate(
     if not outcome.events:
         return []
 
+    pending_events: list[PendingEvent] = []
+    release_event = await release_active_floor_for_lifecycle(
+        session,
+        aggregate,
+        reason=FloorReleaseReason.PHASE_CHANGED,
+        occurred_at=now,
+        action_id=None,
+    )
+    if release_event is not None:
+        pending_events.append(release_event)
+    pending_events.extend(outcome.events)
+
     first_sequence = aggregate.last_sequence + 1
-    _apply_reconciliation_to_aggregate(aggregate, outcome, now=now)
+    _apply_reconciliation_to_aggregate(
+        aggregate,
+        outcome,
+        now=now,
+        event_count=len(pending_events),
+    )
     return _event_rows(
         session_id=aggregate.id,
         first_sequence=first_sequence,
-        events=outcome.events,
+        events=pending_events,
         occurred_at=now,
         action_id=None,
     )
@@ -196,11 +221,60 @@ async def create_session(
             await require_selectable_question_version(session, question_version_id)
             session.add(row)
             await session.flush()
+            assignments = list(
+                (
+                    await session.scalars(
+                        select(QuestionPersonaAssignment)
+                        .where(
+                            QuestionPersonaAssignment.question_version_id
+                            == question_version_id
+                        )
+                        .order_by(QuestionPersonaAssignment.slot)
+                    )
+                ).all()
+            )
+            if len(assignments) != 3 or [item.slot for item in assignments] != [
+                1,
+                2,
+                3,
+            ]:
+                raise ValueError(
+                    "Selectable question has an invalid participant roster."
+                )
+            session.add(
+                SessionParticipant(
+                    id=uuid4(),
+                    session_id=row.id,
+                    actor_kind="HUMAN",
+                    participation_role="CANDIDATE",
+                    seat_order=1,
+                    availability="AVAILABLE",
+                    user_id=owner_id,
+                    question_persona_assignment_id=None,
+                    created_at=now,
+                )
+            )
+            session.add_all(
+                [
+                    SessionParticipant(
+                        id=uuid4(),
+                        session_id=row.id,
+                        actor_kind="AI",
+                        participation_role="CANDIDATE",
+                        seat_order=assignment.slot + 1,
+                        availability="AVAILABLE",
+                        user_id=None,
+                        question_persona_assignment_id=assignment.id,
+                        created_at=now,
+                    )
+                    for assignment in assignments
+                ]
+            )
             session.add(event)
             await session.flush()
     except QuestionNotFoundError:
         raise
-    except QuestionPersistenceError, SQLAlchemyError:
+    except QuestionPersistenceError, SQLAlchemyError, ValueError:
         _raise_persistence_error()
     return _snapshot(row)
 
@@ -287,7 +361,8 @@ async def apply_session_command(
                 )
 
             now = _utc_now()
-            system_event_rows = _reconcile_due_for_locked_aggregate(
+            system_event_rows = await reconcile_due_for_locked_aggregate(
+                session,
                 aggregate,
                 now=now,
             )
@@ -318,6 +393,21 @@ async def apply_session_command(
                 )
                 await session.flush()
 
+                pending_events = list(outcome.events)
+                if outcome.status in {
+                    SessionStatus.COMPLETED,
+                    SessionStatus.ABORTED_USER,
+                }:
+                    release_event = await release_active_floor_for_lifecycle(
+                        session,
+                        aggregate,
+                        reason=FloorReleaseReason.SESSION_TERMINATED,
+                        occurred_at=now,
+                        action_id=command.action_id,
+                    )
+                    if release_event is not None:
+                        pending_events.insert(0, release_event)
+
                 first_sequence = aggregate.last_sequence + 1
                 aggregate.status = outcome.status.value
                 aggregate.phase_started_at = outcome.phase_started_at
@@ -325,11 +415,11 @@ async def apply_session_command(
                 if outcome.frozen_duration_plan is not None:
                     aggregate.phase_duration_plan = outcome.frozen_duration_plan
                 aggregate.updated_at = now
-                aggregate.last_sequence += len(outcome.events)
+                aggregate.last_sequence += len(pending_events)
                 event_rows = _event_rows(
                     session_id=command.session_id,
                     first_sequence=first_sequence,
-                    events=outcome.events,
+                    events=pending_events,
                     occurred_at=now,
                     action_id=command.action_id,
                 )
@@ -368,7 +458,8 @@ async def reconcile_session_deadline(
             if aggregate is None:
                 raise SessionNotFoundError
 
-            event_rows = _reconcile_due_for_locked_aggregate(
+            event_rows = await reconcile_due_for_locked_aggregate(
+                session,
                 aggregate,
                 now=effective_now,
             )
