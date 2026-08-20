@@ -1,6 +1,6 @@
 # P1-2 Question & Persona Foundation Execution Plan
 
-Status: `P1 IN_PROGRESS`; `P1-2 IN_PROGRESS`; `P1-2A completed`; `P1-2B completed`; `P1-2C completed`; `P1-2D not started / awaiting explicit approval`
+Status: `P1 IN_PROGRESS`; `P1-2 DONE`; `P1-2A` through `P1-2D completed`; independent final verdict `PASS`; `P1-3 not started / awaiting explicit approval`
 
 Target version: `V0.1 Internal Validation`
 
@@ -31,7 +31,7 @@ P1-2 只建立题目/人格的 persistence、domain、最小 authenticated read/
 1. **P1-2A — Design freeze**：`completed`。本轮 docs-only；冻结 domain、lifecycle、security、B～D scope/callers/acceptance/testing，并同步必要文档。不修改 runtime、tests、schema/migrations、dependencies/lockfiles 或 CI。
 2. **P1-2B — Persistence + Domain + Seed foundation**：`completed`。新增最小 ORM/migration、纯 domain validation、application-owned idempotent seed 和真实 PostgreSQL tests；未新增 HTTP/WS/Web caller。
 3. **P1-2C — API + Session integration + minimal Web vertical slice**：`completed`。已增加 authenticated safe question reads，使新 session 绑定 immutable version，并增加最小 Web 选题/题面展示；未创建 participant/utterance/AI loop。
-4. **P1-2D — Independent acceptance + closeout**：`not started`。从 committed source 独立复核 P1-2B/C 的 schema、immutability、non-disclosure、history traceability 和 browser vertical slice；不增加新业务能力。
+4. **P1-2D — Independent acceptance + closeout**：`completed`。已从 committed source 独立复核 P1-2B/C 的 schema、immutability、non-disclosure、history traceability 和 browser vertical slice；未增加新业务能力，verdict `PASS`。
 
 P1-2B、P1-2C、P1-2D 均需单独明确批准。P1-2A 完成后不得自动开始 P1-2B。
 
@@ -303,4 +303,5 @@ The 12 formal V0.1 questions are Deferred. To give P1-2C a real caller, P1-2B ma
 - [x] P1-2A docs-only synchronization and validation completed。
 - [x] P1-2B implementation and risk-matched validation completed。
 - [x] P1-2C safe API、immutable session binding、minimal Web caller and risk-matched validation completed。
-- [ ] P1-2D not started。
+- [x] P1-2D independent final acceptance completed；verdict `PASS`；findings 无 blocker/material item。
+- [x] P1-2 `DONE`；P1 remains `IN_PROGRESS`；P1-3 not started / awaiting explicit approval。

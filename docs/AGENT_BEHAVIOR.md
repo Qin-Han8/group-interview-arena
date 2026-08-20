@@ -1,9 +1,9 @@
 # AI 候选人与讨论编排骨架
 
-- Status: P1-2A persona design frozen; P1-2B persona persistence/domain/seed implemented
+- Status: P1-2 completed; persona foundation implemented; orchestrator/AI runtime deferred
 - Current phase: P1 — IN_PROGRESS
 - Target version: V0.1 Internal Validation
-- Detailed orchestrator/agent design: Not started; P1-1A～E and P1-2A/B completed; P1-2C awaiting explicit approval
+- Detailed orchestrator/agent design: Not started; P1-1 and P1-2 completed; P1-3 awaiting explicit approval
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -160,7 +160,7 @@ P1-1A 冻结、P1-1B～D 已实现讨论会话的 persistence/backend transport 
 
 ## Future work
 
-- P1：`IN_PROGRESS`；P1-1 session foundation `DONE`；P1-2A persona/stance boundary 与 P1-2B persistence/domain/seed completed；P1-2C awaiting explicit approval。完整状态机、调度、记忆和 AI runtime 仍未开始并需后续批准。
+- P1：`IN_PROGRESS`；P1-1 session foundation 与 P1-2 question/persona foundation 均为 `DONE`；P1-2C safe public question/session caller 和 P1-2D independent acceptance 已完成。P1-3 not started / awaiting explicit approval；完整状态机、调度、记忆和 AI runtime 仍未开始并需后续批准。
 - P2：加入语音、打断、播放停止和恢复语义。
 - P3：建立角色行为与评分证据之间的校准边界。
 - P6/V1.0：扩展到 6～8 种角色和压力模式。

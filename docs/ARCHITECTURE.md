@@ -1,6 +1,6 @@
 # P0 技术架构基线
 
-- Status: P0 Architecture Baseline + P1-1 completed + P1-2C implemented
+- Status: P0 Architecture Baseline + P1-1/P1-2 completed
 - Current phase: P1 — IN_PROGRESS
 - Architecture baseline established by: P0-2 — DONE
 - P0-3 foundation status: DONE
@@ -8,7 +8,7 @@
 - P0-5 identity boundary status: DONE
 - Most recently completed task: P0-7 independent final acceptance — PASS after two documentation findings remediation and finding-only recheck
 - P0 status: DONE; P0-1 through P0-7 completed
-- P1 status: IN_PROGRESS; P1-1 DONE; P1-2 IN_PROGRESS; P1-2A/P1-2B/P1-2C completed; P1-2D awaiting explicit approval
+- P1 status: IN_PROGRESS; P1-1/P1-2 DONE; P1-2A through P1-2D completed; P1-3 awaiting explicit approval
 - Target version: V0.1 Internal Validation
 - Business architecture detail: P1-1 runtime completed; P1-2 question/persona persistence/domain/safe caller boundary implemented through P1-2C
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
@@ -249,7 +249,7 @@ WebSocket 使用独立版本化事件契约，至少表达 event type、schema v
 - P1-2C 已只增加 authenticated safe question reads、version-bound session creation 和最小 Web selection/render caller；未增加 question mutation/admin、persona/private API、participant/utterance、WS event vocabulary 或 AI runtime。
 - Private Stance/internal calibration fields 不进入 REST OpenAPI、generated Web contract、Browser、WebSocket、logs、traces 或 errors。未来 AI caller 只在获批后由 server-side application service 按 session-bound version 为单一 assignment 加载最小 private context。
 - Published content/assignment/stance 采用 append-only application invariant；retirement 只影响未来 discovery。Session foreign key 使用 restrict/no-action historical semantics，禁止 mutable latest pointer 或 retirement cascade 改写历史。
-- 完整范围、schema、B～D caller/acceptance/testing 见 [`exec-plans/P1-2_question-persona-foundation.md`](exec-plans/P1-2_question-persona-foundation.md)。P1-2D 保持 not started / awaiting explicit approval。
+- 完整范围、schema、B～D caller/acceptance/testing 见 [`exec-plans/P1-2_question-persona-foundation.md`](exec-plans/P1-2_question-persona-foundation.md)。P1-2D independent verdict `PASS`，P1-2 `DONE`；P1-3 保持 not started / awaiting explicit approval。
 
 ## Configuration, secrets and error boundaries
 
@@ -322,7 +322,7 @@ Redis 只在多 API workers、横向扩容、跨进程 WebSocket broadcast、dis
 - P0-5D：completed；真实 browser Cookie/CORS/CSRF 闭环已通过 Chromium 验证；
 - P0-5E：completed；final outcome `PASS after findings remediation and independent recheck`；
 - P0：`DONE`；P0-1～P0-7 completed；P0-7 finding-only independent recheck `PASS`，P1 readiness `READY`；其后用户已明确批准进入 P1；
-- P1：`IN_PROGRESS`；P1-1A～E 已完成且 verdict `PASS`；P1-2A/B/C 已完成 question/persona design、persistence/domain/seed、safe API/session/Web vertical slice，P1-2D 未开始且等待明确批准；完整状态机、调度、记忆和基础报告仍需后续分别设计；
+- P1：`IN_PROGRESS`；P1-1A～E 已完成且 verdict `PASS`；P1-2A～D 已完成 question/persona design、persistence/domain/seed、safe API/session/Web vertical slice 与 independent acceptance，P1-2 `DONE`；P1-3 not started / awaiting explicit approval，完整状态机、调度、记忆和基础报告仍需后续分别设计；
 - P2 以后：只在对应阶段获批后增加语音、评分训练和商业化能力。
 
 ## 与其他文档关系

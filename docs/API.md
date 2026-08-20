@@ -1,6 +1,6 @@
 # API 与事件技术基线
 
-- Status: P0 API Architecture Baseline + P1-1 completed + P1-2C implemented
+- Status: P0 API Architecture Baseline + P1-1/P1-2 completed
 - Current phase: P1 — IN_PROGRESS
 - API architecture baseline established by: P0-2 — DONE
 - Target version: V0.1 Internal Validation
@@ -283,7 +283,7 @@ P0-3D 已完成最小 API、OpenAPI authority、typed config、request correlati
 
 - `IN_PROGRESS`；P1-1A～E 已完成第一条文字会话 scoped contract、persistence、backend REST/WS、Web caller、browser reconnect regression 和 independent acceptance；P1-1 `DONE`；
 - P1-2A safe question/session/private projection design freeze 已完成 docs-only；
-- P1-2B persistence/domain/seed 与 P1-2C safe API/session/Web vertical slice 均已完成；P1-2D 未开始并等待单独明确批准。
+- P1-2B persistence/domain/seed、P1-2C safe API/session/Web vertical slice 与 P1-2D independent acceptance 均已完成；P1-2 `DONE`，P1-3 未开始并等待单独明确批准。
 
 ### P2 and later
 

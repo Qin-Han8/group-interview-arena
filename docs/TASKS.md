@@ -1,17 +1,17 @@
 # 当前任务清单
 
-- Status: P1 in progress; P1-1 completed; P1-2 persistence/domain foundation in progress
-- Managed scope: P1-2 only; P1-2A/B/C completed; P1-2D not started and requires separate explicit approval
-- Most recently completed subphase: P1-2B — `DONE`
+- Status: P1 in progress; P1-1 and P1-2 completed; P1-3 not started
+- Managed scope: P1-2 closeout completed; no P1-3 implementation is approved
+- Most recently completed subphase: P1-2D — `DONE`
 - P0-7 final outcome: initial verdict `BLOCKED` with two documentation findings; remediation completed; finding-only independent recheck `PASS`; new blockers none; P1 readiness `READY`
 - Current phase: P1 — `IN_PROGRESS`
-- Current task: P1-2 — `IN_PROGRESS`
-- Next subphase gate: P1-2D — `TODO` / not started / awaiting explicit user approval
+- Most recently completed task: P1-2 — `DONE`
+- Next task gate: P1-3 — `TODO` / not started / awaiting explicit user approval
 - P0 status: `DONE`; P0-1 through P0-7 completed
 - Allowed status values: `TODO` / `IN_PROGRESS` / `BLOCKED` / `DONE`
 - Related roadmap: [`ROADMAP.md`](ROADMAP.md)
 
-用户已明确批准正式进入 P1、P1-2A Question & Persona design freeze 和 P1-2B persistence/domain/seed foundation。P1-2C～D 不因前序完成而自动获准，也不提前展开完整状态机、调度、记忆、报告或 P2～P6。
+用户已明确批准正式进入 P1 以及 P1-2A～D；P1-2 已在独立验收 PASS 后完成。P1-3 未开始并等待单独明确批准，不提前展开完整状态机、调度、记忆、报告或 P2～P6。
 
 ## P0-1 — 仓库与文档治理
 
@@ -410,8 +410,8 @@
 
 - ID: `P1-2`
 - 名称：Question & Persona foundation
-- Status: `IN_PROGRESS`
-- Approval state：用户已明确批准 P1-2A/P1-2B/P1-2C；三者 completed；P1-2D not started / awaiting separate explicit approval。
+- Status: `DONE`
+- Approval state：用户已明确批准 P1-2A～D；四个子步骤 completed；independent final verdict `PASS`。
 - 目标：建立 stable Question Template identity、immutable published Question Version、stable-behavior Persona Template，以及 question-version-specific Persona Assignment / Private Stance，并让后续 session 绑定不可变版本且不泄露私有立场。
 - In scope：P1-2A design freeze；后续经单独批准的 P1-2B persistence/domain/seed、P1-2C safe API/session/Web vertical slice、P1-2D independent acceptance。
 - Out of scope：完整 CMS/RBAC/审批流、AI 自动出题、12 道正式内容生产、LLM/provider、participant/utterance、完整状态机/调度/记忆、scoring/report、Redis/queue/voice 和行业题包插件。
@@ -423,7 +423,7 @@
 - `P1-2A — Design freeze`：completed；docs-only；未修改 runtime/tests/schema/migrations/dependencies/lockfiles/CI；
 - `P1-2B — Persistence + Domain + Seed foundation`：completed；
 - `P1-2C — API + Session integration + minimal Web vertical slice`：completed；
-- `P1-2D — Independent acceptance + closeout`：not started。
+- `P1-2D — Independent acceptance + closeout`：completed；independent verdict `PASS`。
 
 ### P1-2A completion note
 
@@ -442,7 +442,7 @@
 - application writer 对 published bundle 只允许 insert 或 exact-match no-op；同版本 drift 拒绝，新 version 追加不覆盖旧 version；retirement 和 session `ON DELETE RESTRICT` 保留历史追溯；
 - deterministic seed 精确建立四种 V0.1 Persona Template 和一个明确标记、不计入 12 道正式题的 internal-validation bundle；重复执行 no-op，stable-code drift 在单一事务内失败；
 - exact metadata/catalog、numeric/structured checks、private one-to-one、seed、immutability、retirement、single-head、fresh/repeat/downgrade/re-upgrade 和 P1-1 regression gates 通过；未新增 HTTP/WS/Web/dependency/lockfile/CI；
-- P1-2 保持 `IN_PROGRESS`；P1-2C 已完成，P1-2D 未开始并等待单独明确批准。
+- P1-2C 与 P1-2D 后续均已完成；P1-2 independent final verdict `PASS`，当前状态为 `DONE`。
 
 ### P1-2C completion note
 
@@ -452,7 +452,15 @@
 - ordinary OpenAPI/REST/WebSocket/browser/log surfaces 只使用显式 public allowlist；negative sentinel 覆盖 Private Stance、persona calibration 与内部题目 calibration 不泄露；未创建内部 endpoint 或 speculative AI abstraction；
 - 最小 Web caller 通过 generated contract 完成题目选择、session 创建、safe content 展示与 reload 后按 authoritative snapshot 恢复同一 version；existing owner/CSRF/CORS、action idempotency、sequence、reconnect/gap 语义保持通过；
 - API 281 tests、Web 42 tests、Ruff/format/Pyright/lint/typecheck/build、OpenAPI drift、Alembic、真实 PostgreSQL integration 与 2 项真实 Chromium E2E 均通过，zero skips；开发库经 exact-name/empty-row preflight 后只向前迁移到 `f1a12b15c002`，未 downgrade、未 seed；
-- 正式 12 题、LLM/provider、participant/utterance、state machine/scheduler/memory、AI persona runtime、scoring/report、CMS/RBAC/approval、Redis/queue/voice 继续 Deferred；P1-2D 未开始并等待明确批准。
+- 正式 12 题、LLM/provider、participant/utterance、state machine/scheduler/memory、AI persona runtime、scoring/report、CMS/RBAC/approval、Redis/queue/voice 继续 Deferred；该 P1-2C checkpoint 未自动开始 P1-2D，后续独立验收结果见下方 P1-2D completion note。
+
+### P1-2D completion note
+
+- 从 clean committed `main` HEAD `5752f078e9343c64b5d234936252a66130ad7538` 独立复核 P1-2A～C actual source；HEAD 与 `origin/main` 一致，总纲 SHA-256 保持 `2388A9660320406CB35D5354126AD71C6849A98DB7C4A356796CA951BF372F26`；
+- 独立重跑 API 228 项 non-integration、53 项 PostgreSQL integration、281 项 full suite，Web 42 项 tests、lint/format/typecheck/build、OpenAPI drift、Alembic head/drift 与 2 项真实 Chromium E2E；required skips 为 0；
+- 复核 exact schema、published bundle insert-or-exact-match、deterministic seed/drift failure、retirement/history、Private Stance isolation、exact session version FK、auth/CSRF/ownership/WS/idempotency/reconnect regression 与 Deferred absence；无 blocker 或 material finding；
+- development PostgreSQL 验收前后均为 `f1a12b15c002` 且保持 18 rows，不用于 destructive fixture；disposable databases、ports `3000`/`8000` 与 E2E processes 均清理完成；
+- independent verdict `PASS`；P1-2D completed，P1-2 `DONE`，P1 保持 `IN_PROGRESS`；P1-3 not started / awaiting explicit approval。
 
 ## 任务更新规则
 
