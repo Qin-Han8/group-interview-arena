@@ -2,11 +2,11 @@
 
 - Status: Active baseline
 - Most recently completed development phase: P0 — `DONE`
-- Most recently completed subphase: P1-3D — `DONE`
+- Most recently completed subphase: P1-4A — `DONE`
 - P0-7 final outcome: initial `BLOCKED`; two documentation findings remediated; finding-only independent recheck `PASS`; P1 readiness `READY`
 - Current phase: P1 — `IN_PROGRESS`
-- Most recently completed task: P1-3D — `DONE`; P1-3 — `DONE`
-- Next task gate: P1-4 — `NOT_STARTED` / awaiting explicit user approval
+- Most recently completed task: P1-4A — `DONE`; P1-4 — `IN_PROGRESS`
+- Next task gate: P1-4B — `NOT_STARTED` / awaiting explicit user approval
 - P0 status: `DONE`; P0-1 through P0-7 completed
 - Target product version: V0.1 — Internal Validation
 - Source: [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) §30–31
@@ -18,7 +18,7 @@
 - `P0～P6`：研发推进阶段，描述按什么顺序建立能力；
 - `V0.1 / V0.5 / V1.0`：产品交付版本，描述某个可验证版本包含什么。
 
-阶段不是版本，P0-x/P1-x 也不是新增产品版本。P0 已完成不代表 V0.1 的全部业务能力已经实现；用户已明确批准进入 P1、P1-2A～D 和 P1-3。P1-2 与 P1-3 均已在 independent verdict `PASS` 后完成；P1 保持 `IN_PROGRESS`，P1-4 尚未获准开始。
+阶段不是版本，P0-x/P1-x 也不是新增产品版本。P0 已完成不代表 V0.1 的全部业务能力已经实现；用户已明确批准进入 P1、P1-2A～D、P1-3 和 P1-4。P1-2 与 P1-3 均已在 independent verdict `PASS` 后完成；P1 保持 `IN_PROGRESS`，P1-4A 已完成 docs-only design freeze，P1-4B 等待单独明确批准。
 
 ## 2. 开发阶段
 
@@ -84,7 +84,17 @@ P1-2A 已冻结 stable Question Template、immutable published Question Version�
 - `P1-3C — Realtime/Web complete phase flow`：completed；
 - `P1-3D — Independent acceptance + closeout`：completed；independent verdict `PASS`。
 
-P1-3A 已冻结 V0.1 单向 path、合法 abort、server-authoritative transition matrix、server-owned immutable duration plan、durable phase start/deadline、deadline-first concurrent reconciliation、P1-1 action/sequence/transaction/commit-before-send 复用、historical v1 + current v2 formal state events，以及 Browser 只投影 state/timing/sequence 的边界。P1-3B 已实现 backend/domain/persistence/API/realtime-parser foundation、linear Alembic timing migration、server-owned closed duration plan、transactional overdue reconciliation、`session.start` 与 generalized v2 `session.state_changed` compatibility。P1-3C 已实现 in-process deadline recovery、startup durable-deadline reconciliation、connected WS catch-up/push、Browser authoritative phase/deadline projection 和真实 PostgreSQL Chromium complete-flow validation；P1-3D 从 clean committed source 独立复核全部 acceptance gates，verdict `PASS`、无 unresolved Critical/High/Medium finding，P1-3 已为 `DONE`。总纲长期 `DEVICE_CHECK`、pause/failure/partial/report states 继续 Deferred；P1-4 floor scheduling、participant/utterance、AI/LLM、memory、report/scoring、Redis/queue 和 voice 均未开始。完整 scope/gates 见 [`exec-plans/P1-3_session-state-machine.md`](exec-plans/P1-3_session-state-machine.md)。
+P1-3A 已冻结 V0.1 单向 path、合法 abort、server-authoritative transition matrix、server-owned immutable duration plan、durable phase start/deadline、deadline-first concurrent reconciliation、P1-1 action/sequence/transaction/commit-before-send 复用、historical v1 + current v2 formal state events，以及 Browser 只投影 state/timing/sequence 的边界。P1-3B 已实现 backend/domain/persistence/API/realtime-parser foundation、linear Alembic timing migration、server-owned closed duration plan、transactional overdue reconciliation、`session.start` 与 generalized v2 `session.state_changed` compatibility。P1-3C 已实现 in-process deadline recovery、startup durable-deadline reconciliation、connected WS catch-up/push、Browser authoritative phase/deadline projection 和真实 PostgreSQL Chromium complete-flow validation；P1-3D 从 clean committed source 独立复核全部 acceptance gates，verdict `PASS`、无 unresolved Critical/High/Medium finding，P1-3 已为 `DONE`。总纲长期 `DEVICE_CHECK`、pause/failure/partial/report states 继续 Deferred；P1-4A floor-control design freeze 已完成，participant/floor persistence、scheduler runtime、AI/LLM、utterance、memory、report/scoring、Redis/queue 和 voice 均未实现。完整 P1-3 scope/gates 见 [`exec-plans/P1-3_session-state-machine.md`](exec-plans/P1-3_session-state-machine.md)。
+
+`P1-4 — Floor control / speaker scheduling` 固定为五阶段：
+
+- `P1-4A — Floor control design freeze`：completed；docs-only；
+- `P1-4B — Scheduling persistence + domain foundation`：not started / awaiting explicit approval；
+- `P1-4C — Deterministic scheduler engine`：not started；
+- `P1-4D — Realtime/Web floor experience`：not started；
+- `P1-4E — Independent acceptance + closeout`：not started。
+
+P1-4A 已冻结 phase lifecycle 与 within-phase floor authority 分离、single current owner、AI/human/system participant compatibility、speaking opportunity/candidate/decision/intervention 领域语言、deterministic lexicographic V0.1 policy、fairness/monopoly/phase/silence-deadline rules、`floor.granted` / `floor.released` / `floor.intervention_requested` 最小事实事件，以及 safe decision metadata/audit trail 与 private stance/persona/scoring non-disclosure。Scheduler 只决定谁说，未来 LLM/provider 只决定获准 AI 说什么。P1-4 保持 `IN_PROGRESS`；P1-4B 尚未获准，不得开始 migration/domain/runtime。完整 scope/gates 见 [`exec-plans/P1-4_floor-control.md`](exec-plans/P1-4_floor-control.md)。
 
 ## 5. 产品版本
 

@@ -1,16 +1,16 @@
 # P0 技术架构基线
 
-- Status: P0 Architecture Baseline + P1-1/P1-2/P1-3 completed
+- Status: P0 Architecture Baseline + P1-1/P1-2/P1-3 completed + P1-4A design frozen
 - Current phase: P1 — IN_PROGRESS
 - Architecture baseline established by: P0-2 — DONE
 - P0-3 foundation status: DONE
 - P0-4 database foundation status: DONE
 - P0-5 identity boundary status: DONE
-- Most recently completed task: P1-3D independent final acceptance — `PASS`; P1-3 `DONE`
+- Most recently completed task: P1-4A floor-control design freeze — `PASS`; P1-4 `IN_PROGRESS`
 - P0 status: DONE; P0-1 through P0-7 completed
-- P1 status: IN_PROGRESS; P1-1/P1-2/P1-3 DONE; P1-3A～D completed; P1-4 not started / awaiting explicit approval
+- P1 status: IN_PROGRESS; P1-1/P1-2/P1-3 DONE; P1-4 IN_PROGRESS; P1-4A completed; P1-4B awaiting explicit approval
 - Target version: V0.1 Internal Validation
-- Business architecture detail: P1-1 runtime completed; P1-2 question/persona boundary implemented; P1-3 state/timing/recovery/realtime/Web flow independently accepted
+- Business architecture detail: P1-1 runtime completed; P1-2 question/persona boundary implemented; P1-3 state/timing/recovery/realtime/Web flow independently accepted; P1-4 floor-control boundary design frozen
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -262,6 +262,16 @@ WebSocket 使用独立版本化事件契约，至少表达 event type、schema v
 - P1-3C app-owned in-process recovery runtime 只提供 wake-up/liveness，并在 startup、WS connect 和 connected catch-up path 调用同一 overdue reconciliation foundation；PostgreSQL deadline、row lock 和 event log 提供 correctness。Redis/queue、distributed scheduler 和 cross-process realtime fan-out 继续 Deferred。
 - `DEVICE_CHECK`、pause/system failure/partial completion 和 report lifecycle states 保留总纲长期语义但不进入 P1-3 handler。完整设计、C～D scope 和 stop conditions 见 [`exec-plans/P1-3_session-state-machine.md`](exec-plans/P1-3_session-state-machine.md)。
 
+### P1-4 floor-control architecture — design frozen, runtime deferred
+
+- P1-3 remains the sole lifecycle/phase/timing authority. P1-4 floor control operates only inside the authoritative current phase and cannot start、advance、pause、extend or complete it.
+- A session has zero or one current floor owner. Ownership references a generalized session participant, not a Persona Template/provider/browser connection；participant actor kind supports `AI`、`HUMAN`、`SYSTEM`, while role separates ordinary `CANDIDATE` from `MODERATOR` intervention.
+- Speaking opportunity is durable intent/obligation when recovery requires it；candidate speaker and fairness ranking are recomputable runtime views；scheduler decision is the causal audit record；formal event is the resulting fact.
+- The V0.1 scheduler is a pure deterministic lexicographic policy over phase context、availability、opportunities、floor history、derived fairness and closed server policy. It prioritizes unmet first opportunity, prevents monopoly, applies phase-aware order, uses stable slot/UUID tie-break and can request explainable silence/deadline intervention.
+- Persona parameters、Private Stance、prompt、LLM/provider output、scoring and Browser ranks are not scheduler inputs. Scheduler decides who speaks；future LLM/provider may only generate what an already-granted AI says.
+- Minimal future formal facts are `floor.granted`、`floor.released` and `floor.intervention_requested`, persisted/ordered through the existing session aggregate transaction and sequence boundary. Decision metadata retains safe policy reason/audit facts while excluding private stance、hidden persona calibration and internal scoring.
+- P1-4A created no schema/migration/runtime. P1-4B may establish minimal participant/opportunity/current-grant/decision persistence only after explicit approval；P1-4C scheduler engine、P1-4D Realtime/Web and P1-4E independent acceptance remain separately gated. Full design is in [`exec-plans/P1-4_floor-control.md`](exec-plans/P1-4_floor-control.md).
+
 ## Configuration, secrets and error boundaries
 
 - 配置采用类型化、启动时校验的方式；
@@ -284,6 +294,7 @@ WebSocket 使用独立版本化事件契约，至少表达 event type、schema v
 - P1：WebSocket tests、fake provider tests、deterministic session/orchestrator regression；
 - P1-2：closed domain/schema validation、真实 PostgreSQL immutable-version/seed/history integration、private non-disclosure 和最小 browser vertical-slice regression；fake provider 仍等真实 provider caller；
 - P1-3：pure transition/timing tests、真实 PostgreSQL concurrency/deadline/restart recovery、historical event compatibility 和 authoritative Browser phase-flow regression；不以 Browser timer test 替代 server correctness；
+- P1-4：generalized participant/single-owner persistence、pure deterministic scheduling、enumeration-order invariance、fairness/monopoly/phase/intervention、真实 PostgreSQL race/restart recovery、safe explanation/non-disclosure 和 authoritative Browser floor-flow regression；
 - P0-5D 已因真实跨应用 auth flow 加入 `@playwright/test 1.62.1`，只运行 Chromium，并由 test-only 编排器使用迁移后的隔离 `gia_p05d_*` PostgreSQL database；
 - 真实 LLM tests 必须显式执行，不进入默认 CI。
 
@@ -334,7 +345,7 @@ Redis 只在多 API workers、横向扩容、跨进程 WebSocket broadcast、dis
 - P0-5D：completed；真实 browser Cookie/CORS/CSRF 闭环已通过 Chromium 验证；
 - P0-5E：completed；final outcome `PASS after findings remediation and independent recheck`；
 - P0：`DONE`；P0-1～P0-7 completed；P0-7 finding-only independent recheck `PASS`，P1 readiness `READY`；其后用户已明确批准进入 P1；
-- P1：`IN_PROGRESS`；P1-1、P1-2、P1-3 均已完成且 independent verdict `PASS`；P1-3A～D completed，P1-3 `DONE`；P1-4 调度、记忆和基础报告未开始并仍需后续分别批准；
+- P1：`IN_PROGRESS`；P1-1、P1-2、P1-3 均已完成且 independent verdict `PASS`；P1-4A floor-control design freeze completed，P1-4 `IN_PROGRESS`；P1-4B persistence/domain 尚未开始并等待明确批准，P1-4C～E 仍分别 gated；LLM/utterance、记忆和基础报告继续 Deferred；
 - P2 以后：只在对应阶段获批后增加语音、评分训练和商业化能力。
 
 ## 与其他文档关系

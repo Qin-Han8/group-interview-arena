@@ -1,17 +1,17 @@
 # 当前任务清单
 
-- Status: P1 in progress; P1-1, P1-2, and P1-3 completed
-- Managed scope: P1-3A～D completed; P1-4 remains unstarted and requires explicit approval
-- Most recently completed subphase: P1-3D — `DONE`
+- Status: P1 in progress; P1-1, P1-2, and P1-3 completed; P1-4 in progress
+- Managed scope: P1-4A completed docs-only; P1-4B remains unstarted and requires explicit approval
+- Most recently completed subphase: P1-4A — `DONE`
 - P0-7 final outcome: initial verdict `BLOCKED` with two documentation findings; remediation completed; finding-only independent recheck `PASS`; new blockers none; P1 readiness `READY`
 - Current phase: P1 — `IN_PROGRESS`
-- Most recently completed task: P1-3D — `DONE`; P1-3 — `DONE`
-- Next task gate: P1-4 — `TODO` / not started / awaiting explicit user approval
+- Most recently completed task: P1-4A — `DONE`; P1-4 — `IN_PROGRESS`
+- Next task gate: P1-4B — `TODO` / not started / awaiting explicit user approval
 - P0 status: `DONE`; P0-1 through P0-7 completed
 - Allowed status values: `TODO` / `IN_PROGRESS` / `BLOCKED` / `DONE`
 - Related roadmap: [`ROADMAP.md`](ROADMAP.md)
 
-用户已明确批准正式进入 P1、P1-2A～D 和 P1-3；P1-2 与 P1-3 均已在 independent verdict `PASS` 后完成。P1 保持 `IN_PROGRESS`；P1-4 未开始并等待单独明确批准，不得提前实现 AI/participant/utterance、记忆、报告、语音、Redis/queue 或 P2～P6。
+用户已明确批准正式进入 P1、P1-2A～D、P1-3 和 P1-4；P1-2 与 P1-3 均已在 independent verdict `PASS` 后完成。P1/P1-4 保持 `IN_PROGRESS`；P1-4A docs-only design freeze 已完成，P1-4B 未开始并等待单独明确批准，不得提前实现 scheduler runtime、LLM/utterance、记忆、报告、语音、Redis/queue 或 P2～P6。
 
 ## P0-1 — 仓库与文档治理
 
@@ -516,6 +516,37 @@
 - 独立复核 frozen transition matrix、durable deadline arithmetic、startup/WS unified reconciliation、aggregate lock/action idempotency/race precedence、v1/v2 realtime compatibility、Browser authority boundary 和全部 Deferred absence；无 unresolved Critical/High/Medium finding；
 - API non-integration `260 passed`、真实 PostgreSQL integration `60 passed`、Web `50 passed`、Chromium `2 passed`；Ruff、format、Pyright、Web lint/typecheck/build、OpenAPI drift、Alembic head/current/check 和 cleanup gates 均通过；
 - Independent verdict `PASS`；P1-3D completed，P1-3 `DONE`，P1 保持 `IN_PROGRESS`；P1-4 `TODO` / not started / awaiting explicit user approval。
+
+## P1-4 — Floor control / speaker scheduling
+
+- ID: `P1-4`
+- 名称：Floor control / speaker scheduling
+- Status: `IN_PROGRESS`
+- Approval state：用户已明确批准 P1-4；P1-4A completed；P1-4B not started / awaiting explicit approval；P1-4C～E not started。
+- 目标：建立 phase 内 server-authoritative、deterministic、可解释、可恢复且兼容 AI/human/system participant 的单一发言权调度边界；只决定谁说，不生成说什么。
+- In scope：P1-4A docs-only design freeze；后续分别获批的 P1-4B scheduling persistence + domain foundation、P1-4C deterministic scheduler engine、P1-4D realtime/Web floor experience、P1-4E independent acceptance + closeout。
+- Out of scope：LLM/provider、prompt orchestration、utterance generation、scoring/report、memory、Redis/queue、complex ML ranking、multi-agent negotiation、voice/ASR/TTS、emotion detection、human audio/video。
+- Dependencies：P1-1/P1-2/P1-3 `DONE`；Accepted `D-003`、`D-007`、`D-008`、`D-013`、`ADR-003`、`ADR-005`～`ADR-015` 中相关边界；P1-4B～E 每个实施子步骤仍需用户明确批准。
+- Acceptance criteria：P1-4A～E 全部完成并经 P1-4E 独立验收后，phase/floor authority 无漂移、每场最多一个 current floor owner、相同输入/policy 产生相同选择、fairness/monopoly/phase/intervention 可验证、AI/human/system 共享 participant model、decision/audit 可解释且不泄露 private stance/persona calibration/scoring，reload/reconnect/restart 从 durable truth 恢复。
+
+### Substep progress
+
+- `P1-4A — Floor control design freeze`：completed；docs-only；未修改 runtime/tests/schema/migrations/dependencies/lockfiles/CI；
+- `P1-4B — Scheduling persistence + domain foundation`：not started / awaiting explicit approval；
+- `P1-4C — Deterministic scheduler engine`：not started；
+- `P1-4D — Realtime/Web floor experience`：not started；
+- `P1-4E — Independent acceptance + closeout`：not started。
+
+### P1-4A completion note
+
+- 从 clean committed `main` HEAD `0fdf2c0034737044efcd986b1915fabe81f8a56c` 恢复总纲、Accepted Decisions、P1-1/P1-2/P1-3 actual-source baseline 和 session/API/architecture/agent docs；总纲 SHA-256 保持 `2388A9660320406CB35D5354126AD71C6849A98DB7C4A356796CA951BF372F26`；
+- 冻结 P1-3 phase 控制 lifecycle、P1-4 floor 只控制 within-phase turns：floor 不推进、暂停、延长或修改 session phase/deadline，phase change 使旧 floor/candidate calculation 失效；
+- 冻结 generalized participant（AI/HUMAN/SYSTEM actor + CANDIDATE/MODERATOR role）、single current owner、speaking opportunity、ephemeral candidate speaker、causal scheduler decision 和 intervention 领域边界；
+- 冻结 V0.1 deterministic lexicographic policy：eligibility、opportunity class、未获 floor 优先、monopoly guard、phase-aware order、stable slot/UUID tie-break，以及 silence/deadline explainable intervention；不使用 LLM/ML/persona/private stance 决定 speaker；
+- 冻结最小 formal facts 为 `floor.granted`、`floor.released`、`floor.intervention_requested`；event 是事实、decision 是原因、未来 LLM output 是后续内容；
+- 冻结 durable participant/opportunity/current grant/decision audit/floor history 与 runtime candidate/fairness/timer calculation 的分界，并允许未来评分只消费可观察 floor facts，不把 scheduler reason 当作能力评分；
+- 冻结 safe policy reason/decision metadata/audit trail，明确禁止泄露 Private Stance、hidden persona calibration、prompt、provider score 或 internal scoring；
+- 无新增 Accepted/Proposed ADR，无 blocker；完整 B～E scope、acceptance、validation 和 stop conditions 见 [`exec-plans/P1-4_floor-control.md`](exec-plans/P1-4_floor-control.md)。P1-4B 未开始并等待单独明确批准。
 
 ## 任务更新规则
 

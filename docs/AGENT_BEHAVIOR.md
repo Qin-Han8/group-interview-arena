@@ -1,14 +1,14 @@
 # AI 候选人与讨论编排骨架
 
-- Status: P1-2/P1-3 completed; orchestrator/AI runtime deferred
+- Status: P1-2/P1-3 completed; P1-4A floor-control design frozen; scheduler/AI runtime deferred
 - Current phase: P1 — IN_PROGRESS
 - Target version: V0.1 Internal Validation
-- Detailed orchestrator/agent design: P1-3A～D completed; independent verdict `PASS`; P1-4 not started / awaiting explicit approval
+- Detailed orchestrator/agent design: P1-3A～D completed; independent verdict `PASS`; P1-4A completed; P1-4B awaiting explicit approval
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
 
-本文件记录已确认的 AI 候选人/私有立场基础、P1-3A 冻结的讨论状态机边界、P1-3B 已实现的 backend state/timing foundation 和 P1-3C 已实现的 realtime/Web phase projection；发言权调度、结构化记忆和 AI runtime 仍待后续任务。当前不包含 production Prompt、模型选择、发言权算法或 AI runtime 代码。
+本文件记录已确认的 AI 候选人/私有立场基础、P1-3 已实现的讨论状态机，以及 P1-4A 冻结的 floor-control 领域和确定性策略边界；发言权 persistence/runtime、结构化记忆和 AI runtime 仍待后续任务。当前不包含 production Prompt、模型选择、scheduler runtime、发言生成或 AI runtime 代码。
 
 ## Confirmed by PROJECT_MASTER_PLAN
 
@@ -165,6 +165,53 @@ Concurrent user/system transitions share the P1-1 aggregate row lock、durable a
 
 Formal event vocabulary remains `session.created` and `session.state_changed`。Historical abort event v1 remains readable；P1-3B emits generalized v2 payload for start、abort and phase-deadline transitions。P1-3C adds startup/connected recovery and Browser authoritative phase projection without adding a client-side state machine。Full matrix、timing arithmetic、snapshot and P1-3D gates are in [`exec-plans/P1-3_session-state-machine.md`](exec-plans/P1-3_session-state-machine.md)。This foundation does not implement P1-4 floor scheduling or AI behavior。
 
+## P1-4A frozen floor-control boundary
+
+### Phase controls lifecycle; floor controls turns
+
+- P1-3 is the sole authority for session phase/status/deadline. Floor control reads that context and assigns a turn only inside a floor-enabled phase；it never starts、advances、pauses、extends、completes or aborts the phase.
+- `CREATED`、`PREPARATION` and terminal states have no active floor. V0.1 floor-enabled phases are `OPENING_STATEMENTS` through `FINAL_SUMMARY`.
+- Each session has zero or one current floor owner. A phase change invalidates old opportunity/candidate calculations and releases an old grant, but floor cleanup cannot delay or veto the phase transition.
+
+### Generalized participant and floor language
+
+- Participant is session-scoped and supports actor kind `AI`、`HUMAN`、`SYSTEM`; role distinguishes ordinary `CANDIDATE` from `MODERATOR`. The model must not be an AI-agent-only list.
+- Current floor owner is a participant holding one stable grant identity for one session phase.
+- Speaking opportunity is a normalized request/obligation to be considered, not a grant and not speech content.
+- Candidate speaker is an ephemeral eligible-participant view with safe policy facts；it is not persisted as canonical state.
+- Scheduler decision is the deterministic cause: grant, request intervention or no grant. Intervention is a typed moderator/system control request caused by silence/no candidate/deadline pressure；it is not generated speech.
+
+### Deterministic V0.1 scheduling
+
+Scheduler inputs are restricted to authoritative phase context、participant availability、open opportunities、durable floor history、derived fairness state and closed configured policy/injected UTC. Persona parameters、Private Stance、hidden question calibration、prompt、provider output/model score and Browser rank are excluded.
+
+The selection policy is closed lexicographic ordering:
+
+1. filter by availability、role and phase eligibility；
+2. apply closed opportunity-class order；
+3. prefer participants without a current-phase grant；
+4. prevent consecutive/per-phase monopoly while another eligible unmet opportunity exists；
+5. apply phase-mandated order or discussion-phase fewest-grants/longest-wait order；
+6. break remaining ties by stable participant slot, then UUID；
+7. request an explainable moderator/system intervention on configured silence or deadline pressure, while P1-3 phase expiry remains authoritative。
+
+No ML/semantic ranking, random tie-break or multi-agent negotiation is used. The same validated input and policy version must return the same result.
+
+### Who speaks versus what is said
+
+Scheduler only answers **who should speak**. Future LLM/provider may answer **what an already-granted AI says**. LLM output cannot choose a speaker, change state/floor, rewrite policy or serve as post-hoc decision justification. Human participant speech has no LLM dependency.
+
+### Facts, explanation and privacy
+
+- Minimum future formal facts are `floor.granted`、`floor.released` and `floor.intervention_requested`.
+- Event is the fact；scheduler decision is the cause；future LLM output/utterance is later content.
+- Each decision retains policy version、safe reason code、phase、timestamp、selected participant/opportunity and safe fairness/tie-break facts sufficient to answer why that participant received floor.
+- Public explanation is allowlisted from safe reason metadata. Private Stance、red lines、hidden information、persona numeric calibration、prompt/provider internals and scoring cannot enter decision explanation、events、Browser、logs or errors.
+- Durable facts include participant/availability lifecycle、accepted opportunities、single current grant、decision audit and floor history. Candidate lists、derived fairness counters、timers and rejected ranking alternatives are runtime-only.
+- Future scoring may consume observable floor timing/distribution/interruption facts, but P1-4 neither scores users nor treats scheduler reason as evidence of ability.
+
+Full B～E scope、persistence/recovery boundary、validation and stop conditions are in [`exec-plans/P1-4_floor-control.md`](exec-plans/P1-4_floor-control.md)。P1-4A is docs-only；P1-4B remains not started / awaiting explicit approval.
+
 ## Implementation guidance
 
 - 大模型负责自然语言和受约束的局部语义决策；项目代码负责状态、时间、发言权、私有信息隔离、记忆和恢复。
@@ -178,7 +225,8 @@ Formal event vocabulary remains `session.created` and `session.state_changed`。
 - TBD：具体 LLM 供应商（总纲第 37 节）；
 - TBD：P1-2B initial numeric seed 经过真实讨论后的校准方法和 blind-test threshold；
 - Confirmed for P1-3：V0.1 状态转换条件、abort 来源、deadline concurrency/recovery 语义；
-- TBD：P1-4 调度公式和冲突循环阈值；
+- Confirmed for P1-4A：V0.1 deterministic lexicographic floor policy、single-owner/participant/event/explanation/persistence boundary；
+- TBD after real discussion evidence：policy parameter calibration values and conflict-loop content semantics；P1-4 does not use semantic conflict ranking；
 - TBD：结构化记忆和模型输出的正式 Schema；
 - TBD：角色盲测样本及通过标准的执行细节。
 
@@ -186,7 +234,7 @@ Formal event vocabulary remains `session.created` and `session.state_changed`。
 
 ## Future work
 
-- P1：`IN_PROGRESS`；P1-1 session foundation、P1-2 question/persona foundation 与 P1-3 session state machine 均为 `DONE`；P1-3A～D completed，independent verdict `PASS`；P1-4 调度、记忆和 AI runtime 未开始并需后续批准。
+- P1：`IN_PROGRESS`；P1-1 session foundation、P1-2 question/persona foundation 与 P1-3 session state machine 均为 `DONE`；P1-4A floor-control design freeze completed，P1-4 `IN_PROGRESS`；P1-4B persistence/domain 等待明确批准，P1-4C～E 未开始；记忆和 AI runtime 继续 Deferred。
 - P2：加入语音、打断、播放停止和恢复语义。
 - P3：建立角色行为与评分证据之间的校准边界。
 - P6/V1.0：扩展到 6～8 种角色和压力模式。

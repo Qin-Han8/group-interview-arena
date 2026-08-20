@@ -1,6 +1,6 @@
 # API 与事件技术基线
 
-- Status: P0 API Architecture Baseline + P1-1/P1-2/P1-3 completed
+- Status: P0 API Architecture Baseline + P1-1/P1-2/P1-3 completed + P1-4A floor contract frozen
 - Current phase: P1 — IN_PROGRESS
 - API architecture baseline established by: P0-2 — DONE
 - Target version: V0.1 Internal Validation
@@ -10,6 +10,7 @@
 - P1-1 contract: scoped/frozen by P1-1A; P1-1B persistence, P1-1C REST/WebSocket runtime, P1-1D Web realtime caller and P1-1E independent final review completed
 - P1-2 contract: P1-2A/B/C completed; safe question reads and immutable version-bound session creation implemented
 - P1-3 contract: P1-3A～D completed; independent verdict `PASS`; P1-3 `DONE`
+- P1-4 contract: P1-4A docs-only design freeze completed; persistence/runtime/Realtime/Web not implemented; P1-4B awaiting explicit approval
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -246,6 +247,39 @@ P1-3C Browser renders a local display countdown from authoritative UTC values bu
 
 The exact state matrix、deadline arithmetic、historical version compatibility and P1-3B～D gates are in [`exec-plans/P1-3_session-state-machine.md`](exec-plans/P1-3_session-state-machine.md)。
 
+## P1-4 floor-control contract — design frozen, not implemented
+
+P1-4A freezes the following future contract boundary. It does not add an endpoint, command, event parser, OpenAPI field, migration or Web caller.
+
+### Authority and command boundary
+
+- P1-3 phase/status/deadline remains authoritative. Floor commands can express participant intent or release/interruption intent only；Browser cannot select the winning speaker, provide a rank/reason/fairness value, set current owner or modify phase/timing.
+- Future command vocabulary must retain stable UUIDv4 `action_id`, owner authorization, exact closed payloads and existing durable retry/conflict semantics. P1-4D must document the exact commands before implementing them.
+- Scheduler evaluation and silence/deadline intervention are server-owned operations. They are not fake Browser commands and do not depend on prompt/LLM output.
+
+### Minimum formal event vocabulary
+
+P1-4 adds exactly three planned formal fact types:
+
+- `floor.granted`：a participant acquired a specific grant in the authoritative current phase；
+- `floor.released`：that exact current grant ended for a closed safe reason；
+- `floor.intervention_requested`：the deterministic scheduler requested a typed moderator/system intervention。
+
+An event states what happened. Its causal scheduler decision separately retains safe policy version/reason/audit metadata. A future utterance or LLM output occurs after grant and is not embedded in these floor events.
+
+The eventual closed payloads may expose only identities needed for recovery/projection (`participant_id`、`grant_id`、phase、opportunity/decision reference where needed), safe reason code and ordered event envelope. They must not expose Private Stance、persona parameters/calibration、prompt、provider score/output、candidate ranking vector or scoring data.
+
+Hand raises/opportunities、candidate lists、fairness calculations、timer ticks and provider thinking states are not automatically formal events. Adding any event beyond the three above requires a demonstrated recovery/client caller and a prior plan update.
+
+### Snapshot and recovery boundary
+
+- The owner-authorized server snapshot or a purpose-built floor load boundary must eventually identify the current grant/owner, phase association, safe explanation and event watermark needed for reload/gap/reconnect recovery.
+- Browser projects server truth only. It cannot infer ownership from a local queue, local countdown, audio playback or generated text.
+- Replacement is ordered release then grant in one locked transaction；duplicate/stale/concurrent operations must preserve zero-or-one current owner and contiguous event sequence；all durable mutation commits before send.
+- Phase change/abort/completion invalidates stale floor evaluation and releases any old current grant without allowing floor cleanup to delay or alter the P1-3 transition.
+
+Exact domain/persistence, reason metadata and P1-4B～E gates are in [`exec-plans/P1-4_floor-control.md`](exec-plans/P1-4_floor-control.md)。
+
 ## Unified error semantics
 
 REST error model 至少表达：
@@ -314,7 +348,8 @@ P0-3D 已完成最小 API、OpenAPI authority、typed config、request correlati
 - `IN_PROGRESS`；P1-1A～E 已完成第一条文字会话 scoped contract、persistence、backend REST/WS、Web caller、browser reconnect regression 和 independent acceptance；P1-1 `DONE`；
 - P1-2A safe question/session/private projection design freeze 已完成 docs-only；
 - P1-2B persistence/domain/seed、P1-2C safe API/session/Web vertical slice 与 P1-2D independent acceptance 均已完成；P1-2 `DONE`。
-- P1-3A～D 已完成；state/timing/command/event/snapshot、backend durable foundation 与 realtime/Web complete phase flow 已独立验收 `PASS`；P1-3 `DONE`，P1 保持 `IN_PROGRESS`，P1-4 未开始并等待单独明确批准。
+- P1-3A～D 已完成；state/timing/command/event/snapshot、backend durable foundation 与 realtime/Web complete phase flow 已独立验收 `PASS`；P1-3 `DONE`，P1 保持 `IN_PROGRESS`。
+- P1-4A 已完成 docs-only floor-control contract freeze；P1-4 `IN_PROGRESS`。P1-4B persistence/domain、P1-4C scheduler、P1-4D Realtime/Web 与 P1-4E independent acceptance 均未实现，P1-4B 等待单独明确批准。
 
 ### P2 and later
 
@@ -328,7 +363,8 @@ P0-3D 已完成最小 API、OpenAPI authority、typed config、request correlati
 - Implemented：P1-2 safe question reads 和 version-bound session create contract；
 - Implemented：P1-3B `session.start` REST/WS command parsing、generalized state event v2、phase timing snapshot 和 backend durable state-machine foundation；
 - Implemented：P1-3C in-process deadline recovery、connected realtime catch-up/push、Browser authoritative phase/deadline projection 和 complete Chromium phase flow；
-- Deferred：P1-3 之后的完整 REST endpoint / WebSocket command/event 集合；
+- Frozen but not implemented：P1-4 minimum formal floor facts `floor.granted` / `floor.released` / `floor.intervention_requested`；exact commands/payloads/snapshot await their approved implementation subphase；
+- Deferred：P1-4 之后的完整 REST endpoint / WebSocket command/event 集合；
 - Deferred：event retention/compaction、large replay pagination、multi-tab/cross-process delivery 和长期 compatibility policy；
 - TBD：V0.1 之后的 identity expansion、verified recovery flow 与 authorization；
 - TBD：音频上传和短期签名协议；
