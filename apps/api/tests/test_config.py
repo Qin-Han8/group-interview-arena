@@ -58,9 +58,12 @@ def test_enabled_tracing_requires_otlp_http_endpoint() -> None:
         Settings(otel_tracing_enabled=True)
 
 
-def test_session_phase_duration_settings_reject_non_positive_values() -> None:
+@pytest.mark.parametrize("value", [True, 1.0, "1", 0, -1])
+def test_session_phase_duration_settings_require_strict_positive_integers(
+    value: object,
+) -> None:
     with pytest.raises(ValidationError):
-        Settings(session_phase_durations=SessionPhaseDurations(preparation_seconds=0))
+        SessionPhaseDurations(preparation_seconds=value)  # pyright: ignore[reportArgumentType]
 
 
 @pytest.mark.parametrize(

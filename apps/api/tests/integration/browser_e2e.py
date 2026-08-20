@@ -5,10 +5,12 @@ import socket
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
+from typing import BinaryIO
 from urllib.error import HTTPError, URLError
 from urllib.request import urlopen
 
@@ -39,6 +41,7 @@ API_PORT = 8000
 WEB_PORT = 3000
 STARTUP_TIMEOUT_SECONDS = 60.0
 SHUTDOWN_TIMEOUT_SECONDS = 15.0
+API_RESTART_DOWNTIME_SECONDS = 2.25
 
 API_ROOT = Path(__file__).resolve().parents[2]
 REPOSITORY_ROOT = API_ROOT.parents[1]
@@ -117,11 +120,31 @@ def _server_process(
     environment: dict[str, str],
     log_path: Path,
 ) -> Generator[subprocess.Popen[bytes]]:
+    process, log_file = _start_server_process(
+        command,
+        cwd=cwd,
+        environment=environment,
+        log_path=log_path,
+    )
+    try:
+        yield process
+    finally:
+        _stop_server_process(process, log_file)
+
+
+def _start_server_process(
+    command: list[str],
+    *,
+    cwd: Path,
+    environment: dict[str, str],
+    log_path: Path,
+) -> tuple[subprocess.Popen[bytes], BinaryIO]:
     creation_flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
     process_environment = os.environ.copy()
     process_environment.update(environment)
 
-    with log_path.open("wb") as log_file:
+    log_file = log_path.open("ab")
+    try:
         process = subprocess.Popen(
             command,
             cwd=cwd,
@@ -130,10 +153,20 @@ def _server_process(
             stderr=subprocess.STDOUT,
             creationflags=creation_flags,
         )
-        try:
-            yield process
-        finally:
-            _terminate_process_tree(process)
+    except Exception:
+        log_file.close()
+        raise
+    return process, log_file
+
+
+def _stop_server_process(
+    process: subprocess.Popen[bytes],
+    log_file: BinaryIO,
+) -> None:
+    try:
+        _terminate_process_tree(process)
+    finally:
+        log_file.close()
 
 
 def _wait_for_port_release(port: int) -> None:
@@ -145,13 +178,14 @@ def _wait_for_port_release(port: int) -> None:
     raise RuntimeError(f"E2E server cleanup left port {port} in use.")
 
 
-def _run_playwright() -> None:
+def _run_playwright(*, environment_overrides: dict[str, str]) -> None:
     pnpm = shutil.which("pnpm.cmd" if os.name == "nt" else "pnpm")
     if pnpm is None:
         raise RuntimeError("pnpm is required to run the browser E2E suite.")
 
     environment = os.environ.copy()
     environment["CI"] = "true"
+    environment.update(environment_overrides)
     completed = subprocess.run(
         [
             pnpm,
@@ -187,49 +221,112 @@ def _run_browser_flow(temporary_database: TemporaryDatabase) -> None:
         temporary_path = Path(temp_directory)
         api_log = temporary_path / "api.log"
         web_log = temporary_path / "web.log"
+        restart_request = temporary_path / "restart-api.request"
+        restart_ready = temporary_path / "restart-api.ready"
+
+        api_command = [
+            sys.executable,
+            "-m",
+            "uvicorn",
+            "group_interview_arena_api.app:app",
+            "--host",
+            "localhost",
+            "--port",
+            str(API_PORT),
+            "--loop",
+            "group_interview_arena_api.core.event_loop:create_runtime_event_loop",
+        ]
+        api_environment = {
+            "GIA_API_CORS_ORIGINS": f'["{WEB_ORIGIN}"]',
+            "GIA_API_DATABASE_URL": database_url.get_secret_value(),
+            "GIA_API_ENVIRONMENT": "test",
+            "GIA_API_SESSION_COOKIE_SECURE": "false",
+            "GIA_API_SESSION_PHASE_DURATIONS": (
+                '{"preparation_seconds":2,'
+                '"opening_statements_seconds":2,'
+                '"exploration_seconds":2,'
+                '"conflict_and_evaluation_seconds":2,'
+                '"convergence_seconds":2,'
+                '"final_summary_seconds":2}'
+            ),
+            "PYTHONUNBUFFERED": "1",
+        }
+        current_api: list[tuple[subprocess.Popen[bytes], BinaryIO] | None] = [
+            _start_server_process(
+                api_command,
+                cwd=API_ROOT,
+                environment=api_environment,
+                log_path=api_log,
+            )
+        ]
+        coordinator_errors: list[BaseException] = []
+        coordinator_stop = threading.Event()
+
+        def restart_api_when_requested() -> None:
+            try:
+                while not coordinator_stop.is_set():
+                    if not restart_request.exists():
+                        time.sleep(0.05)
+                        continue
+
+                    running = current_api[0]
+                    if running is None:
+                        raise RuntimeError(
+                            "API restart requested without a running API."
+                        )
+                    _stop_server_process(*running)
+                    current_api[0] = None
+                    _wait_for_port_release(API_PORT)
+                    time.sleep(API_RESTART_DOWNTIME_SECONDS)
+                    if coordinator_stop.is_set():
+                        return
+
+                    restarted = _start_server_process(
+                        api_command,
+                        cwd=API_ROOT,
+                        environment=api_environment,
+                        log_path=api_log,
+                    )
+                    current_api[0] = restarted
+                    _wait_for_http(f"{API_ORIGIN}/health", restarted[0], api_log)
+                    restart_ready.write_text("ready", encoding="utf-8")
+                    return
+            except BaseException as exception:
+                coordinator_errors.append(exception)
 
         try:
-            with _server_process(
-                [
-                    sys.executable,
-                    "-m",
-                    "uvicorn",
-                    "group_interview_arena_api.app:app",
-                    "--host",
-                    "localhost",
-                    "--port",
-                    str(API_PORT),
-                    "--loop",
-                    "group_interview_arena_api.core.event_loop:create_runtime_event_loop",
-                ],
-                cwd=API_ROOT,
-                environment={
-                    "GIA_API_CORS_ORIGINS": f'["{WEB_ORIGIN}"]',
-                    "GIA_API_DATABASE_URL": database_url.get_secret_value(),
-                    "GIA_API_ENVIRONMENT": "test",
-                    "GIA_API_SESSION_COOKIE_SECURE": "false",
-                    "GIA_API_SESSION_PHASE_DURATIONS": (
-                        '{"preparation_seconds":1,'
-                        '"opening_statements_seconds":1,'
-                        '"exploration_seconds":1,'
-                        '"conflict_and_evaluation_seconds":1,'
-                        '"convergence_seconds":1,'
-                        '"final_summary_seconds":1}'
-                    ),
-                    "PYTHONUNBUFFERED": "1",
-                },
-                log_path=api_log,
-            ) as api_process:
-                _wait_for_http(f"{API_ORIGIN}/health", api_process, api_log)
+            initial_api = current_api[0]
+            assert initial_api is not None
+            _wait_for_http(f"{API_ORIGIN}/health", initial_api[0], api_log)
 
-                with _server_process(
-                    [node, str(next_cli), "dev"],
-                    cwd=WEB_ROOT,
-                    environment={"NEXT_PUBLIC_API_BASE_URL": API_ORIGIN},
-                    log_path=web_log,
-                ) as web_process:
-                    _wait_for_http(WEB_ORIGIN, web_process, web_log)
-                    _run_playwright()
+            with _server_process(
+                [node, str(next_cli), "dev"],
+                cwd=WEB_ROOT,
+                environment={"NEXT_PUBLIC_API_BASE_URL": API_ORIGIN},
+                log_path=web_log,
+            ) as web_process:
+                _wait_for_http(WEB_ORIGIN, web_process, web_log)
+                coordinator = threading.Thread(
+                    target=restart_api_when_requested,
+                    name="gia-e2e-api-restart",
+                )
+                coordinator.start()
+                try:
+                    _run_playwright(
+                        environment_overrides={
+                            "GIA_E2E_API_RESTART_REQUEST": str(restart_request),
+                            "GIA_E2E_API_RESTART_READY": str(restart_ready),
+                        }
+                    )
+                finally:
+                    coordinator_stop.set()
+                    coordinator.join(timeout=SHUTDOWN_TIMEOUT_SECONDS)
+                if coordinator.is_alive():
+                    raise RuntimeError("API restart coordinator did not stop.")
+                if coordinator_errors:
+                    raise RuntimeError("API restart coordinator failed.") from (
+                        coordinator_errors[0]
+                    )
         except Exception:
             print("API server log tail:", file=sys.stderr)
             print(_log_tail(api_log), file=sys.stderr)
@@ -237,6 +334,10 @@ def _run_browser_flow(temporary_database: TemporaryDatabase) -> None:
             print(_log_tail(web_log), file=sys.stderr)
             raise
         finally:
+            running = current_api[0]
+            if running is not None:
+                _stop_server_process(*running)
+                current_api[0] = None
             _wait_for_port_release(WEB_PORT)
             _wait_for_port_release(API_PORT)
 
@@ -332,8 +433,8 @@ def main() -> int:
 
     print(
         "P1-3C browser E2E passed with immutable question binding, one durable "
-        "start action, sequences [1..8], completed phase recovery, and private "
-        "sentinel isolation; "
+        "start action, sequences [1..8], API restart catch-up, completed phase "
+        "recovery, and private sentinel isolation; "
         "temporary database and servers were cleaned."
     )
     return 0

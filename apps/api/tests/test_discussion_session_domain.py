@@ -160,6 +160,17 @@ def test_duration_plan_requires_exact_positive_timed_phase_map() -> None:
         )
 
 
+@pytest.mark.parametrize("value", [True, 1.0, "1", 0, -1])
+def test_duration_plan_rejects_non_strict_positive_integers(value: object) -> None:
+    with pytest.raises(ValueError):
+        PhaseDurationPlan.from_seconds(
+            {
+                **PLAN.to_json(),
+                "PREPARATION": value,
+            }
+        )
+
+
 def test_overdue_reconciliation_uses_persisted_deadlines_without_drift() -> None:
     outcome = reconcile_due_transitions(
         status=SessionStatus.PREPARATION,

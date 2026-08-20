@@ -33,7 +33,7 @@ type PendingCommand = SessionAbortCommand | SessionStartCommand;
 
 const SOCKET_OPEN = 1;
 const RECONNECT_DELAY_MS = 250;
-const MAX_RECONNECT_ATTEMPTS = 1;
+const MAX_RECONNECT_ATTEMPTS = 5;
 const RECOVERY_STABILITY_MS = 1_000;
 
 const SAFE_ERROR_MESSAGES: Record<RealtimeErrorCode, string> = {
@@ -207,6 +207,7 @@ export function createSessionRealtimeClient(
       if (active) {
         options.onConnectionChange("disconnected");
         options.onError("无法重新加载会话，请稍后重试。");
+        scheduleReconnect(generation);
       }
     } finally {
       reloading = false;
@@ -215,11 +216,12 @@ export function createSessionRealtimeClient(
 
   function scheduleReconnect(expectedGeneration: number) {
     if (!active || reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) return;
+    const delay = RECONNECT_DELAY_MS * 2 ** reconnectAttempts;
     reconnectAttempts += 1;
     reconnectTimer = setTimeout(() => {
       reconnectTimer = undefined;
       void reloadSnapshotAndReconnect(expectedGeneration);
-    }, RECONNECT_DELAY_MS);
+    }, delay);
   }
 
   return {

@@ -230,8 +230,71 @@ describe("session realtime client", () => {
     await vi.runAllTimersAsync();
     await flushAsync();
 
-    expect(loadSnapshot).toHaveBeenCalledOnce();
-    expect(FakeWebSocket.instances).toHaveLength(2);
+    expect(loadSnapshot).toHaveBeenCalledTimes(2);
+    expect(FakeWebSocket.instances).toHaveLength(3);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("retries failed snapshot recovery with bounded backoff and replays pending intent", async () => {
+    const loadSnapshot = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("API restarting"))
+      .mockRejectedValueOnce(new Error("API still restarting"))
+      .mockResolvedValue(ABORTED_SNAPSHOT);
+    const onSnapshot = vi.fn();
+    const onPendingChange = vi.fn();
+    const client = createSessionRealtimeClient({
+      baseUrl: BASE_URL,
+      snapshot: CREATED_SNAPSHOT,
+      loadSnapshot,
+      onEvent: vi.fn(),
+      onSnapshot,
+      onPendingChange,
+      onConnectionChange: vi.fn(),
+      onError: vi.fn(),
+    });
+
+    client.start();
+    const firstSocket = FakeWebSocket.instances[0];
+    firstSocket?.open();
+    client.startSession();
+    firstSocket?.disconnect();
+    await vi.runAllTimersAsync();
+    await flushAsync();
+
+    expect(loadSnapshot).toHaveBeenCalledTimes(3);
+    expect(onSnapshot).toHaveBeenCalledWith(ABORTED_SNAPSHOT);
+    const recoveredSocket = FakeWebSocket.instances[1];
+    recoveredSocket?.open();
+    expect(recoveredSocket?.sent).toEqual(firstSocket?.sent);
+    recoveredSocket?.receive(stateChanged(2));
+    expect(onPendingChange.mock.calls).toEqual([[true], [false]]);
+  });
+
+  it("stops retrying after the bounded snapshot recovery budget is exhausted", async () => {
+    const loadSnapshot = vi
+      .fn()
+      .mockRejectedValue(new Error("API unavailable"));
+    const client = createSessionRealtimeClient({
+      baseUrl: BASE_URL,
+      snapshot: CREATED_SNAPSHOT,
+      loadSnapshot,
+      onEvent: vi.fn(),
+      onSnapshot: vi.fn(),
+      onPendingChange: vi.fn(),
+      onConnectionChange: vi.fn(),
+      onError: vi.fn(),
+    });
+
+    client.start();
+    const firstSocket = FakeWebSocket.instances[0];
+    firstSocket?.open();
+    firstSocket?.disconnect();
+    await vi.runAllTimersAsync();
+    await flushAsync();
+
+    expect(loadSnapshot).toHaveBeenCalledTimes(5);
+    expect(FakeWebSocket.instances).toHaveLength(1);
     expect(vi.getTimerCount()).toBe(0);
   });
 

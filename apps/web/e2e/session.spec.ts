@@ -1,9 +1,12 @@
 import { expect, test } from "@playwright/test";
+import { access, writeFile } from "node:fs/promises";
 
 const API_BASE_URL = "http://localhost:8000";
 const PRIVATE_SENTINEL = "P1_2C_PRIVATE_SENTINEL_DO_NOT_DISCLOSE";
+const API_RESTART_REQUEST = process.env.GIA_E2E_API_RESTART_REQUEST;
+const API_RESTART_READY = process.env.GIA_E2E_API_RESTART_READY;
 
-test("browser session uses durable phase deadlines and REST reload", async ({
+test("browser session recovers durable phases across API restart and reload", async ({
   page,
 }) => {
   const username = `P11D_${Date.now().toString(36)}`;
@@ -76,6 +79,9 @@ test("browser session uses durable phase deadlines and REST reload", async ({
   await expect(page.getByText("进行中")).toBeVisible();
   await expect(page.getByTestId("phase-label")).toContainText("准备");
   await expect(page.getByTestId("session-sequence")).toHaveText("2");
+  const deadlineBeforeRestart = await page
+    .getByTestId("phase-deadline")
+    .textContent();
   await expect.poll(() => startCommand).toBeTruthy();
   const parsedCommand = JSON.parse(startCommand ?? "{}");
   expect(parsedCommand).toEqual({
@@ -90,9 +96,38 @@ test("browser session uses durable phase deadlines and REST reload", async ({
   expect(startCommand).not.toContain("next_status");
   expect(startCommand).not.toContain("phase_deadline_at");
 
+  expect(API_RESTART_REQUEST).toBeTruthy();
+  expect(API_RESTART_READY).toBeTruthy();
+  await writeFile(API_RESTART_REQUEST!, "restart", "utf8");
+  await expect
+    .poll(
+      async () => {
+        try {
+          await access(API_RESTART_READY!);
+          return true;
+        } catch {
+          return false;
+        }
+      },
+      { timeout: 10_000 },
+    )
+    .toBe(true);
+  await expect(page.getByText("实时连接已建立")).toBeVisible({
+    timeout: 10_000,
+  });
+  await expect
+    .poll(async () =>
+      Number(await page.getByTestId("session-sequence").textContent()),
+    )
+    .toBeGreaterThan(2);
+  await expect(page.getByTestId("phase-label")).not.toContainText("准备");
+  await expect(page.getByTestId("phase-deadline")).not.toHaveText(
+    deadlineBeforeRestart ?? "",
+  );
+
   await expect(
     page.locator("p").filter({ hasText: "会话状态：" }),
-  ).toContainText("已完成", { timeout: 15_000 });
+  ).toContainText("已完成", { timeout: 25_000 });
   await expect(page.getByTestId("phase-label")).toContainText("已完成");
   await expect(page.getByTestId("session-sequence")).toHaveText("8");
 

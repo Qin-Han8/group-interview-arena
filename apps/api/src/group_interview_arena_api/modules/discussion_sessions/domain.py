@@ -95,14 +95,18 @@ class PhaseDurationPlan:
 
     @classmethod
     def from_seconds(
-        cls, values: Mapping[str | SessionStatus, int]
+        cls, values: Mapping[str | SessionStatus, object]
     ) -> PhaseDurationPlan:
         normalized: dict[SessionStatus, int] = {}
         for key, seconds in values.items():
             status = key if isinstance(key, SessionStatus) else SessionStatus(key)
             if status not in ACTIVE_PHASES:
                 raise ValueError("Duration plan contains an unsupported phase.")
-            if seconds <= 0:
+            if (
+                isinstance(seconds, bool)
+                or not isinstance(seconds, int)
+                or seconds <= 0
+            ):
                 raise ValueError(
                     "Duration plan values must be positive integer seconds."
                 )

@@ -39,12 +39,12 @@ class DatabaseSettings(BaseSettings):
 
 
 class SessionPhaseDurations(BaseModel):
-    preparation_seconds: int = Field(default=240, gt=0)
-    opening_statements_seconds: int = Field(default=240, gt=0)
-    exploration_seconds: int = Field(default=900, gt=0)
-    conflict_and_evaluation_seconds: int = Field(default=300, gt=0)
-    convergence_seconds: int = Field(default=180, gt=0)
-    final_summary_seconds: int = Field(default=60, gt=0)
+    preparation_seconds: int = Field(default=240, gt=0, strict=True)
+    opening_statements_seconds: int = Field(default=240, gt=0, strict=True)
+    exploration_seconds: int = Field(default=900, gt=0, strict=True)
+    conflict_and_evaluation_seconds: int = Field(default=300, gt=0, strict=True)
+    convergence_seconds: int = Field(default=180, gt=0, strict=True)
+    final_summary_seconds: int = Field(default=60, gt=0, strict=True)
 
     def to_duration_plan(self) -> PhaseDurationPlan:
         return PhaseDurationPlan.from_seconds(
