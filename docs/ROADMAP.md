@@ -2,11 +2,11 @@
 
 - Status: Active baseline
 - Most recently completed development phase: P0 — `DONE`
-- Most recently completed subphase: P1-4B — `DONE`
+- Most recently completed subphase: P1-4C — `DONE`
 - P0-7 final outcome: initial `BLOCKED`; two documentation findings remediated; finding-only independent recheck `PASS`; P1 readiness `READY`
 - Current phase: P1 — `IN_PROGRESS`
-- Most recently completed task: P1-4B — `DONE`; P1-4 — `IN_PROGRESS`
-- Next task gate: P1-4C — `NOT_STARTED` / awaiting explicit user approval
+- Most recently completed task: P1-4C — `DONE`; P1-4 — `IN_PROGRESS`
+- Next task gate: P1-4D — `NOT_STARTED` / awaiting explicit user approval
 - P0 status: `DONE`; P0-1 through P0-7 completed
 - Target product version: V0.1 — Internal Validation
 - Source: [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) §30–31
@@ -18,7 +18,7 @@
 - `P0～P6`：研发推进阶段，描述按什么顺序建立能力；
 - `V0.1 / V0.5 / V1.0`：产品交付版本，描述某个可验证版本包含什么。
 
-阶段不是版本，P0-x/P1-x 也不是新增产品版本。P0 已完成不代表 V0.1 的全部业务能力已经实现；用户已明确批准进入 P1、P1-2A～D、P1-3、P1-4 和 P1-4B。P1-2 与 P1-3 均已在 independent verdict `PASS` 后完成；P1 保持 `IN_PROGRESS`，P1-4A design freeze 与 P1-4B persistence/domain foundation 已完成，P1-4C 等待单独明确批准。
+阶段不是版本，P0-x/P1-x 也不是新增产品版本。P0 已完成不代表 V0.1 的全部业务能力已经实现；用户已明确批准进入 P1、P1-2A～D、P1-3、P1-4 和 P1-4B/C。P1-2 与 P1-3 均已在 independent verdict `PASS` 后完成；P1 保持 `IN_PROGRESS`，P1-4A design freeze、P1-4B persistence/domain foundation 与 P1-4C deterministic scheduler engine 已完成，P1-4D 等待单独明确批准。
 
 ## 2. 开发阶段
 
@@ -90,11 +90,11 @@ P1-3A 已冻结 V0.1 单向 path、合法 abort、server-authoritative transitio
 
 - `P1-4A — Floor control design freeze`：completed；docs-only；
 - `P1-4B — Scheduling persistence + domain foundation`：completed；
-- `P1-4C — Deterministic scheduler engine`：not started / awaiting explicit approval；
-- `P1-4D — Realtime/Web floor experience`：not started；
+- `P1-4C — Deterministic scheduler engine`：completed；
+- `P1-4D — Realtime/Web floor experience`：not started / awaiting explicit approval；
 - `P1-4E — Independent acceptance + closeout`：not started。
 
-P1-4A 已冻结 phase lifecycle 与 within-phase floor authority 分离、single current owner、AI/human/system participant compatibility、speaking opportunity/candidate/decision/intervention 领域语言、deterministic lexicographic V0.1 policy、fairness/monopoly/phase/silence-deadline rules、`floor.granted` / `floor.released` / `floor.intervention_requested` 最小事实事件，以及 safe decision metadata/audit trail 与 private stance/persona/scoring non-disclosure。P1-4B 已实现 generalized participant/floor persistence、single-current-grant database invariant、immutable decision/grant/release/intervention audit history、session action digest/idempotent replay、aggregate-lock concurrency 与 phase/terminal protection；formal event envelope 已支持冻结的三个 facts，但未新增 REST/Web caller。Scheduler 只决定谁说，未来 LLM/provider 只决定获准 AI 说什么。P1-4 保持 `IN_PROGRESS`；P1-4C 尚未获准，不得开始 ranking engine。完整 scope/gates 见 [`exec-plans/P1-4_floor-control.md`](exec-plans/P1-4_floor-control.md)。
+P1-4A 已冻结 phase lifecycle 与 within-phase floor authority 分离、single current owner、AI/human/system participant compatibility、speaking opportunity/candidate/decision/intervention 领域语言、deterministic lexicographic V0.1 policy、fairness/monopoly/phase/silence-deadline rules、`floor.granted` / `floor.released` / `floor.intervention_requested` 最小事实事件，以及 safe decision metadata/audit trail 与 private stance/persona/scoring non-disclosure。P1-4B 已实现 generalized participant/floor persistence、single-current-grant database invariant、immutable decision/grant/release/intervention audit history、session action digest/idempotent replay、aggregate-lock concurrency 与 phase/terminal protection。P1-4C 已实现 pure deterministic scheduler、closed typed policy、durable fairness reconstruction、stable seat/UUID tie-break、explainable intervention，以及同一 aggregate lock/transaction 内的 decision → grant/intervention；未新增 public REST/Web caller。Scheduler 只决定谁说，未来 LLM/provider 只决定获准 AI 说什么。P1-4 保持 `IN_PROGRESS`；P1-4D 尚未获准，不得开始 Realtime/Web floor experience。完整 scope/gates 见 [`exec-plans/P1-4_floor-control.md`](exec-plans/P1-4_floor-control.md)。
 
 ## 5. 产品版本
 

@@ -1,16 +1,16 @@
 # P0 技术架构基线
 
-- Status: P0 Architecture Baseline + P1-1/P1-2/P1-3 completed + P1-4A/P1-4B completed
+- Status: P0 Architecture Baseline + P1-1/P1-2/P1-3 completed + P1-4A/P1-4B/P1-4C completed
 - Current phase: P1 — IN_PROGRESS
 - Architecture baseline established by: P0-2 — DONE
 - P0-3 foundation status: DONE
 - P0-4 database foundation status: DONE
 - P0-5 identity boundary status: DONE
-- Most recently completed task: P1-4B floor persistence/domain foundation — `PASS`; P1-4 `IN_PROGRESS`
+- Most recently completed task: P1-4C deterministic scheduler engine — `PASS`; P1-4 `IN_PROGRESS`
 - P0 status: DONE; P0-1 through P0-7 completed
-- P1 status: IN_PROGRESS; P1-1/P1-2/P1-3 DONE; P1-4 IN_PROGRESS; P1-4A/P1-4B completed; P1-4C awaiting explicit approval
+- P1 status: IN_PROGRESS; P1-1/P1-2/P1-3 DONE; P1-4 IN_PROGRESS; P1-4A/P1-4B/P1-4C completed; P1-4D awaiting explicit approval
 - Target version: V0.1 Internal Validation
-- Business architecture detail: P1-1 runtime completed; P1-2 question/persona boundary implemented; P1-3 state/timing/recovery/realtime/Web flow independently accepted; P1-4 floor-control design plus persistence/domain foundation implemented
+- Business architecture detail: P1-1 runtime completed; P1-2 question/persona boundary implemented; P1-3 state/timing/recovery/realtime/Web flow independently accepted; P1-4 floor-control design, persistence/domain foundation and deterministic scheduler implemented
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -262,7 +262,7 @@ WebSocket 使用独立版本化事件契约，至少表达 event type、schema v
 - P1-3C app-owned in-process recovery runtime 只提供 wake-up/liveness，并在 startup、WS connect 和 connected catch-up path 调用同一 overdue reconciliation foundation；PostgreSQL deadline、row lock 和 event log 提供 correctness。Redis/queue、distributed scheduler 和 cross-process realtime fan-out 继续 Deferred。
 - `DEVICE_CHECK`、pause/system failure/partial completion 和 report lifecycle states 保留总纲长期语义但不进入 P1-3 handler。完整设计、C～D scope 和 stop conditions 见 [`exec-plans/P1-3_session-state-machine.md`](exec-plans/P1-3_session-state-machine.md)。
 
-### P1-4 floor-control architecture — persistence/domain foundation implemented
+### P1-4 floor-control architecture — deterministic scheduler implemented
 
 - P1-3 remains the sole lifecycle/phase/timing authority. P1-4 floor control operates only inside the authoritative current phase and cannot start、advance、pause、extend or complete it.
 - A session has zero or one current floor owner. Ownership references a generalized session participant, not a Persona Template/provider/browser connection；participant actor kind supports `AI`、`HUMAN`、`SYSTEM`, while role separates ordinary `CANDIDATE` from `MODERATOR` intervention.
@@ -274,7 +274,9 @@ WebSocket 使用独立版本化事件契约，至少表达 event type、schema v
 - Floor commands are an internal domain/service boundary in P1-4B. They reuse owner authorization, `session_actions` UUID identity + semantic digest, aggregate `FOR UPDATE` locking, contiguous `discussion_events` sequence and one transaction. Duplicate commands replay causal facts; digest conflicts, stale phase/sequence, wrong grant, ineligible actors and terminal sessions fail without mutation.
 - The session row's nullable composite reference `(id, current_floor_grant_id)` may target only a grant in that same session, so the locked aggregate is the zero-or-one current owner projection. Grant/release facts remain append-only; release is a separate one-to-one fact rather than an update to historical grant data.
 - P1-3 deadline/abort reconciliation may release an active grant in the same transaction before `session.state_changed`, preserving contiguous order while leaving status/timing semantics exclusively in P1-3. Floor code never writes lifecycle state.
-- The three frozen formal floor facts are accepted by the strict server envelope, but P1-4B adds no public REST command, snapshot field, Web parser or UI. P1-4C scheduler engine、P1-4D Realtime/Web and P1-4E independent acceptance remain separately gated. Full design is in [`exec-plans/P1-4_floor-control.md`](exec-plans/P1-4_floor-control.md).
+- P1-4C implements the pure policy in `modules/floor_control/scheduler.py`. All input enumeration is explicitly sorted；first opportunity、monopoly guard、phase-aware fairness and stable seat/UUID form a closed lexicographic key, while injected UTC is used only for silence/deadline thresholds. Candidate lists/fairness counters remain runtime-only.
+- Internal `floor.schedule` orchestration reconstructs participant/opportunity/history facts only after acquiring the existing session aggregate row lock, validates exact phase/sequence/current-grant preconditions, then persists action digest、safe decision and grant/intervention plus one formal event in the same transaction. Concurrent evaluation cannot create a second owner；duplicate action replays and stale evaluation fails closed.
+- The three frozen formal floor facts are accepted by the strict server envelope, but P1-4C adds no public REST command, snapshot field, Web parser or UI. P1-4D Realtime/Web and P1-4E independent acceptance remain separately gated. Full design is in [`exec-plans/P1-4_floor-control.md`](exec-plans/P1-4_floor-control.md).
 
 ## Configuration, secrets and error boundaries
 
@@ -349,7 +351,7 @@ Redis 只在多 API workers、横向扩容、跨进程 WebSocket broadcast、dis
 - P0-5D：completed；真实 browser Cookie/CORS/CSRF 闭环已通过 Chromium 验证；
 - P0-5E：completed；final outcome `PASS after findings remediation and independent recheck`；
 - P0：`DONE`；P0-1～P0-7 completed；P0-7 finding-only independent recheck `PASS`，P1 readiness `READY`；其后用户已明确批准进入 P1；
-- P1：`IN_PROGRESS`；P1-1、P1-2、P1-3 均已完成且 independent verdict `PASS`；P1-4A design freeze 与 P1-4B floor persistence/domain foundation completed，P1-4 `IN_PROGRESS`；P1-4C 尚未开始并等待明确批准，P1-4D～E 仍分别 gated；LLM/utterance、记忆和基础报告继续 Deferred；
+- P1：`IN_PROGRESS`；P1-1、P1-2、P1-3 均已完成且 independent verdict `PASS`；P1-4A/B/C completed，P1-4 `IN_PROGRESS`；P1-4D 尚未开始并等待明确批准，P1-4E 仍 separately gated；LLM/utterance、记忆和基础报告继续 Deferred；
 - P2 以后：只在对应阶段获批后增加语音、评分训练和商业化能力。
 
 ## 与其他文档关系

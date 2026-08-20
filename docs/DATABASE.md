@@ -15,7 +15,7 @@
 - Target version: V0.1 Internal Validation
 - Business schema: identity, session, question/persona, durable phase timing, and P1-4B participant/floor audit foundation (sixteen product tables)
 - P1-1 status: P1-1A～E completed; independent final verdict PASS; P1-1 DONE
-- P1-2/P1-3 status: DONE; P1-4 IN_PROGRESS; P1-4A/P1-4B completed; P1-4C awaiting explicit approval
+- P1-2/P1-3 status: DONE; P1-4 IN_PROGRESS; P1-4A/P1-4B/P1-4C completed; P1-4D awaiting explicit approval
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -331,6 +331,8 @@ The migration backfills the same four-seat roster for existing sessions that alr
 
 Floor mutation reuses `session_actions` command identity and SHA-256 semantic digest, the locked session aggregate, contiguous `discussion_events` allocation and atomic commit. The durable facts are sufficient to reconstruct the single current owner and observable floor history after restart；candidate lists、derived fairness counters、timer calculations and ranking alternatives remain runtime calculations. Private Stance、persona calibration、prompt/provider internals、hidden weights and future scoring data have no floor columns or persisted metadata keys.
 
+P1-4C adds no migration or column. Its internal scheduler reads the existing participant/opportunity/grant/release facts after acquiring the session row lock, derives runtime fairness deterministically, and writes into the existing action/decision/grant/intervention/event schema atomically. Therefore the linear head remains `f1a14b15c004` and the exact product-table count remains sixteen.
+
 The exact schema, migration and concurrency gates are in [`exec-plans/P1-4_floor-control.md`](exec-plans/P1-4_floor-control.md)。
 
 ## Future business schema
@@ -361,7 +363,7 @@ The exact schema, migration and concurrency gates are in [`exec-plans/P1-4_floor
 
 - P0-5C：FastAPI lifespan/request dependency 已成为现有 async DB runtime 的第一个 application caller；真实 PostgreSQL auth integration 只使用迁移到 head 的隔离临时数据库，development DB 保持 head `4fe43b42641b` 且两张表均为 0 rows；
 - P0-5D：completed；browser closure 已实现，existing Cookie/CORS/CSRF/shared trusted-origin boundary 已生效；P1 不得创建第二套 trusted-origin config；
-- P1：`IN_PROGRESS`；P1-1/P1-2/P1-3 `DONE`；P1-4A/P1-4B completed；current migration head `f1a14b15c004`、精确十六张 product tables，P1-4B participant/floor persistence and domain foundation 已通过 migration/catalog/concurrency gates；P1-4C scheduler engine 尚未开始并等待明确批准，utterance、记忆和报告继续 Deferred；
+- P1：`IN_PROGRESS`；P1-1/P1-2/P1-3 `DONE`；P1-4A/P1-4B/P1-4C completed；current migration head `f1a14b15c004`、精确十六张 product tables，P1-4C deterministic scheduler 复用既有 floor schema 且不新增 migration；P1-4D 尚未开始并等待明确批准，utterance、记忆和报告继续 Deferred；
 - P2～P4：仅随获批范围增加音频、评分训练和商业化数据。
 
 ## 与其他文档关系

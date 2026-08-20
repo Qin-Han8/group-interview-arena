@@ -1,6 +1,8 @@
 import asyncio
 from collections.abc import Callable, Coroutine
 from contextlib import asynccontextmanager
+from dataclasses import replace
+from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol
 from uuid import UUID, uuid4
 
@@ -19,6 +21,7 @@ from group_interview_arena_api.db import (
     SessionAction,
     SessionParticipant,
     SimulationSession,
+    SpeakingOpportunity,
     User,
 )
 from group_interview_arena_api.db.runtime import (
@@ -55,7 +58,14 @@ from group_interview_arena_api.modules.floor_control.domain import (
     SafeDecisionMetadata,
     StaleFloorDecisionError,
 )
-from group_interview_arena_api.modules.floor_control.service import apply_floor_command
+from group_interview_arena_api.modules.floor_control.scheduler import (
+    V0_1_SCHEDULER_POLICY,
+    ScheduleFloorCommand,
+)
+from group_interview_arena_api.modules.floor_control.service import (
+    apply_floor_command,
+    apply_scheduler_command,
+)
 from group_interview_arena_api.modules.question_personas.seed import (
     INTERNAL_VALIDATION_BUNDLE,
     seed_question_persona_foundation,
@@ -196,6 +206,33 @@ def _grant(
             primary_reason=FloorPolicyReason.FIRST_OPPORTUNITY,
             supporting_reasons=(FloorPolicyReason.PHASE_MANDATED_TURN,),
             metadata=_metadata(),
+        ),
+    )
+
+
+def _schedule(
+    session_id: UUID,
+    *,
+    evaluated_at: datetime,
+    expected_sequence: int = 3,
+    action_id: UUID | None = None,
+    decision_id: UUID | None = None,
+    grant_id: UUID | None = None,
+    intervention_id: UUID | None = None,
+) -> ScheduleFloorCommand:
+    return ScheduleFloorCommand(
+        session_id=session_id,
+        action_id=action_id or uuid4(),
+        decision_id=decision_id or uuid4(),
+        grant_id=grant_id or uuid4(),
+        intervention_id=intervention_id or uuid4(),
+        expected_phase=SessionStatus.OPENING_STATEMENTS,
+        expected_last_sequence=expected_sequence,
+        expected_current_floor_grant_id=None,
+        evaluated_at=evaluated_at,
+        policy=replace(
+            V0_1_SCHEDULER_POLICY,
+            deadline_intervention_threshold=timedelta(milliseconds=100),
         ),
     )
 
@@ -717,3 +754,309 @@ def test_owner_deletion_cascades_session_and_floor_history_without_orphans(
     run_async(
         lambda: _verify_session_deletion_cascades_floor_history(migrated_database)
     )
+
+
+async def _verify_scheduler_retry_fairness_and_audit(
+    temporary_database: TemporaryDatabaseContext,
+) -> None:
+    async with _session_factory(temporary_database) as session_factory:
+        owner_id, session_id, participants = await _active_session(session_factory)
+        async with session_factory() as session:
+            aggregate = await session.get(SimulationSession, session_id)
+            assert aggregate is not None and aggregate.phase_started_at is not None
+            evaluated_at = datetime.now(UTC)
+        opportunity_id = uuid4()
+        async with session_factory() as session:
+            async with session.begin():
+                session.add(
+                    SpeakingOpportunity(
+                        id=opportunity_id,
+                        session_id=session_id,
+                        participant_id=participants[2].id,
+                        phase=SessionStatus.OPENING_STATEMENTS.value,
+                        opportunity_kind="EXPLICIT_REQUEST",
+                        created_at=evaluated_at,
+                    )
+                )
+
+        first = _schedule(session_id, evaluated_at=evaluated_at)
+        async with session_factory() as session:
+            first_events = await apply_scheduler_command(
+                session,
+                owner_id=owner_id,
+                command=first,
+            )
+        async with session_factory() as session:
+            duplicate_events = await apply_scheduler_command(
+                session,
+                owner_id=owner_id,
+                command=first,
+            )
+        assert duplicate_events == first_events
+        assert [(item.sequence, item.event_type) for item in first_events] == [
+            (4, "floor.granted")
+        ]
+        assert first_events[0].payload["participant_id"] == str(participants[2].id)
+        assert first_events[0].payload["opportunity_id"] == str(opportunity_id)
+
+        conflict = _schedule(
+            session_id,
+            evaluated_at=evaluated_at,
+            action_id=first.action_id,
+        )
+        async with session_factory() as session:
+            with pytest.raises(ActionIdConflictError):
+                await apply_scheduler_command(
+                    session,
+                    owner_id=owner_id,
+                    command=conflict,
+                )
+
+        release = ReleaseFloorCommand(
+            session_id=session_id,
+            action_id=uuid4(),
+            grant_id=first.grant_id,
+            expected_phase=SessionStatus.OPENING_STATEMENTS,
+            expected_last_sequence=4,
+            reason=FloorReleaseReason.SPEAKER_FINISHED,
+        )
+        async with session_factory() as session:
+            await apply_floor_command(session, owner_id=owner_id, command=release)
+
+        second = _schedule(
+            session_id,
+            evaluated_at=datetime.now(UTC),
+            expected_sequence=5,
+        )
+        async with session_factory() as session:
+            second_events = await apply_scheduler_command(
+                session,
+                owner_id=owner_id,
+                command=second,
+            )
+        assert [(item.sequence, item.event_type) for item in second_events] == [
+            (6, "floor.granted")
+        ]
+        assert second_events[0].payload["participant_id"] == str(participants[0].id)
+        assert second_events[0].payload["reason_code"] == "MONOPOLY_PREVENTION"
+
+        async with session_factory() as session:
+            first_decision = await session.get(FloorDecision, first.decision_id)
+            second_decision = await session.get(FloorDecision, second.decision_id)
+            aggregate = await session.get(SimulationSession, session_id)
+            assert first_decision is not None and second_decision is not None
+            assert aggregate is not None
+            assert aggregate.current_floor_grant_id == second.grant_id
+            assert first_decision.primary_reason_code == "FIRST_OPPORTUNITY"
+            assert first_decision.supporting_reason_codes == ["EXPLICIT_OPPORTUNITY"]
+            assert second_decision.primary_reason_code == "MONOPOLY_PREVENTION"
+            assert second_decision.decision_metadata == {
+                "current_phase_grant_count": 0,
+                "first_opportunity_unmet": True,
+                "previous_owner_was_selected": False,
+                "consecutive_grant_count": 0,
+                "tie_break_class": "SEAT_ORDER",
+            }
+            sequences = list(
+                (
+                    await session.scalars(
+                        select(DiscussionEvent.sequence)
+                        .where(DiscussionEvent.session_id == session_id)
+                        .order_by(DiscussionEvent.sequence)
+                    )
+                ).all()
+            )
+            assert sequences == [1, 2, 3, 4, 5, 6]
+
+
+def test_scheduler_retry_digest_fairness_restart_and_audit_are_durable(
+    migrated_database: TemporaryDatabaseContext,
+) -> None:
+    run_async(lambda: _verify_scheduler_retry_fairness_and_audit(migrated_database))
+
+
+async def _verify_concurrent_scheduling(
+    temporary_database: TemporaryDatabaseContext,
+) -> None:
+    async with _session_factory(temporary_database) as session_factory:
+        owner_id, session_id, _ = await _active_session(session_factory)
+        async with session_factory() as session:
+            aggregate = await session.get(SimulationSession, session_id)
+            assert aggregate is not None and aggregate.phase_started_at is not None
+            evaluated_at = datetime.now(UTC)
+        commands = [
+            _schedule(session_id, evaluated_at=evaluated_at),
+            _schedule(session_id, evaluated_at=evaluated_at),
+        ]
+
+        async def apply(command: ScheduleFloorCommand) -> object:
+            try:
+                async with session_factory() as session:
+                    return await apply_scheduler_command(
+                        session,
+                        owner_id=owner_id,
+                        command=command,
+                    )
+            except Exception as exception:
+                return exception
+
+        outcomes = await asyncio.gather(*(apply(command) for command in commands))
+        assert sum(isinstance(item, list) for item in outcomes) == 1
+        assert sum(isinstance(item, StaleFloorDecisionError) for item in outcomes) == 1
+
+        async with session_factory() as session:
+            aggregate = await session.get(SimulationSession, session_id)
+            assert aggregate is not None
+            assert aggregate.current_floor_grant_id is not None
+            assert aggregate.last_sequence == 4
+            assert (
+                await session.scalar(
+                    select(func.count())
+                    .select_from(FloorGrant)
+                    .where(FloorGrant.session_id == session_id)
+                )
+                == 1
+            )
+            assert (
+                await session.scalar(
+                    select(func.count())
+                    .select_from(FloorDecision)
+                    .where(FloorDecision.session_id == session_id)
+                )
+                == 1
+            )
+
+
+def test_concurrent_scheduler_calls_produce_one_active_grant(
+    migrated_database: TemporaryDatabaseContext,
+) -> None:
+    run_async(lambda: _verify_concurrent_scheduling(migrated_database))
+
+
+async def _verify_scheduler_deadline_intervention(
+    temporary_database: TemporaryDatabaseContext,
+) -> None:
+    async with _session_factory(temporary_database) as session_factory:
+        owner_id, session_id, _ = await _active_session(session_factory)
+        async with session_factory() as session:
+            aggregate = await session.get(SimulationSession, session_id)
+            assert aggregate is not None and aggregate.phase_deadline_at is not None
+            evaluated_at = aggregate.phase_deadline_at - timedelta(milliseconds=50)
+        command = _schedule(session_id, evaluated_at=evaluated_at)
+
+        async with session_factory() as session:
+            events = await apply_scheduler_command(
+                session,
+                owner_id=owner_id,
+                command=command,
+            )
+        async with session_factory() as session:
+            duplicate = await apply_scheduler_command(
+                session,
+                owner_id=owner_id,
+                command=command,
+            )
+
+        assert duplicate == events
+        assert [(item.sequence, item.event_type) for item in events] == [
+            (4, "floor.intervention_requested")
+        ]
+        assert events[0].payload["intervention_kind"] == "DEADLINE"
+        assert events[0].payload["reason_code"] == "DEADLINE_RECOVERY"
+        async with session_factory() as session:
+            aggregate = await session.get(SimulationSession, session_id)
+            decision = await session.get(FloorDecision, command.decision_id)
+            intervention = await session.get(
+                FloorIntervention,
+                command.intervention_id,
+            )
+            assert aggregate is not None
+            assert aggregate.current_floor_grant_id is None
+            assert aggregate.status == SessionStatus.OPENING_STATEMENTS.value
+            assert decision is not None and intervention is not None
+            assert decision.outcome_kind == "REQUEST_INTERVENTION"
+            assert intervention.decision_id == decision.id
+
+
+def test_scheduler_deadline_intervention_is_atomic_and_idempotent(
+    migrated_database: TemporaryDatabaseContext,
+) -> None:
+    run_async(lambda: _verify_scheduler_deadline_intervention(migrated_database))
+
+
+async def _verify_scheduler_phase_boundary_and_rollback(
+    temporary_database: TemporaryDatabaseContext,
+) -> None:
+    async with _session_factory(temporary_database) as session_factory:
+        owner_id, session_id, _ = await _active_session(session_factory)
+        async with session_factory() as session:
+            aggregate = await session.get(SimulationSession, session_id)
+            assert aggregate is not None and aggregate.phase_deadline_at is not None
+            deadline = aggregate.phase_deadline_at
+        stale = _schedule(session_id, evaluated_at=deadline)
+        async with session_factory() as session:
+            with pytest.raises(StaleFloorDecisionError):
+                await apply_scheduler_command(
+                    session,
+                    owner_id=owner_id,
+                    command=stale,
+                )
+        async with session_factory() as session:
+            aggregate = await session.get(SimulationSession, session_id)
+            assert aggregate is not None
+            assert aggregate.status == SessionStatus.EXPLORATION.value
+            assert aggregate.last_sequence == 4
+            assert aggregate.current_floor_grant_id is None
+            assert await session.get(FloorDecision, stale.decision_id) is None
+            assert await session.get(FloorGrant, stale.grant_id) is None
+
+        assert aggregate.phase_started_at is not None
+        rollback = ScheduleFloorCommand(
+            session_id=session_id,
+            action_id=uuid4(),
+            decision_id=uuid4(),
+            grant_id=uuid4(),
+            intervention_id=uuid4(),
+            expected_phase=SessionStatus.EXPLORATION,
+            expected_last_sequence=4,
+            expected_current_floor_grant_id=None,
+            evaluated_at=datetime.now(UTC),
+            policy=replace(
+                V0_1_SCHEDULER_POLICY,
+                deadline_intervention_threshold=timedelta(milliseconds=100),
+            ),
+        )
+        original = service.floor_granted_event
+        service.floor_granted_event = lambda **_: PendingEvent(  # type: ignore[assignment]
+            event_type="floor.granted",
+            payload={},
+            event_version=0,
+        )
+        try:
+            async with session_factory() as session:
+                with pytest.raises(SessionPersistenceError):
+                    await apply_scheduler_command(
+                        session,
+                        owner_id=owner_id,
+                        command=rollback,
+                    )
+        finally:
+            service.floor_granted_event = original
+
+        async with session_factory() as session:
+            aggregate = await session.get(SimulationSession, session_id)
+            assert aggregate is not None
+            assert aggregate.last_sequence == 4
+            assert aggregate.current_floor_grant_id is None
+            assert (
+                await session.get(SessionAction, (session_id, rollback.action_id))
+                is None
+            )
+            assert await session.get(FloorDecision, rollback.decision_id) is None
+            assert await session.get(FloorGrant, rollback.grant_id) is None
+
+
+def test_scheduler_phase_transition_wins_and_rollback_is_atomic(
+    migrated_database: TemporaryDatabaseContext,
+) -> None:
+    run_async(lambda: _verify_scheduler_phase_boundary_and_rollback(migrated_database))

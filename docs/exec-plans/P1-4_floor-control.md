@@ -1,6 +1,6 @@
 # P1-4 Floor Control / Speaker Scheduling Execution Plan
 
-Status: `P1 IN_PROGRESS`; `P1-4 IN_PROGRESS`; `P1-4A completed`; `P1-4B completed`; `P1-4C not started / awaiting explicit approval`; `P1-4D not started`; `P1-4E not started`
+Status: `P1 IN_PROGRESS`; `P1-4 IN_PROGRESS`; `P1-4A completed`; `P1-4B completed`; `P1-4C completed`; `P1-4D not started / awaiting explicit approval`; `P1-4E not started`
 
 Target version: `V0.1 Internal Validation`
 
@@ -30,8 +30,8 @@ P1-4 只决定“谁应该说”，不决定“说什么”。Scheduler 是 proj
 
 1. **P1-4A — Floor control design freeze**：`completed`。Docs-only 冻结领域模型、phase/floor authority、V0.1 deterministic policy、human compatibility、events、explainability、persistence、B～E scope 和 acceptance。
 2. **P1-4B — Scheduling persistence + domain foundation**：`completed`。已建立通用 participant、speaking opportunity、current floor、decision/audit facts 的最小 persistence/domain 基础与 migration；未实现自动 speaker selection engine、Realtime/Web 或 LLM。
-3. **P1-4C — Deterministic scheduler engine**：`not started / awaiting explicit approval`。实现 pure deterministic candidate construction/ranking、fairness、monopoly guard、phase policy、silence/deadline intervention、transactional grant/release 与 deterministic regressions；不生成 utterance。
-4. **P1-4D — Realtime/Web floor experience**：`not started`。在既有 ordered session channel 上实现最小 floor commands/events/snapshot projection、Browser current-speaker/queue intent 和真实 PostgreSQL Chromium flow；Browser 不拥有 scheduler。
+3. **P1-4C — Deterministic scheduler engine**：`completed`。已实现 pure deterministic candidate construction/ranking、fairness、monopoly guard、phase policy、silence/deadline intervention、transactional decision → grant/intervention 与 deterministic regressions；不生成 utterance。
+4. **P1-4D — Realtime/Web floor experience**：`not started / awaiting explicit approval`。在既有 ordered session channel 上实现最小 floor commands/events/snapshot projection、Browser current-speaker/queue intent 和真实 PostgreSQL Chromium flow；Browser 不拥有 scheduler。
 5. **P1-4E — Independent acceptance + closeout**：`not started`。从 committed source 独立复核 persistence、determinism、race/recovery、phase integration、human compatibility、explainability/non-disclosure、Realtime/Web 和 Deferred absence；通过后才可将 P1-4 标为 `DONE`。
 
 P1-4B 已获得单独明确批准并完成；P1-4C 仍须单独明确批准。P1-4B 完成不授权 scheduler ranking engine、dependency、lockfile、CI、public API 或 Web 修改。
@@ -216,6 +216,14 @@ Snapshot/restart recovery must be able to reconstruct exactly one current owner 
 - Every grant/intervention has a safe auditable reason; private/persona/scoring/provider inputs are absent.
 - No utterance generation, LLM/provider, semantic/ML ranking, Redis/queue or multi-agent negotiation is introduced.
 
+### P1-4C implementation checkpoint
+
+- Baseline: clean committed `main` at `d6a6861ebc061d95303eda25254e55a5be875863`, equal to `origin/main`; master-plan SHA-256 unchanged from P1-4A/B.
+- Pure scheduler uses closed `v0.1-floor-1` typed policy, injected aware UTC and explicitly sorted durable inputs. It filters ordinary AI/human candidates by role/availability, classifies open opportunity or fairness fallback, applies first-opportunity and monopoly rules, uses phase-specific fairness order, then stable seat/UUID tie-break.
+- Deadline pressure wins before a new grant；when caps leave no ordinary grant, configured silence can request intervention；an empty ordinary roster requests `NO_ELIGIBLE_PARTICIPANT`. Each outcome carries only the frozen safe reason/metadata allowlist.
+- Internal `floor.schedule` evaluation runs after P1-3 overdue reconciliation and inside the existing owner-authorized session row lock. It verifies phase、sequence and current-grant preconditions, reconstructs history after locking, and atomically persists action digest、decision、grant/intervention and at most one ordered formal event. Duplicate calls replay；digest conflicts and stale/concurrent calls fail closed.
+- No schema/migration、dependency/lockfile、public REST/OpenAPI、WebSocket inbound command、snapshot field or Web UI changed. P1-4D remains separately gated.
+
 ## P1-4D — Realtime/Web floor experience
 
 ### Scope
@@ -294,8 +302,8 @@ P1-4 does not implement or prebuild:
 
 - P1-4A：completed；docs-only floor-control design freeze；validation `PASS`；no blocker。
 - P1-4B：completed；linear migration `f1a14b15c004`、participant/floor persistence、internal command lifecycle、durable audit、phase integration and required validation `PASS`；no blocker。
-- P1-4C：not started / awaiting explicit user approval。
-- P1-4D：not started。
+- P1-4C：completed；deterministic scheduler、locked transactional orchestration and required validation `PASS`；no blocker。
+- P1-4D：not started / awaiting explicit user approval。
 - P1-4E：not started。
 
 ### P1-4B implementation record
