@@ -1,6 +1,6 @@
 # P0 技术架构基线
 
-- Status: P0 Architecture Baseline + P1-1/P1-2 completed
+- Status: P0 Architecture Baseline + P1-1/P1-2 completed + P1-3 design frozen
 - Current phase: P1 — IN_PROGRESS
 - Architecture baseline established by: P0-2 — DONE
 - P0-3 foundation status: DONE
@@ -8,9 +8,9 @@
 - P0-5 identity boundary status: DONE
 - Most recently completed task: P0-7 independent final acceptance — PASS after two documentation findings remediation and finding-only recheck
 - P0 status: DONE; P0-1 through P0-7 completed
-- P1 status: IN_PROGRESS; P1-1/P1-2 DONE; P1-2A through P1-2D completed; P1-3 awaiting explicit approval
+- P1 status: IN_PROGRESS; P1-1/P1-2 DONE; P1-3 IN_PROGRESS; P1-3A completed; P1-3B awaiting explicit approval
 - Target version: V0.1 Internal Validation
-- Business architecture detail: P1-1 runtime completed; P1-2 question/persona persistence/domain/safe caller boundary implemented through P1-2C
+- Business architecture detail: P1-1 runtime completed; P1-2 question/persona boundary implemented; P1-3 state/timing design frozen, runtime not started
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -249,7 +249,18 @@ WebSocket 使用独立版本化事件契约，至少表达 event type、schema v
 - P1-2C 已只增加 authenticated safe question reads、version-bound session creation 和最小 Web selection/render caller；未增加 question mutation/admin、persona/private API、participant/utterance、WS event vocabulary 或 AI runtime。
 - Private Stance/internal calibration fields 不进入 REST OpenAPI、generated Web contract、Browser、WebSocket、logs、traces 或 errors。未来 AI caller 只在获批后由 server-side application service 按 session-bound version 为单一 assignment 加载最小 private context。
 - Published content/assignment/stance 采用 append-only application invariant；retirement 只影响未来 discovery。Session foreign key 使用 restrict/no-action historical semantics，禁止 mutable latest pointer 或 retirement cascade 改写历史。
-- 完整范围、schema、B～D caller/acceptance/testing 见 [`exec-plans/P1-2_question-persona-foundation.md`](exec-plans/P1-2_question-persona-foundation.md)。P1-2D independent verdict `PASS`，P1-2 `DONE`；P1-3 保持 not started / awaiting explicit approval。
+- 完整范围、schema、B～D caller/acceptance/testing 见 [`exec-plans/P1-2_question-persona-foundation.md`](exec-plans/P1-2_question-persona-foundation.md)。P1-2D independent verdict `PASS`，P1-2 `DONE`；其后的 P1-3A 已完成 docs-only design freeze。
+
+### P1-3 session state/timing architecture — design frozen, runtime not started
+
+- V0.1 implemented status path 冻结为 `CREATED -> PREPARATION -> OPENING_STATEMENTS -> EXPLORATION -> CONFLICT_AND_EVALUATION -> CONVERGENCE -> FINAL_SUMMARY -> COMPLETED`；`ABORTED_USER` 可从 `CREATED` 和全部 active phases 进入。
+- FastAPI/domain/PostgreSQL 是 state、timing、deadline 和 transition authority；Browser 只投影 snapshot + ordered formal events，不可指定 next state 或以 countdown 触发 transition。
+- P1-3B 计划向现有 session aggregate additive 增加 durable current phase start/deadline 和 server-resolved immutable duration plan；duration 是 typed server configuration，不硬编码 future mode parameters，也不接受 Browser duration。
+- 所有 user transition intent 继续使用 P1-1 stable `action_id`、semantic replay/conflict、session row lock、single transaction、durable sequence 和 commit-before-send。Deadline transition 是 nullable-causation system operation，以 exact status/deadline precondition 保证 concurrent callbacks 只提交一次。
+- Recovered phase arithmetic anchored to the previous durable deadline；reload/reconnect/restart 不重置 deadline，downtime catch-up 可按顺序推进多个 overdue phases。
+- Formal vocabulary 保持最小：`session.created` v1 与 `session.state_changed`。Historical abort v1 必须继续可读；P1-3 generalized state/timing payload 使用 event version 2，不静默改写旧 event。
+- In-process timer 只提供 wake-up/liveness；PostgreSQL deadline、row lock 和 event log 提供 correctness。Redis/queue、distributed scheduler 和 cross-process realtime fan-out 继续 Deferred。
+- `DEVICE_CHECK`、pause/system failure/partial completion 和 report lifecycle states 保留总纲长期语义但不进入 P1-3 handler。完整设计、B～D scope 和 stop conditions 见 [`exec-plans/P1-3_session-state-machine.md`](exec-plans/P1-3_session-state-machine.md)。
 
 ## Configuration, secrets and error boundaries
 
@@ -272,6 +283,7 @@ WebSocket 使用独立版本化事件契约，至少表达 event type、schema v
 - P0-4：真实 PostgreSQL integration/migration tests，不使用 SQLite 代替；
 - P1：WebSocket tests、fake provider tests、deterministic session/orchestrator regression；
 - P1-2：closed domain/schema validation、真实 PostgreSQL immutable-version/seed/history integration、private non-disclosure 和最小 browser vertical-slice regression；fake provider 仍等真实 provider caller；
+- P1-3：pure transition/timing tests、真实 PostgreSQL concurrency/deadline/restart recovery、historical event compatibility 和 authoritative Browser phase-flow regression；不以 Browser timer test 替代 server correctness；
 - P0-5D 已因真实跨应用 auth flow 加入 `@playwright/test 1.62.1`，只运行 Chromium，并由 test-only 编排器使用迁移后的隔离 `gia_p05d_*` PostgreSQL database；
 - 真实 LLM tests 必须显式执行，不进入默认 CI。
 
@@ -322,7 +334,7 @@ Redis 只在多 API workers、横向扩容、跨进程 WebSocket broadcast、dis
 - P0-5D：completed；真实 browser Cookie/CORS/CSRF 闭环已通过 Chromium 验证；
 - P0-5E：completed；final outcome `PASS after findings remediation and independent recheck`；
 - P0：`DONE`；P0-1～P0-7 completed；P0-7 finding-only independent recheck `PASS`，P1 readiness `READY`；其后用户已明确批准进入 P1；
-- P1：`IN_PROGRESS`；P1-1A～E 已完成且 verdict `PASS`；P1-2A～D 已完成 question/persona design、persistence/domain/seed、safe API/session/Web vertical slice 与 independent acceptance，P1-2 `DONE`；P1-3 not started / awaiting explicit approval，完整状态机、调度、记忆和基础报告仍需后续分别设计；
+- P1：`IN_PROGRESS`；P1-1A～E 已完成且 verdict `PASS`；P1-2A～D 已完成且 P1-2 `DONE`；P1-3A state/timing design freeze 已完成，P1-3 `IN_PROGRESS`，P1-3B not started / awaiting explicit approval；P1-4 调度、记忆和基础报告仍需后续分别批准；
 - P2 以后：只在对应阶段获批后增加语音、评分训练和商业化能力。
 
 ## 与其他文档关系

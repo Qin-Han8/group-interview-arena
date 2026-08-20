@@ -1,14 +1,14 @@
 # AI 候选人与讨论编排骨架
 
-- Status: P1-2 completed; persona foundation implemented; orchestrator/AI runtime deferred
+- Status: P1-2 completed; P1-3 state-machine design frozen; orchestrator/AI runtime deferred
 - Current phase: P1 — IN_PROGRESS
 - Target version: V0.1 Internal Validation
-- Detailed orchestrator/agent design: Not started; P1-1 and P1-2 completed; P1-3 awaiting explicit approval
+- Detailed orchestrator/agent design: P1-3A state/timing boundary completed docs-only; P1-3B awaiting explicit approval
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
 
-本文件未来定义 AI 候选人的参数化行为、私有立场、讨论状态机、发言权调度和结构化记忆。当前不包含 production Prompt、模型选择、可执行算法或代码。
+本文件记录已确认的 AI 候选人/私有立场基础和 P1-3A 已冻结的讨论状态机边界；发言权调度、结构化记忆和 AI runtime 仍待后续任务。当前不包含 production Prompt、模型选择、可执行算法或代码。
 
 ## Confirmed by PROJECT_MASTER_PLAN
 
@@ -140,6 +140,31 @@ P1-1A 冻结、P1-1B～D 已实现讨论会话的 persistence/backend transport 
 - `session.abort` 不要求 question/participant/utterance，因此可在不提前决定其 Schema 的前提下建立真实 vertical slice；
 - P1-1B persistence/migration foundation、P1-1C deterministic domain command service/REST/WebSocket 与 P1-1D authoritative Web projection/reconnect caller 已完成；`session.abort` 之外的状态机、讨论行为、角色与 AI 仍未实现。完整计划见 [`exec-plans/P1-1_discussion-session-foundation.md`](exec-plans/P1-1_discussion-session-foundation.md)。
 
+## P1-3A frozen state-machine boundary
+
+V0.1 current implemented path is frozen as:
+
+```text
+CREATED
+  -> PREPARATION
+  -> OPENING_STATEMENTS
+  -> EXPLORATION
+  -> CONFLICT_AND_EVALUATION
+  -> CONVERGENCE
+  -> FINAL_SUMMARY
+  -> COMPLETED
+```
+
+`session.start` 是唯一开始 intent；phase deadline 是唯一自动前进 trigger；Browser 没有 `advance`/`finish`/`set_state` 或 next-state input。`session.abort` 可从 `CREATED` 和任一 active timed phase 进入 `ABORTED_USER`。禁止跳阶段、倒退和从 `COMPLETED` / `ABORTED_USER` 返回 active discussion。
+
+`DEVICE_CHECK`、`PAUSED_NETWORK`、`PAUSED_SYSTEM`、`FAILED_SERVICE`、`COMPLETED_PARTIAL`、`REPORT_GENERATING`、`REPORTED` 保留总纲长期语义但在 P1-3 Deferred。未来 report lifecycle 只能从 discussion completion 单向扩展，不能 reopen discussion。
+
+每个 session 在 start 时由 server-owned typed configuration 冻结六个 active phases 的 duration plan；current `phase_started_at` / `phase_deadline_at` 持久化并使用 server UTC。Recovered phase start anchored to the previous deadline，so reload、reconnect、restart 或 callback delay 不增加额外时间。Browser countdown only displays the deadline and never owns expiry。
+
+Concurrent user/system transitions share the P1-1 aggregate row lock、durable action replay、monotonic sequence、single transaction and commit-before-send boundary。System timeout uses exact expected status/deadline and null action causation；before a user command is applied, overdue phases are reconciled in order。This makes duplicate timers、stale starts and timeout/abort races resolve to one ordered durable outcome。
+
+Formal event vocabulary remains `session.created` and `session.state_changed`。Historical abort event v1 remains readable；P1-3 state/timing transitions use generalized v2 payload。Full matrix、timing arithmetic、snapshot and P1-3B～D gates are in [`exec-plans/P1-3_session-state-machine.md`](exec-plans/P1-3_session-state-machine.md)。This design does not implement P1-4 floor scheduling or AI behavior。
+
 ## Implementation guidance
 
 - 大模型负责自然语言和受约束的局部语义决策；项目代码负责状态、时间、发言权、私有信息隔离、记忆和恢复。
@@ -152,7 +177,8 @@ P1-1A 冻结、P1-1B～D 已实现讨论会话的 persistence/backend transport 
 - TBD：标准模式 AI 发言人数和总时长（总纲第 37 节）；
 - TBD：具体 LLM 供应商（总纲第 37 节）；
 - TBD：P1-2B initial numeric seed 经过真实讨论后的校准方法和 blind-test threshold；
-- TBD：状态转换条件、调度公式和冲突循环阈值；
+- Confirmed for P1-3：V0.1 状态转换条件、abort 来源、deadline concurrency/recovery 语义；
+- TBD：P1-4 调度公式和冲突循环阈值；
 - TBD：结构化记忆和模型输出的正式 Schema；
 - TBD：角色盲测样本及通过标准的执行细节。
 
@@ -160,7 +186,7 @@ P1-1A 冻结、P1-1B～D 已实现讨论会话的 persistence/backend transport 
 
 ## Future work
 
-- P1：`IN_PROGRESS`；P1-1 session foundation 与 P1-2 question/persona foundation 均为 `DONE`；P1-2C safe public question/session caller 和 P1-2D independent acceptance 已完成。P1-3 not started / awaiting explicit approval；完整状态机、调度、记忆和 AI runtime 仍未开始并需后续批准。
+- P1：`IN_PROGRESS`；P1-1 session foundation 与 P1-2 question/persona foundation 均为 `DONE`；P1-3A state/timing design freeze 已完成 docs-only，P1-3 `IN_PROGRESS`，P1-3B not started / awaiting explicit approval；state-machine runtime、P1-4 调度、记忆和 AI runtime 仍未开始并需后续批准。
 - P2：加入语音、打断、播放停止和恢复语义。
 - P3：建立角色行为与评分证据之间的校准边界。
 - P6/V1.0：扩展到 6～8 种角色和压力模式。

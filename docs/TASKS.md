@@ -1,17 +1,17 @@
 # 当前任务清单
 
-- Status: P1 in progress; P1-1 and P1-2 completed; P1-3 not started
-- Managed scope: P1-2 closeout completed; no P1-3 implementation is approved
-- Most recently completed subphase: P1-2D — `DONE`
+- Status: P1 in progress; P1-1 and P1-2 completed; P1-3 design freeze completed
+- Managed scope: P1-3A docs-only design freeze completed; no P1-3B implementation is approved
+- Most recently completed subphase: P1-3A — `DONE`
 - P0-7 final outcome: initial verdict `BLOCKED` with two documentation findings; remediation completed; finding-only independent recheck `PASS`; new blockers none; P1 readiness `READY`
 - Current phase: P1 — `IN_PROGRESS`
 - Most recently completed task: P1-2 — `DONE`
-- Next task gate: P1-3 — `TODO` / not started / awaiting explicit user approval
+- Next task gate: P1-3B — `TODO` / not started / awaiting explicit user approval
 - P0 status: `DONE`; P0-1 through P0-7 completed
 - Allowed status values: `TODO` / `IN_PROGRESS` / `BLOCKED` / `DONE`
 - Related roadmap: [`ROADMAP.md`](ROADMAP.md)
 
-用户已明确批准正式进入 P1 以及 P1-2A～D；P1-2 已在独立验收 PASS 后完成。P1-3 未开始并等待单独明确批准，不提前展开完整状态机、调度、记忆、报告或 P2～P6。
+用户已明确批准正式进入 P1、P1-2A～D 和 P1-3；P1-2 已在独立验收 PASS 后完成，P1-3A docs-only design freeze 已完成。P1-3 保持 `IN_PROGRESS`，P1-3B 未开始并等待单独明确批准；不得提前实现 P1-4 调度、AI/participant/utterance、记忆、报告、语音、Redis/queue 或 P2～P6。
 
 ## P0-1 — 仓库与文档治理
 
@@ -460,7 +460,37 @@
 - 独立重跑 API 228 项 non-integration、53 项 PostgreSQL integration、281 项 full suite，Web 42 项 tests、lint/format/typecheck/build、OpenAPI drift、Alembic head/drift 与 2 项真实 Chromium E2E；required skips 为 0；
 - 复核 exact schema、published bundle insert-or-exact-match、deterministic seed/drift failure、retirement/history、Private Stance isolation、exact session version FK、auth/CSRF/ownership/WS/idempotency/reconnect regression 与 Deferred absence；无 blocker 或 material finding；
 - development PostgreSQL 验收前后均为 `f1a12b15c002` 且保持 18 rows，不用于 destructive fixture；disposable databases、ports `3000`/`8000` 与 E2E processes 均清理完成；
-- independent verdict `PASS`；P1-2D completed，P1-2 `DONE`，P1 保持 `IN_PROGRESS`；P1-3 not started / awaiting explicit approval。
+- independent verdict `PASS`；P1-2D completed，P1-2 `DONE`，P1 保持 `IN_PROGRESS`；在该 closeout checkpoint，P1-3 尚未开始，其后已获批并完成 P1-3A。
+
+## P1-3 — Session state machine
+
+- ID: `P1-3`
+- 名称：Session state machine
+- Status: `IN_PROGRESS`
+- Approval state：用户已明确批准 P1-3；P1-3A completed docs-only；P1-3B not started / awaiting explicit approval。
+- 目标：建立 V0.1 server-authoritative 单向 session phase state machine、durable timing/deadline、deterministic concurrent transition、ordered formal events 和 restart/reconnect recovery。
+- In scope：P1-3A design freeze；后续分别获批的 P1-3B backend state machine + durable phase foundation、P1-3C realtime/Web complete phase flow、P1-3D independent acceptance + closeout。
+- Out of scope：P1-4 floor scheduling、AI speaker selection、participant/utterance runtime、LLM/provider、memory、report/scoring、Redis/queue、voice/device check 和完整 pause/system-failure engine。
+- Dependencies：P1-1/P1-2 `DONE`；Accepted `D-003`、`D-008`、`ADR-003`、`ADR-005`～`ADR-015` 中相关边界；每个实施子步骤仍需用户明确批准。
+- Acceptance criteria：P1-3A～D 全部完成并经独立验收后，状态只能沿冻结路径或合法 abort 推进；并发/duplicate/stale/timeout races 只有一个 durable result；server UTC deadline 在 reload/reconnect/restart 后不重置不漂移；Browser 只投影 authoritative state/timing/sequence。
+
+### Substep progress
+
+- `P1-3A — Design freeze`：completed；docs-only；未修改 runtime/tests/schema/migrations/dependencies/lockfiles/CI；
+- `P1-3B — Backend state machine + durable phase foundation`：not started / awaiting explicit approval；
+- `P1-3C — Realtime/Web complete phase flow`：not started / awaiting explicit approval；
+- `P1-3D — Independent acceptance + closeout`：not started / awaiting explicit approval。
+
+### P1-3A completion note
+
+- 从 clean committed `main` HEAD `b775106` 恢复总纲、Accepted Decisions、P1-1/P1-2 actual source 和 session/API/database/Web 文档；总纲 SHA-256 保持 `2388A9660320406CB35D5354126AD71C6849A98DB7C4A356796CA951BF372F26`；
+- 冻结 V0.1 implemented path：`CREATED -> PREPARATION -> OPENING_STATEMENTS -> EXPLORATION -> CONFLICT_AND_EVALUATION -> CONVERGENCE -> FINAL_SUMMARY -> COMPLETED`，并保留合法 `ABORTED_USER`；
+- 冻结 exact transition matrix：无跳阶段、倒退、active reopening 或 Browser-specified next state；abort 来源为 `CREATED` 和全部 timed active phases；`COMPLETED` / `ABORTED_USER` 在 P1-3 为 terminal；
+- 冻结 server-owned duration plan、durable `phase_started_at` / `phase_deadline_at`、server UTC deadline arithmetic、overdue multi-phase catch-up 和 restart/reconnect no-drift semantics；
+- 冻结 `session.start` / `session.abort` user intent 与 internal deadline transition 分离；用户 command 复用 durable action identity，所有 transition 复用 row lock、single transaction、monotonic sequence 和 commit-before-send；
+- 冻结 formal vocabulary 为 `session.created` v1 + generalized `session.state_changed` v2，同时保留 historical v1 replay；snapshot additively 投影 current state/timing/`server_now`/sequence，Browser 不拥有状态机；
+- `DEVICE_CHECK`、pause/system failure/partial completion 和 report states 保留总纲长期语义但 Deferred；无 Proposed Decision 或 blocker；
+- 完整 B～D scope、acceptance、validation 和 stop conditions 见 [`exec-plans/P1-3_session-state-machine.md`](exec-plans/P1-3_session-state-machine.md)。
 
 ## 任务更新规则
 

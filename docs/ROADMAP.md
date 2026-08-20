@@ -2,11 +2,11 @@
 
 - Status: Active baseline
 - Most recently completed development phase: P0 — `DONE`
-- Most recently completed subphase: P1-2D — `DONE`
+- Most recently completed subphase: P1-3A — `DONE`
 - P0-7 final outcome: initial `BLOCKED`; two documentation findings remediated; finding-only independent recheck `PASS`; P1 readiness `READY`
 - Current phase: P1 — `IN_PROGRESS`
-- Most recently completed task: P1-2 — `DONE`
-- Next task gate: P1-3 — `NOT_STARTED` / awaiting explicit user approval
+- Most recently completed task: P1-2 — `DONE`; P1-3 remains `IN_PROGRESS`
+- Next task gate: P1-3B — `NOT_STARTED` / awaiting explicit user approval
 - P0 status: `DONE`; P0-1 through P0-7 completed
 - Target product version: V0.1 — Internal Validation
 - Source: [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) §30–31
@@ -18,7 +18,7 @@
 - `P0～P6`：研发推进阶段，描述按什么顺序建立能力；
 - `V0.1 / V0.5 / V1.0`：产品交付版本，描述某个可验证版本包含什么。
 
-阶段不是版本，P0-x/P1-x 也不是新增产品版本。P0 已完成不代表 V0.1 的全部业务能力已经实现；用户已明确批准进入 P1 和 P1-2A～D，P1-2 已在 independent verdict `PASS` 后完成。P1 继续 `IN_PROGRESS`，P1-3 尚未获准开始。
+阶段不是版本，P0-x/P1-x 也不是新增产品版本。P0 已完成不代表 V0.1 的全部业务能力已经实现；用户已明确批准进入 P1、P1-2A～D 和 P1-3。P1-2 已在 independent verdict `PASS` 后完成；P1-3A docs-only design freeze 已完成，P1/P1-3 继续 `IN_PROGRESS`，P1-3B 尚未获准开始。
 
 ## 2. 开发阶段
 
@@ -75,7 +75,16 @@ P1-1A 完成 docs-only plan/scope freeze；P1-1B 完成三表 ORM/migration 与�
 - `P1-2C — API + Session integration + minimal Web vertical slice`：completed；
 - `P1-2D — Independent acceptance + closeout`：completed；independent verdict `PASS`。
 
-P1-2A 已冻结 stable Question Template、immutable published Question Version、stable-behavior Persona Template、version-specific Assignment/Private Stance、session version binding、private non-disclosure、numeric validation、retirement/deletion 和历史追溯边界，并确认 V0.1 四种基础角色。P1-2B 已实现精确五表 persistence、linear migration、strict closed domain validation、四 Persona deterministic seed 和一个明确标记的 internal-validation bundle。P1-2C 已实现 authenticated safe question reads、exact immutable version-bound session creation、authoritative snapshot 与最小 Web 选题/题面 vertical slice。P1-2D 从 clean committed source 独立复现 PostgreSQL/Chromium/full gates，verdict `PASS`、无 blocker/material finding。P1-2 现为 `DONE`；P1 保持 `IN_PROGRESS`，P1-3 not started / awaiting explicit approval。完整 scope/gates 见 [`exec-plans/P1-2_question-persona-foundation.md`](exec-plans/P1-2_question-persona-foundation.md)。Participant/utterance、完整状态机/调度/记忆、LLM/provider 和基础报告继续留给后续获批任务。
+P1-2A 已冻结 stable Question Template、immutable published Question Version、stable-behavior Persona Template、version-specific Assignment/Private Stance、session version binding、private non-disclosure、numeric validation、retirement/deletion 和历史追溯边界，并确认 V0.1 四种基础角色。P1-2B 已实现精确五表 persistence、linear migration、strict closed domain validation、四 Persona deterministic seed 和一个明确标记的 internal-validation bundle。P1-2C 已实现 authenticated safe question reads、exact immutable version-bound session creation、authoritative snapshot 与最小 Web 选题/题面 vertical slice。P1-2D 从 clean committed source 独立复现 PostgreSQL/Chromium/full gates，verdict `PASS`、无 blocker/material finding。P1-2 现为 `DONE`；P1 保持 `IN_PROGRESS`，其后的 P1-3A 已完成。完整 scope/gates 见 [`exec-plans/P1-2_question-persona-foundation.md`](exec-plans/P1-2_question-persona-foundation.md)。Participant/utterance、调度/记忆、LLM/provider 和基础报告继续留给后续获批任务。
+
+`P1-3 — Session state machine` 固定为四阶段：
+
+- `P1-3A — Design freeze`：completed；docs-only；
+- `P1-3B — Backend state machine + durable phase foundation`：not started / awaiting explicit approval；
+- `P1-3C — Realtime/Web complete phase flow`：not started / awaiting explicit approval；
+- `P1-3D — Independent acceptance + closeout`：not started / awaiting explicit approval。
+
+P1-3A 已冻结 V0.1 单向 path、合法 abort、server-authoritative transition matrix、server-owned immutable duration plan、durable phase start/deadline、deadline-first concurrent reconciliation、P1-1 action/sequence/transaction/commit-before-send 复用、historical v1 + current v2 formal state events，以及 Browser 只投影 state/timing/sequence 的边界。总纲长期 `DEVICE_CHECK`、pause/failure/partial/report states 继续 Deferred；P1-4 floor scheduling、participant/utterance、AI/LLM、memory、report/scoring、Redis/queue 和 voice 均未开始。完整 scope/gates 见 [`exec-plans/P1-3_session-state-machine.md`](exec-plans/P1-3_session-state-machine.md)。
 
 ## 5. 产品版本
 

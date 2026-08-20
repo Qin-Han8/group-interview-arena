@@ -1,9 +1,9 @@
 # 产品需求文档骨架
 
-- Status: Skeleton / Baseline
-- Current phase: P0
+- Status: Baseline + P1-3 session-flow design freeze
+- Current phase: P1 — IN_PROGRESS
 - Target version: V0.1 Internal Validation
-- Detailed design: Not started
+- Detailed design: P1-3A session state/timing flow frozen; broader PRD remains incremental
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -45,7 +45,16 @@ V0.1 的目标是验证多角色讨论和状态机，不公开收费。
 - 压力事件；
 - 行业题包。
 
-当前 P0-1 只建立文档治理，不实现上述任何 V0.1 业务能力。
+当前 P1 已实现 P1-1 session foundation 与 P1-2 question/persona foundation；P1-3A 只冻结 session phase/timing design，尚未实现完整 V0.1 讨论闭环。
+
+## P1-3A confirmed session-flow boundary
+
+- V0.1 text flow uses `CREATED -> PREPARATION -> OPENING_STATEMENTS -> EXPLORATION -> CONFLICT_AND_EVALUATION -> CONVERGENCE -> FINAL_SUMMARY -> COMPLETED`；device check remains a later voice concern。
+- User can start a created session or abort a created/active session；the user cannot skip、reverse or choose a destination phase。
+- Active phase duration is configurable by the server and frozen per session；reload、reconnect or server restart does not reset the authoritative deadline。
+- Browser displays server-authoritative phase/timing/sequence and a display-only countdown；it does not own the state machine。
+- Long-term pause、service-failure、partial-completion and report lifecycle states remain Deferred；P1-3 does not invent placeholder user flows for them。
+- P1-4 floor scheduling、AI/participant/utterance、memory、report/scoring and voice remain separate future work。
 
 ## Implementation guidance
 

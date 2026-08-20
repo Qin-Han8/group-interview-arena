@@ -1,6 +1,6 @@
 # 数据库技术基线
 
-- Status: P0 Data Architecture Baseline + P1-1 completed + P1-2B schema implemented
+- Status: P0 Data Architecture Baseline + P1-1/P1-2 schema implemented + P1-3 data design frozen
 - Current phase: P1 — IN_PROGRESS
 - Data architecture baseline established by: P0-2 — DONE
 - Local PostgreSQL infrastructure: P0-4B — completed
@@ -15,7 +15,7 @@
 - Target version: V0.1 Internal Validation
 - Business schema: identity, P1-1 session foundation and P1-2B question/persona foundation (ten product tables)
 - P1-1 status: P1-1A～E completed; independent final verdict PASS; P1-1 DONE
-- P1-2 status: DONE; P1-2A through P1-2D completed; independent verdict PASS; P1-3 not started / awaiting explicit approval
+- P1-2 status: DONE; P1-3 IN_PROGRESS; P1-3A completed docs-only; P1-3B not started / awaiting explicit approval
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -292,6 +292,24 @@ P1-2B table set 是既有五张加上述五张，共十张；没有增加 partic
 
 Publication service 对新 version/new assignment 先拒绝 retired Question Template 或 Persona Template；若 immutable bundle 已经存在且 exact-match，则在后续 retirement 后仍保持 no-op，以保留 deterministic seed 和历史解析语义。
 
+## P1-3 durable phase data design — frozen, not implemented
+
+P1-3A 根据 actual ten-table source 冻结 additive session model；当前 Alembic head、ORM 和 development database 尚未包含以下 columns。P1-3B 获批后才可实现：
+
+- `simulation_sessions.phase_started_at TIMESTAMPTZ NULL`：current timed phase 的 effective start；
+- `simulation_sessions.phase_deadline_at TIMESTAMPTZ NULL`：current timed phase 的 authoritative server UTC deadline；
+- `simulation_sessions.phase_duration_plan JSONB NULL`：在 accepted `session.start` 时由 server config 解析并冻结的 closed six-phase positive-integer seconds map。
+
+`CREATED` 和既有 legacy rows 可以全部为 null；started active sessions 必须由 application invariant 保持三者完整，terminal `COMPLETED` / `ABORTED_USER` 清空 current start/deadline 但保留 immutable plan。数据库继续使用 evolvable `status VARCHAR`，不增加把当前状态集合永久锁死的 PostgreSQL native enum。
+
+Duration plan 是特定用途、closed-schema domain value，不是 generic metadata；Browser、ordinary logs/traces/errors 和 formal event payload 不接收完整 plan。它用于保证 app restart/config change 后未来 phase duration 仍由 session-start 时已冻结的配置决定。
+
+Phase history 不另建 speculative table：现有 `discussion_events` 以 ordered `session.state_changed` v2 保存每次 effective start/deadline，current row 保存当前 projection。Historical v1 abort event 保持原样可读，不执行 data rewrite。
+
+Deadline transition 继续锁定 `simulation_sessions` row，并在同一 transaction 内更新 status/current timing/`last_sequence`、插入所有 ordered events。System deadline events 使用 null causation；user start/abort events 关联现有 durable action。Concurrent timeout 以 exact expected status/deadline precondition 只成功一次；network send 仍在 commit 后。
+
+完整 migration、catalog、rollback、concurrency、restart recovery 和 B～D acceptance 见 [`exec-plans/P1-3_session-state-machine.md`](exec-plans/P1-3_session-state-machine.md)。
+
 ## Future business schema
 
 总纲提到 `users`、题目版本、角色模板、会话、参与者、阶段、发言、讨论事件、结构化记忆、报告、证据、训练、反馈、模型调用和审计等未来领域概念。
@@ -319,7 +337,7 @@ Publication service 对新 version/new assignment 先拒绝 retired Question Tem
 
 - P0-5C：FastAPI lifespan/request dependency 已成为现有 async DB runtime 的第一个 application caller；真实 PostgreSQL auth integration 只使用迁移到 head 的隔离临时数据库，development DB 保持 head `4fe43b42641b` 且两张表均为 0 rows；
 - P0-5D：completed；browser closure 已实现，existing Cookie/CORS/CSRF/shared trusted-origin boundary 已生效；P1 不得创建第二套 trusted-origin config；
-- P1：`IN_PROGRESS`；P1-1/P1-2 `DONE`；P1-2A～D completed，current migration head `f1a12b15c002`、精确十张 product tables，independent PostgreSQL verdict `PASS`；P1-3 not started / awaiting explicit approval；participant/utterance、记忆和报告继续留给后续获批任务；
+- P1：`IN_PROGRESS`；P1-1/P1-2 `DONE`；current migration head `f1a12b15c002`、精确十张 product tables，independent PostgreSQL verdict `PASS`；P1-3A durable phase data design 已冻结但未实现，P1-3B not started / awaiting explicit approval；participant/utterance、记忆和报告继续留给后续获批任务；
 - P2～P4：仅随获批范围增加音频、评分训练和商业化数据。
 
 ## 与其他文档关系

@@ -1,6 +1,6 @@
 # P1-2 Question & Persona Foundation Execution Plan
 
-Status: `P1 IN_PROGRESS`; `P1-2 DONE`; `P1-2A` through `P1-2D completed`; independent final verdict `PASS`; `P1-3 not started / awaiting explicit approval`
+Status: `P1-2 DONE`; `P1-2A` through `P1-2D completed`; independent final verdict `PASS`; at P1-2 closeout P1-3 was not started, and P1-3A subsequently completed
 
 Target version: `V0.1 Internal Validation`
 
@@ -304,4 +304,4 @@ The 12 formal V0.1 questions are Deferred. To give P1-2C a real caller, P1-2B ma
 - [x] P1-2B implementation and risk-matched validation completed。
 - [x] P1-2C safe API、immutable session binding、minimal Web caller and risk-matched validation completed。
 - [x] P1-2D independent final acceptance completed；verdict `PASS`；findings 无 blocker/material item。
-- [x] P1-2 `DONE`；P1 remains `IN_PROGRESS`；P1-3 not started / awaiting explicit approval。
+- [x] P1-2 `DONE`；P1 remained `IN_PROGRESS`；at this closeout checkpoint P1-3 was not started；P1-3A subsequently completed under its own plan。
