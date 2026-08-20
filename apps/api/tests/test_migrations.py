@@ -12,6 +12,7 @@ BASELINE_REVISION = "7c6ccd86b3c5"
 IDENTITY_REVISION = "4fe43b42641b"
 SESSION_FOUNDATION_REVISION = "f1a11d15c001"
 QUESTION_PERSONA_FOUNDATION_REVISION = "f1a12b15c002"
+SESSION_PHASE_TIMING_REVISION = "f1a13b15c003"
 
 
 def _alembic_config() -> Config:
@@ -28,15 +29,17 @@ def test_alembic_config_uses_project_migration_directory_without_url() -> None:
     assert config.get_main_option("sqlalchemy.url") is None
 
 
-def test_migration_history_is_linear_with_single_question_persona_head() -> None:
+def test_migration_history_is_linear_with_single_session_phase_timing_head() -> None:
     script = ScriptDirectory.from_config(_alembic_config())
     baseline = script.get_revision(BASELINE_REVISION)
     identity = script.get_revision(IDENTITY_REVISION)
     session_foundation = script.get_revision(SESSION_FOUNDATION_REVISION)
     question_persona = script.get_revision(QUESTION_PERSONA_FOUNDATION_REVISION)
+    session_phase_timing = script.get_revision(SESSION_PHASE_TIMING_REVISION)
 
-    assert script.get_heads() == [QUESTION_PERSONA_FOUNDATION_REVISION]
+    assert script.get_heads() == [SESSION_PHASE_TIMING_REVISION]
     assert [revision.revision for revision in script.walk_revisions()] == [
+        SESSION_PHASE_TIMING_REVISION,
         QUESTION_PERSONA_FOUNDATION_REVISION,
         SESSION_FOUNDATION_REVISION,
         IDENTITY_REVISION,
@@ -58,6 +61,10 @@ def test_migration_history_is_linear_with_single_question_persona_head() -> None
     assert question_persona.down_revision == SESSION_FOUNDATION_REVISION
     assert question_persona.branch_labels == set()
     assert question_persona.dependencies is None
+    assert session_phase_timing.revision == SESSION_PHASE_TIMING_REVISION
+    assert session_phase_timing.down_revision == QUESTION_PERSONA_FOUNDATION_REVISION
+    assert session_phase_timing.branch_labels == set()
+    assert session_phase_timing.dependencies is None
 
 
 def test_baseline_upgrade_and_downgrade_are_zero_op() -> None:

@@ -1,6 +1,7 @@
+import json
 import logging
 from datetime import UTC, datetime
-from typing import Annotated
+from typing import Annotated, cast
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Query, WebSocket
@@ -23,7 +24,9 @@ from group_interview_arena_api.identity.service import (
 from group_interview_arena_api.modules.discussion_sessions.contracts import (
     FormalEventEnvelope,
     RealtimeErrorCode,
+    RealtimeSessionCommand,
     SessionAbortCommand,
+    SessionStartCommand,
     WsErrorDetail,
     WsErrorEnvelope,
 )
@@ -51,6 +54,19 @@ _ERROR_MESSAGES: dict[RealtimeErrorCode, str] = {
     "SEQUENCE_AHEAD": "Session history must be reloaded.",
     "INTERNAL_ERROR": "An internal error occurred.",
 }
+
+
+def _parse_command(text: str) -> RealtimeSessionCommand:
+    raw = json.loads(text)
+    if not isinstance(raw, dict):
+        raise ValueError("Realtime command must be an object.")
+    payload = cast(dict[str, object], raw)
+    command_type = payload.get("type")
+    if command_type == "session.abort":
+        return SessionAbortCommand.model_validate(payload)
+    if command_type == "session.start":
+        return SessionStartCommand.model_validate(payload)
+    raise ValueError("Unsupported realtime command.")
 
 
 def _formal_event(event: StoredEvent) -> FormalEventEnvelope:
@@ -233,8 +249,8 @@ def create_realtime_router(settings: Settings) -> APIRouter:
                     return
 
                 try:
-                    parsed = SessionAbortCommand.model_validate_json(text)
-                except ValidationError:
+                    parsed = _parse_command(text)
+                except json.JSONDecodeError, ValidationError, ValueError:
                     await _send_error(
                         websocket,
                         code="PROTOCOL_ERROR",
@@ -279,6 +295,9 @@ def create_realtime_router(settings: Settings) -> APIRouter:
                             session,
                             owner_id=user.user_id,
                             command=command,
+                            duration_plan=(
+                                settings.session_phase_durations.to_duration_plan()
+                            ),
                         )
                 except InvalidSessionStateError:
                     await _send_error(

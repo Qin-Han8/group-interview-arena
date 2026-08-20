@@ -1,6 +1,7 @@
 import asyncio
 from collections.abc import Callable, Coroutine
 from contextlib import asynccontextmanager
+from datetime import timedelta
 from typing import Any, Protocol
 from uuid import UUID, uuid4
 
@@ -24,8 +25,10 @@ from group_interview_arena_api.modules.discussion_sessions import service
 from group_interview_arena_api.modules.discussion_sessions.domain import (
     InvalidSessionStateError,
     PendingEvent,
+    PhaseDurationPlan,
     SessionCommand,
     SessionCommandOutcome,
+    SessionSnapshot,
     SessionStatus,
 )
 from group_interview_arena_api.modules.discussion_sessions.service import (
@@ -41,6 +44,16 @@ from group_interview_arena_api.modules.question_personas.seed import (
 )
 
 pytestmark = pytest.mark.integration
+PLAN = PhaseDurationPlan.from_seconds(
+    {
+        SessionStatus.PREPARATION: 1,
+        SessionStatus.OPENING_STATEMENTS: 2,
+        SessionStatus.EXPLORATION: 3,
+        SessionStatus.CONFLICT_AND_EVALUATION: 4,
+        SessionStatus.CONVERGENCE: 5,
+        SessionStatus.FINAL_SUMMARY: 6,
+    }
+)
 
 
 class TemporaryDatabaseContext(Protocol):
@@ -91,6 +104,16 @@ def _abort(session_id: UUID, action_id: UUID | None = None) -> SessionCommand:
     )
 
 
+def _start(session_id: UUID, action_id: UUID | None = None) -> SessionCommand:
+    return SessionCommand(
+        schema_version=1,
+        command_type="session.start",
+        session_id=session_id,
+        action_id=action_id or uuid4(),
+        payload={},
+    )
+
+
 async def _verify_creation_and_owner_snapshot(
     temporary_database: TemporaryDatabaseContext,
 ) -> None:
@@ -108,6 +131,9 @@ async def _verify_creation_and_owner_snapshot(
         assert snapshot.status is SessionStatus.CREATED
         assert snapshot.last_sequence == 1
         assert snapshot.question_version_id == INTERNAL_VALIDATION_BUNDLE.version_id
+        assert snapshot.phase_started_at is None
+        assert snapshot.phase_deadline_at is None
+        assert snapshot.server_now >= snapshot.updated_at
         assert snapshot.created_at == snapshot.updated_at
 
         async with session_factory() as session:
@@ -116,7 +142,18 @@ async def _verify_creation_and_owner_snapshot(
                 owner_id=owner_id,
                 session_id=snapshot.session_id,
             )
-            assert loaded == snapshot
+            assert loaded.server_now >= snapshot.server_now
+            assert loaded == SessionSnapshot(
+                session_id=snapshot.session_id,
+                question_version_id=snapshot.question_version_id,
+                status=snapshot.status,
+                phase_started_at=snapshot.phase_started_at,
+                phase_deadline_at=snapshot.phase_deadline_at,
+                server_now=loaded.server_now,
+                created_at=snapshot.created_at,
+                updated_at=snapshot.updated_at,
+                last_sequence=snapshot.last_sequence,
+            )
             event = await session.scalar(
                 select(DiscussionEvent).where(
                     DiscussionEvent.session_id == snapshot.session_id
@@ -307,6 +344,7 @@ async def _verify_multi_event_reservation_and_rollback(
         def two_event_outcome(
             _status: SessionStatus,
             _command: SessionCommand,
+            **_kwargs: object,
         ) -> SessionCommandOutcome:
             return SessionCommandOutcome(
                 status=SessionStatus.ABORTED_USER,
@@ -348,6 +386,7 @@ async def _verify_multi_event_reservation_and_rollback(
         def unserializable_outcome(
             _status: SessionStatus,
             _command: SessionCommand,
+            **_kwargs: object,
         ) -> SessionCommandOutcome:
             return SessionCommandOutcome(
                 status=SessionStatus.ABORTED_USER,
@@ -399,3 +438,223 @@ def test_multi_event_reservation_is_contiguous_and_failure_rolls_back(
             monkeypatch,
         )
     )
+
+
+async def _verify_start_timing_and_duplicate_replay(
+    temporary_database: TemporaryDatabaseContext,
+) -> None:
+    async with _session_factory(temporary_database) as session_factory:
+        owner_id = await _seed_user(session_factory)
+        async with session_factory() as session:
+            snapshot = await create_session(
+                session,
+                owner_id=owner_id,
+                question_version_id=INTERNAL_VALIDATION_BUNDLE.version_id,
+            )
+
+        action_id = uuid4()
+        command = _start(snapshot.session_id, action_id)
+        async with session_factory() as session:
+            accepted = await apply_session_command(
+                session,
+                owner_id=owner_id,
+                command=command,
+                duration_plan=PLAN,
+            )
+        async with session_factory() as session:
+            duplicate = await apply_session_command(
+                session,
+                owner_id=owner_id,
+                command=command,
+                duration_plan=PLAN,
+            )
+
+        assert accepted == duplicate
+        assert [event.sequence for event in accepted] == [2]
+        assert accepted[0].event_version == 2
+        assert accepted[0].payload["trigger"] == "USER_START"
+        assert accepted[0].payload["status"] == "PREPARATION"
+
+        async with session_factory() as session:
+            persisted = await session.get(SimulationSession, snapshot.session_id)
+            assert persisted is not None
+            assert persisted.status == "PREPARATION"
+            assert persisted.phase_started_at is not None
+            assert persisted.phase_deadline_at is not None
+            assert (
+                persisted.phase_deadline_at
+                == persisted.phase_started_at + timedelta(seconds=1)
+            )
+            assert persisted.phase_duration_plan == PLAN.to_json()
+            assert persisted.last_sequence == 2
+
+        async with session_factory() as session:
+            with pytest.raises(InvalidSessionStateError):
+                await apply_session_command(
+                    session,
+                    owner_id=owner_id,
+                    command=_start(snapshot.session_id),
+                    duration_plan=PLAN,
+                )
+
+
+def test_start_freezes_timing_and_duplicate_replays_persisted_result(
+    migrated_database: TemporaryDatabaseContext,
+) -> None:
+    run_async(lambda: _verify_start_timing_and_duplicate_replay(migrated_database))
+
+
+async def _verify_deadline_reconciliation_and_abort_precedence(
+    temporary_database: TemporaryDatabaseContext,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async with _session_factory(temporary_database) as session_factory:
+        owner_id = await _seed_user(session_factory)
+        async with session_factory() as session:
+            snapshot = await create_session(
+                session,
+                owner_id=owner_id,
+                question_version_id=INTERNAL_VALIDATION_BUNDLE.version_id,
+            )
+        async with session_factory() as session:
+            await apply_session_command(
+                session,
+                owner_id=owner_id,
+                command=_start(snapshot.session_id),
+                duration_plan=PLAN,
+            )
+
+        async with session_factory() as session:
+            persisted = await session.get(SimulationSession, snapshot.session_id)
+            assert persisted is not None
+            assert persisted.phase_deadline_at is not None
+            before_deadline = persisted.phase_deadline_at - timedelta(microseconds=1)
+
+        monkeypatch.setattr(service, "_utc_now", lambda: before_deadline)
+        async with session_factory() as session:
+            abort_before = await apply_session_command(
+                session,
+                owner_id=owner_id,
+                command=_abort(snapshot.session_id),
+                duration_plan=PLAN,
+            )
+        assert abort_before[0].payload["trigger"] == "USER_ABORT"
+
+        async with session_factory() as session:
+            completed_snapshot = await create_session(
+                session,
+                owner_id=owner_id,
+                question_version_id=INTERNAL_VALIDATION_BUNDLE.version_id,
+            )
+        async with session_factory() as session:
+            await apply_session_command(
+                session,
+                owner_id=owner_id,
+                command=_start(completed_snapshot.session_id),
+                duration_plan=PLAN,
+            )
+        async with session_factory() as session:
+            persisted = await session.get(
+                SimulationSession, completed_snapshot.session_id
+            )
+            assert persisted is not None
+            assert persisted.phase_started_at is not None
+            after_all_deadlines = persisted.phase_started_at + timedelta(seconds=21)
+
+        monkeypatch.setattr(service, "_utc_now", lambda: after_all_deadlines)
+        async with session_factory() as session:
+            with pytest.raises(InvalidSessionStateError):
+                await apply_session_command(
+                    session,
+                    owner_id=owner_id,
+                    command=_abort(completed_snapshot.session_id),
+                    duration_plan=PLAN,
+                )
+
+        async with session_factory() as session:
+            persisted = await session.get(
+                SimulationSession, completed_snapshot.session_id
+            )
+            assert persisted is not None
+            assert persisted.status == "COMPLETED"
+            assert persisted.phase_started_at is None
+            assert persisted.phase_deadline_at is None
+            assert persisted.last_sequence == 8
+            events = list(
+                (
+                    await session.scalars(
+                        select(DiscussionEvent)
+                        .where(
+                            DiscussionEvent.session_id == completed_snapshot.session_id
+                        )
+                        .order_by(DiscussionEvent.sequence)
+                    )
+                ).all()
+            )
+            assert [event.sequence for event in events] == list(range(1, 9))
+            assert events[-1].causation_action_id is None
+            assert events[-1].payload["status"] == "COMPLETED"
+
+
+def test_deadline_reconciliation_is_deterministic_around_abort(
+    migrated_database: TemporaryDatabaseContext,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run_async(
+        lambda: _verify_deadline_reconciliation_and_abort_precedence(
+            migrated_database,
+            monkeypatch,
+        )
+    )
+
+
+async def _verify_concurrent_start_allows_one_winner(
+    temporary_database: TemporaryDatabaseContext,
+) -> None:
+    async with _session_factory(temporary_database) as session_factory:
+        owner_id = await _seed_user(session_factory)
+        async with session_factory() as session:
+            snapshot = await create_session(
+                session,
+                owner_id=owner_id,
+                question_version_id=INTERNAL_VALIDATION_BUNDLE.version_id,
+            )
+
+        async def apply(command: SessionCommand):
+            async with session_factory() as session:
+                return await apply_session_command(
+                    session,
+                    owner_id=owner_id,
+                    command=command,
+                    duration_plan=PLAN,
+                )
+
+        results = await asyncio.gather(
+            apply(_start(snapshot.session_id)),
+            apply(_start(snapshot.session_id)),
+            return_exceptions=True,
+        )
+        assert sum(isinstance(result, list) for result in results) == 1
+        assert (
+            sum(isinstance(result, InvalidSessionStateError) for result in results) == 1
+        )
+
+        async with session_factory() as session:
+            persisted = await session.get(SimulationSession, snapshot.session_id)
+            assert persisted is not None
+            assert persisted.status == "PREPARATION"
+            assert persisted.last_sequence == 2
+            assert (
+                await session.scalar(
+                    select(func.count())
+                    .select_from(SessionAction)
+                    .where(SessionAction.session_id == snapshot.session_id)
+                )
+                == 1
+            )
+
+
+def test_concurrent_distinct_start_actions_have_one_committed_winner(
+    migrated_database: TemporaryDatabaseContext,
+) -> None:
+    run_async(lambda: _verify_concurrent_start_allows_one_winner(migrated_database))

@@ -157,6 +157,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sessions/{session_id}/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start */
+        post: operations["start_sessions__session_id__start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -175,7 +192,7 @@ export interface components {
          * ErrorCode
          * @enum {string}
          */
-        ErrorCode: "NOT_FOUND" | "VALIDATION_ERROR" | "INTERNAL_ERROR" | "INVALID_USERNAME" | "INVALID_PASSWORD" | "USERNAME_UNAVAILABLE" | "INVALID_CREDENTIALS" | "AUTHENTICATION_REQUIRED" | "CSRF_REJECTED" | "SESSION_NOT_FOUND" | "QUESTION_NOT_FOUND";
+        ErrorCode: "NOT_FOUND" | "VALIDATION_ERROR" | "INTERNAL_ERROR" | "INVALID_USERNAME" | "INVALID_PASSWORD" | "USERNAME_UNAVAILABLE" | "INVALID_CREDENTIALS" | "AUTHENTICATION_REQUIRED" | "CSRF_REJECTED" | "SESSION_NOT_FOUND" | "QUESTION_NOT_FOUND" | "INVALID_SESSION_STATE" | "ACTION_ID_CONFLICT";
         /** ErrorDetail */
         ErrorDetail: {
             code: components["schemas"]["ErrorCode"];
@@ -321,6 +338,15 @@ export interface components {
             /** Question Version Id */
             question_version_id: string | null;
             status: components["schemas"]["SessionStatus"];
+            /** Phase Started At */
+            phase_started_at: string | null;
+            /** Phase Deadline At */
+            phase_deadline_at: string | null;
+            /**
+             * Server Now
+             * Format: date-time
+             */
+            server_now: string;
             /**
              * Created At
              * Format: date-time
@@ -334,11 +360,19 @@ export interface components {
             /** Last Sequence */
             last_sequence: number;
         };
+        /** SessionStartRequest */
+        SessionStartRequest: {
+            /**
+             * Action Id
+             * Format: uuid4
+             */
+            action_id: string;
+        };
         /**
          * SessionStatus
          * @enum {string}
          */
-        SessionStatus: "CREATED" | "ABORTED_USER";
+        SessionStatus: "CREATED" | "PREPARATION" | "OPENING_STATEMENTS" | "EXPLORATION" | "CONFLICT_AND_EVALUATION" | "CONVERGENCE" | "FINAL_SUMMARY" | "COMPLETED" | "ABORTED_USER";
     };
     responses: never;
     parameters: never;
@@ -743,6 +777,89 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    start_sessions__session_id__start_post: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Required first-party browser request marker. */
+                "X-GIA-CSRF": "1";
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SessionStartRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionSnapshotResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

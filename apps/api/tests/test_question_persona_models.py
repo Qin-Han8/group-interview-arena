@@ -153,4 +153,4 @@ def test_session_version_reference_is_nullable_restrict_without_index() -> None:
         for index in table.indexes
         if isinstance(index, Index)
     )
-    assert sum(isinstance(item, CheckConstraint) for item in table.constraints) == 1
+    assert sum(isinstance(item, CheckConstraint) for item in table.constraints) == 4

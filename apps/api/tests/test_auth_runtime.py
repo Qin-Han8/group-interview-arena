@@ -190,6 +190,7 @@ def test_openapi_generation_is_database_environment_independent(
         "/questions/{question_version_id}",
         "/sessions",
         "/sessions/{session_id}",
+        "/sessions/{session_id}/start",
     }
     security_schemes = schema["components"]["securitySchemes"]
     assert security_schemes == {

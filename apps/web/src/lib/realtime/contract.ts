@@ -8,7 +8,18 @@ export type SessionCreatedEvent = {
   payload: { status: "CREATED" };
 };
 
-export type SessionStateChangedEvent = {
+type SessionStatus =
+  | "CREATED"
+  | "PREPARATION"
+  | "OPENING_STATEMENTS"
+  | "EXPLORATION"
+  | "CONFLICT_AND_EVALUATION"
+  | "CONVERGENCE"
+  | "FINAL_SUMMARY"
+  | "COMPLETED"
+  | "ABORTED_USER";
+
+export type SessionStateChangedV1Event = {
   schema_version: 1;
   type: "session.state_changed";
   session_id: string;
@@ -20,6 +31,25 @@ export type SessionStateChangedEvent = {
     status: "ABORTED_USER";
   };
 };
+
+export type SessionStateChangedV2Event = {
+  schema_version: 2;
+  type: "session.state_changed";
+  session_id: string;
+  sequence: number;
+  occurred_at: string;
+  action_id: string | null;
+  payload: {
+    previous_status: SessionStatus;
+    status: SessionStatus;
+    trigger: "USER_START" | "USER_ABORT" | "PHASE_DEADLINE";
+    phase_started_at: string | null;
+    phase_deadline_at: string | null;
+  };
+};
+
+export type SessionStateChangedEvent =
+  SessionStateChangedV1Event | SessionStateChangedV2Event;
 
 export type FormalSessionEvent = SessionCreatedEvent | SessionStateChangedEvent;
 
@@ -62,6 +92,25 @@ const ERROR_CODES = new Set<RealtimeErrorCode>([
   "SEQUENCE_AHEAD",
   "INTERNAL_ERROR",
 ]);
+const SESSION_STATUSES = new Set<SessionStatus>([
+  "CREATED",
+  "PREPARATION",
+  "OPENING_STATEMENTS",
+  "EXPLORATION",
+  "CONFLICT_AND_EVALUATION",
+  "CONVERGENCE",
+  "FINAL_SUMMARY",
+  "COMPLETED",
+  "ABORTED_USER",
+]);
+const ACTIVE_STATUSES = new Set<SessionStatus>([
+  "PREPARATION",
+  "OPENING_STATEMENTS",
+  "EXPLORATION",
+  "CONFLICT_AND_EVALUATION",
+  "CONVERGENCE",
+  "FINAL_SUMMARY",
+]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -88,11 +137,44 @@ function isAwareTimestamp(value: unknown): value is string {
 }
 
 function hasEnvelopeIdentity(value: Record<string, unknown>) {
+  return isUuid4(value.session_id) && isAwareTimestamp(value.occurred_at);
+}
+
+function isSessionStatus(value: unknown): value is SessionStatus {
   return (
-    value.schema_version === 1 &&
-    isUuid4(value.session_id) &&
-    isAwareTimestamp(value.occurred_at)
+    typeof value === "string" && SESSION_STATUSES.has(value as SessionStatus)
   );
+}
+
+function isV2StateChangedPayload(
+  value: Record<string, unknown>,
+): value is SessionStateChangedV2Event["payload"] {
+  if (
+    !hasExactKeys(value, [
+      "previous_status",
+      "status",
+      "trigger",
+      "phase_started_at",
+      "phase_deadline_at",
+    ]) ||
+    !isSessionStatus(value.previous_status) ||
+    !isSessionStatus(value.status) ||
+    value.previous_status === value.status ||
+    !["USER_START", "USER_ABORT", "PHASE_DEADLINE"].includes(
+      String(value.trigger),
+    )
+  ) {
+    return false;
+  }
+
+  if (ACTIVE_STATUSES.has(value.status)) {
+    return (
+      isAwareTimestamp(value.phase_started_at) &&
+      isAwareTimestamp(value.phase_deadline_at)
+    );
+  }
+
+  return value.phase_started_at === null && value.phase_deadline_at === null;
 }
 
 function isFormalEvent(
@@ -109,6 +191,7 @@ function isFormalEvent(
       "payload",
     ]) ||
     !hasEnvelopeIdentity(value) ||
+    (value.schema_version !== 1 && value.schema_version !== 2) ||
     !Number.isSafeInteger(value.sequence) ||
     Number(value.sequence) <= 0 ||
     !isRecord(value.payload)
@@ -118,19 +201,28 @@ function isFormalEvent(
 
   if (value.type === "session.created") {
     return (
+      value.schema_version === 1 &&
       value.action_id === null &&
       hasExactKeys(value.payload, ["status"]) &&
       value.payload.status === "CREATED"
     );
   }
 
-  return (
-    value.type === "session.state_changed" &&
-    isUuid4(value.action_id) &&
-    hasExactKeys(value.payload, ["previous_status", "status"]) &&
-    value.payload.previous_status === "CREATED" &&
-    value.payload.status === "ABORTED_USER"
-  );
+  if (value.type !== "session.state_changed") return false;
+
+  if (value.schema_version === 1) {
+    return (
+      isUuid4(value.action_id) &&
+      hasExactKeys(value.payload, ["previous_status", "status"]) &&
+      value.payload.previous_status === "CREATED" &&
+      value.payload.status === "ABORTED_USER"
+    );
+  }
+
+  if (!isV2StateChangedPayload(value.payload)) return false;
+  if (value.payload.trigger === "PHASE_DEADLINE")
+    return value.action_id === null;
+  return isUuid4(value.action_id);
 }
 
 function isErrorEvent(
@@ -146,6 +238,7 @@ function isErrorEvent(
       "error",
     ]) ||
     !hasEnvelopeIdentity(value) ||
+    value.schema_version !== 1 ||
     value.type !== "error" ||
     (value.action_id !== null && !isUuid4(value.action_id)) ||
     !isRecord(value.error) ||

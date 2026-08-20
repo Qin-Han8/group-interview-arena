@@ -2,8 +2,20 @@ from enum import StrEnum
 from typing import Self
 from urllib.parse import urlsplit
 
-from pydantic import AnyHttpUrl, SecretStr, field_validator, model_validator
+from pydantic import (
+    AnyHttpUrl,
+    BaseModel,
+    Field,
+    SecretStr,
+    field_validator,
+    model_validator,
+)
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from group_interview_arena_api.modules.discussion_sessions.domain import (
+    PhaseDurationPlan,
+    SessionStatus,
+)
 
 
 class Environment(StrEnum):
@@ -26,6 +38,29 @@ class DatabaseSettings(BaseSettings):
     database_url: SecretStr
 
 
+class SessionPhaseDurations(BaseModel):
+    preparation_seconds: int = Field(default=240, gt=0)
+    opening_statements_seconds: int = Field(default=240, gt=0)
+    exploration_seconds: int = Field(default=900, gt=0)
+    conflict_and_evaluation_seconds: int = Field(default=300, gt=0)
+    convergence_seconds: int = Field(default=180, gt=0)
+    final_summary_seconds: int = Field(default=60, gt=0)
+
+    def to_duration_plan(self) -> PhaseDurationPlan:
+        return PhaseDurationPlan.from_seconds(
+            {
+                SessionStatus.PREPARATION: self.preparation_seconds,
+                SessionStatus.OPENING_STATEMENTS: self.opening_statements_seconds,
+                SessionStatus.EXPLORATION: self.exploration_seconds,
+                SessionStatus.CONFLICT_AND_EVALUATION: (
+                    self.conflict_and_evaluation_seconds
+                ),
+                SessionStatus.CONVERGENCE: self.convergence_seconds,
+                SessionStatus.FINAL_SUMMARY: self.final_summary_seconds,
+            }
+        )
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="GIA_API_", extra="ignore")
 
@@ -36,6 +71,9 @@ class Settings(BaseSettings):
     otel_tracing_enabled: bool = False
     otel_service_name: str = "group-interview-arena-api"
     otel_otlp_http_endpoint: AnyHttpUrl | None = None
+    session_phase_durations: SessionPhaseDurations = Field(
+        default_factory=SessionPhaseDurations
+    )
 
     @model_validator(mode="after")
     def require_secure_production_session_cookie(self) -> Self:

@@ -80,6 +80,32 @@ class SimulationSession(Base):
             "last_sequence >= 0",
             name="last_sequence_non_negative",
         ),
+        CheckConstraint(
+            "(phase_started_at IS NULL AND phase_deadline_at IS NULL) OR "
+            "(phase_started_at IS NOT NULL AND phase_deadline_at IS NOT NULL "
+            "AND phase_deadline_at > phase_started_at)",
+            name="phase_timing_pair_valid",
+        ),
+        CheckConstraint(
+            "(status IN ('PREPARATION', 'OPENING_STATEMENTS', 'EXPLORATION', "
+            "'CONFLICT_AND_EVALUATION', 'CONVERGENCE', 'FINAL_SUMMARY') "
+            "AND phase_started_at IS NOT NULL "
+            "AND phase_deadline_at IS NOT NULL "
+            "AND phase_duration_plan IS NOT NULL) OR "
+            "(status NOT IN ('PREPARATION', 'OPENING_STATEMENTS', 'EXPLORATION', "
+            "'CONFLICT_AND_EVALUATION', 'CONVERGENCE', 'FINAL_SUMMARY') "
+            "AND phase_started_at IS NULL "
+            "AND phase_deadline_at IS NULL)",
+            name="phase_timing_status_consistent",
+        ),
+        CheckConstraint(
+            "phase_duration_plan IS NULL OR "
+            "(jsonb_typeof(phase_duration_plan) = 'object' "
+            "AND phase_duration_plan ?& array["
+            "'PREPARATION', 'OPENING_STATEMENTS', 'EXPLORATION', "
+            "'CONFLICT_AND_EVALUATION', 'CONVERGENCE', 'FINAL_SUMMARY'])",
+            name="phase_duration_plan_required_keys",
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
@@ -109,6 +135,18 @@ class SimulationSession(Base):
     question_version_id: Mapped[UUID | None] = mapped_column(
         Uuid,
         ForeignKey("question_versions.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
+    phase_started_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    phase_deadline_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    phase_duration_plan: Mapped[dict[str, int] | None] = mapped_column(
+        JSONB,
         nullable=True,
     )
 

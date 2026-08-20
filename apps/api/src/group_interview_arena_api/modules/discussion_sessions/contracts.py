@@ -13,7 +13,9 @@ from pydantic import (
 from group_interview_arena_api.modules.discussion_sessions.domain import SessionStatus
 
 
-def _require_aware(value: datetime) -> datetime:
+def _require_aware(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
     if value.tzinfo is None or value.utcoffset() is None:
         raise ValueError("Realtime timestamps must be timezone-aware.")
     return value
@@ -46,19 +48,50 @@ class SessionAbortCommand(_ClosedModel):
         }
 
 
+class SessionStartCommand(_ClosedModel):
+    schema_version: Literal[1]
+    type: Literal["session.start"]
+    session_id: UUID4
+    action_id: UUID4
+    payload: EmptyPayload
+
+    def semantic_payload(self) -> dict[str, object]:
+        return {
+            "schema_version": self.schema_version,
+            "type": self.type,
+            "payload": self.payload.model_dump(mode="json"),
+        }
+
+
+type RealtimeSessionCommand = SessionAbortCommand | SessionStartCommand
+
+
+class SessionStartRequest(_ClosedModel):
+    action_id: UUID4
+
+
 class SessionSnapshotResponse(_ClosedModel):
     id: UUID4
     question_version_id: UUID4 | None
     status: SessionStatus
+    phase_started_at: datetime | None
+    phase_deadline_at: datetime | None
+    server_now: datetime
     created_at: datetime
     updated_at: datetime
     last_sequence: int = Field(ge=0)
 
-    _validate_timestamps = field_validator("created_at", "updated_at")(_require_aware)
+    _validate_timestamps = field_validator(
+        "phase_started_at",
+        "phase_deadline_at",
+        "server_now",
+        "created_at",
+        "updated_at",
+    )(_require_aware)
 
 
 class FormalEventEnvelope(_ClosedModel):
-    schema_version: Literal[1]
+    schema_version: Literal[1, 2]
     type: Literal["session.created", "session.state_changed"]
     session_id: UUID4
     sequence: int = Field(gt=0)
@@ -69,13 +102,48 @@ class FormalEventEnvelope(_ClosedModel):
     @model_validator(mode="after")
     def validate_event_shape(self) -> Self:
         if self.type == "session.created":
-            if self.action_id is not None or self.payload != {"status": "CREATED"}:
+            if (
+                self.schema_version != 1
+                or self.action_id is not None
+                or self.payload != {"status": "CREATED"}
+            ):
                 raise ValueError("Invalid session.created event.")
-        elif self.action_id is None or self.payload != {
-            "previous_status": "CREATED",
-            "status": "ABORTED_USER",
-        }:
-            raise ValueError("Invalid session.state_changed event.")
+        elif self.schema_version == 1:
+            if self.action_id is None or self.payload != {
+                "previous_status": "CREATED",
+                "status": "ABORTED_USER",
+            }:
+                raise ValueError("Invalid historical session.state_changed event.")
+        else:
+            if set(self.payload) != {
+                "previous_status",
+                "status",
+                "trigger",
+                "phase_started_at",
+                "phase_deadline_at",
+            }:
+                raise ValueError("Invalid session.state_changed v2 payload.")
+            previous_status = SessionStatus(str(self.payload["previous_status"]))
+            status = SessionStatus(str(self.payload["status"]))
+            trigger = self.payload["trigger"]
+            if trigger not in {"USER_START", "USER_ABORT", "PHASE_DEADLINE"}:
+                raise ValueError("Invalid session.state_changed v2 trigger.")
+            if trigger in {"USER_START", "USER_ABORT"} and self.action_id is None:
+                raise ValueError("User transition events require an action id.")
+            if trigger == "PHASE_DEADLINE" and self.action_id is not None:
+                raise ValueError("Deadline transition events must be system events.")
+            if status in {SessionStatus.COMPLETED, SessionStatus.ABORTED_USER}:
+                if (
+                    self.payload["phase_started_at"] is not None
+                    or self.payload["phase_deadline_at"] is not None
+                ):
+                    raise ValueError("Terminal events must not carry current timing.")
+            elif not isinstance(
+                self.payload["phase_started_at"], str
+            ) or not isinstance(self.payload["phase_deadline_at"], str):
+                raise ValueError("Active phase events require current timing.")
+            if previous_status is status:
+                raise ValueError("State change must change status.")
         return self
 
     _validate_timestamp = field_validator("occurred_at")(_require_aware)

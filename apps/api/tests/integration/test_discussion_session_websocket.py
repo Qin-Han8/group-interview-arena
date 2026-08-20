@@ -262,12 +262,16 @@ def test_websocket_abort_duplicate_invalid_state_and_ordered_catchup(
 
             websocket.send_json(command)
             accepted = websocket.receive_json()
+            assert accepted["schema_version"] == 2
             assert accepted["type"] == "session.state_changed"
             assert accepted["sequence"] == 2
             assert accepted["action_id"] == str(action_id)
             assert accepted["payload"] == {
                 "previous_status": "CREATED",
                 "status": "ABORTED_USER",
+                "trigger": "USER_ABORT",
+                "phase_started_at": None,
+                "phase_deadline_at": None,
             }
 
             websocket.send_json(command)

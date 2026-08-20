@@ -26,6 +26,7 @@ API_ROOT = Path(__file__).resolve().parents[2]
 BASELINE_REVISION = "7c6ccd86b3c5"
 IDENTITY_REVISION = "4fe43b42641b"
 SESSION_FOUNDATION_REVISION = "f1a11d15c001"
+QUESTION_PERSONA_REVISION = "f1a12b15c002"
 EXPECTED_PRODUCT_TABLES = frozenset(
     {
         "auth_sessions",
@@ -210,6 +211,34 @@ def test_database_downgrades_to_p1_1_and_reupgrades_to_head(
         )
 
 
+def test_database_downgrades_to_p1_2_and_reupgrades_to_head(
+    temporary_database: TemporaryDatabaseContext,
+) -> None:
+    config = _alembic_config()
+    head = ScriptDirectory.from_config(config).get_current_head()
+    assert head is not None
+
+    with _temporary_migration_environment(temporary_database):
+        command.upgrade(config, "head")
+        command.downgrade(config, QUESTION_PERSONA_REVISION)
+
+        assert _migration_state(temporary_database) == MigrationState(
+            revision=QUESTION_PERSONA_REVISION,
+            version_table_exists=True,
+            product_tables=EXPECTED_PRODUCT_TABLES,
+        )
+
+        command.upgrade(config, "head")
+        command.current(config, check_heads=True)
+        command.check(config)
+
+        assert _migration_state(temporary_database) == MigrationState(
+            revision=head,
+            version_table_exists=True,
+            product_tables=EXPECTED_PRODUCT_TABLES,
+        )
+
+
 def test_database_downgrades_to_baseline_and_reupgrades_to_head(
     temporary_database: TemporaryDatabaseContext,
 ) -> None:
@@ -326,6 +355,9 @@ def test_head_has_exact_p1_1b_columns_constraints_and_indexes(
         ("simulation_sessions", "created_at", "timestamptz", "NO", None),
         ("simulation_sessions", "updated_at", "timestamptz", "NO", None),
         ("simulation_sessions", "question_version_id", "uuid", "YES", None),
+        ("simulation_sessions", "phase_started_at", "timestamptz", "YES", None),
+        ("simulation_sessions", "phase_deadline_at", "timestamptz", "YES", None),
+        ("simulation_sessions", "phase_duration_plan", "jsonb", "YES", None),
     ]
     assert constraints == {
         "ck_discussion_events_event_version_positive",
@@ -333,6 +365,9 @@ def test_head_has_exact_p1_1b_columns_constraints_and_indexes(
         "ck_session_actions_command_version_positive",
         "ck_session_actions_payload_digest_sha256",
         "ck_simulation_sessions_last_sequence_non_negative",
+        "ck_simulation_sessions_phase_duration_plan_required_keys",
+        "ck_simulation_sessions_phase_timing_pair_valid",
+        "ck_simulation_sessions_phase_timing_status_consistent",
         "fk_discussion_events_session_id_session_actions",
         "fk_discussion_events_session_id_simulation_sessions",
         "fk_session_actions_session_id_simulation_sessions",

@@ -14,11 +14,16 @@ from group_interview_arena_api.db.models import (
     SimulationSession,
 )
 from group_interview_arena_api.modules.discussion_sessions.domain import (
+    DeadlineReconciliationOutcome,
+    InvalidSessionStateError,
+    PendingEvent,
+    PhaseDurationPlan,
     SessionCommand,
     SessionSnapshot,
     SessionStatus,
     StoredEvent,
     decide_session_command,
+    reconcile_due_transitions,
 )
 from group_interview_arena_api.modules.question_personas.service import (
     QuestionNotFoundError,
@@ -52,10 +57,14 @@ def _raise_persistence_error() -> Never:
 
 
 def _snapshot(row: SimulationSession) -> SessionSnapshot:
+    server_now = _utc_now()
     return SessionSnapshot(
         session_id=row.id,
         question_version_id=row.question_version_id,
         status=SessionStatus(row.status),
+        phase_started_at=row.phase_started_at,
+        phase_deadline_at=row.phase_deadline_at,
+        server_now=server_now,
         created_at=row.created_at,
         updated_at=row.updated_at,
         last_sequence=row.last_sequence,
@@ -87,6 +96,74 @@ def _command_digest(command: SessionCommand) -> bytes:
         sort_keys=True,
     ).encode("utf-8")
     return hashlib.sha256(encoded).digest()
+
+
+def _duration_plan_from_row(row: SimulationSession) -> PhaseDurationPlan | None:
+    if row.phase_duration_plan is None:
+        return None
+    return PhaseDurationPlan.from_seconds(row.phase_duration_plan)
+
+
+def _apply_reconciliation_to_aggregate(
+    aggregate: SimulationSession,
+    outcome: DeadlineReconciliationOutcome,
+    *,
+    now: datetime,
+) -> None:
+    aggregate.status = outcome.status.value
+    aggregate.phase_started_at = outcome.phase_started_at
+    aggregate.phase_deadline_at = outcome.phase_deadline_at
+    if outcome.events:
+        aggregate.updated_at = now
+        aggregate.last_sequence += len(outcome.events)
+
+
+def _event_rows(
+    *,
+    session_id: UUID,
+    first_sequence: int,
+    events: list[PendingEvent],
+    occurred_at: datetime,
+    action_id: UUID | None,
+) -> list[DiscussionEvent]:
+    return [
+        DiscussionEvent(
+            session_id=session_id,
+            sequence=first_sequence + offset,
+            event_version=pending.event_version,
+            event_type=pending.event_type,
+            causation_action_id=action_id,
+            payload=pending.payload,
+            occurred_at=occurred_at,
+        )
+        for offset, pending in enumerate(events)
+    ]
+
+
+def _reconcile_due_for_locked_aggregate(
+    aggregate: SimulationSession,
+    *,
+    now: datetime,
+) -> list[DiscussionEvent]:
+    outcome = reconcile_due_transitions(
+        status=SessionStatus(aggregate.status),
+        phase_started_at=aggregate.phase_started_at,
+        phase_deadline_at=aggregate.phase_deadline_at,
+        duration_plan=_duration_plan_from_row(aggregate),
+        now=now,
+    )
+    if not outcome.events:
+        return []
+
+    first_sequence = aggregate.last_sequence + 1
+    _apply_reconciliation_to_aggregate(aggregate, outcome, now=now)
+    return _event_rows(
+        session_id=aggregate.id,
+        first_sequence=first_sequence,
+        events=outcome.events,
+        occurred_at=now,
+        action_id=None,
+    )
 
 
 async def create_session(
@@ -174,8 +251,11 @@ async def apply_session_command(
     *,
     owner_id: UUID,
     command: SessionCommand,
+    duration_plan: PhaseDurationPlan | None = None,
 ) -> list[StoredEvent]:
     digest = _command_digest(command)
+    pending_invalid_state: InvalidSessionStateError | None = None
+    stored_events: list[StoredEvent] = []
     try:
         async with session.begin():
             aggregate = await session.scalar(
@@ -206,44 +286,100 @@ async def apply_session_command(
                     action_id=command.action_id,
                 )
 
-            outcome = decide_session_command(
-                SessionStatus(aggregate.status),
-                command,
-            )
             now = _utc_now()
-            session.add(
-                SessionAction(
-                    session_id=command.session_id,
-                    action_id=command.action_id,
-                    command_version=command.schema_version,
-                    command_type=command.command_type,
-                    payload_digest=digest,
-                    created_at=now,
-                )
+            system_event_rows = _reconcile_due_for_locked_aggregate(
+                aggregate,
+                now=now,
             )
-            await session.flush()
+            if system_event_rows:
+                session.add_all(system_event_rows)
+                await session.flush()
 
-            first_sequence = aggregate.last_sequence + 1
-            aggregate.status = outcome.status.value
-            aggregate.updated_at = now
-            aggregate.last_sequence += len(outcome.events)
-            event_rows = [
-                DiscussionEvent(
-                    session_id=command.session_id,
-                    sequence=first_sequence + offset,
-                    event_version=1,
-                    event_type=pending.event_type,
-                    causation_action_id=command.action_id,
-                    payload=pending.payload,
-                    occurred_at=now,
+            try:
+                outcome = decide_session_command(
+                    SessionStatus(aggregate.status),
+                    command,
+                    now=now,
+                    duration_plan=duration_plan,
                 )
-                for offset, pending in enumerate(outcome.events)
-            ]
-            session.add_all(event_rows)
-            await session.flush()
-            stored_events = [_stored_event(row) for row in event_rows]
+            except InvalidSessionStateError as exception:
+                pending_invalid_state = exception
+                stored_events = [_stored_event(row) for row in system_event_rows]
+            else:
+                session.add(
+                    SessionAction(
+                        session_id=command.session_id,
+                        action_id=command.action_id,
+                        command_version=command.schema_version,
+                        command_type=command.command_type,
+                        payload_digest=digest,
+                        created_at=now,
+                    )
+                )
+                await session.flush()
+
+                first_sequence = aggregate.last_sequence + 1
+                aggregate.status = outcome.status.value
+                aggregate.phase_started_at = outcome.phase_started_at
+                aggregate.phase_deadline_at = outcome.phase_deadline_at
+                if outcome.frozen_duration_plan is not None:
+                    aggregate.phase_duration_plan = outcome.frozen_duration_plan
+                aggregate.updated_at = now
+                aggregate.last_sequence += len(outcome.events)
+                event_rows = _event_rows(
+                    session_id=command.session_id,
+                    first_sequence=first_sequence,
+                    events=outcome.events,
+                    occurred_at=now,
+                    action_id=command.action_id,
+                )
+                session.add_all(event_rows)
+                await session.flush()
+                stored_events = [_stored_event(row) for row in event_rows]
     except SessionNotFoundError, ActionIdConflictError:
         raise
+    except ValueError:
+        _raise_persistence_error()
+    except SQLAlchemyError:
+        _raise_persistence_error()
+    if pending_invalid_state is not None:
+        raise pending_invalid_state
+    return stored_events
+
+
+async def reconcile_session_deadline(
+    session: AsyncSession,
+    *,
+    owner_id: UUID,
+    session_id: UUID,
+    now: datetime | None = None,
+) -> list[StoredEvent]:
+    effective_now = _utc_now() if now is None else now
+    try:
+        async with session.begin():
+            aggregate = await session.scalar(
+                select(SimulationSession)
+                .where(
+                    SimulationSession.id == session_id,
+                    SimulationSession.owner_user_id == owner_id,
+                )
+                .with_for_update()
+            )
+            if aggregate is None:
+                raise SessionNotFoundError
+
+            event_rows = _reconcile_due_for_locked_aggregate(
+                aggregate,
+                now=effective_now,
+            )
+            if event_rows:
+                session.add_all(event_rows)
+                await session.flush()
+            stored_events = [_stored_event(row) for row in event_rows]
+    except SessionNotFoundError:
+        raise
+    except ValueError:
+        _raise_persistence_error()
     except SQLAlchemyError:
         _raise_persistence_error()
     return stored_events

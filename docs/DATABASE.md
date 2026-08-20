@@ -1,6 +1,6 @@
 # 数据库技术基线
 
-- Status: P0 Data Architecture Baseline + P1-1/P1-2 schema implemented + P1-3 data design frozen
+- Status: P0 Data Architecture Baseline + P1-1/P1-2 schema implemented + P1-3B durable phase schema implemented
 - Current phase: P1 — IN_PROGRESS
 - Data architecture baseline established by: P0-2 — DONE
 - Local PostgreSQL infrastructure: P0-4B — completed
@@ -13,14 +13,14 @@
 - P0-5B identity persistence: completed
 - P0-5C backend auth runtime: completed
 - Target version: V0.1 Internal Validation
-- Business schema: identity, P1-1 session foundation and P1-2B question/persona foundation (ten product tables)
+- Business schema: identity, P1-1 session foundation, P1-2B question/persona foundation, and P1-3B additive session timing fields (ten product tables)
 - P1-1 status: P1-1A～E completed; independent final verdict PASS; P1-1 DONE
-- P1-2 status: DONE; P1-3 IN_PROGRESS; P1-3A completed docs-only; P1-3B not started / awaiting explicit approval
+- P1-2 status: DONE; P1-3 IN_PROGRESS; P1-3A completed docs-only; P1-3B completed; P1-3C not started / awaiting explicit approval
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
 
-本文件记录 P0-2 已批准的数据技术基线、P0-4 完成状态、P0-5 identity persistence、P1-1 session persistence/transaction callers，以及已实现的 P1-2B question/persona persistence foundation。迁移目标 product tables 精确为十张，Alembic single head 为 `f1a12b15c002`。
+本文件记录 P0-2 已批准的数据技术基线、P0-4 完成状态、P0-5 identity persistence、P1-1 session persistence/transaction callers、P1-2B question/persona persistence foundation，以及 P1-3B additive durable phase/timing fields。迁移目标 product tables 精确为十张，Alembic single head 为 `f1a13b15c003`。
 
 正式决策见 [`DECISIONS.md`](DECISIONS.md) `ADR-005`、`ADR-010`、`ADR-013`、`ADR-015`。
 
@@ -292,9 +292,9 @@ P1-2B table set 是既有五张加上述五张，共十张；没有增加 partic
 
 Publication service 对新 version/new assignment 先拒绝 retired Question Template 或 Persona Template；若 immutable bundle 已经存在且 exact-match，则在后续 retirement 后仍保持 no-op，以保留 deterministic seed 和历史解析语义。
 
-## P1-3 durable phase data design — frozen, not implemented
+## P1-3 durable phase data — P1-3B implemented
 
-P1-3A 根据 actual ten-table source 冻结 additive session model；当前 Alembic head、ORM 和 development database 尚未包含以下 columns。P1-3B 获批后才可实现：
+P1-3B 根据 P1-3A 冻结模型，以线性 Alembic revision `f1a13b15c003` 向既有 `simulation_sessions` additive 增加以下 columns；历史 revisions 未改写，product table count 仍为十张：
 
 - `simulation_sessions.phase_started_at TIMESTAMPTZ NULL`：current timed phase 的 effective start；
 - `simulation_sessions.phase_deadline_at TIMESTAMPTZ NULL`：current timed phase 的 authoritative server UTC deadline；
@@ -302,11 +302,13 @@ P1-3A 根据 actual ten-table source 冻结 additive session model；当前 Alem
 
 `CREATED` 和既有 legacy rows 可以全部为 null；started active sessions 必须由 application invariant 保持三者完整，terminal `COMPLETED` / `ABORTED_USER` 清空 current start/deadline 但保留 immutable plan。数据库继续使用 evolvable `status VARCHAR`，不增加把当前状态集合永久锁死的 PostgreSQL native enum。
 
+P1-3B database constraints are scoped to real invariants：`phase_started_at`/`phase_deadline_at` must be both null or both present with deadline after start；active timed statuses require current timing and a duration plan；non-active statuses require current timing to be null；non-null duration plans must be JSON objects with all six required timed phase keys。Exact positive-integer closed plan validation remains the domain/config write boundary.
+
 Duration plan 是特定用途、closed-schema domain value，不是 generic metadata；Browser、ordinary logs/traces/errors 和 formal event payload 不接收完整 plan。它用于保证 app restart/config change 后未来 phase duration 仍由 session-start 时已冻结的配置决定。
 
 Phase history 不另建 speculative table：现有 `discussion_events` 以 ordered `session.state_changed` v2 保存每次 effective start/deadline，current row 保存当前 projection。Historical v1 abort event 保持原样可读，不执行 data rewrite。
 
-Deadline transition 继续锁定 `simulation_sessions` row，并在同一 transaction 内更新 status/current timing/`last_sequence`、插入所有 ordered events。System deadline events 使用 null causation；user start/abort events 关联现有 durable action。Concurrent timeout 以 exact expected status/deadline precondition 只成功一次；network send 仍在 commit 后。
+Deadline transition 继续锁定 `simulation_sessions` row，并在同一 transaction 内更新 status/current timing/`last_sequence`、插入所有 ordered events。System deadline events 使用 null causation；user start/abort events 关联现有 durable action。Concurrent timeout / user command races are reconciled under the same aggregate row lock before new user intent is applied；network send 仍在 commit 后。
 
 完整 migration、catalog、rollback、concurrency、restart recovery 和 B～D acceptance 见 [`exec-plans/P1-3_session-state-machine.md`](exec-plans/P1-3_session-state-machine.md)。
 
@@ -337,7 +339,7 @@ Deadline transition 继续锁定 `simulation_sessions` row，并在同一 transa
 
 - P0-5C：FastAPI lifespan/request dependency 已成为现有 async DB runtime 的第一个 application caller；真实 PostgreSQL auth integration 只使用迁移到 head 的隔离临时数据库，development DB 保持 head `4fe43b42641b` 且两张表均为 0 rows；
 - P0-5D：completed；browser closure 已实现，existing Cookie/CORS/CSRF/shared trusted-origin boundary 已生效；P1 不得创建第二套 trusted-origin config；
-- P1：`IN_PROGRESS`；P1-1/P1-2 `DONE`；current migration head `f1a12b15c002`、精确十张 product tables，independent PostgreSQL verdict `PASS`；P1-3A durable phase data design 已冻结但未实现，P1-3B not started / awaiting explicit approval；participant/utterance、记忆和报告继续留给后续获批任务；
+- P1：`IN_PROGRESS`；P1-1/P1-2 `DONE`；current migration head `f1a13b15c003`、精确十张 product tables，P1-3B durable phase data foundation 已实现并通过 PostgreSQL migration/concurrency gates；P1-3C not started / awaiting explicit approval；participant/utterance、记忆和报告继续留给后续获批任务；
 - P2～P4：仅随获批范围增加音频、评分训练和商业化数据。
 
 ## 与其他文档关系

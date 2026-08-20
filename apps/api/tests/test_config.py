@@ -7,6 +7,7 @@ from group_interview_arena_api.core.config import (
     DatabaseSettings,
     Environment,
     LogLevel,
+    SessionPhaseDurations,
     Settings,
 )
 
@@ -42,11 +43,24 @@ def test_development_settings_can_be_created(
     assert settings.otel_tracing_enabled is False
     assert settings.otel_service_name == "group-interview-arena-api"
     assert settings.otel_otlp_http_endpoint is None
+    assert settings.session_phase_durations.to_duration_plan().to_json() == {
+        "PREPARATION": 240,
+        "OPENING_STATEMENTS": 240,
+        "EXPLORATION": 900,
+        "CONFLICT_AND_EVALUATION": 300,
+        "CONVERGENCE": 180,
+        "FINAL_SUMMARY": 60,
+    }
 
 
 def test_enabled_tracing_requires_otlp_http_endpoint() -> None:
     with pytest.raises(ValidationError, match="Tracing requires an OTLP HTTP endpoint"):
         Settings(otel_tracing_enabled=True)
+
+
+def test_session_phase_duration_settings_reject_non_positive_values() -> None:
+    with pytest.raises(ValidationError):
+        Settings(session_phase_durations=SessionPhaseDurations(preparation_seconds=0))
 
 
 @pytest.mark.parametrize(

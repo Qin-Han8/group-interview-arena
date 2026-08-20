@@ -132,10 +132,19 @@ async def _verify_rest_contract(
                 "id",
                 "question_version_id",
                 "status",
+                "phase_started_at",
+                "phase_deadline_at",
+                "server_now",
                 "created_at",
                 "updated_at",
                 "last_sequence",
             }
+            assert snapshot["phase_started_at"] is None
+            assert snapshot["phase_deadline_at"] is None
+            assert re.fullmatch(
+                r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z",
+                snapshot["server_now"],
+            )
             assert snapshot["question_version_id"] == str(
                 INTERNAL_VALIDATION_BUNDLE.version_id
             )
@@ -147,7 +156,42 @@ async def _verify_rest_contract(
 
             loaded = await owner.get(f"/sessions/{session_id}")
             assert loaded.status_code == 200
-            assert loaded.json() == snapshot
+            loaded_snapshot = loaded.json()
+            assert loaded_snapshot["server_now"] >= snapshot["server_now"]
+            loaded_snapshot["server_now"] = snapshot["server_now"]
+            assert loaded_snapshot == snapshot
+
+            action_id = uuid4()
+            started = await owner.post(
+                f"/sessions/{session_id}/start",
+                headers=AUTH_HEADERS,
+                json={"action_id": str(action_id)},
+            )
+            assert started.status_code == 200
+            started_snapshot = started.json()
+            assert started_snapshot["status"] == "PREPARATION"
+            assert started_snapshot["last_sequence"] == 2
+            assert started_snapshot["phase_started_at"] is not None
+            assert started_snapshot["phase_deadline_at"] is not None
+            assert (
+                started_snapshot["phase_started_at"]
+                < started_snapshot["phase_deadline_at"]
+            )
+
+            duplicate_start = await owner.post(
+                f"/sessions/{session_id}/start",
+                headers=AUTH_HEADERS,
+                json={"action_id": str(action_id)},
+            )
+            assert duplicate_start.status_code == 200
+            assert duplicate_start.json()["last_sequence"] == 2
+
+            stale_start = await owner.post(
+                f"/sessions/{session_id}/start",
+                headers=AUTH_HEADERS,
+                json={"action_id": str(uuid4())},
+            )
+            _assert_safe_error(stale_start, 409, "INVALID_SESSION_STATE")
 
             missing = await owner.get(f"/sessions/{uuid4()}")
             _assert_safe_error(missing, 404, "SESSION_NOT_FOUND")
@@ -169,14 +213,26 @@ async def _verify_rest_contract(
             assert stored is not None
             assert stored.owner_user_id == owner_id
             assert stored.question_version_id == INTERNAL_VALIDATION_BUNDLE.version_id
-            assert stored.last_sequence == 1
+            assert stored.status == "PREPARATION"
+            assert stored.phase_started_at is not None
+            assert stored.phase_deadline_at is not None
+            assert stored.phase_duration_plan is not None
+            assert set(stored.phase_duration_plan) == {
+                "PREPARATION",
+                "OPENING_STATEMENTS",
+                "EXPLORATION",
+                "CONFLICT_AND_EVALUATION",
+                "CONVERGENCE",
+                "FINAL_SUMMARY",
+            }
+            assert stored.last_sequence == 2
             assert (
                 await session.scalar(
                     select(func.count())
                     .select_from(DiscussionEvent)
                     .where(DiscussionEvent.session_id == session_id)
                 )
-                == 1
+                == 2
             )
 
 

@@ -34,16 +34,40 @@ function projectEvent(
   snapshot: SessionSnapshot,
   event: FormalSessionEvent,
 ): SessionSnapshot {
+  if (event.type === "session.created") {
+    return {
+      ...snapshot,
+      status: "CREATED",
+      phase_started_at: null,
+      phase_deadline_at: null,
+      updated_at: event.occurred_at,
+      last_sequence: event.sequence,
+    };
+  }
+
   return {
     ...snapshot,
-    status: event.type === "session.state_changed" ? "ABORTED_USER" : "CREATED",
+    status: event.payload.status,
+    phase_started_at:
+      event.schema_version === 2 ? event.payload.phase_started_at : null,
+    phase_deadline_at:
+      event.schema_version === 2 ? event.payload.phase_deadline_at : null,
     updated_at: event.occurred_at,
     last_sequence: event.sequence,
   };
 }
 
 function statusLabel(status: SessionSnapshot["status"]) {
-  return status === "CREATED" ? "已创建" : "已由用户结束";
+  switch (status) {
+    case "CREATED":
+      return "已创建";
+    case "ABORTED_USER":
+      return "已由用户结束";
+    case "COMPLETED":
+      return "已完成";
+    default:
+      return "进行中";
+  }
 }
 
 function connectionLabel(state: RealtimeConnectionState) {

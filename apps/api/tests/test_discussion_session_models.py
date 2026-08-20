@@ -55,6 +55,9 @@ def test_simulation_sessions_has_exact_forward_safe_shape() -> None:
         table.c.created_at,
         table.c.updated_at,
         table.c.question_version_id,
+        table.c.phase_started_at,
+        table.c.phase_deadline_at,
+        table.c.phase_duration_plan,
     ]
     assert isinstance(table.c.id.type, Uuid)
     assert table.c.id.primary_key is True
@@ -74,13 +77,24 @@ def test_simulation_sessions_has_exact_forward_safe_shape() -> None:
     assert table.c.created_at.type.timezone is True
     assert isinstance(table.c.updated_at.type, DateTime)
     assert table.c.updated_at.type.timezone is True
+    assert isinstance(table.c.phase_started_at.type, DateTime)
+    assert table.c.phase_started_at.type.timezone is True
+    assert table.c.phase_started_at.nullable is True
+    assert isinstance(table.c.phase_deadline_at.type, DateTime)
+    assert table.c.phase_deadline_at.type.timezone is True
+    assert table.c.phase_deadline_at.nullable is True
+    assert isinstance(table.c.phase_duration_plan.type, JSONB)
+    assert table.c.phase_duration_plan.nullable is True
     assert _constraint_names(table) == {
+        "ck_simulation_sessions_phase_duration_plan_required_keys",
+        "ck_simulation_sessions_phase_timing_pair_valid",
+        "ck_simulation_sessions_phase_timing_status_consistent",
         "ck_simulation_sessions_last_sequence_non_negative",
         "fk_simulation_sessions_owner_user_id_users",
         "fk_simulation_sessions_question_version_id_question_versions",
         "pk_simulation_sessions",
     }
-    assert sum(isinstance(item, CheckConstraint) for item in table.constraints) == 1
+    assert sum(isinstance(item, CheckConstraint) for item in table.constraints) == 4
     assert table.indexes == set()
 
 
