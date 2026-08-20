@@ -1,14 +1,14 @@
 # AI 候选人与讨论编排骨架
 
-- Status: P1-2 completed; P1-3B backend state-machine foundation implemented; orchestrator/AI runtime deferred
+- Status: P1-2 completed; P1-3C realtime/Web phase flow implemented; orchestrator/AI runtime deferred
 - Current phase: P1 — IN_PROGRESS
 - Target version: V0.1 Internal Validation
-- Detailed orchestrator/agent design: P1-3A state/timing boundary completed docs-only; P1-3B backend state machine completed; P1-3C awaiting explicit approval
+- Detailed orchestrator/agent design: P1-3A state/timing boundary completed docs-only; P1-3B backend state machine completed; P1-3C realtime/Web phase flow completed; P1-3D awaiting explicit approval
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
 
-本文件记录已确认的 AI 候选人/私有立场基础、P1-3A 冻结的讨论状态机边界和 P1-3B 已实现的 backend state/timing foundation；发言权调度、结构化记忆和 AI runtime 仍待后续任务。当前不包含 production Prompt、模型选择、发言权算法或 AI runtime 代码。
+本文件记录已确认的 AI 候选人/私有立场基础、P1-3A 冻结的讨论状态机边界、P1-3B 已实现的 backend state/timing foundation 和 P1-3C 已实现的 realtime/Web phase projection；发言权调度、结构化记忆和 AI runtime 仍待后续任务。当前不包含 production Prompt、模型选择、发言权算法或 AI runtime 代码。
 
 ## Confirmed by PROJECT_MASTER_PLAN
 
@@ -140,7 +140,7 @@ P1-1A 冻结、P1-1B～D 已实现讨论会话的 persistence/backend transport 
 - `session.abort` 不要求 question/participant/utterance，因此可在不提前决定其 Schema 的前提下建立真实 vertical slice；
 - P1-1B persistence/migration foundation、P1-1C deterministic domain command service/REST/WebSocket 与 P1-1D authoritative Web projection/reconnect caller 已完成；`session.abort` 之外的状态机、讨论行为、角色与 AI 仍未实现。完整计划见 [`exec-plans/P1-1_discussion-session-foundation.md`](exec-plans/P1-1_discussion-session-foundation.md)。
 
-## P1-3 state-machine boundary and P1-3B backend foundation
+## P1-3 state-machine boundary and P1-3C realtime/Web flow
 
 V0.1 current implemented path is frozen as:
 
@@ -163,7 +163,7 @@ CREATED
 
 Concurrent user/system transitions share the P1-1 aggregate row lock、durable action replay、monotonic sequence、single transaction and commit-before-send boundary。System timeout uses exact expected status/deadline and null action causation；before a user command is applied, overdue phases are reconciled in order。This makes duplicate timers、stale starts and timeout/abort races resolve to one ordered durable outcome。
 
-Formal event vocabulary remains `session.created` and `session.state_changed`。Historical abort event v1 remains readable；P1-3B emits generalized v2 payload for start、abort and phase-deadline transitions。Full matrix、timing arithmetic、snapshot and P1-3C～D gates are in [`exec-plans/P1-3_session-state-machine.md`](exec-plans/P1-3_session-state-machine.md)。This foundation does not implement P1-4 floor scheduling or AI behavior。
+Formal event vocabulary remains `session.created` and `session.state_changed`。Historical abort event v1 remains readable；P1-3B emits generalized v2 payload for start、abort and phase-deadline transitions。P1-3C adds startup/connected recovery and Browser authoritative phase projection without adding a client-side state machine。Full matrix、timing arithmetic、snapshot and P1-3D gates are in [`exec-plans/P1-3_session-state-machine.md`](exec-plans/P1-3_session-state-machine.md)。This foundation does not implement P1-4 floor scheduling or AI behavior。
 
 ## Implementation guidance
 
@@ -186,7 +186,7 @@ Formal event vocabulary remains `session.created` and `session.state_changed`。
 
 ## Future work
 
-- P1：`IN_PROGRESS`；P1-1 session foundation 与 P1-2 question/persona foundation 均为 `DONE`；P1-3A state/timing design freeze 已完成 docs-only，P1-3B backend state-machine + durable phase foundation 已完成，P1-3 `IN_PROGRESS`；P1-3C realtime/Web complete phase flow、P1-4 调度、记忆和 AI runtime 仍未开始并需后续批准。
+- P1：`IN_PROGRESS`；P1-1 session foundation 与 P1-2 question/persona foundation 均为 `DONE`；P1-3A state/timing design freeze 已完成 docs-only，P1-3B backend state-machine + durable phase foundation 已完成，P1-3C realtime/Web complete phase flow 已完成，P1-3 `IN_PROGRESS`；P1-3D independent acceptance、P1-4 调度、记忆和 AI runtime 仍未开始并需后续批准。
 - P2：加入语音、打断、播放停止和恢复语义。
 - P3：建立角色行为与评分证据之间的校准边界。
 - P6/V1.0：扩展到 6～8 种角色和压力模式。

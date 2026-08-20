@@ -5,6 +5,7 @@ import {
   type FormalSessionEvent,
   type RealtimeErrorCode,
   type SessionAbortCommand,
+  type SessionStartCommand,
 } from "./contract";
 
 export type RealtimeConnectionState =
@@ -23,9 +24,12 @@ type SessionRealtimeOptions = {
 
 export type SessionRealtimeClient = {
   start: () => void;
+  startSession: () => string;
   abort: () => string;
   stop: () => void;
 };
+
+type PendingCommand = SessionAbortCommand | SessionStartCommand;
 
 const SOCKET_OPEN = 1;
 const RECONNECT_DELAY_MS = 250;
@@ -63,7 +67,7 @@ export function createSessionRealtimeClient(
   let generation = 0;
   let socket: WebSocket | undefined;
   let lastSequence = options.snapshot.last_sequence;
-  let pendingCommand: SessionAbortCommand | undefined;
+  let pendingCommand: PendingCommand | undefined;
   let reconnectAttempts = 0;
   let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
   let recoveryStabilityTimer: ReturnType<typeof setTimeout> | undefined;
@@ -223,6 +227,20 @@ export function createSessionRealtimeClient(
       if (active) return;
       active = true;
       connect();
+    },
+    startSession() {
+      if (!pendingCommand) {
+        pendingCommand = {
+          schema_version: 1,
+          type: "session.start",
+          session_id: sessionId,
+          action_id: crypto.randomUUID(),
+          payload: {},
+        };
+        options.onPendingChange(true);
+      }
+      if (socket) sendPending(socket);
+      return pendingCommand.action_id;
     },
     abort() {
       if (!pendingCommand) {

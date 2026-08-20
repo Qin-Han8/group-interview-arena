@@ -37,6 +37,7 @@ from group_interview_arena_api.identity.service import (
     DUMMY_PASSWORD_HASH,
     AuthenticationResult,
 )
+from tests.deadline_recovery_test_helpers import disable_deadline_recovery_runtime
 
 TEST_DATABASE_URL = (
     "postgresql+psycopg://test-user:test-password@127.0.0.1:5432/"
@@ -222,7 +223,10 @@ def test_lifespan_requires_database_configuration_at_runtime(
         asyncio.run(enter_lifespan())
 
 
-def test_lifespan_initializes_and_cleans_database_runtime_without_connecting() -> None:
+def test_lifespan_initializes_and_cleans_database_runtime_without_connecting(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    disable_deadline_recovery_runtime(monkeypatch)
     application = create_app(
         Settings(environment=Environment.TEST),
         DatabaseSettings(database_url=SecretStr(TEST_DATABASE_URL)),

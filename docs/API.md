@@ -1,6 +1,6 @@
 # API 与事件技术基线
 
-- Status: P0 API Architecture Baseline + P1-1/P1-2 completed + P1-3B backend state-machine foundation implemented
+- Status: P0 API Architecture Baseline + P1-1/P1-2 completed + P1-3C realtime/Web complete phase flow implemented
 - Current phase: P1 — IN_PROGRESS
 - API architecture baseline established by: P0-2 — DONE
 - Target version: V0.1 Internal Validation
@@ -9,7 +9,7 @@
 - P0-5 browser CORS/CSRF/Web closure: P0-5D completed
 - P1-1 contract: scoped/frozen by P1-1A; P1-1B persistence, P1-1C REST/WebSocket runtime, P1-1D Web realtime caller and P1-1E independent final review completed
 - P1-2 contract: P1-2A/B/C completed; safe question reads and immutable version-bound session creation implemented
-- P1-3 contract: P1-3A completed docs-only; P1-3B backend state-machine + durable phase foundation implemented; P1-3C realtime/Web complete phase flow not started
+- P1-3 contract: P1-3A completed docs-only; P1-3B backend state-machine + durable phase foundation implemented; P1-3C realtime/Web complete phase flow implemented; P1-3D not started
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -217,9 +217,9 @@ P1-2C 已按 P1-2A 冻结 contract 实现以下边界；FastAPI OpenAPI 与 gene
 
 完整 scope、dependencies、caller、acceptance 和 testing 见 [`exec-plans/P1-2_question-persona-foundation.md`](exec-plans/P1-2_question-persona-foundation.md)。
 
-## P1-3 state/timing contract — P1-3B backend implemented
+## P1-3 state/timing contract — P1-3C realtime/Web implemented
 
-P1-3A 冻结以下 additive contract；P1-3B 已实现 backend/domain/persistence/API/realtime-parser foundation。P1-3C 的 in-process deadline scheduler/recovery loop、connected push 和完整 Browser phase UI 尚未开始。
+P1-3A 冻结以下 additive contract；P1-3B 已实现 backend/domain/persistence/API/realtime-parser foundation。P1-3C 已实现 in-process deadline recovery、connected WebSocket catch-up/push、Browser start/current-phase/deadline projection 和真实 PostgreSQL Chromium complete-flow validation；P1-3D independent acceptance 尚未开始。
 
 ### User command vocabulary
 
@@ -236,12 +236,13 @@ P1-3A 冻结以下 additive contract；P1-3B 已实现 backend/domain/persistenc
 - Stored `session.state_changed` v1 abort events remain readable。P1-3 emits `session.state_changed` event version 2 with closed `previous_status`、`status`、`trigger`、nullable `phase_started_at` and nullable `phase_deadline_at`。
 - `trigger` is exactly `USER_START`、`USER_ABORT` or `PHASE_DEADLINE`。User events carry the action ID；system deadline events carry null。
 - All state/timing/watermark/events commit before any WebSocket send；send failure is recovered through existing ordered catch-up。
+- App startup, WS connect and the connected catch-up loop call the same server-side overdue reconciliation foundation；duplicate recovery callbacks are idempotent because P1-3B exact status/deadline preconditions and aggregate row lock remain the mutation authority。
 
 ### Authoritative snapshot projection
 
 P1-3B additively extends `SessionSnapshotResponse` with nullable `phase_started_at` / `phase_deadline_at` and response-time `server_now`。Status expands to the exact V0.1 implemented path plus `ABORTED_USER`。The server-only frozen duration plan is never returned。
 
-Browser may render a local display countdown from authoritative UTC values but cannot transition at zero；snapshot or a v2 event replaces the complete local phase/timing projection。Gap、sequence-ahead、reload and reconnect continue to recover through REST snapshot + ordered formal events。
+P1-3C Browser renders a local display countdown from authoritative UTC values but cannot transition at zero；snapshot or a v2 event replaces the complete local phase/timing projection。Gap、sequence-ahead、reload and reconnect continue to recover through REST snapshot + ordered formal events。
 
 The exact state matrix、deadline arithmetic、historical version compatibility and P1-3B～D gates are in [`exec-plans/P1-3_session-state-machine.md`](exec-plans/P1-3_session-state-machine.md)。
 
@@ -313,7 +314,7 @@ P0-3D 已完成最小 API、OpenAPI authority、typed config、request correlati
 - `IN_PROGRESS`；P1-1A～E 已完成第一条文字会话 scoped contract、persistence、backend REST/WS、Web caller、browser reconnect regression 和 independent acceptance；P1-1 `DONE`；
 - P1-2A safe question/session/private projection design freeze 已完成 docs-only；
 - P1-2B persistence/domain/seed、P1-2C safe API/session/Web vertical slice 与 P1-2D independent acceptance 均已完成；P1-2 `DONE`。
-- P1-3A state/timing/command/event/snapshot design freeze 已完成 docs-only；P1-3B backend state-machine + durable phase foundation 已实现；P1-3 `IN_PROGRESS`，P1-3C 未开始并等待单独明确批准。
+- P1-3A state/timing/command/event/snapshot design freeze 已完成 docs-only；P1-3B backend state-machine + durable phase foundation 已实现；P1-3C realtime/Web complete phase flow 已实现；P1-3 `IN_PROGRESS`，P1-3D 未开始并等待单独明确批准。
 
 ### P2 and later
 
@@ -326,6 +327,7 @@ P0-3D 已完成最小 API、OpenAPI authority、typed config、request correlati
 - TBD：WebSocket schema generator package；
 - Implemented：P1-2 safe question reads 和 version-bound session create contract；
 - Implemented：P1-3B `session.start` REST/WS command parsing、generalized state event v2、phase timing snapshot 和 backend durable state-machine foundation；
+- Implemented：P1-3C in-process deadline recovery、connected realtime catch-up/push、Browser authoritative phase/deadline projection 和 complete Chromium phase flow；
 - Deferred：P1-3 之后的完整 REST endpoint / WebSocket command/event 集合；
 - Deferred：event retention/compaction、large replay pagination、multi-tab/cross-process delivery 和长期 compatibility policy；
 - TBD：V0.1 之后的 identity expansion、verified recovery flow 与 authorization；

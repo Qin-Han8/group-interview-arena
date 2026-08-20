@@ -27,6 +27,7 @@ from group_interview_arena_api.core.config import (
     Settings,
 )
 from group_interview_arena_api.core.logging import JsonFormatter
+from tests.deadline_recovery_test_helpers import disable_deadline_recovery_runtime
 
 APPLICATION_LOGGER_NAME = "group_interview_arena_api"
 TEST_DATABASE_URL = (
@@ -45,6 +46,13 @@ UNSUPPORTED_AMBIENT_EXPORTER_AUTH_VARIABLES = (
     "OTEL_EXPORTER_OTLP_TRACES_CLIENT_CERTIFICATE",
     "OTEL_PYTHON_EXPORTER_OTLP_HTTP_TRACES_CREDENTIAL_PROVIDER",
 )
+
+
+@pytest.fixture(autouse=True)
+def _disable_deadline_recovery_for_tracing_tests(  # pyright: ignore[reportUnusedFunction]
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    disable_deadline_recovery_runtime(monkeypatch)
 
 
 def _require_tracing_api() -> tuple[Any, Any]:

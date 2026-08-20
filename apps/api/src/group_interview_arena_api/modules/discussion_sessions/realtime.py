@@ -1,5 +1,7 @@
+import asyncio
 import json
 import logging
+from contextlib import suppress
 from datetime import UTC, datetime
 from typing import Annotated, cast
 from uuid import UUID, uuid4
@@ -43,6 +45,7 @@ from group_interview_arena_api.modules.discussion_sessions.service import (
     apply_session_command,
     get_session_snapshot,
     load_reconnect_events,
+    reconcile_session_deadline,
 )
 
 logger = logging.getLogger(__name__)
@@ -130,6 +133,10 @@ async def _deny(websocket: WebSocket) -> None:
     await websocket.close(code=1008)
 
 
+async def _send_formal_event(websocket: WebSocket, event: StoredEvent) -> None:
+    await websocket.send_json(_formal_event(event).model_dump(mode="json"))
+
+
 async def _authorized_user(
     websocket: WebSocket,
     *,
@@ -182,6 +189,12 @@ def create_realtime_router(settings: Settings) -> APIRouter:
         sequence_ahead = False
         try:
             async with session_factory() as session:
+                await reconcile_session_deadline(
+                    session,
+                    owner_id=user.user_id,
+                    session_id=session_id,
+                )
+            async with session_factory() as session:
                 catchup = await load_reconnect_events(
                     session,
                     owner_id=user.user_id,
@@ -226,9 +239,63 @@ def create_realtime_router(settings: Settings) -> APIRouter:
             return
 
         active_action_id: UUID | None = None
+        sent_sequence = after_sequence
+        send_lock = asyncio.Lock()
+        catchup_task: asyncio.Task[None] | None = None
+
+        async def send_new_events(events: list[StoredEvent]) -> None:
+            nonlocal sent_sequence
+            for event in events:
+                if event.sequence <= sent_sequence:
+                    continue
+                async with send_lock:
+                    if event.sequence <= sent_sequence:
+                        continue
+                    await _send_formal_event(websocket, event)
+                    sent_sequence = event.sequence
+
+        async def send_command_events(events: list[StoredEvent]) -> None:
+            nonlocal sent_sequence
+            for event in events:
+                async with send_lock:
+                    await _send_formal_event(websocket, event)
+                    sent_sequence = max(sent_sequence, event.sequence)
+
+        async def catchup_committed_events() -> None:
+            try:
+                while True:
+                    await asyncio.sleep(0.25)
+                    async with session_factory() as session:
+                        await reconcile_session_deadline(
+                            session,
+                            owner_id=user.user_id,
+                            session_id=session_id,
+                        )
+                    async with session_factory() as session:
+                        events = await load_reconnect_events(
+                            session,
+                            owner_id=user.user_id,
+                            session_id=session_id,
+                            after_sequence=sent_sequence,
+                        )
+                    await send_new_events(events)
+            except asyncio.CancelledError:
+                raise
+            except SequenceAheadError, SessionNotFoundError, SessionPersistenceError:
+                request_id = create_request_id()
+                async with send_lock:
+                    await _send_error(
+                        websocket,
+                        code="INTERNAL_ERROR",
+                        session_id=session_id,
+                        action_id=None,
+                        request_id=request_id,
+                    )
+                    await websocket.close(code=1011)
+
         try:
-            for event in catchup:
-                await websocket.send_json(_formal_event(event).model_dump(mode="json"))
+            await send_new_events(catchup)
+            catchup_task = asyncio.create_task(catchup_committed_events())
 
             while True:
                 message = await websocket.receive()
@@ -358,10 +425,7 @@ def create_realtime_router(settings: Settings) -> APIRouter:
                     await websocket.close(code=1011)
                     return
 
-                for event in events:
-                    await websocket.send_json(
-                        _formal_event(event).model_dump(mode="json")
-                    )
+                await send_command_events(events)
                 log_event(
                     logger,
                     logging.INFO,
@@ -400,5 +464,10 @@ def create_realtime_router(settings: Settings) -> APIRouter:
                 await websocket.close(code=1011)
             except Exception:
                 pass
+        finally:
+            if catchup_task is not None:
+                catchup_task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await catchup_task
 
     return router

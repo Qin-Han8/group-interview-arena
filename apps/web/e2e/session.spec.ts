@@ -3,17 +3,17 @@ import { expect, test } from "@playwright/test";
 const API_BASE_URL = "http://localhost:8000";
 const PRIVATE_SENTINEL = "P1_2C_PRIVATE_SENTINEL_DO_NOT_DISCLOSE";
 
-test("browser session uses durable ordered WebSocket events and REST reload", async ({
+test("browser session uses durable phase deadlines and REST reload", async ({
   page,
 }) => {
   const username = `P11D_${Date.now().toString(36)}`;
   const password = `P1-1D browser ${crypto.randomUUID()} phrase`;
-  let abortCommand: string | undefined;
+  let startCommand: string | undefined;
 
   page.on("websocket", (socket) => {
     socket.on("framesent", ({ payload }) => {
-      if (typeof payload === "string" && payload.includes("session.abort")) {
-        abortCommand = payload;
+      if (typeof payload === "string" && payload.includes("session.start")) {
+        startCommand = payload;
       }
     });
   });
@@ -72,26 +72,35 @@ test("browser session uses durable ordered WebSocket events and REST reload", as
   );
   expect(new URL(page.url()).searchParams.get("session_id")).toBe(sessionId);
 
-  await page.getByRole("button", { name: "结束会话" }).click();
-  await expect(page.getByText("已由用户结束")).toBeVisible();
+  await page.getByRole("button", { name: "开始讨论" }).click();
+  await expect(page.getByText("进行中")).toBeVisible();
+  await expect(page.getByTestId("phase-label")).toContainText("准备");
   await expect(page.getByTestId("session-sequence")).toHaveText("2");
-  await expect.poll(() => abortCommand).toBeTruthy();
-  const parsedCommand = JSON.parse(abortCommand ?? "{}");
+  await expect.poll(() => startCommand).toBeTruthy();
+  const parsedCommand = JSON.parse(startCommand ?? "{}");
   expect(parsedCommand).toEqual({
     schema_version: 1,
-    type: "session.abort",
+    type: "session.start",
     session_id: sessionId,
     action_id: expect.stringMatching(
       /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
     ),
     payload: {},
   });
+  expect(startCommand).not.toContain("next_status");
+  expect(startCommand).not.toContain("phase_deadline_at");
+
+  await expect(
+    page.locator("p").filter({ hasText: "会话状态：" }),
+  ).toContainText("已完成", { timeout: 15_000 });
+  await expect(page.getByTestId("phase-label")).toContainText("已完成");
+  await expect(page.getByTestId("session-sequence")).toHaveText("8");
 
   const duplicate = await page.evaluate(
     ({ command, session }) =>
       new Promise<Record<string, unknown>>((resolve, reject) => {
         const socket = new WebSocket(
-          `ws://localhost:8000/ws/sessions/${session}?after_sequence=2`,
+          `ws://localhost:8000/ws/sessions/${session}?after_sequence=8`,
         );
         const timeout = window.setTimeout(() => {
           socket.close();
@@ -108,14 +117,18 @@ test("browser session uses durable ordered WebSocket events and REST reload", as
           reject(new Error("Duplicate replay WebSocket failed"));
         });
       }),
-    { command: abortCommand!, session: sessionId },
+    { command: startCommand!, session: sessionId },
   );
   expect(duplicate).toMatchObject({
     type: "session.state_changed",
     session_id: sessionId,
     sequence: 2,
     action_id: parsedCommand.action_id,
-    payload: { previous_status: "CREATED", status: "ABORTED_USER" },
+    payload: {
+      previous_status: "CREATED",
+      status: "PREPARATION",
+      trigger: "USER_START",
+    },
   });
   expect(JSON.stringify(duplicate)).not.toContain(PRIVATE_SENTINEL);
 
@@ -133,8 +146,10 @@ test("browser session uses durable ordered WebSocket events and REST reload", as
     body: {
       id: sessionId,
       question_version_id: questionVersionId,
-      status: "ABORTED_USER",
-      last_sequence: 2,
+      status: "COMPLETED",
+      phase_started_at: null,
+      phase_deadline_at: null,
+      last_sequence: 8,
     },
   });
   expect(JSON.stringify(authoritative)).not.toContain(PRIVATE_SENTINEL);
@@ -154,8 +169,10 @@ test("browser session uses durable ordered WebSocket events and REST reload", as
   await expect(page.getByTestId("current-username")).toHaveText(
     username.toLowerCase(),
   );
-  await expect(page.getByText("已由用户结束")).toBeVisible();
-  await expect(page.getByTestId("session-sequence")).toHaveText("2");
+  await expect(
+    page.locator("p").filter({ hasText: "会话状态：" }),
+  ).toContainText("已完成");
+  await expect(page.getByTestId("session-sequence")).toHaveText("8");
   await expect(page.getByTestId("question-version-id")).toContainText(
     questionVersionId,
   );

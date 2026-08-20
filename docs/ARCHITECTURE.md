@@ -1,6 +1,6 @@
 # P0 技术架构基线
 
-- Status: P0 Architecture Baseline + P1-1/P1-2 completed + P1-3B backend state-machine foundation implemented
+- Status: P0 Architecture Baseline + P1-1/P1-2 completed + P1-3C realtime/Web phase flow implemented
 - Current phase: P1 — IN_PROGRESS
 - Architecture baseline established by: P0-2 — DONE
 - P0-3 foundation status: DONE
@@ -8,9 +8,9 @@
 - P0-5 identity boundary status: DONE
 - Most recently completed task: P0-7 independent final acceptance — PASS after two documentation findings remediation and finding-only recheck
 - P0 status: DONE; P0-1 through P0-7 completed
-- P1 status: IN_PROGRESS; P1-1/P1-2 DONE; P1-3 IN_PROGRESS; P1-3A completed; P1-3B completed; P1-3C awaiting explicit approval
+- P1 status: IN_PROGRESS; P1-1/P1-2 DONE; P1-3 IN_PROGRESS; P1-3A completed; P1-3B completed; P1-3C completed; P1-3D awaiting explicit approval
 - Target version: V0.1 Internal Validation
-- Business architecture detail: P1-1 runtime completed; P1-2 question/persona boundary implemented; P1-3B backend state/timing foundation implemented, complete realtime/Web phase flow not started
+- Business architecture detail: P1-1 runtime completed; P1-2 question/persona boundary implemented; P1-3B backend state/timing foundation implemented; P1-3C complete realtime/Web phase flow implemented
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -251,15 +251,15 @@ WebSocket 使用独立版本化事件契约，至少表达 event type、schema v
 - Published content/assignment/stance 采用 append-only application invariant；retirement 只影响未来 discovery。Session foreign key 使用 restrict/no-action historical semantics，禁止 mutable latest pointer 或 retirement cascade 改写历史。
 - 完整范围、schema、B～D caller/acceptance/testing 见 [`exec-plans/P1-2_question-persona-foundation.md`](exec-plans/P1-2_question-persona-foundation.md)。P1-2D independent verdict `PASS`，P1-2 `DONE`；其后的 P1-3A 已完成 docs-only design freeze。
 
-### P1-3 session state/timing architecture — backend foundation implemented
+### P1-3 session state/timing architecture — realtime/Web flow implemented
 
 - V0.1 implemented status path 冻结为 `CREATED -> PREPARATION -> OPENING_STATEMENTS -> EXPLORATION -> CONFLICT_AND_EVALUATION -> CONVERGENCE -> FINAL_SUMMARY -> COMPLETED`；`ABORTED_USER` 可从 `CREATED` 和全部 active phases 进入。
 - FastAPI/domain/PostgreSQL 是 state、timing、deadline 和 transition authority；Browser 只投影 snapshot + ordered formal events，不可指定 next state 或以 countdown 触发 transition。
 - P1-3B 已向现有 session aggregate additive 增加 durable current phase start/deadline 和 server-resolved immutable duration plan；duration 是 typed server configuration，不硬编码 future mode parameters，也不接受 Browser duration。
 - 所有 user transition intent 继续使用 P1-1 stable `action_id`、semantic replay/conflict、session row lock、single transaction、durable sequence 和 commit-before-send。Deadline transition 是 nullable-causation system operation；new user command 在同一 locked transaction 内先 reconcile overdue deadline，再应用 user intent。
-- Recovered phase arithmetic anchored to the previous durable deadline；reload/reconnect/restart 不重置 deadline，downtime catch-up 可按顺序推进多个 overdue phases；P1-3B backend foundation 已用真实 PostgreSQL concurrency/regression 覆盖该语义。
+- Recovered phase arithmetic anchored to the previous durable deadline；reload/reconnect/restart 不重置 deadline，downtime catch-up 可按顺序推进多个 overdue phases；P1-3B backend foundation 与 P1-3C startup/connected recovery 已用真实 PostgreSQL concurrency/regression/Chromium complete-flow 覆盖该语义。
 - Formal vocabulary 保持最小：`session.created` v1 与 `session.state_changed`。Historical abort v1 继续可读；P1-3B start/abort/deadline transitions 使用 generalized event version 2，不静默改写旧 event。
-- In-process timer 只提供 wake-up/liveness；PostgreSQL deadline、row lock 和 event log 提供 correctness。Redis/queue、distributed scheduler 和 cross-process realtime fan-out 继续 Deferred。
+- P1-3C app-owned in-process recovery runtime 只提供 wake-up/liveness，并在 startup、WS connect 和 connected catch-up path 调用同一 overdue reconciliation foundation；PostgreSQL deadline、row lock 和 event log 提供 correctness。Redis/queue、distributed scheduler 和 cross-process realtime fan-out 继续 Deferred。
 - `DEVICE_CHECK`、pause/system failure/partial completion 和 report lifecycle states 保留总纲长期语义但不进入 P1-3 handler。完整设计、C～D scope 和 stop conditions 见 [`exec-plans/P1-3_session-state-machine.md`](exec-plans/P1-3_session-state-machine.md)。
 
 ## Configuration, secrets and error boundaries
@@ -334,7 +334,7 @@ Redis 只在多 API workers、横向扩容、跨进程 WebSocket broadcast、dis
 - P0-5D：completed；真实 browser Cookie/CORS/CSRF 闭环已通过 Chromium 验证；
 - P0-5E：completed；final outcome `PASS after findings remediation and independent recheck`；
 - P0：`DONE`；P0-1～P0-7 completed；P0-7 finding-only independent recheck `PASS`，P1 readiness `READY`；其后用户已明确批准进入 P1；
-- P1：`IN_PROGRESS`；P1-1A～E 已完成且 verdict `PASS`；P1-2A～D 已完成且 P1-2 `DONE`；P1-3A state/timing design freeze 已完成，P1-3B backend state-machine foundation 已完成，P1-3 `IN_PROGRESS`，P1-3C not started / awaiting explicit approval；P1-4 调度、记忆和基础报告仍需后续分别批准；
+- P1：`IN_PROGRESS`；P1-1A～E 已完成且 verdict `PASS`；P1-2A～D 已完成且 P1-2 `DONE`；P1-3A state/timing design freeze 已完成，P1-3B backend state-machine foundation 已完成，P1-3C realtime/Web complete phase flow 已完成，P1-3 `IN_PROGRESS`，P1-3D not started / awaiting explicit approval；P1-4 调度、记忆和基础报告仍需后续分别批准；
 - P2 以后：只在对应阶段获批后增加语音、评分训练和商业化能力。
 
 ## 与其他文档关系

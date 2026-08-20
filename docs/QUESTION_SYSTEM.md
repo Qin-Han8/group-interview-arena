@@ -3,7 +3,7 @@
 - Status: P1-2 completed; design, persistence/domain/seed, safe caller, and independent acceptance complete
 - Current phase: P1 — IN_PROGRESS
 - Target version: V0.1 Internal Validation
-- Current status: P1-2 DONE；P1-3 IN_PROGRESS；P1-3A completed docs-only；P1-3B completed；P1-3C awaiting explicit approval
+- Current status: P1-2 DONE；P1-3 IN_PROGRESS；P1-3A completed docs-only；P1-3B completed；P1-3C completed；P1-3D awaiting explicit approval
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -128,7 +128,7 @@ V0.5 扩展到排序选择、资源分配、方案策划和两难决策，共 20
 - P1-2B：completed；persistence/domain/seed foundation 已建立；
 - P1-2C：completed；safe API/session/Web vertical slice 已建立并通过真实 Chromium/PostgreSQL 验证；
 - P1-2D：completed；independent verdict `PASS`；
-- P1-3A：completed；state/timing design consumes immutable question-version binding without changing question/persona schema；P1-3B completed without changing question/persona schema；P1-3C awaiting explicit approval；
+- P1-3A：completed；state/timing design consumes immutable question-version binding without changing question/persona schema；P1-3B completed without changing question/persona schema；P1-3C completed without changing question/persona schema；P1-3D awaiting explicit approval；
 - P3：细化题型对评分权重和证据要求的影响；
 - P5：通过公开测试补充精品题并验证质量指标；
 - V1.0：按已批准范围扩展更多题型和 AI 变体能力。

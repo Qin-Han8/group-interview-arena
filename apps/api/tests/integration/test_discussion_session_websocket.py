@@ -20,6 +20,7 @@ from group_interview_arena_api.app import create_app
 from group_interview_arena_api.core.config import (
     DatabaseSettings,
     Environment,
+    SessionPhaseDurations,
     Settings,
 )
 from group_interview_arena_api.db.runtime import (
@@ -75,7 +76,11 @@ class SyncTestClient(Protocol):
     ) -> WebSocketTestSession: ...
 
 
-def _application(temporary_database: TemporaryDatabaseContext) -> FastAPI:
+def _application(
+    temporary_database: TemporaryDatabaseContext,
+    *,
+    settings: Settings | None = None,
+) -> FastAPI:
     async def seed() -> None:
         engine = create_database_engine(temporary_database.database_settings())
         try:
@@ -87,7 +92,8 @@ def _application(temporary_database: TemporaryDatabaseContext) -> FastAPI:
 
     asyncio.run(seed(), loop_factory=asyncio.SelectorEventLoop)
     return create_app(
-        Settings(
+        settings
+        or Settings(
             environment=Environment.TEST,
             cors_origins=(TRUSTED_ORIGIN,),
         ),
@@ -140,6 +146,16 @@ def _abort_command(session_id: str, action_id: UUID) -> dict[str, object]:
     return {
         "schema_version": 1,
         "type": "session.abort",
+        "session_id": session_id,
+        "action_id": str(action_id),
+        "payload": {},
+    }
+
+
+def _start_command(session_id: str, action_id: UUID) -> dict[str, object]:
+    return {
+        "schema_version": 1,
+        "type": "session.start",
         "session_id": session_id,
         "action_id": str(action_id),
         "payload": {},
@@ -434,3 +450,60 @@ def test_websocket_ahead_watermark_and_lost_send_reconnect_are_durable(
             assert recovered["action_id"] == str(action_id)
             websocket.send_json(_abort_command(session_id, action_id))
             assert websocket.receive_json() == recovered
+
+
+def test_websocket_delivers_committed_phase_deadline_event(
+    migrated_database: TemporaryDatabaseContext,
+) -> None:
+    application = _application(
+        migrated_database,
+        settings=Settings(
+            environment=Environment.TEST,
+            cors_origins=(TRUSTED_ORIGIN,),
+            session_phase_durations=SessionPhaseDurations(
+                preparation_seconds=1,
+                opening_statements_seconds=30,
+                exploration_seconds=30,
+                conflict_and_evaluation_seconds=30,
+                convergence_seconds=30,
+                final_summary_seconds=30,
+            ),
+        ),
+    )
+    with _client(application) as client:
+        _register(client, "ws_phase_owner")
+        snapshot = _create_session(client)
+        session_id = str(snapshot["id"])
+        action_id = uuid4()
+
+        with client.websocket_connect(
+            _ws_path(session_id),
+            headers={"Origin": TRUSTED_ORIGIN},
+        ) as websocket:
+            websocket.send_json(_start_command(session_id, action_id))
+            started = websocket.receive_json()
+            assert started["schema_version"] == 2
+            assert started["sequence"] == 2
+            assert started["action_id"] == str(action_id)
+            assert started["payload"]["trigger"] == "USER_START"
+            assert started["payload"]["status"] == "PREPARATION"
+            assert started["payload"]["phase_started_at"] is not None
+            assert started["payload"]["phase_deadline_at"] is not None
+
+            advanced = websocket.receive_json()
+            assert advanced["schema_version"] == 2
+            assert advanced["type"] == "session.state_changed"
+            assert advanced["sequence"] == 3
+            assert advanced["action_id"] is None
+            assert advanced["payload"]["trigger"] == "PHASE_DEADLINE"
+            assert advanced["payload"]["previous_status"] == "PREPARATION"
+            assert advanced["payload"]["status"] == "OPENING_STATEMENTS"
+            assert (
+                advanced["payload"]["phase_started_at"]
+                == started["payload"]["phase_deadline_at"]
+            )
+
+        restored = client.get(f"/sessions/{session_id}")
+        assert restored.status_code == 200
+        assert restored.json()["status"] == "OPENING_STATEMENTS"
+        assert restored.json()["last_sequence"] == 3

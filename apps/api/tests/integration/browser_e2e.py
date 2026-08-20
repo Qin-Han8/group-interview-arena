@@ -208,6 +208,14 @@ def _run_browser_flow(temporary_database: TemporaryDatabase) -> None:
                     "GIA_API_DATABASE_URL": database_url.get_secret_value(),
                     "GIA_API_ENVIRONMENT": "test",
                     "GIA_API_SESSION_COOKIE_SECURE": "false",
+                    "GIA_API_SESSION_PHASE_DURATIONS": (
+                        '{"preparation_seconds":1,'
+                        '"opening_statements_seconds":1,'
+                        '"exploration_seconds":1,'
+                        '"conflict_and_evaluation_seconds":1,'
+                        '"convergence_seconds":1,'
+                        '"final_summary_seconds":1}'
+                    ),
                     "PYTHONUNBUFFERED": "1",
                 },
                 log_path=api_log,
@@ -243,7 +251,8 @@ def _verify_session_persistence(temporary_database: TemporaryDatabase) -> None:
         password=database_url.password,
     ) as connection:
         session_rows = connection.execute(
-            "SELECT status, last_sequence, question_version_id FROM simulation_sessions"
+            "SELECT status, last_sequence, question_version_id, "
+            "phase_started_at, phase_deadline_at FROM simulation_sessions"
         ).fetchall()
         action_count = connection.execute(
             "SELECT count(*) FROM session_actions"
@@ -252,12 +261,14 @@ def _verify_session_persistence(temporary_database: TemporaryDatabase) -> None:
             "SELECT sequence FROM discussion_events ORDER BY sequence"
         ).fetchall()
 
-    if session_rows != [("ABORTED_USER", 2, INTERNAL_VALIDATION_BUNDLE.version_id)]:
+    if session_rows != [
+        ("COMPLETED", 8, INTERNAL_VALIDATION_BUNDLE.version_id, None, None)
+    ]:
         raise RuntimeError("Browser E2E session state was not persisted exactly.")
     if action_count is None or action_count[0] != 1:
         raise RuntimeError("Browser E2E action idempotency row count was not one.")
-    if event_sequences != [(1,), (2,)]:
-        raise RuntimeError("Browser E2E formal event sequences were not [1, 2].")
+    if event_sequences != [(sequence,) for sequence in range(1, 9)]:
+        raise RuntimeError("Browser E2E formal event sequences were not [1..8].")
 
 
 async def _seed_browser_question_async(
@@ -320,8 +331,9 @@ def main() -> int:
         _verify_session_persistence(temporary_database)
 
     print(
-        "P1-2C browser E2E passed with immutable question binding, one durable "
-        "action, sequences [1, 2], and private sentinel isolation; "
+        "P1-3C browser E2E passed with immutable question binding, one durable "
+        "start action, sequences [1..8], completed phase recovery, and private "
+        "sentinel isolation; "
         "temporary database and servers were cleaned."
     )
     return 0

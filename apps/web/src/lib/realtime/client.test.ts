@@ -145,6 +145,34 @@ describe("session realtime client", () => {
     expect(crypto.randomUUID).toHaveBeenCalledOnce();
   });
 
+  it("sends a user start intent without selecting the next phase", () => {
+    const client = createSessionRealtimeClient({
+      baseUrl: BASE_URL,
+      snapshot: CREATED_SNAPSHOT,
+      loadSnapshot: vi.fn().mockResolvedValue(CREATED_SNAPSHOT),
+      onEvent: vi.fn(),
+      onSnapshot: vi.fn(),
+      onPendingChange: vi.fn(),
+      onConnectionChange: vi.fn(),
+      onError: vi.fn(),
+    });
+
+    client.start();
+    const socket = FakeWebSocket.instances[0];
+    socket?.open();
+
+    expect(client.startSession()).toBe(ACTION_ID);
+    expect(JSON.parse(socket?.sent[0] ?? "{}")).toEqual({
+      schema_version: 1,
+      type: "session.start",
+      session_id: SESSION_ID,
+      action_id: ACTION_ID,
+      payload: {},
+    });
+    expect(socket?.sent[0]).not.toContain("next_status");
+    expect(socket?.sent[0]).not.toContain("phase_deadline_at");
+  });
+
   it("renews the bounded reconnect budget after a recovered socket stays healthy without events", async () => {
     const loadSnapshot = vi.fn().mockResolvedValue(CREATED_SNAPSHOT);
     const client = createSessionRealtimeClient({

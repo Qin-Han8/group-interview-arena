@@ -1,6 +1,6 @@
 # P1-3 Session State-Machine Execution Plan
 
-Status: `P1 IN_PROGRESS`; `P1-3 IN_PROGRESS`; `P1-3A completed`; `P1-3B completed`; `P1-3C not started / awaiting explicit approval`
+Status: `P1 IN_PROGRESS`; `P1-3 IN_PROGRESS`; `P1-3A completed`; `P1-3B completed`; `P1-3C completed`; `P1-3D not started / awaiting explicit approval`
 
 Target version: `V0.1 Internal Validation`
 
@@ -31,10 +31,10 @@ P1-3 只建立 session phase/state/timing/recovery 和 Browser authoritative pro
 
 1. **P1-3A — Design freeze**：`completed`。Docs-only 冻结状态、transition、timing、command/event、snapshot、B～D scope 和 acceptance；不修改 runtime、tests、schema/migration、dependency/lockfile 或 CI。
 2. **P1-3B — Backend state machine + durable phase foundation**：`completed`。实现 pure domain matrix、additive timing persistence、server-owned duration-plan resolution、locked transactional transitions、due reconciliation、REST/WS backend contracts和 PostgreSQL regressions；不实现 Browser complete phase UI 或 P1-4 调度。
-3. **P1-3C — Realtime/Web complete phase flow**：`not started / awaiting explicit approval`。实现 in-process deadline wake-up/recovery、connected WS catch-up/push、Browser start/current-phase/deadline projection 和真实 PostgreSQL Chromium complete-flow validation；不引入 Redis/queue。
+3. **P1-3C — Realtime/Web complete phase flow**：`completed`。实现 in-process deadline wake-up/recovery、connected WS catch-up/push、Browser start/current-phase/deadline projection 和真实 PostgreSQL Chromium complete-flow validation；不引入 Redis/queue。
 4. **P1-3D — Independent acceptance + closeout**：`not started / awaiting explicit approval`。从 committed source 独立复核 matrix、并发、timing、restart/reconnect、contract/browser 和 Deferred absence；PASS 后才把 P1-3 标记 `DONE`。
 
-P1-3C、P1-3D 均需单独明确批准。P1-3B 完成后不得自动开始 P1-3C。
+P1-3D 需单独明确批准。P1-3C 完成后不得自动开始 P1-3D。
 
 ## Frozen V0.1 state model
 
@@ -316,5 +316,5 @@ P1-3B implemented the backend-only foundation and ran risk-matched backend/Web/A
 - [x] P1-3B～D scope、acceptance、validation、risks and explicit deferrals frozen。
 - [x] No Proposed Decision or blocker found；P1-3A completed docs-only。
 - [x] P1-3B backend state machine + durable phase foundation completed。
-- [ ] P1-3C not started / awaiting explicit approval。
+- [x] P1-3C realtime/Web complete phase flow completed。
 - [ ] P1-3D not started / awaiting explicit approval。

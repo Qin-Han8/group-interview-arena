@@ -83,6 +83,14 @@ export type SessionAbortCommand = {
   payload: Record<string, never>;
 };
 
+export type SessionStartCommand = {
+  schema_version: 1;
+  type: "session.start";
+  session_id: string;
+  action_id: string;
+  payload: Record<string, never>;
+};
+
 const UUID4_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ERROR_CODES = new Set<RealtimeErrorCode>([

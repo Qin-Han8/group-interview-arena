@@ -77,6 +77,15 @@ const ABORTED: SessionSnapshot = {
   updated_at: "2026-08-16T00:00:01Z",
   last_sequence: 2,
 };
+const PREPARATION: SessionSnapshot = {
+  ...CREATED,
+  status: "PREPARATION",
+  phase_started_at: "2026-08-16T00:00:01Z",
+  phase_deadline_at: "2026-08-16T00:04:01Z",
+  server_now: "2026-08-16T00:00:01Z",
+  updated_at: "2026-08-16T00:00:01Z",
+  last_sequence: 2,
+};
 const API_CLIENT = { unit: true } as unknown as ApiClient;
 
 const mockedCreateSession = vi.mocked(createSession);
@@ -87,15 +96,17 @@ const mockedCreateRealtime = vi.mocked(createSessionRealtimeClient);
 
 function installRealtimeDouble() {
   const start = vi.fn();
+  const startSession = vi.fn(() => ACTION_ID);
   const abort = vi.fn(() => ACTION_ID);
   const stop = vi.fn();
   let options: Parameters<typeof createSessionRealtimeClient>[0] | undefined;
   mockedCreateRealtime.mockImplementation((candidate) => {
     options = candidate;
-    return { start, abort, stop };
+    return { start, startSession, abort, stop };
   });
   return {
     start,
+    startSession,
     abort,
     stop,
     options: () => {
@@ -162,6 +173,9 @@ describe("SessionPanel", () => {
     realtime
       .options()
       .onConnectionChange("connected" satisfies RealtimeConnectionState);
+    expect(
+      await screen.findByRole("button", { name: "开始讨论" }),
+    ).toBeEnabled();
     fireEvent.click(await screen.findByRole("button", { name: "结束会话" }));
     expect(realtime.abort).toHaveBeenCalledOnce();
 
@@ -176,6 +190,56 @@ describe("SessionPanel", () => {
     } satisfies FormalSessionEvent);
     expect(await screen.findByText("已由用户结束")).toBeInTheDocument();
     expect(screen.getByTestId("session-sequence")).toHaveTextContent("2");
+  });
+
+  it("starts a session and projects authoritative phase timing from v2 events", async () => {
+    installQuestionDiscovery();
+    mockedCreateSession.mockResolvedValue({
+      data: CREATED,
+      response: new Response(null, { status: 201 }),
+    });
+    const realtime = installRealtimeDouble();
+
+    render(
+      <SessionPanel apiClient={API_CLIENT} baseUrl="http://localhost:8000" />,
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "创建文字会话" }),
+    );
+    await screen.findByText("已创建");
+
+    realtime
+      .options()
+      .onConnectionChange("connected" satisfies RealtimeConnectionState);
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "开始讨论" })).toBeEnabled(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "开始讨论" }));
+    expect(realtime.startSession).toHaveBeenCalledOnce();
+
+    realtime.options().onEvent({
+      schema_version: 2,
+      type: "session.state_changed",
+      session_id: SESSION_ID,
+      sequence: 2,
+      occurred_at: PREPARATION.updated_at,
+      action_id: ACTION_ID,
+      payload: {
+        previous_status: "CREATED",
+        status: "PREPARATION",
+        trigger: "USER_START",
+        phase_started_at: PREPARATION.phase_started_at,
+        phase_deadline_at: PREPARATION.phase_deadline_at,
+      },
+    } satisfies FormalSessionEvent);
+
+    expect(await screen.findByText("进行中")).toBeInTheDocument();
+    expect(screen.getByTestId("phase-label")).toHaveTextContent("准备");
+    expect(screen.getByTestId("phase-deadline")).toHaveTextContent(
+      PREPARATION.phase_deadline_at!,
+    );
+    expect(screen.getByTestId("session-sequence")).toHaveTextContent("2");
+    expect(screen.getByRole("button", { name: "结束会话" })).toBeEnabled();
   });
 
   it("reloads the authoritative REST snapshot from the session URL", async () => {

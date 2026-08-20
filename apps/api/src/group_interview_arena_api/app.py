@@ -40,6 +40,11 @@ from group_interview_arena_api.db.runtime import (
     dispose_database_engine,
 )
 from group_interview_arena_api.identity.routes import create_auth_router
+from group_interview_arena_api.modules.discussion_sessions.deadline_recovery import (
+    DeadlineRecoveryRuntime,
+    recover_due_sessions,
+    start_deadline_recovery_runtime,
+)
 from group_interview_arena_api.modules.discussion_sessions.realtime import (
     create_realtime_router,
 )
@@ -86,9 +91,20 @@ def create_app(
                 DATABASE_SESSION_FACTORY_STATE_KEY,
                 session_factory,
             )
+            await recover_due_sessions(session_factory)
+            deadline_recovery_runtime = start_deadline_recovery_runtime(session_factory)
+            application.state.deadline_recovery_runtime = deadline_recovery_runtime
             log_event(logger, logging.INFO, "app.startup.completed")
             yield
         finally:
+            candidate_recovery_runtime = getattr(
+                application.state,
+                "deadline_recovery_runtime",
+                None,
+            )
+            if isinstance(candidate_recovery_runtime, DeadlineRecoveryRuntime):
+                await candidate_recovery_runtime.stop()
+                del application.state.deadline_recovery_runtime
             if hasattr(application.state, DATABASE_SESSION_FACTORY_STATE_KEY):
                 delattr(application.state, DATABASE_SESSION_FACTORY_STATE_KEY)
             try:

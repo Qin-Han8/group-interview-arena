@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 from typing import Any, cast
 from uuid import uuid4
 
+import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient, Response
 from opentelemetry import trace
@@ -23,6 +24,7 @@ from group_interview_arena_api.core.config import (
     Settings,
 )
 from group_interview_arena_api.core.logging import JsonFormatter, log_event
+from tests.deadline_recovery_test_helpers import disable_deadline_recovery_runtime
 
 APPLICATION_LOGGER_NAME = "group_interview_arena_api"
 TEST_DATABASE_URL = (
@@ -231,7 +233,10 @@ def test_unhandled_failure_is_safe_correlated_and_not_double_logged() -> None:
     _assert_values_absent(response.text, sentinels)
 
 
-def test_lifespan_emits_safe_startup_and_shutdown_events() -> None:
+def test_lifespan_emits_safe_startup_and_shutdown_events(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    disable_deadline_recovery_runtime(monkeypatch)
     application = create_app(
         Settings(environment=Environment.TEST),
         DatabaseSettings(database_url=SecretStr(TEST_DATABASE_URL)),

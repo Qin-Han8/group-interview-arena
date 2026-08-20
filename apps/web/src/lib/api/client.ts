@@ -65,6 +65,20 @@ export function createSession(client: ApiClient, questionVersionId: string) {
   });
 }
 
+export function startSession(
+  client: ApiClient,
+  sessionId: string,
+  actionId: string,
+) {
+  return client.POST("/sessions/{session_id}/start", {
+    body: { action_id: actionId },
+    params: {
+      path: { session_id: sessionId },
+      header: { [CSRF_HEADER_NAME]: CSRF_HEADER_VALUE },
+    },
+  });
+}
+
 export function getSessionSnapshot(client: ApiClient, sessionId: string) {
   return client.GET("/sessions/{session_id}", {
     params: { path: { session_id: sessionId } },

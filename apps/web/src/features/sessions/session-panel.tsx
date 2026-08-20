@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   createSession,
@@ -22,6 +22,27 @@ import type { FormalSessionEvent } from "@/lib/realtime/contract";
 type SessionPanelProps = {
   apiClient: ApiClient;
   baseUrl: string;
+};
+
+const PHASES = [
+  "PREPARATION",
+  "OPENING_STATEMENTS",
+  "EXPLORATION",
+  "CONFLICT_AND_EVALUATION",
+  "CONVERGENCE",
+  "FINAL_SUMMARY",
+] as const;
+
+const PHASE_LABELS: Record<SessionSnapshot["status"], string> = {
+  CREATED: "未开始",
+  PREPARATION: "准备",
+  OPENING_STATEMENTS: "个人陈述",
+  EXPLORATION: "观点探索",
+  CONFLICT_AND_EVALUATION: "冲突评估",
+  CONVERGENCE: "收敛决策",
+  FINAL_SUMMARY: "最终总结",
+  COMPLETED: "已完成",
+  ABORTED_USER: "已结束",
 };
 
 function putSessionInUrl(sessionId: string) {
@@ -52,9 +73,14 @@ function projectEvent(
       event.schema_version === 2 ? event.payload.phase_started_at : null,
     phase_deadline_at:
       event.schema_version === 2 ? event.payload.phase_deadline_at : null,
+    server_now: event.occurred_at,
     updated_at: event.occurred_at,
     last_sequence: event.sequence,
   };
+}
+
+function isActivePhase(status: SessionSnapshot["status"]) {
+  return PHASES.some((phase) => phase === status);
 }
 
 function statusLabel(status: SessionSnapshot["status"]) {
@@ -68,6 +94,14 @@ function statusLabel(status: SessionSnapshot["status"]) {
     default:
       return "进行中";
   }
+}
+
+function formatCountdown(milliseconds: number) {
+  if (milliseconds <= 0) return "等待服务器推进";
+  const totalSeconds = Math.ceil(milliseconds / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
 
 function connectionLabel(state: RealtimeConnectionState) {
@@ -98,7 +132,40 @@ export default function SessionPanel({
   const [connection, setConnection] =
     useState<RealtimeConnectionState>("disconnected");
   const [errorMessage, setErrorMessage] = useState<string>();
+  const [clockAnchor, setClockAnchor] = useState({
+    localNowMs: 0,
+    serverNowMs: 0,
+  });
+  const [displayNowMs, setDisplayNowMs] = useState(0);
+  const snapshotRef = useRef<SessionSnapshot | undefined>(undefined);
   const realtimeRef = useRef<SessionRealtimeClient | undefined>(undefined);
+
+  const updateClockFromSnapshot = useCallback((next: SessionSnapshot) => {
+    if (!next.server_now) return;
+    const localNowMs = Date.now();
+    setClockAnchor({
+      localNowMs,
+      serverNowMs: Date.parse(next.server_now),
+    });
+    setDisplayNowMs(localNowMs);
+  }, []);
+
+  const applySnapshot = useCallback(
+    (next: SessionSnapshot) => {
+      snapshotRef.current = next;
+      setSnapshot(next);
+      updateClockFromSnapshot(next);
+    },
+    [updateClockFromSnapshot],
+  );
+
+  useEffect(() => {
+    if (!snapshot?.phase_deadline_at || !isActivePhase(snapshot.status)) return;
+    const interval = window.setInterval(() => {
+      setDisplayNowMs(Date.now());
+    }, 1_000);
+    return () => window.clearInterval(interval);
+  }, [snapshot?.phase_deadline_at, snapshot?.status]);
 
   useEffect(() => {
     let active = true;
@@ -137,7 +204,7 @@ export default function SessionPanel({
           setErrorMessage("无法加载会话，请确认会话仍然可用。");
           return;
         }
-        setSnapshot(result.data);
+        applySnapshot(result.data);
         setConnectionSeed(result.data);
         if (result.data.question_version_id) {
           const questionResult = await getQuestion(
@@ -162,7 +229,7 @@ export default function SessionPanel({
     return () => {
       active = false;
     };
-  }, [apiClient]);
+  }, [apiClient, applySnapshot]);
 
   useEffect(() => {
     if (!connectionSeed) return;
@@ -177,12 +244,11 @@ export default function SessionPanel({
       },
       onEvent(event) {
         if (!active) return;
-        setSnapshot((current) =>
-          current ? projectEvent(current, event) : current,
-        );
+        const current = snapshotRef.current;
+        if (current) applySnapshot(projectEvent(current, event));
       },
       onSnapshot(authoritative) {
-        if (active) setSnapshot(authoritative);
+        if (active) applySnapshot(authoritative);
       },
       onPendingChange(pending) {
         if (active) setPendingAction(pending);
@@ -202,7 +268,7 @@ export default function SessionPanel({
       realtime.stop();
       if (realtimeRef.current === realtime) realtimeRef.current = undefined;
     };
-  }, [apiClient, baseUrl, connectionSeed]);
+  }, [apiClient, applySnapshot, baseUrl, connectionSeed]);
 
   async function create() {
     if (creating || !selectedQuestionId) return;
@@ -215,7 +281,7 @@ export default function SessionPanel({
         return;
       }
       putSessionInUrl(result.data.id);
-      setSnapshot(result.data);
+      applySnapshot(result.data);
       setConnectionSeed(result.data);
       const authoritativeQuestionId = result.data.question_version_id;
       if (!authoritativeQuestionId) {
@@ -237,6 +303,18 @@ export default function SessionPanel({
       setCreating(false);
     }
   }
+
+  const estimatedServerNowMs =
+    clockAnchor.serverNowMs === 0
+      ? undefined
+      : clockAnchor.serverNowMs + (displayNowMs - clockAnchor.localNowMs);
+  const phaseDeadlineMs = snapshot?.phase_deadline_at
+    ? Date.parse(snapshot.phase_deadline_at)
+    : undefined;
+  const countdown =
+    phaseDeadlineMs === undefined || estimatedServerNowMs === undefined
+      ? undefined
+      : formatCountdown(phaseDeadlineMs - estimatedServerNowMs);
 
   if (checkingUrl) {
     return (
@@ -313,9 +391,70 @@ export default function SessionPanel({
             <span data-testid="session-sequence">{snapshot.last_sequence}</span>
           </p>
           <p className="text-neutral-600">{connectionLabel(connection)}</p>
+          <div className="mt-4 space-y-3 border-t border-neutral-200 pt-4">
+            <div>
+              <p className="font-medium" data-testid="phase-label">
+                当前阶段：{PHASE_LABELS[snapshot.status]}
+              </p>
+              {countdown ? (
+                <p className="text-neutral-600" data-testid="phase-countdown">
+                  剩余时间：{countdown}
+                </p>
+              ) : (
+                <p className="text-neutral-600">等待开始后显示阶段时间。</p>
+              )}
+              {snapshot.phase_deadline_at ? (
+                <p
+                  className="break-all text-neutral-600"
+                  data-testid="phase-deadline"
+                >
+                  服务端截止：{snapshot.phase_deadline_at}
+                </p>
+              ) : null}
+            </div>
+            <ol className="grid gap-1 text-neutral-600">
+              {PHASES.map((phase) => (
+                <li
+                  className={
+                    snapshot.status === phase
+                      ? "font-medium text-neutral-950"
+                      : undefined
+                  }
+                  key={phase}
+                >
+                  {PHASE_LABELS[phase]}
+                </li>
+              ))}
+            </ol>
+          </div>
           {snapshot.status === "CREATED" ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                className="border border-neutral-900 bg-neutral-900 px-4 py-2 font-medium text-white disabled:opacity-50"
+                disabled={pendingAction || connection !== "connected"}
+                onClick={() => {
+                  setErrorMessage(undefined);
+                  realtimeRef.current?.startSession();
+                }}
+                type="button"
+              >
+                {pendingAction ? "正在开始…" : "开始讨论"}
+              </button>
+              <button
+                className="border border-neutral-900 px-4 py-2 font-medium disabled:opacity-50"
+                disabled={pendingAction || connection !== "connected"}
+                onClick={() => {
+                  setErrorMessage(undefined);
+                  realtimeRef.current?.abort();
+                }}
+                type="button"
+              >
+                {pendingAction ? "正在结束…" : "结束会话"}
+              </button>
+            </div>
+          ) : isActivePhase(snapshot.status) ? (
             <button
-              className="mt-2 border border-neutral-900 px-4 py-2 font-medium disabled:opacity-50"
+              className="mt-3 border border-neutral-900 px-4 py-2 font-medium disabled:opacity-50"
               disabled={pendingAction || connection !== "connected"}
               onClick={() => {
                 setErrorMessage(undefined);
