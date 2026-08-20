@@ -1,9 +1,9 @@
 # AI 候选人与讨论编排骨架
 
-- Status: P1-2 completed; P1-3C realtime/Web phase flow implemented; orchestrator/AI runtime deferred
+- Status: P1-2/P1-3 completed; orchestrator/AI runtime deferred
 - Current phase: P1 — IN_PROGRESS
 - Target version: V0.1 Internal Validation
-- Detailed orchestrator/agent design: P1-3A state/timing boundary completed docs-only; P1-3B backend state machine completed; P1-3C realtime/Web phase flow completed; P1-3D awaiting explicit approval
+- Detailed orchestrator/agent design: P1-3A～D completed; independent verdict `PASS`; P1-4 not started / awaiting explicit approval
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -186,7 +186,7 @@ Formal event vocabulary remains `session.created` and `session.state_changed`。
 
 ## Future work
 
-- P1：`IN_PROGRESS`；P1-1 session foundation 与 P1-2 question/persona foundation 均为 `DONE`；P1-3A state/timing design freeze 已完成 docs-only，P1-3B backend state-machine + durable phase foundation 已完成，P1-3C realtime/Web complete phase flow 已完成，P1-3 `IN_PROGRESS`；P1-3D independent acceptance、P1-4 调度、记忆和 AI runtime 仍未开始并需后续批准。
+- P1：`IN_PROGRESS`；P1-1 session foundation、P1-2 question/persona foundation 与 P1-3 session state machine 均为 `DONE`；P1-3A～D completed，independent verdict `PASS`；P1-4 调度、记忆和 AI runtime 未开始并需后续批准。
 - P2：加入语音、打断、播放停止和恢复语义。
 - P3：建立角色行为与评分证据之间的校准边界。
 - P6/V1.0：扩展到 6～8 种角色和压力模式。

@@ -1,6 +1,6 @@
 # API 与事件技术基线
 
-- Status: P0 API Architecture Baseline + P1-1/P1-2 completed + P1-3C realtime/Web complete phase flow implemented
+- Status: P0 API Architecture Baseline + P1-1/P1-2/P1-3 completed
 - Current phase: P1 — IN_PROGRESS
 - API architecture baseline established by: P0-2 — DONE
 - Target version: V0.1 Internal Validation
@@ -9,7 +9,7 @@
 - P0-5 browser CORS/CSRF/Web closure: P0-5D completed
 - P1-1 contract: scoped/frozen by P1-1A; P1-1B persistence, P1-1C REST/WebSocket runtime, P1-1D Web realtime caller and P1-1E independent final review completed
 - P1-2 contract: P1-2A/B/C completed; safe question reads and immutable version-bound session creation implemented
-- P1-3 contract: P1-3A completed docs-only; P1-3B backend state-machine + durable phase foundation implemented; P1-3C realtime/Web complete phase flow implemented; P1-3D not started
+- P1-3 contract: P1-3A～D completed; independent verdict `PASS`; P1-3 `DONE`
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -217,9 +217,9 @@ P1-2C 已按 P1-2A 冻结 contract 实现以下边界；FastAPI OpenAPI 与 gene
 
 完整 scope、dependencies、caller、acceptance 和 testing 见 [`exec-plans/P1-2_question-persona-foundation.md`](exec-plans/P1-2_question-persona-foundation.md)。
 
-## P1-3 state/timing contract — P1-3C realtime/Web implemented
+## P1-3 state/timing contract — completed and independently accepted
 
-P1-3A 冻结以下 additive contract；P1-3B 已实现 backend/domain/persistence/API/realtime-parser foundation。P1-3C 已实现 in-process deadline recovery、connected WebSocket catch-up/push、Browser start/current-phase/deadline projection 和真实 PostgreSQL Chromium complete-flow validation；P1-3D independent acceptance 尚未开始。
+P1-3A 冻结以下 additive contract；P1-3B 已实现 backend/domain/persistence/API/realtime-parser foundation；P1-3C 已实现 in-process deadline recovery、connected WebSocket catch-up/push、Browser start/current-phase/deadline projection 和真实 PostgreSQL Chromium complete-flow validation；P1-3D 已从 clean committed source 独立复核并给出 `PASS`。
 
 ### User command vocabulary
 
@@ -314,7 +314,7 @@ P0-3D 已完成最小 API、OpenAPI authority、typed config、request correlati
 - `IN_PROGRESS`；P1-1A～E 已完成第一条文字会话 scoped contract、persistence、backend REST/WS、Web caller、browser reconnect regression 和 independent acceptance；P1-1 `DONE`；
 - P1-2A safe question/session/private projection design freeze 已完成 docs-only；
 - P1-2B persistence/domain/seed、P1-2C safe API/session/Web vertical slice 与 P1-2D independent acceptance 均已完成；P1-2 `DONE`。
-- P1-3A state/timing/command/event/snapshot design freeze 已完成 docs-only；P1-3B backend state-machine + durable phase foundation 已实现；P1-3C realtime/Web complete phase flow 已实现；P1-3 `IN_PROGRESS`，P1-3D 未开始并等待单独明确批准。
+- P1-3A～D 已完成；state/timing/command/event/snapshot、backend durable foundation 与 realtime/Web complete phase flow 已独立验收 `PASS`；P1-3 `DONE`，P1 保持 `IN_PROGRESS`，P1-4 未开始并等待单独明确批准。
 
 ### P2 and later
 

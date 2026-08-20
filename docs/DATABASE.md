@@ -15,7 +15,7 @@
 - Target version: V0.1 Internal Validation
 - Business schema: identity, P1-1 session foundation, P1-2B question/persona foundation, and P1-3B additive session timing fields (ten product tables)
 - P1-1 status: P1-1A～E completed; independent final verdict PASS; P1-1 DONE
-- P1-2 status: DONE; P1-3 IN_PROGRESS; P1-3A completed docs-only; P1-3B completed; P1-3C completed; P1-3D not started / awaiting explicit approval
+- P1-2/P1-3 status: DONE; P1-3A～D completed; P1-3 independent verdict `PASS`; P1-4 not started / awaiting explicit approval
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -339,7 +339,7 @@ Deadline transition 继续锁定 `simulation_sessions` row，并在同一 transa
 
 - P0-5C：FastAPI lifespan/request dependency 已成为现有 async DB runtime 的第一个 application caller；真实 PostgreSQL auth integration 只使用迁移到 head 的隔离临时数据库，development DB 保持 head `4fe43b42641b` 且两张表均为 0 rows；
 - P0-5D：completed；browser closure 已实现，existing Cookie/CORS/CSRF/shared trusted-origin boundary 已生效；P1 不得创建第二套 trusted-origin config；
-- P1：`IN_PROGRESS`；P1-1/P1-2 `DONE`；current migration head `f1a13b15c003`、精确十张 product tables，P1-3B durable phase data foundation 已实现并通过 PostgreSQL migration/concurrency gates；P1-3C recovery/realtime/Web flow 已完成且无 schema change；P1-3D not started / awaiting explicit approval；participant/utterance、记忆和报告继续留给后续获批任务；
+- P1：`IN_PROGRESS`；P1-1/P1-2/P1-3 `DONE`；current migration head `f1a13b15c003`、精确十张 product tables，P1-3 durable phase/recovery/realtime/Web flow 已独立验收 `PASS`；P1-3C/D 无 schema change；P1-4、participant/utterance、记忆和报告未开始并继续留给后续获批任务；
 - P2～P4：仅随获批范围增加音频、评分训练和商业化数据。
 
 ## 与其他文档关系

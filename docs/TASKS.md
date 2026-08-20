@@ -1,17 +1,17 @@
 # 当前任务清单
 
-- Status: P1 in progress; P1-1 and P1-2 completed; P1-3C realtime/Web complete phase flow completed
-- Managed scope: P1-3A docs-only design freeze, P1-3B backend implementation, and P1-3C realtime/Web implementation completed; P1-3D is not approved
-- Most recently completed subphase: P1-3C — `DONE`
+- Status: P1 in progress; P1-1, P1-2, and P1-3 completed
+- Managed scope: P1-3A～D completed; P1-4 remains unstarted and requires explicit approval
+- Most recently completed subphase: P1-3D — `DONE`
 - P0-7 final outcome: initial verdict `BLOCKED` with two documentation findings; remediation completed; finding-only independent recheck `PASS`; new blockers none; P1 readiness `READY`
 - Current phase: P1 — `IN_PROGRESS`
-- Most recently completed task: P1-3C — `DONE`
-- Next task gate: P1-3D — `TODO` / not started / awaiting explicit user approval
+- Most recently completed task: P1-3D — `DONE`; P1-3 — `DONE`
+- Next task gate: P1-4 — `TODO` / not started / awaiting explicit user approval
 - P0 status: `DONE`; P0-1 through P0-7 completed
 - Allowed status values: `TODO` / `IN_PROGRESS` / `BLOCKED` / `DONE`
 - Related roadmap: [`ROADMAP.md`](ROADMAP.md)
 
-用户已明确批准正式进入 P1、P1-2A～D 和 P1-3；P1-2 已在独立验收 PASS 后完成，P1-3A docs-only design freeze、P1-3B backend state-machine foundation 与 P1-3C realtime/Web complete phase flow 已完成。P1-3 保持 `IN_PROGRESS`，P1-3D 未开始并等待单独明确批准；不得提前实现 P1-4 调度、AI/participant/utterance、记忆、报告、语音、Redis/queue 或 P2～P6。
+用户已明确批准正式进入 P1、P1-2A～D 和 P1-3；P1-2 与 P1-3 均已在 independent verdict `PASS` 后完成。P1 保持 `IN_PROGRESS`；P1-4 未开始并等待单独明确批准，不得提前实现 AI/participant/utterance、记忆、报告、语音、Redis/queue 或 P2～P6。
 
 ## P0-1 — 仓库与文档治理
 
@@ -466,8 +466,8 @@
 
 - ID: `P1-3`
 - 名称：Session state machine
-- Status: `IN_PROGRESS`
-- Approval state：用户已明确批准 P1-3；P1-3A completed docs-only；P1-3B completed；P1-3C completed；P1-3D not started / awaiting explicit approval。
+- Status: `DONE`
+- Approval state：用户已明确批准并完成 P1-3A～D；P1-3D independent verdict `PASS`。
 - 目标：建立 V0.1 server-authoritative 单向 session phase state machine、durable timing/deadline、deterministic concurrent transition、ordered formal events 和 restart/reconnect recovery。
 - In scope：P1-3A design freeze；后续分别获批的 P1-3B backend state machine + durable phase foundation、P1-3C realtime/Web complete phase flow、P1-3D independent acceptance + closeout。
 - Out of scope：P1-4 floor scheduling、AI speaker selection、participant/utterance runtime、LLM/provider、memory、report/scoring、Redis/queue、voice/device check 和完整 pause/system-failure engine。
@@ -479,7 +479,7 @@
 - `P1-3A — Design freeze`：completed；docs-only；未修改 runtime/tests/schema/migrations/dependencies/lockfiles/CI；
 - `P1-3B — Backend state machine + durable phase foundation`：completed；
 - `P1-3C — Realtime/Web complete phase flow`：completed；
-- `P1-3D — Independent acceptance + closeout`：not started / awaiting explicit approval。
+- `P1-3D — Independent acceptance + closeout`：completed；independent verdict `PASS`。
 
 ### P1-3A completion note
 
@@ -507,7 +507,15 @@
 - 实现 app-owned in-process deadline recovery runtime：startup 从 durable `phase_deadline_at` 扫描并 reconcile overdue sessions，运行期 bounded async loop 按最近 active deadline wake-up，shutdown cancellable/awaited；未引入 Redis、queue、APScheduler、distributed scheduler 或未来 scheduler abstraction；
 - WS connect 和 connected catch-up path 调用同一 deadline reconciliation foundation，deadline/user command race 继续复用 P1-3B aggregate row lock、single transaction、durable sequence/action replay 和 commit-before-send；
 - Web 新增 `session.start` intent caller、authoritative phase/status/timing projection、phase timeline、server-deadline countdown display、reload/reconnect snapshot recovery；Browser 不提交 next state、duration 或 deadline，也不以 local countdown 推进状态；
-- Backend targeted recovery/WS/session regression、API full suite、Alembic head/check、Web lint/type/test/build 和真实 Chromium E2E 均通过；P1-3D independent acceptance 仍未开始，需单独明确批准。
+- Backend targeted recovery/WS/session regression、API full suite、Alembic head/check、Web lint/type/test/build 和真实 Chromium E2E 均通过；其后 P1-3D 从 committed source 独立复现全部 acceptance gates 并完成 closeout。
+
+### P1-3D completion note
+
+- 从 clean committed `main` HEAD `529e58bf58268277473cbddf4f6d036466ee3411` 开始，确认与 `origin/main` 一致；总纲 SHA-256 保持 `2388A9660320406CB35D5354126AD71C6849A98DB7C4A356796CA951BF372F26`；
+- 独立确认 F1 bounded Web restart recovery 和 F2 strict positive-integer duration validation 已进入 committed source；snapshot failure 继续 bounded backoff recovery，bool/float/string/zero/negative 在 config/domain boundary 均被拒绝；
+- 独立复核 frozen transition matrix、durable deadline arithmetic、startup/WS unified reconciliation、aggregate lock/action idempotency/race precedence、v1/v2 realtime compatibility、Browser authority boundary 和全部 Deferred absence；无 unresolved Critical/High/Medium finding；
+- API non-integration `260 passed`、真实 PostgreSQL integration `60 passed`、Web `50 passed`、Chromium `2 passed`；Ruff、format、Pyright、Web lint/typecheck/build、OpenAPI drift、Alembic head/current/check 和 cleanup gates 均通过；
+- Independent verdict `PASS`；P1-3D completed，P1-3 `DONE`，P1 保持 `IN_PROGRESS`；P1-4 `TODO` / not started / awaiting explicit user approval。
 
 ## 任务更新规则
 

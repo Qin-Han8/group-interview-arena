@@ -1,6 +1,6 @@
 # P1-3 Session State-Machine Execution Plan
 
-Status: `P1 IN_PROGRESS`; `P1-3 IN_PROGRESS`; `P1-3A completed`; `P1-3B completed`; `P1-3C completed`; `P1-3D not started / awaiting explicit approval`
+Status: `P1 IN_PROGRESS`; `P1-3 DONE`; `P1-3A completed`; `P1-3B completed`; `P1-3C completed`; `P1-3D completed`; independent verdict `PASS`
 
 Target version: `V0.1 Internal Validation`
 
@@ -16,9 +16,9 @@ P1-3A baseline: committed `main` at `b775106` (`P1-2D: docs: complete question a
 
 P1-3 只建立 session phase/state/timing/recovery 和 Browser authoritative projection。它不实现发言权、AI speaker selection、participant/utterance、LLM/provider、memory、report/scoring、voice/device check、完整 pause/failure engine、Redis 或 queue。
 
-## Current baseline and actual-source findings
+## P1-3A baseline and actual-source findings
 
-- P1-1/P1-2 independent verdicts 均为 `PASS`；当前 Alembic single head 是 `f1a12b15c002`，product tables 精确为十张。
+- P1-1/P1-2 independent verdicts 均为 `PASS`；P1-3A 开始时 Alembic single head 是 `f1a12b15c002`，product tables 精确为十张。
 - `simulation_sessions` 已拥有 UUIDv4 identity、owner、immutable `question_version_id`、`status VARCHAR(32)`、durable `last_sequence` 和 timestamps；当前没有 phase timing/plan columns。
 - 当前 application `SessionStatus` 精确为 `CREATED` / `ABORTED_USER`；唯一 browser business command 是 `session.abort`，且只允许 `CREATED -> ABORTED_USER`。
 - `apply_session_command()` 已用 owner-scoped `SELECT ... FOR UPDATE`、durable `(session_id, action_id)`、semantic digest、single transaction、contiguous event allocation 和 commit-before-send 建立正确并发基础。
@@ -32,9 +32,9 @@ P1-3 只建立 session phase/state/timing/recovery 和 Browser authoritative pro
 1. **P1-3A — Design freeze**：`completed`。Docs-only 冻结状态、transition、timing、command/event、snapshot、B～D scope 和 acceptance；不修改 runtime、tests、schema/migration、dependency/lockfile 或 CI。
 2. **P1-3B — Backend state machine + durable phase foundation**：`completed`。实现 pure domain matrix、additive timing persistence、server-owned duration-plan resolution、locked transactional transitions、due reconciliation、REST/WS backend contracts和 PostgreSQL regressions；不实现 Browser complete phase UI 或 P1-4 调度。
 3. **P1-3C — Realtime/Web complete phase flow**：`completed`。实现 in-process deadline wake-up/recovery、connected WS catch-up/push、Browser start/current-phase/deadline projection 和真实 PostgreSQL Chromium complete-flow validation；不引入 Redis/queue。
-4. **P1-3D — Independent acceptance + closeout**：`not started / awaiting explicit approval`。从 committed source 独立复核 matrix、并发、timing、restart/reconnect、contract/browser 和 Deferred absence；PASS 后才把 P1-3 标记 `DONE`。
+4. **P1-3D — Independent acceptance + closeout**：`completed`；independent verdict `PASS`。已从 committed source 独立复核 matrix、并发、timing、restart/reconnect、contract/browser 和 Deferred absence，P1-3 已标记 `DONE`。
 
-P1-3D 需单独明确批准。P1-3C 完成后不得自动开始 P1-3D。
+P1-3D 已获单独明确批准并完成；P1-4 仍需单独明确批准，不因 P1-3 closeout 自动开始。
 
 ## Frozen V0.1 state model
 
@@ -243,6 +243,14 @@ Backend Pydantic models remain WS contract authority。Web derivative must suppo
 - Confirm all Deferred states/capabilities remain absent and documentation matches actual source。
 - Independent verdict must be `PASS` with no unresolved correctness、security/privacy、migration/API compatibility or material-rework finding before P1-3 becomes `DONE`。
 
+### Independent acceptance result
+
+- Clean committed `main` HEAD `529e58bf58268277473cbddf4f6d036466ee3411` 与 `origin/main` 一致；master-plan SHA-256 未变。
+- F1 bounded Web restart recovery 与 F2 strict positive-integer duration validation 均已存在于 committed source；真实 Chromium 覆盖 active phase、API restart、missed events 和 authoritative phase/deadline/sequence recovery。
+- Frozen matrix、durable timing、startup/WS unified reconciliation、transaction/idempotency/race semantics、v1/v2 compatibility、Web authority boundary、security/privacy、migration 和 explicit deferrals 均独立复核通过。
+- API non-integration `260 passed`、PostgreSQL integration `60 passed`、Web `50 passed`、Chromium `2 passed`；Ruff、format、Pyright、Web lint/typecheck/build、OpenAPI drift、Alembic head/current/check、artifact/process/database cleanup 均通过。
+- Findings：no Critical、High or Medium findings。Independent verdict `PASS`；P1-3D completed，P1-3 `DONE`，P1 保持 `IN_PROGRESS`，P1-4 not started。
+
 ## Validation strategy for implementation phases
 
 Use actual project commands at execution time and preserve machine evidence。Expected families:
@@ -317,4 +325,4 @@ P1-3B implemented the backend-only foundation and ran risk-matched backend/Web/A
 - [x] No Proposed Decision or blocker found；P1-3A completed docs-only。
 - [x] P1-3B backend state machine + durable phase foundation completed。
 - [x] P1-3C realtime/Web complete phase flow completed。
-- [ ] P1-3D not started / awaiting explicit approval。
+- [x] P1-3D independent acceptance + closeout completed；verdict `PASS`；P1-3 `DONE`。

@@ -1,16 +1,16 @@
 # P0 技术架构基线
 
-- Status: P0 Architecture Baseline + P1-1/P1-2 completed + P1-3C realtime/Web phase flow implemented
+- Status: P0 Architecture Baseline + P1-1/P1-2/P1-3 completed
 - Current phase: P1 — IN_PROGRESS
 - Architecture baseline established by: P0-2 — DONE
 - P0-3 foundation status: DONE
 - P0-4 database foundation status: DONE
 - P0-5 identity boundary status: DONE
-- Most recently completed task: P0-7 independent final acceptance — PASS after two documentation findings remediation and finding-only recheck
+- Most recently completed task: P1-3D independent final acceptance — `PASS`; P1-3 `DONE`
 - P0 status: DONE; P0-1 through P0-7 completed
-- P1 status: IN_PROGRESS; P1-1/P1-2 DONE; P1-3 IN_PROGRESS; P1-3A completed; P1-3B completed; P1-3C completed; P1-3D awaiting explicit approval
+- P1 status: IN_PROGRESS; P1-1/P1-2/P1-3 DONE; P1-3A～D completed; P1-4 not started / awaiting explicit approval
 - Target version: V0.1 Internal Validation
-- Business architecture detail: P1-1 runtime completed; P1-2 question/persona boundary implemented; P1-3B backend state/timing foundation implemented; P1-3C complete realtime/Web phase flow implemented
+- Business architecture detail: P1-1 runtime completed; P1-2 question/persona boundary implemented; P1-3 state/timing/recovery/realtime/Web flow independently accepted
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -334,7 +334,7 @@ Redis 只在多 API workers、横向扩容、跨进程 WebSocket broadcast、dis
 - P0-5D：completed；真实 browser Cookie/CORS/CSRF 闭环已通过 Chromium 验证；
 - P0-5E：completed；final outcome `PASS after findings remediation and independent recheck`；
 - P0：`DONE`；P0-1～P0-7 completed；P0-7 finding-only independent recheck `PASS`，P1 readiness `READY`；其后用户已明确批准进入 P1；
-- P1：`IN_PROGRESS`；P1-1A～E 已完成且 verdict `PASS`；P1-2A～D 已完成且 P1-2 `DONE`；P1-3A state/timing design freeze 已完成，P1-3B backend state-machine foundation 已完成，P1-3C realtime/Web complete phase flow 已完成，P1-3 `IN_PROGRESS`，P1-3D not started / awaiting explicit approval；P1-4 调度、记忆和基础报告仍需后续分别批准；
+- P1：`IN_PROGRESS`；P1-1、P1-2、P1-3 均已完成且 independent verdict `PASS`；P1-3A～D completed，P1-3 `DONE`；P1-4 调度、记忆和基础报告未开始并仍需后续分别批准；
 - P2 以后：只在对应阶段获批后增加语音、评分训练和商业化能力。
 
 ## 与其他文档关系
