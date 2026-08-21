@@ -8,7 +8,7 @@ export type SessionCreatedEvent = {
   payload: { status: "CREATED" };
 };
 
-type SessionStatus =
+export type SessionStatus =
   | "CREATED"
   | "PREPARATION"
   | "OPENING_STATEMENTS"
@@ -51,7 +51,80 @@ export type SessionStateChangedV2Event = {
 export type SessionStateChangedEvent =
   SessionStateChangedV1Event | SessionStateChangedV2Event;
 
-export type FormalSessionEvent = SessionCreatedEvent | SessionStateChangedEvent;
+type FloorPhase = Exclude<
+  SessionStatus,
+  "CREATED" | "PREPARATION" | "COMPLETED" | "ABORTED_USER"
+>;
+
+export type FloorPolicyReason =
+  | "PHASE_MANDATED_TURN"
+  | "EXPLICIT_OPPORTUNITY"
+  | "FIRST_OPPORTUNITY"
+  | "FAIRNESS_RECOVERY"
+  | "MONOPOLY_PREVENTION"
+  | "PHASE_SUMMARY_OPPORTUNITY"
+  | "SILENCE_RECOVERY"
+  | "DEADLINE_RECOVERY"
+  | "NO_ELIGIBLE_PARTICIPANT";
+
+export type FloorReleaseReason =
+  "SPEAKER_FINISHED" | "INTERRUPTED" | "PHASE_CHANGED" | "SESSION_TERMINATED";
+
+export type FloorGrantedEvent = {
+  schema_version: 1;
+  type: "floor.granted";
+  session_id: string;
+  sequence: number;
+  occurred_at: string;
+  action_id: string;
+  payload: {
+    grant_id: string;
+    decision_id: string;
+    participant_id: string;
+    phase: FloorPhase;
+    opportunity_id: string | null;
+    reason_code: FloorPolicyReason;
+    policy_version: string;
+  };
+};
+
+export type FloorReleasedEvent = {
+  schema_version: 1;
+  type: "floor.released";
+  session_id: string;
+  sequence: number;
+  occurred_at: string;
+  action_id: string | null;
+  payload: {
+    grant_id: string;
+    participant_id: string;
+    phase: FloorPhase;
+    reason_code: FloorReleaseReason;
+  };
+};
+
+export type FloorInterventionRequestedEvent = {
+  schema_version: 1;
+  type: "floor.intervention_requested";
+  session_id: string;
+  sequence: number;
+  occurred_at: string;
+  action_id: string;
+  payload: {
+    intervention_id: string;
+    decision_id: string;
+    phase: FloorPhase;
+    intervention_kind: "SILENCE" | "DEADLINE" | "NO_ELIGIBLE_PARTICIPANT";
+    reason_code: FloorPolicyReason;
+    policy_version: string;
+  };
+};
+
+export type FloorEvent =
+  FloorGrantedEvent | FloorReleasedEvent | FloorInterventionRequestedEvent;
+
+export type FormalSessionEvent =
+  SessionCreatedEvent | SessionStateChangedEvent | FloorEvent;
 
 export type RealtimeErrorCode =
   | "INVALID_SESSION_STATE"
@@ -119,6 +192,30 @@ const ACTIVE_STATUSES = new Set<SessionStatus>([
   "CONVERGENCE",
   "FINAL_SUMMARY",
 ]);
+const FLOOR_PHASES = new Set<FloorPhase>([
+  "OPENING_STATEMENTS",
+  "EXPLORATION",
+  "CONFLICT_AND_EVALUATION",
+  "CONVERGENCE",
+  "FINAL_SUMMARY",
+]);
+const FLOOR_POLICY_REASONS = new Set<FloorPolicyReason>([
+  "PHASE_MANDATED_TURN",
+  "EXPLICIT_OPPORTUNITY",
+  "FIRST_OPPORTUNITY",
+  "FAIRNESS_RECOVERY",
+  "MONOPOLY_PREVENTION",
+  "PHASE_SUMMARY_OPPORTUNITY",
+  "SILENCE_RECOVERY",
+  "DEADLINE_RECOVERY",
+  "NO_ELIGIBLE_PARTICIPANT",
+]);
+const FLOOR_RELEASE_REASONS = new Set<FloorReleaseReason>([
+  "SPEAKER_FINISHED",
+  "INTERRUPTED",
+  "PHASE_CHANGED",
+  "SESSION_TERMINATED",
+]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -185,6 +282,89 @@ function isV2StateChangedPayload(
   return value.phase_started_at === null && value.phase_deadline_at === null;
 }
 
+function isFloorPhase(value: unknown): value is FloorPhase {
+  return typeof value === "string" && FLOOR_PHASES.has(value as FloorPhase);
+}
+
+function isFloorPolicyReason(value: unknown): value is FloorPolicyReason {
+  return (
+    typeof value === "string" &&
+    FLOOR_POLICY_REASONS.has(value as FloorPolicyReason)
+  );
+}
+
+function isFloorEvent(value: Record<string, unknown>): value is FloorEvent {
+  if (
+    value.schema_version !== 1 ||
+    !isRecord(value.payload) ||
+    !isFloorPhase(value.payload.phase)
+  ) {
+    return false;
+  }
+  const payload = value.payload;
+
+  if (value.type === "floor.granted") {
+    return (
+      isUuid4(value.action_id) &&
+      hasExactKeys(payload, [
+        "grant_id",
+        "decision_id",
+        "participant_id",
+        "phase",
+        "opportunity_id",
+        "reason_code",
+        "policy_version",
+      ]) &&
+      isUuid4(payload.grant_id) &&
+      isUuid4(payload.decision_id) &&
+      isUuid4(payload.participant_id) &&
+      (payload.opportunity_id === null || isUuid4(payload.opportunity_id)) &&
+      isFloorPolicyReason(payload.reason_code) &&
+      typeof payload.policy_version === "string" &&
+      payload.policy_version.length > 0 &&
+      payload.policy_version.length <= 64
+    );
+  }
+
+  if (value.type === "floor.released") {
+    return (
+      (value.action_id === null || isUuid4(value.action_id)) &&
+      hasExactKeys(payload, [
+        "grant_id",
+        "participant_id",
+        "phase",
+        "reason_code",
+      ]) &&
+      isUuid4(payload.grant_id) &&
+      isUuid4(payload.participant_id) &&
+      typeof payload.reason_code === "string" &&
+      FLOOR_RELEASE_REASONS.has(payload.reason_code as FloorReleaseReason)
+    );
+  }
+
+  if (value.type !== "floor.intervention_requested") return false;
+  return (
+    isUuid4(value.action_id) &&
+    hasExactKeys(payload, [
+      "intervention_id",
+      "decision_id",
+      "phase",
+      "intervention_kind",
+      "reason_code",
+      "policy_version",
+    ]) &&
+    isUuid4(payload.intervention_id) &&
+    isUuid4(payload.decision_id) &&
+    ["SILENCE", "DEADLINE", "NO_ELIGIBLE_PARTICIPANT"].includes(
+      String(payload.intervention_kind),
+    ) &&
+    isFloorPolicyReason(payload.reason_code) &&
+    typeof payload.policy_version === "string" &&
+    payload.policy_version.length > 0 &&
+    payload.policy_version.length <= 64
+  );
+}
+
 function isFormalEvent(
   value: Record<string, unknown>,
 ): value is FormalSessionEvent {
@@ -216,7 +396,7 @@ function isFormalEvent(
     );
   }
 
-  if (value.type !== "session.state_changed") return false;
+  if (value.type !== "session.state_changed") return isFloorEvent(value);
 
   if (value.schema_version === 1) {
     return (

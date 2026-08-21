@@ -178,6 +178,26 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** CurrentFloorGrantResponse */
+        CurrentFloorGrantResponse: {
+            /**
+             * Grant Id
+             * Format: uuid4
+             */
+            grant_id: string;
+            /**
+             * Participant Id
+             * Format: uuid4
+             */
+            participant_id: string;
+            phase: components["schemas"]["SessionStatus"];
+            reason_code: components["schemas"]["FloorPolicyReason"];
+            /**
+             * Granted At
+             * Format: date-time
+             */
+            granted_at: string;
+        };
         /** CurrentUserResponse */
         CurrentUserResponse: {
             /**
@@ -205,6 +225,64 @@ export interface components {
         ErrorResponse: {
             error: components["schemas"]["ErrorDetail"];
         };
+        /**
+         * FloorInterventionKind
+         * @enum {string}
+         */
+        FloorInterventionKind: "SILENCE" | "DEADLINE" | "NO_ELIGIBLE_PARTICIPANT";
+        /** FloorLifecycleResponse */
+        FloorLifecycleResponse: {
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "floor.granted" | "floor.released" | "floor.intervention_requested";
+            /** Sequence */
+            sequence: number;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+            phase: components["schemas"]["SessionStatus"];
+            /** Reason Code */
+            reason_code: components["schemas"]["FloorPolicyReason"] | components["schemas"]["FloorReleaseReason"];
+            /** Grant Id */
+            grant_id?: string | null;
+            /** Participant Id */
+            participant_id?: string | null;
+            /** Intervention Id */
+            intervention_id?: string | null;
+            intervention_kind?: components["schemas"]["FloorInterventionKind"] | null;
+        };
+        /** FloorParticipantResponse */
+        FloorParticipantResponse: {
+            /**
+             * Participant Id
+             * Format: uuid4
+             */
+            participant_id: string;
+            actor_kind: components["schemas"]["ParticipantActorKind"];
+            /** Seat Order */
+            seat_order: number;
+        };
+        /**
+         * FloorPolicyReason
+         * @enum {string}
+         */
+        FloorPolicyReason: "PHASE_MANDATED_TURN" | "EXPLICIT_OPPORTUNITY" | "FIRST_OPPORTUNITY" | "FAIRNESS_RECOVERY" | "MONOPOLY_PREVENTION" | "PHASE_SUMMARY_OPPORTUNITY" | "SILENCE_RECOVERY" | "DEADLINE_RECOVERY" | "NO_ELIGIBLE_PARTICIPANT";
+        /**
+         * FloorReleaseReason
+         * @enum {string}
+         */
+        FloorReleaseReason: "SPEAKER_FINISHED" | "INTERRUPTED" | "PHASE_CHANGED" | "SESSION_TERMINATED";
+        /** FloorSnapshotResponse */
+        FloorSnapshotResponse: {
+            /** Participants */
+            participants: components["schemas"]["FloorParticipantResponse"][];
+            current_grant: components["schemas"]["CurrentFloorGrantResponse"] | null;
+            latest_event: components["schemas"]["FloorLifecycleResponse"] | null;
+        };
         /** HealthResponse */
         HealthResponse: {
             /**
@@ -223,6 +301,11 @@ export interface components {
              */
             password: string;
         };
+        /**
+         * ParticipantActorKind
+         * @enum {string}
+         */
+        ParticipantActorKind: "AI" | "HUMAN" | "SYSTEM";
         /** PublicConstraint */
         PublicConstraint: {
             /** Key */
@@ -359,6 +442,7 @@ export interface components {
             updated_at: string;
             /** Last Sequence */
             last_sequence: number;
+            floor: components["schemas"]["FloorSnapshotResponse"];
         };
         /** SessionStartRequest */
         SessionStartRequest: {

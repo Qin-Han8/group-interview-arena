@@ -135,6 +135,42 @@ class SessionCommand:
 
 
 @dataclass(frozen=True)
+class FloorParticipantSnapshot:
+    participant_id: UUID
+    actor_kind: str
+    seat_order: int
+
+
+@dataclass(frozen=True)
+class CurrentFloorGrantSnapshot:
+    grant_id: UUID
+    participant_id: UUID
+    phase: SessionStatus
+    reason_code: str
+    granted_at: datetime
+
+
+@dataclass(frozen=True)
+class FloorLifecycleSnapshot:
+    event_type: str
+    sequence: int
+    occurred_at: datetime
+    phase: SessionStatus
+    reason_code: str
+    grant_id: UUID | None = None
+    participant_id: UUID | None = None
+    intervention_id: UUID | None = None
+    intervention_kind: str | None = None
+
+
+@dataclass(frozen=True)
+class FloorSnapshot:
+    participants: tuple[FloorParticipantSnapshot, ...] = ()
+    current_grant: CurrentFloorGrantSnapshot | None = None
+    latest_event: FloorLifecycleSnapshot | None = None
+
+
+@dataclass(frozen=True)
 class SessionSnapshot:
     session_id: UUID
     question_version_id: UUID | None
@@ -145,6 +181,7 @@ class SessionSnapshot:
     created_at: datetime
     updated_at: datetime
     last_sequence: int
+    floor: FloorSnapshot = FloorSnapshot()
 
 
 @dataclass(frozen=True)

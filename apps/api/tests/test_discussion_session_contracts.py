@@ -6,6 +6,10 @@ import pytest
 from pydantic import ValidationError
 
 from group_interview_arena_api.modules.discussion_sessions.contracts import (
+    CurrentFloorGrantResponse,
+    FloorLifecycleResponse,
+    FloorParticipantResponse,
+    FloorSnapshotResponse,
     FormalEventEnvelope,
     SessionAbortCommand,
     SessionSnapshotResponse,
@@ -14,6 +18,10 @@ from group_interview_arena_api.modules.discussion_sessions.contracts import (
     WsErrorEnvelope,
 )
 from group_interview_arena_api.modules.discussion_sessions.domain import SessionStatus
+from group_interview_arena_api.modules.floor_control.domain import (
+    FloorPolicyReason,
+    ParticipantActorKind,
+)
 
 
 def test_abort_command_accepts_only_the_exact_v1_envelope() -> None:
@@ -106,6 +114,11 @@ def test_snapshot_and_formal_events_emit_exact_utc_z_contracts() -> None:
         created_at=occurred_at,
         updated_at=occurred_at,
         last_sequence=1,
+        floor=FloorSnapshotResponse(
+            participants=[],
+            current_grant=None,
+            latest_event=None,
+        ),
     )
     event = FormalEventEnvelope(
         schema_version=1,
@@ -130,6 +143,11 @@ def test_snapshot_and_formal_events_emit_exact_utc_z_contracts() -> None:
         "created_at": "2026-08-16T01:02:03Z",
         "updated_at": "2026-08-16T01:02:03Z",
         "last_sequence": 1,
+        "floor": {
+            "participants": [],
+            "current_grant": None,
+            "latest_event": None,
+        },
     }
     assert event.model_dump(mode="json") == {
         "schema_version": 1,
@@ -223,3 +241,84 @@ def test_formal_event_payload_and_error_envelope_are_closed_and_distinct() -> No
 
     assert "sequence" not in error
     assert UUID(error["error"]["request_id"]).version == 4
+
+
+def test_floor_snapshot_projection_is_closed_safe_and_human_compatible() -> None:
+    occurred_at = datetime(2026, 8, 20, 1, 2, 3, tzinfo=UTC)
+    participant_id = uuid4()
+    grant_id = uuid4()
+
+    projection = FloorSnapshotResponse(
+        participants=[
+            FloorParticipantResponse(
+                participant_id=participant_id,
+                actor_kind=ParticipantActorKind.HUMAN,
+                seat_order=1,
+            )
+        ],
+        current_grant=CurrentFloorGrantResponse(
+            grant_id=grant_id,
+            participant_id=participant_id,
+            phase=SessionStatus.OPENING_STATEMENTS,
+            reason_code=FloorPolicyReason.FIRST_OPPORTUNITY,
+            granted_at=occurred_at,
+        ),
+        latest_event=FloorLifecycleResponse(
+            type="floor.granted",
+            sequence=4,
+            occurred_at=occurred_at,
+            phase=SessionStatus.OPENING_STATEMENTS,
+            reason_code=FloorPolicyReason.FIRST_OPPORTUNITY,
+            grant_id=grant_id,
+            participant_id=participant_id,
+        ),
+    ).model_dump(mode="json")
+
+    assert projection == {
+        "participants": [
+            {
+                "participant_id": str(participant_id),
+                "actor_kind": "HUMAN",
+                "seat_order": 1,
+            }
+        ],
+        "current_grant": {
+            "grant_id": str(grant_id),
+            "participant_id": str(participant_id),
+            "phase": "OPENING_STATEMENTS",
+            "reason_code": "FIRST_OPPORTUNITY",
+            "granted_at": "2026-08-20T01:02:03Z",
+        },
+        "latest_event": {
+            "type": "floor.granted",
+            "sequence": 4,
+            "occurred_at": "2026-08-20T01:02:03Z",
+            "phase": "OPENING_STATEMENTS",
+            "reason_code": "FIRST_OPPORTUNITY",
+            "grant_id": str(grant_id),
+            "participant_id": str(participant_id),
+            "intervention_id": None,
+            "intervention_kind": None,
+        },
+    }
+    serialized = json.dumps(projection)
+    for forbidden in (
+        "decision_id",
+        "policy_version",
+        "metadata",
+        "ranking",
+        "weight",
+        "stance",
+        "persona",
+        "prompt",
+        "score",
+    ):
+        assert forbidden not in serialized.lower()
+
+    with pytest.raises(ValidationError):
+        FloorLifecycleResponse.model_validate(
+            {
+                **projection["latest_event"],
+                "hidden_ranking": [0.99],
+            }
+        )

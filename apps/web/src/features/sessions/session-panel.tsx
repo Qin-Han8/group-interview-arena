@@ -17,7 +17,7 @@ import {
   type RealtimeConnectionState,
   type SessionRealtimeClient,
 } from "@/lib/realtime/client";
-import type { FormalSessionEvent } from "@/lib/realtime/contract";
+import { projectSessionEvent } from "@/lib/realtime/projection";
 
 type SessionPanelProps = {
   apiClient: ApiClient;
@@ -51,36 +51,40 @@ function putSessionInUrl(sessionId: string) {
   window.history.replaceState({}, "", url);
 }
 
-function projectEvent(
-  snapshot: SessionSnapshot,
-  event: FormalSessionEvent,
-): SessionSnapshot {
-  if (event.type === "session.created") {
-    return {
-      ...snapshot,
-      status: "CREATED",
-      phase_started_at: null,
-      phase_deadline_at: null,
-      updated_at: event.occurred_at,
-      last_sequence: event.sequence,
-    };
-  }
-
-  return {
-    ...snapshot,
-    status: event.payload.status,
-    phase_started_at:
-      event.schema_version === 2 ? event.payload.phase_started_at : null,
-    phase_deadline_at:
-      event.schema_version === 2 ? event.payload.phase_deadline_at : null,
-    server_now: event.occurred_at,
-    updated_at: event.occurred_at,
-    last_sequence: event.sequence,
-  };
-}
-
 function isActivePhase(status: SessionSnapshot["status"]) {
   return PHASES.some((phase) => phase === status);
+}
+
+function participantLabel(
+  participant: SessionSnapshot["floor"]["participants"][number] | undefined,
+) {
+  if (!participant) return "会话参与者";
+  if (participant.actor_kind === "HUMAN") return "你（真人参与者）";
+  if (participant.actor_kind === "SYSTEM") return "系统主持";
+  return `AI 候选人 ${Math.max(1, participant.seat_order - 1)}`;
+}
+
+const FLOOR_REASON_LABELS: Record<string, string> = {
+  PHASE_MANDATED_TURN: "当前阶段要求的发言机会",
+  EXPLICIT_OPPORTUNITY: "已接受的发言机会",
+  FIRST_OPPORTUNITY: "优先安排尚未发言的参与者",
+  FAIRNESS_RECOVERY: "恢复发言机会公平性",
+  MONOPOLY_PREVENTION: "避免同一参与者连续占用发言权",
+  PHASE_SUMMARY_OPPORTUNITY: "当前阶段的总结机会",
+  SILENCE_RECOVERY: "讨论静默，需要主持介入",
+  DEADLINE_RECOVERY: "阶段临近截止，需要主持介入",
+  NO_ELIGIBLE_PARTICIPANT: "当前没有符合条件的参与者",
+  SPEAKER_FINISHED: "发言已结束",
+  INTERRUPTED: "发言已被中止",
+  PHASE_CHANGED: "阶段已切换",
+  SESSION_TERMINATED: "会话已结束",
+};
+
+function lifecycleLabel(event: SessionSnapshot["floor"]["latest_event"]) {
+  if (!event) return "等待服务端分配发言权";
+  if (event.type === "floor.granted") return "发言权已授予";
+  if (event.type === "floor.released") return "发言权已释放";
+  return "已请求主持介入";
 }
 
 function statusLabel(status: SessionSnapshot["status"]) {
@@ -245,7 +249,7 @@ export default function SessionPanel({
       onEvent(event) {
         if (!active) return;
         const current = snapshotRef.current;
-        if (current) applySnapshot(projectEvent(current, event));
+        if (current) applySnapshot(projectSessionEvent(current, event));
       },
       onSnapshot(authoritative) {
         if (active) applySnapshot(authoritative);
@@ -426,6 +430,36 @@ export default function SessionPanel({
                 </li>
               ))}
             </ol>
+          </div>
+          <div
+            className="mt-4 space-y-1 border-t border-neutral-200 pt-4"
+            data-testid="floor-status"
+          >
+            <p className="font-medium">发言权</p>
+            <p data-testid="floor-owner">
+              当前发言者：
+              <strong>
+                {snapshot.floor.current_grant
+                  ? participantLabel(
+                      snapshot.floor.participants.find(
+                        (participant) =>
+                          participant.participant_id ===
+                          snapshot.floor.current_grant?.participant_id,
+                      ),
+                    )
+                  : "暂无"}
+              </strong>
+            </p>
+            <p className="text-neutral-600" data-testid="floor-lifecycle">
+              {lifecycleLabel(snapshot.floor.latest_event)}
+            </p>
+            {snapshot.floor.latest_event ? (
+              <p className="text-neutral-600" data-testid="floor-reason">
+                原因：
+                {FLOOR_REASON_LABELS[snapshot.floor.latest_event.reason_code] ??
+                  "服务端发言权规则"}
+              </p>
+            ) : null}
           </div>
           {snapshot.status === "CREATED" ? (
             <div className="mt-3 flex flex-wrap gap-2">

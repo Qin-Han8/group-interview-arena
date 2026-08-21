@@ -58,4 +58,40 @@ def test_session_rest_contract_is_cookie_secured_and_version_bound_in_openapi() 
         "created_at",
         "updated_at",
         "last_sequence",
+        "floor",
     }
+    assert snapshot_schema["required"] == [
+        "id",
+        "question_version_id",
+        "status",
+        "phase_started_at",
+        "phase_deadline_at",
+        "server_now",
+        "created_at",
+        "updated_at",
+        "last_sequence",
+        "floor",
+    ]
+    floor_schema = schema["components"]["schemas"]["FloorSnapshotResponse"]
+    assert set(floor_schema["properties"]) == {
+        "participants",
+        "current_grant",
+        "latest_event",
+    }
+    serialized_schema = (
+        str(floor_schema)
+        + str(schema["components"]["schemas"]["CurrentFloorGrantResponse"])
+        + str(schema["components"]["schemas"]["FloorLifecycleResponse"])
+    )
+    for forbidden in (
+        "decision_id",
+        "policy_version",
+        "metadata",
+        "ranking",
+        "weight",
+        "stance",
+        "persona",
+        "prompt",
+        "score",
+    ):
+        assert forbidden not in serialized_schema.lower()

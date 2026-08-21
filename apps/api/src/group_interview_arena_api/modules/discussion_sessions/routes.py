@@ -13,6 +13,10 @@ from group_interview_arena_api.identity.csrf import (
 )
 from group_interview_arena_api.identity.dependencies import CurrentUserDependency
 from group_interview_arena_api.modules.discussion_sessions.contracts import (
+    CurrentFloorGrantResponse,
+    FloorLifecycleResponse,
+    FloorParticipantResponse,
+    FloorSnapshotResponse,
     SessionCreateRequest,
     SessionSnapshotResponse,
     SessionStartRequest,
@@ -41,6 +45,7 @@ DatabaseSessionFactory = Annotated[
 
 
 def _response(snapshot: SessionSnapshot) -> SessionSnapshotResponse:
+    floor = snapshot.floor
     return SessionSnapshotResponse(
         id=snapshot.session_id,
         question_version_id=snapshot.question_version_id,
@@ -51,6 +56,48 @@ def _response(snapshot: SessionSnapshot) -> SessionSnapshotResponse:
         created_at=snapshot.created_at,
         updated_at=snapshot.updated_at,
         last_sequence=snapshot.last_sequence,
+        floor=FloorSnapshotResponse(
+            participants=[
+                FloorParticipantResponse.model_validate(
+                    {
+                        "participant_id": participant.participant_id,
+                        "actor_kind": participant.actor_kind,
+                        "seat_order": participant.seat_order,
+                    }
+                )
+                for participant in floor.participants
+            ],
+            current_grant=(
+                CurrentFloorGrantResponse.model_validate(
+                    {
+                        "grant_id": floor.current_grant.grant_id,
+                        "participant_id": floor.current_grant.participant_id,
+                        "phase": floor.current_grant.phase,
+                        "reason_code": floor.current_grant.reason_code,
+                        "granted_at": floor.current_grant.granted_at,
+                    }
+                )
+                if floor.current_grant is not None
+                else None
+            ),
+            latest_event=(
+                FloorLifecycleResponse.model_validate(
+                    {
+                        "type": floor.latest_event.event_type,
+                        "sequence": floor.latest_event.sequence,
+                        "occurred_at": floor.latest_event.occurred_at,
+                        "phase": floor.latest_event.phase,
+                        "reason_code": floor.latest_event.reason_code,
+                        "grant_id": floor.latest_event.grant_id,
+                        "participant_id": floor.latest_event.participant_id,
+                        "intervention_id": floor.latest_event.intervention_id,
+                        "intervention_kind": floor.latest_event.intervention_kind,
+                    }
+                )
+                if floor.latest_event is not None
+                else None
+            ),
+        ),
     )
 
 

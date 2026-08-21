@@ -10,13 +10,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from group_interview_arena_api.db.models import (
     DiscussionEvent,
+    FloorDecision,
+    FloorGrant,
     QuestionPersonaAssignment,
     SessionAction,
     SessionParticipant,
     SimulationSession,
 )
 from group_interview_arena_api.modules.discussion_sessions.domain import (
+    CurrentFloorGrantSnapshot,
     DeadlineReconciliationOutcome,
+    FloorLifecycleSnapshot,
+    FloorParticipantSnapshot,
+    FloorSnapshot,
     InvalidSessionStateError,
     PendingEvent,
     PhaseDurationPlan,
@@ -62,7 +68,19 @@ def _raise_persistence_error() -> Never:
     raise SessionPersistenceError from None
 
 
-def _snapshot(row: SimulationSession) -> SessionSnapshot:
+def _participant_snapshot(row: SessionParticipant) -> FloorParticipantSnapshot:
+    return FloorParticipantSnapshot(
+        participant_id=row.id,
+        actor_kind=row.actor_kind,
+        seat_order=row.seat_order,
+    )
+
+
+def _snapshot(
+    row: SimulationSession,
+    *,
+    floor: FloorSnapshot | None = None,
+) -> SessionSnapshot:
     server_now = _utc_now()
     return SessionSnapshot(
         session_id=row.id,
@@ -74,6 +92,101 @@ def _snapshot(row: SimulationSession) -> SessionSnapshot:
         created_at=row.created_at,
         updated_at=row.updated_at,
         last_sequence=row.last_sequence,
+        floor=floor or FloorSnapshot(),
+    )
+
+
+def _floor_lifecycle_snapshot(row: DiscussionEvent) -> FloorLifecycleSnapshot:
+    payload = row.payload
+    event_type = row.event_type
+    return FloorLifecycleSnapshot(
+        event_type=event_type,
+        sequence=row.sequence,
+        occurred_at=row.occurred_at,
+        phase=SessionStatus(str(payload["phase"])),
+        reason_code=str(payload["reason_code"]),
+        grant_id=(
+            UUID(str(payload["grant_id"]))
+            if event_type in {"floor.granted", "floor.released"}
+            else None
+        ),
+        participant_id=(
+            UUID(str(payload["participant_id"]))
+            if event_type in {"floor.granted", "floor.released"}
+            else None
+        ),
+        intervention_id=(
+            UUID(str(payload["intervention_id"]))
+            if event_type == "floor.intervention_requested"
+            else None
+        ),
+        intervention_kind=(
+            str(payload["intervention_kind"])
+            if event_type == "floor.intervention_requested"
+            else None
+        ),
+    )
+
+
+async def _load_floor_snapshot(
+    session: AsyncSession,
+    row: SimulationSession,
+) -> FloorSnapshot:
+    participants = tuple(
+        _participant_snapshot(participant)
+        for participant in (
+            await session.scalars(
+                select(SessionParticipant)
+                .where(SessionParticipant.session_id == row.id)
+                .order_by(SessionParticipant.seat_order, SessionParticipant.id)
+            )
+        ).all()
+    )
+
+    current_grant: CurrentFloorGrantSnapshot | None = None
+    if row.current_floor_grant_id is not None:
+        grant_result = (
+            await session.execute(
+                select(FloorGrant, FloorDecision)
+                .join(FloorDecision, FloorDecision.id == FloorGrant.decision_id)
+                .where(
+                    FloorGrant.session_id == row.id,
+                    FloorGrant.id == row.current_floor_grant_id,
+                )
+            )
+        ).one()
+        grant, decision = grant_result
+        current_grant = CurrentFloorGrantSnapshot(
+            grant_id=grant.id,
+            participant_id=grant.participant_id,
+            phase=SessionStatus(grant.phase),
+            reason_code=decision.primary_reason_code,
+            granted_at=grant.granted_at,
+        )
+
+    latest_event_row = await session.scalar(
+        select(DiscussionEvent)
+        .where(
+            DiscussionEvent.session_id == row.id,
+            DiscussionEvent.event_type.in_(
+                (
+                    "floor.granted",
+                    "floor.released",
+                    "floor.intervention_requested",
+                )
+            ),
+        )
+        .order_by(DiscussionEvent.sequence.desc())
+        .limit(1)
+    )
+    return FloorSnapshot(
+        participants=participants,
+        current_grant=current_grant,
+        latest_event=(
+            _floor_lifecycle_snapshot(latest_event_row)
+            if latest_event_row is not None
+            else None
+        ),
     )
 
 
@@ -241,42 +354,48 @@ async def create_session(
                 raise ValueError(
                     "Selectable question has an invalid participant roster."
                 )
-            session.add(
+            human_participant = SessionParticipant(
+                id=uuid4(),
+                session_id=row.id,
+                actor_kind="HUMAN",
+                participation_role="CANDIDATE",
+                seat_order=1,
+                availability="AVAILABLE",
+                user_id=owner_id,
+                question_persona_assignment_id=None,
+                created_at=now,
+            )
+            ai_participants = [
                 SessionParticipant(
                     id=uuid4(),
                     session_id=row.id,
-                    actor_kind="HUMAN",
+                    actor_kind="AI",
                     participation_role="CANDIDATE",
-                    seat_order=1,
+                    seat_order=assignment.slot + 1,
                     availability="AVAILABLE",
-                    user_id=owner_id,
-                    question_persona_assignment_id=None,
+                    user_id=None,
+                    question_persona_assignment_id=assignment.id,
                     created_at=now,
                 )
-            )
-            session.add_all(
-                [
-                    SessionParticipant(
-                        id=uuid4(),
-                        session_id=row.id,
-                        actor_kind="AI",
-                        participation_role="CANDIDATE",
-                        seat_order=assignment.slot + 1,
-                        availability="AVAILABLE",
-                        user_id=None,
-                        question_persona_assignment_id=assignment.id,
-                        created_at=now,
-                    )
-                    for assignment in assignments
-                ]
-            )
+                for assignment in assignments
+            ]
+            session.add(human_participant)
+            session.add_all(ai_participants)
             session.add(event)
             await session.flush()
     except QuestionNotFoundError:
         raise
     except QuestionPersistenceError, SQLAlchemyError, ValueError:
         _raise_persistence_error()
-    return _snapshot(row)
+    return _snapshot(
+        row,
+        floor=FloorSnapshot(
+            participants=tuple(
+                _participant_snapshot(participant)
+                for participant in [human_participant, *ai_participants]
+            )
+        ),
+    )
 
 
 async def get_session_snapshot(
@@ -287,16 +406,22 @@ async def get_session_snapshot(
 ) -> SessionSnapshot:
     try:
         row = await session.scalar(
-            select(SimulationSession).where(
+            select(SimulationSession)
+            .where(
                 SimulationSession.id == session_id,
                 SimulationSession.owner_user_id == owner_id,
             )
+            .with_for_update(read=True)
         )
     except SQLAlchemyError:
         _raise_persistence_error()
     if row is None:
         raise SessionNotFoundError
-    return _snapshot(row)
+    try:
+        floor = await _load_floor_snapshot(session, row)
+    except SQLAlchemyError, KeyError, TypeError, ValueError:
+        _raise_persistence_error()
+    return _snapshot(row, floor=floor)
 
 
 async def _events_for_action(

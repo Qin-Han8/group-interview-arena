@@ -138,7 +138,14 @@ async def _verify_rest_contract(
                 "created_at",
                 "updated_at",
                 "last_sequence",
+                "floor",
             }
+            assert snapshot["floor"]["current_grant"] is None
+            assert snapshot["floor"]["latest_event"] is None
+            assert [
+                (participant["actor_kind"], participant["seat_order"])
+                for participant in snapshot["floor"]["participants"]
+            ] == [("HUMAN", 1), ("AI", 2), ("AI", 3), ("AI", 4)]
             assert snapshot["phase_started_at"] is None
             assert snapshot["phase_deadline_at"] is None
             assert re.fullmatch(

@@ -153,6 +153,7 @@ async def _verify_creation_and_owner_snapshot(
                 created_at=snapshot.created_at,
                 updated_at=snapshot.updated_at,
                 last_sequence=snapshot.last_sequence,
+                floor=snapshot.floor,
             )
             event = await session.scalar(
                 select(DiscussionEvent).where(

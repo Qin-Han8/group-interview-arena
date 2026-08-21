@@ -1,10 +1,12 @@
 import { expect, test } from "@playwright/test";
 import { access, writeFile } from "node:fs/promises";
 
-const API_BASE_URL = "http://localhost:8000";
+const API_BASE_URL = process.env.GIA_E2E_API_ORIGIN ?? "http://localhost:8000";
 const PRIVATE_SENTINEL = "P1_2C_PRIVATE_SENTINEL_DO_NOT_DISCLOSE";
 const API_RESTART_REQUEST = process.env.GIA_E2E_API_RESTART_REQUEST;
 const API_RESTART_READY = process.env.GIA_E2E_API_RESTART_READY;
+const FLOOR_REQUEST = process.env.GIA_E2E_FLOOR_REQUEST;
+const FLOOR_READY = process.env.GIA_E2E_FLOOR_READY;
 
 test("browser session recovers durable phases across API restart and reload", async ({
   page,
@@ -12,11 +14,17 @@ test("browser session recovers durable phases across API restart and reload", as
   const username = `P11D_${Date.now().toString(36)}`;
   const password = `P1-1D browser ${crypto.randomUUID()} phrase`;
   let startCommand: string | undefined;
+  let floorEvent: string | undefined;
 
   page.on("websocket", (socket) => {
     socket.on("framesent", ({ payload }) => {
       if (typeof payload === "string" && payload.includes("session.start")) {
         startCommand = payload;
+      }
+    });
+    socket.on("framereceived", ({ payload }) => {
+      if (typeof payload === "string" && payload.includes("floor.granted")) {
+        floorEvent = payload;
       }
     });
   });
@@ -79,9 +87,6 @@ test("browser session recovers durable phases across API restart and reload", as
   await expect(page.getByText("进行中")).toBeVisible();
   await expect(page.getByTestId("phase-label")).toContainText("准备");
   await expect(page.getByTestId("session-sequence")).toHaveText("2");
-  const deadlineBeforeRestart = await page
-    .getByTestId("phase-deadline")
-    .textContent();
   await expect.poll(() => startCommand).toBeTruthy();
   const parsedCommand = JSON.parse(startCommand ?? "{}");
   expect(parsedCommand).toEqual({
@@ -95,6 +100,67 @@ test("browser session recovers durable phases across API restart and reload", as
   });
   expect(startCommand).not.toContain("next_status");
   expect(startCommand).not.toContain("phase_deadline_at");
+
+  await expect(page.getByTestId("phase-label")).toContainText("个人陈述", {
+    timeout: 10_000,
+  });
+  await expect(page.getByTestId("session-sequence")).toHaveText("3");
+  expect(FLOOR_REQUEST).toBeTruthy();
+  expect(FLOOR_READY).toBeTruthy();
+  await writeFile(FLOOR_REQUEST!, sessionId, "utf8");
+  await expect
+    .poll(
+      async () => {
+        try {
+          await access(FLOOR_READY!);
+          return true;
+        } catch {
+          return false;
+        }
+      },
+      { timeout: 10_000 },
+    )
+    .toBe(true);
+  await expect(page.getByTestId("session-sequence")).toHaveText("4");
+  await expect(page.getByTestId("floor-owner")).toContainText(
+    "你（真人参与者）",
+  );
+  await expect(page.getByTestId("floor-lifecycle")).toHaveText("发言权已授予");
+  await expect(page.getByTestId("floor-reason")).toContainText(
+    "优先安排尚未发言的参与者",
+  );
+  await expect.poll(() => floorEvent).toBeTruthy();
+  const parsedFloorEvent = JSON.parse(floorEvent ?? "{}");
+  expect(parsedFloorEvent).toMatchObject({
+    schema_version: 1,
+    type: "floor.granted",
+    session_id: sessionId,
+    sequence: 4,
+    payload: {
+      phase: "OPENING_STATEMENTS",
+      reason_code: "FIRST_OPPORTUNITY",
+    },
+  });
+  for (const forbidden of [
+    "private_stance",
+    "persona_calibration",
+    "policy_weights",
+    "hidden_ranking",
+    "decision_metadata",
+    "score",
+    "prompt",
+    "provider",
+  ]) {
+    expect(floorEvent!.toLowerCase()).not.toContain(forbidden);
+  }
+
+  await page.reload();
+  await expect(page.getByTestId("session-sequence")).toHaveText("4");
+  await expect(page.getByTestId("floor-owner")).toContainText(
+    "你（真人参与者）",
+  );
+  await expect(page.getByTestId("floor-lifecycle")).toHaveText("发言权已授予");
+  await expect(page.getByText("实时连接已建立")).toBeVisible();
 
   expect(API_RESTART_REQUEST).toBeTruthy();
   expect(API_RESTART_READY).toBeTruthy();
@@ -115,28 +181,27 @@ test("browser session recovers durable phases across API restart and reload", as
   await expect(page.getByText("实时连接已建立")).toBeVisible({
     timeout: 10_000,
   });
-  await expect
-    .poll(async () =>
-      Number(await page.getByTestId("session-sequence").textContent()),
-    )
-    .toBeGreaterThan(2);
-  await expect(page.getByTestId("phase-label")).not.toContainText("准备");
-  await expect(page.getByTestId("phase-deadline")).not.toHaveText(
-    deadlineBeforeRestart ?? "",
+  await expect(page.getByTestId("session-sequence")).toHaveText("4");
+  await expect(page.getByTestId("floor-owner")).toContainText(
+    "你（真人参与者）",
   );
 
   await expect(
     page.locator("p").filter({ hasText: "会话状态：" }),
   ).toContainText("已完成", { timeout: 25_000 });
   await expect(page.getByTestId("phase-label")).toContainText("已完成");
-  await expect(page.getByTestId("session-sequence")).toHaveText("8");
+  await expect(page.getByTestId("session-sequence")).toHaveText("10");
+  await expect(page.getByTestId("floor-owner")).toContainText("暂无");
+  await expect(page.getByTestId("floor-lifecycle")).toHaveText("发言权已释放");
 
   const duplicate = await page.evaluate(
-    ({ command, session }) =>
+    ({ apiBaseUrl, command, session }) =>
       new Promise<Record<string, unknown>>((resolve, reject) => {
-        const socket = new WebSocket(
-          `ws://localhost:8000/ws/sessions/${session}?after_sequence=8`,
-        );
+        const socketUrl = new URL(apiBaseUrl);
+        socketUrl.protocol = socketUrl.protocol === "https:" ? "wss:" : "ws:";
+        socketUrl.pathname = `/ws/sessions/${session}`;
+        socketUrl.search = "after_sequence=10";
+        const socket = new WebSocket(socketUrl);
         const timeout = window.setTimeout(() => {
           socket.close();
           reject(new Error("Timed out waiting for duplicate replay"));
@@ -152,7 +217,7 @@ test("browser session recovers durable phases across API restart and reload", as
           reject(new Error("Duplicate replay WebSocket failed"));
         });
       }),
-    { command: startCommand!, session: sessionId },
+    { apiBaseUrl: API_BASE_URL, command: startCommand!, session: sessionId },
   );
   expect(duplicate).toMatchObject({
     type: "session.state_changed",
@@ -184,7 +249,16 @@ test("browser session recovers durable phases across API restart and reload", as
       status: "COMPLETED",
       phase_started_at: null,
       phase_deadline_at: null,
-      last_sequence: 8,
+      last_sequence: 10,
+      floor: {
+        current_grant: null,
+        latest_event: {
+          type: "floor.released",
+          sequence: 5,
+          phase: "OPENING_STATEMENTS",
+          reason_code: "PHASE_CHANGED",
+        },
+      },
     },
   });
   expect(JSON.stringify(authoritative)).not.toContain(PRIVATE_SENTINEL);
@@ -207,7 +281,9 @@ test("browser session recovers durable phases across API restart and reload", as
   await expect(
     page.locator("p").filter({ hasText: "会话状态：" }),
   ).toContainText("已完成");
-  await expect(page.getByTestId("session-sequence")).toHaveText("8");
+  await expect(page.getByTestId("session-sequence")).toHaveText("10");
+  await expect(page.getByTestId("floor-owner")).toContainText("暂无");
+  await expect(page.getByTestId("floor-lifecycle")).toHaveText("发言权已释放");
   await expect(page.getByTestId("question-version-id")).toContainText(
     questionVersionId,
   );

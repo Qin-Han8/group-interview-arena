@@ -39,6 +39,10 @@ const SESSION_ID = "00000000-0000-4000-8000-000000000010";
 const ACTION_ID = "00000000-0000-4000-8000-000000000011";
 const QUESTION_VERSION_ID = "21000000-0000-4000-8000-000000000001";
 const QUESTION_TEMPLATE_ID = "20000000-0000-4000-8000-000000000001";
+const HUMAN_PARTICIPANT_ID = "00000000-0000-4000-8000-000000000012";
+const AI_PARTICIPANT_ID = "00000000-0000-4000-8000-000000000013";
+const GRANT_ID = "00000000-0000-4000-8000-000000000014";
+const DECISION_ID = "00000000-0000-4000-8000-000000000015";
 const QUESTION_SUMMARY: QuestionSummary = {
   id: QUESTION_VERSION_ID,
   question_template_id: QUESTION_TEMPLATE_ID,
@@ -70,6 +74,22 @@ const CREATED: SessionSnapshot = {
   created_at: "2026-08-16T00:00:00Z",
   updated_at: "2026-08-16T00:00:00Z",
   last_sequence: 1,
+  floor: {
+    participants: [
+      {
+        participant_id: HUMAN_PARTICIPANT_ID,
+        actor_kind: "HUMAN",
+        seat_order: 1,
+      },
+      {
+        participant_id: AI_PARTICIPANT_ID,
+        actor_kind: "AI",
+        seat_order: 2,
+      },
+    ],
+    current_grant: null,
+    latest_event: null,
+  },
 };
 const ABORTED: SessionSnapshot = {
   ...CREATED,
@@ -272,6 +292,89 @@ describe("SessionPanel", () => {
       QUESTION_VERSION_ID,
     );
     expect(screen.getByText(QUESTION_DETAIL.objective)).toBeInTheDocument();
+  });
+
+  it("projects a floor grant and restores the same safe owner from snapshot", async () => {
+    const opening: SessionSnapshot = {
+      ...CREATED,
+      status: "OPENING_STATEMENTS",
+      phase_started_at: "2026-08-16T00:01:00Z",
+      phase_deadline_at: "2026-08-16T00:05:00Z",
+      last_sequence: 3,
+    };
+    window.history.replaceState({}, "", `/?session_id=${SESSION_ID}`);
+    mockedGetSessionSnapshot.mockResolvedValue({
+      data: opening,
+      response: new Response(null, { status: 200 }),
+    });
+    mockedGetQuestion.mockResolvedValue({
+      data: QUESTION_DETAIL,
+      response: new Response(null, { status: 200 }),
+    });
+    const realtime = installRealtimeDouble();
+
+    render(
+      <SessionPanel apiClient={API_CLIENT} baseUrl="http://localhost:8000" />,
+    );
+    expect(await screen.findByTestId("floor-owner")).toHaveTextContent("暂无");
+
+    realtime.options().onEvent({
+      schema_version: 1,
+      type: "floor.granted",
+      session_id: SESSION_ID,
+      sequence: 4,
+      occurred_at: "2026-08-16T00:01:10Z",
+      action_id: ACTION_ID,
+      payload: {
+        grant_id: GRANT_ID,
+        decision_id: DECISION_ID,
+        participant_id: AI_PARTICIPANT_ID,
+        phase: "OPENING_STATEMENTS",
+        opportunity_id: null,
+        reason_code: "FIRST_OPPORTUNITY",
+        policy_version: "v0.1-floor-1",
+      },
+    } satisfies FormalSessionEvent);
+
+    expect(await screen.findByTestId("floor-owner")).toHaveTextContent(
+      "AI 候选人 1",
+    );
+    expect(screen.getByTestId("floor-lifecycle")).toHaveTextContent(
+      "发言权已授予",
+    );
+    expect(screen.getByTestId("floor-reason")).toHaveTextContent(
+      "优先安排尚未发言的参与者",
+    );
+    expect(screen.getByTestId("session-sequence")).toHaveTextContent("4");
+
+    realtime.options().onSnapshot({
+      ...opening,
+      last_sequence: 4,
+      floor: {
+        ...opening.floor,
+        current_grant: {
+          grant_id: GRANT_ID,
+          participant_id: AI_PARTICIPANT_ID,
+          phase: "OPENING_STATEMENTS",
+          reason_code: "FIRST_OPPORTUNITY",
+          granted_at: "2026-08-16T00:01:10Z",
+        },
+        latest_event: {
+          type: "floor.granted",
+          sequence: 4,
+          occurred_at: "2026-08-16T00:01:10Z",
+          phase: "OPENING_STATEMENTS",
+          reason_code: "FIRST_OPPORTUNITY",
+          grant_id: GRANT_ID,
+          participant_id: AI_PARTICIPANT_ID,
+          intervention_id: null,
+          intervention_kind: null,
+        },
+      },
+    });
+    expect(await screen.findByTestId("floor-owner")).toHaveTextContent(
+      "AI 候选人 1",
+    );
   });
 
   it("shows safe realtime errors and closes the connection on unmount", async () => {

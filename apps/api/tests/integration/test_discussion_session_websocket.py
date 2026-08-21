@@ -8,7 +8,7 @@ from uuid import UUID, uuid4
 import pytest
 from fastapi import FastAPI
 from httpx import Cookies, Headers, Response
-from sqlalchemy import URL
+from sqlalchemy import URL, select
 from starlette.testclient import (
     TestClient,
     WebSocketDenialResponse,
@@ -23,6 +23,7 @@ from group_interview_arena_api.core.config import (
     SessionPhaseDurations,
     Settings,
 )
+from group_interview_arena_api.db.models import SimulationSession
 from group_interview_arena_api.db.runtime import (
     create_database_engine,
     create_database_session_factory,
@@ -30,9 +31,19 @@ from group_interview_arena_api.db.runtime import (
 )
 from group_interview_arena_api.identity.cookies import SESSION_COOKIE_NAME
 from group_interview_arena_api.modules.discussion_sessions import realtime
-from group_interview_arena_api.modules.discussion_sessions.domain import StoredEvent
+from group_interview_arena_api.modules.discussion_sessions.domain import (
+    SessionStatus,
+    StoredEvent,
+)
 from group_interview_arena_api.modules.discussion_sessions.service import (
     ActionIdConflictError,
+)
+from group_interview_arena_api.modules.floor_control.scheduler import (
+    V0_1_SCHEDULER_POLICY,
+    ScheduleFloorCommand,
+)
+from group_interview_arena_api.modules.floor_control.service import (
+    apply_scheduler_command,
 )
 from group_interview_arena_api.modules.question_personas.seed import (
     INTERNAL_VALIDATION_BUNDLE,
@@ -160,6 +171,41 @@ def _start_command(session_id: str, action_id: UUID) -> dict[str, object]:
         "action_id": str(action_id),
         "payload": {},
     }
+
+
+async def _schedule_floor(
+    temporary_database: TemporaryDatabaseContext,
+    session_id: UUID,
+) -> list[StoredEvent]:
+    engine = create_database_engine(temporary_database.database_settings())
+    try:
+        session_factory = create_database_session_factory(engine)
+        async with session_factory() as session:
+            aggregate = await session.scalar(
+                select(SimulationSession).where(SimulationSession.id == session_id)
+            )
+            assert aggregate is not None
+            owner_id = aggregate.owner_user_id
+            command = ScheduleFloorCommand(
+                session_id=session_id,
+                action_id=uuid4(),
+                decision_id=uuid4(),
+                grant_id=uuid4(),
+                intervention_id=uuid4(),
+                expected_phase=SessionStatus(aggregate.status),
+                expected_last_sequence=aggregate.last_sequence,
+                expected_current_floor_grant_id=aggregate.current_floor_grant_id,
+                evaluated_at=aggregate.updated_at,
+                policy=V0_1_SCHEDULER_POLICY,
+            )
+        async with session_factory() as session:
+            return await apply_scheduler_command(
+                session,
+                owner_id=owner_id,
+                command=command,
+            )
+    finally:
+        await dispose_database_engine(engine)
 
 
 def _assert_error(
@@ -507,3 +553,103 @@ def test_websocket_delivers_committed_phase_deadline_event(
         assert restored.status_code == 200
         assert restored.json()["status"] == "OPENING_STATEMENTS"
         assert restored.json()["last_sequence"] == 3
+
+
+def test_websocket_projects_floor_grant_and_recovers_it_from_snapshot_and_catchup(
+    migrated_database: TemporaryDatabaseContext,
+) -> None:
+    application = _application(
+        migrated_database,
+        settings=Settings(
+            environment=Environment.TEST,
+            cors_origins=(TRUSTED_ORIGIN,),
+            session_phase_durations=SessionPhaseDurations(
+                preparation_seconds=1,
+                opening_statements_seconds=30,
+                exploration_seconds=30,
+                conflict_and_evaluation_seconds=30,
+                convergence_seconds=30,
+                final_summary_seconds=30,
+            ),
+        ),
+    )
+    with _client(application) as client:
+        _register(client, "ws_floor_owner")
+        created = _create_session(client)
+        session_id = str(created["id"])
+
+        with client.websocket_connect(
+            _ws_path(session_id),
+            headers={"Origin": TRUSTED_ORIGIN},
+        ) as websocket:
+            websocket.send_json(_start_command(session_id, uuid4()))
+            assert websocket.receive_json()["sequence"] == 2
+            phase_event = websocket.receive_json()
+            assert phase_event["sequence"] == 3
+            assert phase_event["payload"]["status"] == "OPENING_STATEMENTS"
+
+            scheduled = asyncio.run(
+                _schedule_floor(migrated_database, UUID(session_id)),
+                loop_factory=asyncio.SelectorEventLoop,
+            )
+            assert [(event.sequence, event.event_type) for event in scheduled] == [
+                (4, "floor.granted")
+            ]
+            granted = websocket.receive_json()
+            assert granted["schema_version"] == 1
+            assert granted["type"] == "floor.granted"
+            assert granted["sequence"] == 4
+            assert set(granted["payload"]) == {
+                "grant_id",
+                "decision_id",
+                "participant_id",
+                "phase",
+                "opportunity_id",
+                "reason_code",
+                "policy_version",
+            }
+            assert granted["payload"]["phase"] == "OPENING_STATEMENTS"
+            assert granted["payload"]["reason_code"] == "FIRST_OPPORTUNITY"
+
+        snapshot_response = client.get(f"/sessions/{session_id}")
+        assert snapshot_response.status_code == 200
+        snapshot = snapshot_response.json()
+        assert snapshot["last_sequence"] == 4
+        assert snapshot["floor"]["current_grant"] == {
+            "grant_id": granted["payload"]["grant_id"],
+            "participant_id": granted["payload"]["participant_id"],
+            "phase": "OPENING_STATEMENTS",
+            "reason_code": "FIRST_OPPORTUNITY",
+            "granted_at": granted["occurred_at"],
+        }
+        assert snapshot["floor"]["latest_event"] == {
+            "type": "floor.granted",
+            "sequence": 4,
+            "occurred_at": granted["occurred_at"],
+            "phase": "OPENING_STATEMENTS",
+            "reason_code": "FIRST_OPPORTUNITY",
+            "grant_id": granted["payload"]["grant_id"],
+            "participant_id": granted["payload"]["participant_id"],
+            "intervention_id": None,
+            "intervention_kind": None,
+        }
+        assert len(snapshot["floor"]["participants"]) == 4
+
+        with client.websocket_connect(
+            _ws_path(session_id, after_sequence=3),
+            headers={"Origin": TRUSTED_ORIGIN},
+        ) as websocket:
+            assert websocket.receive_json() == granted
+
+        public_surfaces = (str(granted) + str(snapshot)).lower()
+        for forbidden in (
+            "private_stance",
+            "persona_calibration",
+            "policy_weights",
+            "hidden_ranking",
+            "decision_metadata",
+            "score",
+            "prompt",
+            "provider",
+        ):
+            assert forbidden not in public_surfaces

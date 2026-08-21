@@ -271,6 +271,23 @@ async def _verify_roster_and_lifecycle(
         assert [(event.sequence, event.event_type) for event in granted] == [
             (4, "floor.granted")
         ]
+        async with session_factory() as session:
+            grant_snapshot = await get_session_snapshot(
+                session,
+                owner_id=owner_id,
+                session_id=session_id,
+            )
+        assert [
+            (item.actor_kind, item.seat_order)
+            for item in grant_snapshot.floor.participants
+        ] == [("HUMAN", 1), ("AI", 2), ("AI", 3), ("AI", 4)]
+        assert grant_snapshot.floor.current_grant is not None
+        assert grant_snapshot.floor.current_grant.grant_id == command.grant_id
+        assert grant_snapshot.floor.current_grant.participant_id == participants[1].id
+        assert grant_snapshot.floor.current_grant.reason_code == "FIRST_OPPORTUNITY"
+        assert grant_snapshot.floor.latest_event is not None
+        assert grant_snapshot.floor.latest_event.event_type == "floor.granted"
+        assert grant_snapshot.floor.latest_event.sequence == 4
 
         conflict = _grant(
             session_id,
@@ -332,6 +349,22 @@ async def _verify_roster_and_lifecycle(
         assert [
             (event.sequence, event.event_type) for event in intervention_events
         ] == [(6, "floor.intervention_requested")]
+
+        async with session_factory() as session:
+            restored_snapshot = await get_session_snapshot(
+                session,
+                owner_id=owner_id,
+                session_id=session_id,
+            )
+        assert restored_snapshot.floor.current_grant is None
+        assert restored_snapshot.floor.latest_event is not None
+        assert (
+            restored_snapshot.floor.latest_event.event_type
+            == "floor.intervention_requested"
+        )
+        assert restored_snapshot.floor.latest_event.sequence == 6
+        assert restored_snapshot.floor.latest_event.intervention_kind == "SILENCE"
+        assert restored_snapshot.floor.latest_event.reason_code == "SILENCE_RECOVERY"
 
         async with session_factory() as session:
             aggregate = await session.get(SimulationSession, session_id)

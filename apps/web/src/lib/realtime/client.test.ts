@@ -18,6 +18,11 @@ const CREATED_SNAPSHOT: SessionSnapshot = {
   created_at: "2026-08-16T00:00:00Z",
   updated_at: "2026-08-16T00:00:00Z",
   last_sequence: 1,
+  floor: {
+    participants: [],
+    current_grant: null,
+    latest_event: null,
+  },
 };
 const ABORTED_SNAPSHOT: SessionSnapshot = {
   ...CREATED_SNAPSHOT,

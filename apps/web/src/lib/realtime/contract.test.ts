@@ -5,9 +5,60 @@ import { parseRealtimeMessage } from "./contract";
 const SESSION_ID = "00000000-0000-4000-8000-000000000001";
 const ACTION_ID = "00000000-0000-4000-8000-000000000002";
 const REQUEST_ID = "00000000-0000-4000-8000-000000000003";
+const PARTICIPANT_ID = "00000000-0000-4000-8000-000000000004";
+const GRANT_ID = "00000000-0000-4000-8000-000000000005";
+const DECISION_ID = "00000000-0000-4000-8000-000000000006";
+const INTERVENTION_ID = "00000000-0000-4000-8000-000000000007";
 
 describe("WebSocket derivative contract", () => {
   it.each([
+    {
+      schema_version: 1,
+      type: "floor.granted",
+      session_id: SESSION_ID,
+      sequence: 4,
+      occurred_at: "2026-08-20T01:04:01Z",
+      action_id: ACTION_ID,
+      payload: {
+        grant_id: GRANT_ID,
+        decision_id: DECISION_ID,
+        participant_id: PARTICIPANT_ID,
+        phase: "OPENING_STATEMENTS",
+        opportunity_id: null,
+        reason_code: "FIRST_OPPORTUNITY",
+        policy_version: "v0.1-floor-1",
+      },
+    },
+    {
+      schema_version: 1,
+      type: "floor.released",
+      session_id: SESSION_ID,
+      sequence: 5,
+      occurred_at: "2026-08-20T01:04:02Z",
+      action_id: null,
+      payload: {
+        grant_id: GRANT_ID,
+        participant_id: PARTICIPANT_ID,
+        phase: "OPENING_STATEMENTS",
+        reason_code: "PHASE_CHANGED",
+      },
+    },
+    {
+      schema_version: 1,
+      type: "floor.intervention_requested",
+      session_id: SESSION_ID,
+      sequence: 6,
+      occurred_at: "2026-08-20T01:04:03Z",
+      action_id: ACTION_ID,
+      payload: {
+        intervention_id: INTERVENTION_ID,
+        decision_id: DECISION_ID,
+        phase: "EXPLORATION",
+        intervention_kind: "SILENCE",
+        reason_code: "SILENCE_RECOVERY",
+        policy_version: "v0.1-floor-1",
+      },
+    },
     {
       schema_version: 1,
       type: "session.created",
@@ -78,6 +129,24 @@ describe("WebSocket derivative contract", () => {
   it.each([
     "{not-json",
     JSON.stringify({ schema_version: 2 }),
+    JSON.stringify({
+      schema_version: 1,
+      type: "floor.granted",
+      session_id: SESSION_ID,
+      sequence: 4,
+      occurred_at: "2026-08-20T01:04:01Z",
+      action_id: ACTION_ID,
+      payload: {
+        grant_id: GRANT_ID,
+        decision_id: DECISION_ID,
+        participant_id: PARTICIPANT_ID,
+        phase: "OPENING_STATEMENTS",
+        opportunity_id: null,
+        reason_code: "FIRST_OPPORTUNITY",
+        policy_version: "v0.1-floor-1",
+        hidden_ranking: [0.9],
+      },
+    }),
     JSON.stringify({
       schema_version: 1,
       type: "session.created",

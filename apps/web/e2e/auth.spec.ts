@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-const API_BASE_URL = "http://localhost:8000";
+const API_BASE_URL = process.env.GIA_E2E_API_ORIGIN ?? "http://localhost:8000";
 const SESSION_COOKIE_NAME = "gia_session";
 
 test("browser auth round trip preserves and clears the opaque session", async ({

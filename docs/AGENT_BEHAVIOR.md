@@ -1,14 +1,14 @@
 # AI 候选人与讨论编排骨架
 
-- Status: P1-2/P1-3 completed; P1-4A/P1-4B/P1-4C floor design, foundation and deterministic scheduler completed; AI runtime deferred
+- Status: P1-2/P1-3 completed; P1-4A～D floor design, foundation, deterministic scheduler and safe Web projection completed; AI runtime deferred
 - Current phase: P1 — IN_PROGRESS
 - Target version: V0.1 Internal Validation
-- Detailed orchestrator/agent design: P1-3A～D completed; independent verdict `PASS`; P1-4A/P1-4B/P1-4C completed; P1-4D awaiting explicit approval
+- Detailed orchestrator/agent design: P1-3A～D completed; independent verdict `PASS`; P1-4A～D completed; P1-4E awaiting explicit approval
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
 
-本文件记录已确认的 AI 候选人/私有立场基础、P1-3 已实现的讨论状态机、P1-4A 冻结的 floor-control 领域/确定性策略边界、P1-4B participant/floor persistence，以及 P1-4C 已实现的 deterministic scheduler。当前不包含 production Prompt、模型选择、P1-4D Realtime/Web floor UI、发言生成、结构化记忆或 AI runtime 代码。
+本文件记录已确认的 AI 候选人/私有立场基础、P1-3 已实现的讨论状态机、P1-4A 冻结的 floor-control 领域/确定性策略边界、P1-4B participant/floor persistence、P1-4C deterministic scheduler，以及 P1-4D display-only Realtime/Web floor projection。当前不包含 production Prompt、模型选择、发言生成、结构化记忆或 AI runtime 代码。
 
 ## Confirmed by PROJECT_MASTER_PLAN
 
@@ -165,7 +165,7 @@ Concurrent user/system transitions share the P1-1 aggregate row lock、durable a
 
 Formal event vocabulary remains `session.created` and `session.state_changed`。Historical abort event v1 remains readable；P1-3B emits generalized v2 payload for start、abort and phase-deadline transitions。P1-3C adds startup/connected recovery and Browser authoritative phase projection without adding a client-side state machine。Full matrix、timing arithmetic、snapshot and P1-3D gates are in [`exec-plans/P1-3_session-state-machine.md`](exec-plans/P1-3_session-state-machine.md)。This foundation does not implement P1-4 floor scheduling or AI behavior。
 
-## P1-4A/B frozen foundation + P1-4C implemented deterministic scheduler
+## P1-4A～D floor foundation, deterministic scheduler and safe Web projection
 
 ### Phase controls lifecycle; floor controls turns
 
@@ -218,8 +218,10 @@ Scheduler only answers **who should speak**. Future LLM/provider may answer **wh
 - The internal scheduler command is evaluated under the existing session aggregate row lock and shares one transaction with decision + grant/intervention mutation. Exact phase、sequence and current-grant preconditions make concurrent or stale evaluation fail closed；duplicate action identity replays the original fact.
 - A safe decision record contains only closed policy/reason/phase/target/opportunity and allowlisted observable fairness/tie-break metadata. Private Stance、persona calibration、prompt/provider state、hidden ranking weights and scoring data are neither inputs nor persisted explanation.
 - A phase deadline or abort remains controlled by P1-3. If a grant exists, the same locked transaction records `floor.released` before `session.state_changed`; floor cleanup never changes or blocks phase semantics.
+- P1-4D exposes only participant safe identity、current grant and latest allowlisted lifecycle fact through the owner-only snapshot. The existing ordered WS channel projects the same three floor facts；Web uses exact sequence/gap/reconnect/stale-generation recovery and only displays current owner、lifecycle and safe reason.
+- Browser sends no floor command and never decides grant/release/scheduler state. Public projection omits decision metadata、ranking/weights、Private Stance/persona calibration、prompt/provider and scoring data；utterance/content remains a later separately approved concern.
 
-Full D～E scope、recovery boundary、validation and stop conditions are in [`exec-plans/P1-4_floor-control.md`](exec-plans/P1-4_floor-control.md)。P1-4D remains not started / awaiting explicit approval.
+Full D～E scope、recovery boundary、validation and stop conditions are in [`exec-plans/P1-4_floor-control.md`](exec-plans/P1-4_floor-control.md)。P1-4D is completed；P1-4E remains not started / awaiting explicit approval.
 
 ## Implementation guidance
 
@@ -234,7 +236,7 @@ Full D～E scope、recovery boundary、validation and stop conditions are in [`e
 - TBD：具体 LLM 供应商（总纲第 37 节）；
 - TBD：P1-2B initial numeric seed 经过真实讨论后的校准方法和 blind-test threshold；
 - Confirmed for P1-3：V0.1 状态转换条件、abort 来源、deadline concurrency/recovery 语义；
-- Confirmed and implemented through P1-4C：V0.1 deterministic lexicographic floor policy、single-owner/participant/event/explanation/persistence boundary、pure ranking and locked transactional orchestration；
+- Confirmed and implemented through P1-4D：V0.1 deterministic lexicographic floor policy、single-owner/participant/event/explanation/persistence boundary、pure ranking、locked transactional orchestration and display-only authoritative Web recovery；
 - TBD after real discussion evidence：policy parameter calibration values and conflict-loop content semantics；P1-4 does not use semantic conflict ranking；
 - TBD：结构化记忆和模型输出的正式 Schema；
 - TBD：角色盲测样本及通过标准的执行细节。
@@ -243,7 +245,7 @@ Full D～E scope、recovery boundary、validation and stop conditions are in [`e
 
 ## Future work
 
-- P1：`IN_PROGRESS`；P1-1 session foundation、P1-2 question/persona foundation 与 P1-3 session state machine 均为 `DONE`；P1-4A/B/C completed，P1-4 `IN_PROGRESS`；P1-4D 等待明确批准，P1-4E 未开始；记忆和 AI runtime 继续 Deferred。
+- P1：`IN_PROGRESS`；P1-1 session foundation、P1-2 question/persona foundation 与 P1-3 session state machine 均为 `DONE`；P1-4A～D completed，P1-4 `IN_PROGRESS`；P1-4E 未开始并等待明确批准；记忆和 AI runtime 继续 Deferred。
 - P2：加入语音、打断、播放停止和恢复语义。
 - P3：建立角色行为与评分证据之间的校准边界。
 - P6/V1.0：扩展到 6～8 种角色和压力模式。

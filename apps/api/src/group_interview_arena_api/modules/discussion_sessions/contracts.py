@@ -17,6 +17,7 @@ from group_interview_arena_api.modules.floor_control.domain import (
     FloorInterventionKind,
     FloorPolicyReason,
     FloorReleaseReason,
+    ParticipantActorKind,
 )
 
 
@@ -77,6 +78,84 @@ class SessionStartRequest(_ClosedModel):
     action_id: UUID4
 
 
+class FloorParticipantResponse(_ClosedModel):
+    participant_id: UUID4
+    actor_kind: ParticipantActorKind
+    seat_order: int = Field(gt=0)
+
+
+class CurrentFloorGrantResponse(_ClosedModel):
+    grant_id: UUID4
+    participant_id: UUID4
+    phase: SessionStatus
+    reason_code: FloorPolicyReason
+    granted_at: datetime
+
+    @model_validator(mode="after")
+    def validate_phase(self) -> Self:
+        if self.phase not in FLOOR_ENABLED_PHASES:
+            raise ValueError("Current floor requires a floor-enabled phase.")
+        return self
+
+    _validate_timestamp = field_validator("granted_at")(_require_aware)
+
+
+class FloorLifecycleResponse(_ClosedModel):
+    type: Literal[
+        "floor.granted",
+        "floor.released",
+        "floor.intervention_requested",
+    ]
+    sequence: int = Field(gt=0)
+    occurred_at: datetime
+    phase: SessionStatus
+    reason_code: FloorPolicyReason | FloorReleaseReason
+    grant_id: UUID4 | None = None
+    participant_id: UUID4 | None = None
+    intervention_id: UUID4 | None = None
+    intervention_kind: FloorInterventionKind | None = None
+
+    @model_validator(mode="after")
+    def validate_shape(self) -> Self:
+        if self.phase not in FLOOR_ENABLED_PHASES:
+            raise ValueError("Floor lifecycle requires a floor-enabled phase.")
+        if self.type == "floor.granted":
+            if (
+                self.grant_id is None
+                or self.participant_id is None
+                or not isinstance(self.reason_code, FloorPolicyReason)
+                or self.intervention_id is not None
+                or self.intervention_kind is not None
+            ):
+                raise ValueError("Invalid granted floor projection.")
+        elif self.type == "floor.released":
+            if (
+                self.grant_id is None
+                or self.participant_id is None
+                or not isinstance(self.reason_code, FloorReleaseReason)
+                or self.intervention_id is not None
+                or self.intervention_kind is not None
+            ):
+                raise ValueError("Invalid released floor projection.")
+        elif (
+            self.grant_id is not None
+            or self.participant_id is not None
+            or self.intervention_id is None
+            or self.intervention_kind is None
+            or not isinstance(self.reason_code, FloorPolicyReason)
+        ):
+            raise ValueError("Invalid intervention floor projection.")
+        return self
+
+    _validate_timestamp = field_validator("occurred_at")(_require_aware)
+
+
+class FloorSnapshotResponse(_ClosedModel):
+    participants: list[FloorParticipantResponse]
+    current_grant: CurrentFloorGrantResponse | None
+    latest_event: FloorLifecycleResponse | None
+
+
 class SessionSnapshotResponse(_ClosedModel):
     id: UUID4
     question_version_id: UUID4 | None
@@ -87,6 +166,7 @@ class SessionSnapshotResponse(_ClosedModel):
     created_at: datetime
     updated_at: datetime
     last_sequence: int = Field(ge=0)
+    floor: FloorSnapshotResponse
 
     _validate_timestamps = field_validator(
         "phase_started_at",

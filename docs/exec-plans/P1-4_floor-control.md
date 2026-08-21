@@ -1,6 +1,6 @@
 # P1-4 Floor Control / Speaker Scheduling Execution Plan
 
-Status: `P1 IN_PROGRESS`; `P1-4 IN_PROGRESS`; `P1-4A completed`; `P1-4B completed`; `P1-4C completed`; `P1-4D not started / awaiting explicit approval`; `P1-4E not started`
+Status: `P1 IN_PROGRESS`; `P1-4 IN_PROGRESS`; `P1-4A completed`; `P1-4B completed`; `P1-4C completed`; `P1-4D completed`; `P1-4E not started / awaiting explicit approval`
 
 Target version: `V0.1 Internal Validation`
 
@@ -11,6 +11,8 @@ Accepted decisions: [`D-003`](../DECISIONS.md#2-已确认产品决策索引), [`
 P1-4A baseline: committed `main` at `0fdf2c0034737044efcd986b1915fabe81f8a56c` (`P1-3D: docs: complete session state machine phase`); [`PROJECT_MASTER_PLAN.md`](../PROJECT_MASTER_PLAN.md) SHA-256 `2388A9660320406CB35D5354126AD71C6849A98DB7C4A356796CA951BF372F26`
 
 P1-4B baseline: clean committed `main` at `100646c9d547521fb8fc67430385ebe27572f5c5` (`P1-4A: docs: freeze floor control design`), equal to `origin/main`; master-plan SHA-256 unchanged
+
+P1-4D baseline: clean committed `main` at `5a738255d74e1c8534ae84d0eae926b52b8d2f3f` (`P1-4C: feat: add deterministic floor scheduler`), equal to `origin/main`; master-plan SHA-256 unchanged
 
 ## Goal
 
@@ -31,10 +33,10 @@ P1-4 只决定“谁应该说”，不决定“说什么”。Scheduler 是 proj
 1. **P1-4A — Floor control design freeze**：`completed`。Docs-only 冻结领域模型、phase/floor authority、V0.1 deterministic policy、human compatibility、events、explainability、persistence、B～E scope 和 acceptance。
 2. **P1-4B — Scheduling persistence + domain foundation**：`completed`。已建立通用 participant、speaking opportunity、current floor、decision/audit facts 的最小 persistence/domain 基础与 migration；未实现自动 speaker selection engine、Realtime/Web 或 LLM。
 3. **P1-4C — Deterministic scheduler engine**：`completed`。已实现 pure deterministic candidate construction/ranking、fairness、monopoly guard、phase policy、silence/deadline intervention、transactional decision → grant/intervention 与 deterministic regressions；不生成 utterance。
-4. **P1-4D — Realtime/Web floor experience**：`not started / awaiting explicit approval`。在既有 ordered session channel 上实现最小 floor commands/events/snapshot projection、Browser current-speaker/queue intent 和真实 PostgreSQL Chromium flow；Browser 不拥有 scheduler。
-5. **P1-4E — Independent acceptance + closeout**：`not started`。从 committed source 独立复核 persistence、determinism、race/recovery、phase integration、human compatibility、explainability/non-disclosure、Realtime/Web 和 Deferred absence；通过后才可将 P1-4 标为 `DONE`。
+4. **P1-4D — Realtime/Web floor experience**：`completed`。已在既有 ordered session channel 上实现 floor events/safe snapshot projection、Browser current-speaker/lifecycle UI 和真实 PostgreSQL Chromium recovery flow；Browser 不拥有 scheduler，且本轮明确不增加 floor inbound commands。
+5. **P1-4E — Independent acceptance + closeout**：`not started / awaiting explicit approval`。从 committed source 独立复核 persistence、determinism、race/recovery、phase integration、human compatibility、explainability/non-disclosure、Realtime/Web 和 Deferred absence；通过后才可将 P1-4 标为 `DONE`。
 
-P1-4B 已获得单独明确批准并完成；P1-4C 仍须单独明确批准。P1-4B 完成不授权 scheduler ranking engine、dependency、lockfile、CI、public API 或 Web 修改。
+P1-4B～D 已分别获得明确批准并完成；P1-4E 仍须单独明确批准。P1-4D 完成不授权 independent closeout、LLM/utterance、memory、scoring/report、Redis/queue、voice 或下一阶段实现。
 
 ## Frozen floor ownership model
 
@@ -230,6 +232,7 @@ Snapshot/restart recovery must be able to reconstruct exactly one current owner 
 
 - Extend the existing versioned session channel with the three frozen formal floor event types and compatible strict Web parsing.
 - Add the minimum owner-authorized client intent needed for human speaking opportunity/release/interrupt flow only after exact command vocabulary is documented; client never selects the winner.
+- The explicit P1-4D approval narrowed this vertical slice to display-only server facts, so the conditional client-intent item above did not trigger and no floor inbound command was added.
 - Add authoritative floor snapshot fields or a purpose-built owner-only load boundary sufficient for reload/gap/reconnect recovery.
 - Render current speaker, safe pending intent and safe reason explanation in Web; keep pending action identity in memory and reuse existing bounded reconnect/gap recovery.
 - Validate a complete AI/human/system-compatible floor flow with real Next/Chromium/Uvicorn/PostgreSQL infrastructure and safe cleanup.
@@ -303,8 +306,8 @@ P1-4 does not implement or prebuild:
 - P1-4A：completed；docs-only floor-control design freeze；validation `PASS`；no blocker。
 - P1-4B：completed；linear migration `f1a14b15c004`、participant/floor persistence、internal command lifecycle、durable audit、phase integration and required validation `PASS`；no blocker。
 - P1-4C：completed；deterministic scheduler、locked transactional orchestration and required validation `PASS`；no blocker。
-- P1-4D：not started / awaiting explicit user approval。
-- P1-4E：not started。
+- P1-4D：completed；safe REST/WS/Web floor projection and recovery validation `PASS`；no blocker。
+- P1-4E：not started / awaiting explicit user approval。
 
 ### P1-4B implementation record
 
@@ -315,4 +318,12 @@ P1-4 does not implement or prebuild:
 - Decision metadata and the three v1 floor event payloads are strictly allowlisted and omit Private Stance、persona calibration、prompt/provider internals、hidden ranking/weights and scoring data. No public REST/WS command、snapshot field or Browser caller was added.
 - Migration downgrade/re-upgrade/catalog check、domain/contract/model tests、real PostgreSQL concurrency/idempotency/rollback/cascade tests、P1-1/P1-3 regressions、OpenAPI drift and repository quality gates passed. No new ADR、dependency or lockfile change.
 
-Next governance-approved action: review the P1-4B diff; only explicit user approval may start P1-4C.
+### P1-4D implementation record
+
+- Additively extended the owner-only session snapshot with a safe generalized participant directory, zero-or-one current grant and latest allowlisted floor lifecycle projection. Snapshot fields omit decision metadata、policy internals、ranking/weights、Private Stance/persona、prompt/provider and scoring data.
+- Reused the existing v1 floor formal events, single session WebSocket channel and discussion sequence. Strict Web parsing rejects unknown/extra fields；the existing exact-next sequence、duplicate suppression、gap reload、bounded reconnect and stale-generation guard apply unchanged.
+- Added display-only current owner、granted/released/intervention lifecycle and user-facing safe reason text. Browser sends no floor command and cannot schedule、grant、release、alter phase or alter deadline.
+- Real PostgreSQL tests cover live WS delivery、owner-only snapshot equivalence and reconnect catch-up；Chromium covers phase entry → scheduler grant → live event → reload → API restart/reconnect → authoritative restore → phase-change release. Existing P1-1/P1-3/P1-4B/C regressions remain green.
+- No migration、dependency、lockfile、second realtime channel/protocol or Accepted ADR was added. All explicit Deferred scope remains absent.
+
+Next governance-approved action: review the P1-4D diff; only explicit user approval may start P1-4E independent acceptance + closeout.

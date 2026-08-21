@@ -1,6 +1,6 @@
 # P0 技术架构基线
 
-- Status: P0 Architecture Baseline + P1-1/P1-2/P1-3 completed + P1-4A/P1-4B/P1-4C completed
+- Status: P0 Architecture Baseline + P1-1/P1-2/P1-3 completed + P1-4A～D completed
 - Current phase: P1 — IN_PROGRESS
 - Architecture baseline established by: P0-2 — DONE
 - P0-3 foundation status: DONE
@@ -8,7 +8,7 @@
 - P0-5 identity boundary status: DONE
 - Most recently completed task: P1-4C deterministic scheduler engine — `PASS`; P1-4 `IN_PROGRESS`
 - P0 status: DONE; P0-1 through P0-7 completed
-- P1 status: IN_PROGRESS; P1-1/P1-2/P1-3 DONE; P1-4 IN_PROGRESS; P1-4A/P1-4B/P1-4C completed; P1-4D awaiting explicit approval
+- P1 status: IN_PROGRESS; P1-1/P1-2/P1-3 DONE; P1-4 IN_PROGRESS; P1-4A～D completed; P1-4E awaiting explicit approval
 - Target version: V0.1 Internal Validation
 - Business architecture detail: P1-1 runtime completed; P1-2 question/persona boundary implemented; P1-3 state/timing/recovery/realtime/Web flow independently accepted; P1-4 floor-control design, persistence/domain foundation and deterministic scheduler implemented
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
@@ -276,7 +276,8 @@ WebSocket 使用独立版本化事件契约，至少表达 event type、schema v
 - P1-3 deadline/abort reconciliation may release an active grant in the same transaction before `session.state_changed`, preserving contiguous order while leaving status/timing semantics exclusively in P1-3. Floor code never writes lifecycle state.
 - P1-4C implements the pure policy in `modules/floor_control/scheduler.py`. All input enumeration is explicitly sorted；first opportunity、monopoly guard、phase-aware fairness and stable seat/UUID form a closed lexicographic key, while injected UTC is used only for silence/deadline thresholds. Candidate lists/fairness counters remain runtime-only.
 - Internal `floor.schedule` orchestration reconstructs participant/opportunity/history facts only after acquiring the existing session aggregate row lock, validates exact phase/sequence/current-grant preconditions, then persists action digest、safe decision and grant/intervention plus one formal event in the same transaction. Concurrent evaluation cannot create a second owner；duplicate action replays and stale evaluation fails closed.
-- The three frozen formal floor facts are accepted by the strict server envelope, but P1-4C adds no public REST command, snapshot field, Web parser or UI. P1-4D Realtime/Web and P1-4E independent acceptance remain separately gated. Full design is in [`exec-plans/P1-4_floor-control.md`](exec-plans/P1-4_floor-control.md).
+- The three frozen formal floor facts remain on the existing single session channel and discussion sequence. P1-4D additively exposes an owner-only safe snapshot projection (generalized participant identity、current grant、latest lifecycle fact), strict Web parsing/reduction and display-only current-owner/lifecycle/reason UI. Existing exact-next sequence、duplicate suppression、gap reload、bounded reconnect and stale-generation rules recover floor state without a second channel/protocol.
+- Browser has no floor command and cannot select、grant or release a speaker. Public projection is purpose-built and excludes decision metadata、hidden ranking/weights、Private Stance/persona calibration、prompt/provider and scoring data；P1-4E independent acceptance remains separately gated. Full design is in [`exec-plans/P1-4_floor-control.md`](exec-plans/P1-4_floor-control.md).
 
 ## Configuration, secrets and error boundaries
 
@@ -351,7 +352,7 @@ Redis 只在多 API workers、横向扩容、跨进程 WebSocket broadcast、dis
 - P0-5D：completed；真实 browser Cookie/CORS/CSRF 闭环已通过 Chromium 验证；
 - P0-5E：completed；final outcome `PASS after findings remediation and independent recheck`；
 - P0：`DONE`；P0-1～P0-7 completed；P0-7 finding-only independent recheck `PASS`，P1 readiness `READY`；其后用户已明确批准进入 P1；
-- P1：`IN_PROGRESS`；P1-1、P1-2、P1-3 均已完成且 independent verdict `PASS`；P1-4A/B/C completed，P1-4 `IN_PROGRESS`；P1-4D 尚未开始并等待明确批准，P1-4E 仍 separately gated；LLM/utterance、记忆和基础报告继续 Deferred；
+- P1：`IN_PROGRESS`；P1-1、P1-2、P1-3 均已完成且 independent verdict `PASS`；P1-4A～D completed，P1-4 `IN_PROGRESS`；P1-4E 尚未开始并等待明确批准；LLM/utterance、记忆和基础报告继续 Deferred；
 - P2 以后：只在对应阶段获批后增加语音、评分训练和商业化能力。
 
 ## 与其他文档关系

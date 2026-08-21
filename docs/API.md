@@ -1,6 +1,6 @@
 # API 与事件技术基线
 
-- Status: P0 API Architecture Baseline + P1-1/P1-2/P1-3 completed + P1-4A/P1-4B/P1-4C completed
+- Status: P0 API Architecture Baseline + P1-1/P1-2/P1-3 completed + P1-4A～D completed
 - Current phase: P1 — IN_PROGRESS
 - API architecture baseline established by: P0-2 — DONE
 - Target version: V0.1 Internal Validation
@@ -10,7 +10,7 @@
 - P1-1 contract: scoped/frozen by P1-1A; P1-1B persistence, P1-1C REST/WebSocket runtime, P1-1D Web realtime caller and P1-1E independent final review completed
 - P1-2 contract: P1-2A/B/C completed; safe question reads and immutable version-bound session creation implemented
 - P1-3 contract: P1-3A～D completed; independent verdict `PASS`; P1-3 `DONE`
-- P1-4 contract: P1-4A design freeze, P1-4B persistence/domain foundation and P1-4C deterministic scheduler completed; no public floor commands/snapshot/Web caller; P1-4D awaiting explicit approval
+- P1-4 contract: P1-4A～D completed; deterministic scheduler remains server-owned, safe floor snapshot/WS/Web projection implemented, and P1-4E awaits explicit approval
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -148,7 +148,7 @@ P1-1A 已冻结第一个 scoped v1 contract；generator package、完整 P1/P2 �
 
 - `POST /sessions`：authenticated + existing exact Origin / `X-GIA-CSRF: 1`；无 body；原子创建 `CREATED` session 和 sequence `1` 的 `session.created` event；返回 `201 SessionSnapshotResponse`。
 - `GET /sessions/{session_id}`：authenticated owner-only snapshot；missing/non-owner 均返回 `404 SESSION_NOT_FOUND`；read-only，不要求 CSRF header。
-- Snapshot fields 精确为 `id`、`status`、`created_at`、`updated_at`、`last_sequence`；owner identity、Cookie/token、question、participant、utterance 和 event backlog 不进入 response。
+- P1-1 初始 snapshot fields 为 `id`、`status`、`created_at`、`updated_at`、`last_sequence`；后续获批的 question、phase timing 与 safe floor additive projection 分别见下文。Owner credential、Cookie/token、utterance 和 event backlog 始终不进入 response。
 - FastAPI OpenAPI 继续是 REST Source of Truth；Web derivative 已由 P1-1C 重新生成并通过 drift check。
 
 ### WebSocket v1 scope
@@ -247,9 +247,9 @@ P1-3C Browser renders a local display countdown from authoritative UTC values bu
 
 The exact state matrix、deadline arithmetic、historical version compatibility and P1-3B～D gates are in [`exec-plans/P1-3_session-state-machine.md`](exec-plans/P1-3_session-state-machine.md)。
 
-## P1-4 floor-control contract — deterministic scheduler implemented internally
+## P1-4 floor-control contract — deterministic scheduler + safe Realtime/Web projection implemented
 
-P1-4A froze the boundary below. P1-4B implements internal typed commands, strict server formal-event envelopes and durable records；P1-4C adds internal deterministic `floor.schedule` orchestration. Neither subphase adds a REST endpoint、WebSocket inbound command、snapshot/OpenAPI field or Web caller, so the public OpenAPI contract and generated Browser client remain unchanged.
+P1-4A froze the boundary below. P1-4B implements internal typed commands, strict server formal-event envelopes and durable records；P1-4C adds internal deterministic `floor.schedule` orchestration；P1-4D additively projects the resulting facts through the existing owner-only REST snapshot and single ordered WebSocket channel. No public floor command or Browser scheduler authority was added.
 
 ### Authority and command boundary
 
@@ -273,10 +273,12 @@ Hand raises/opportunities、candidate lists、fairness calculations、timer tick
 
 ### Snapshot and recovery boundary
 
-- P1-4B persists the current grant/owner、phase association、safe causal decision and event watermark needed for future recovery. P1-4D must expose the minimum owner-authorized snapshot/load projection before Browser floor UI exists.
+- `SessionSnapshotResponse.floor` exposes only a safe participant directory (`participant_id`、`actor_kind`、`seat_order`), nullable current grant and latest lifecycle fact with phase/public reason/timestamp/sequence. It excludes decision metadata、policy weights/ranking、Private Stance/persona、prompt/provider and scoring fields.
 - Browser projects server truth only. It cannot infer ownership from a local queue, local countdown, audio playback or generated text.
 - Replacement is ordered release then grant in one locked transaction；duplicate/stale/concurrent operations must preserve zero-or-one current owner and contiguous event sequence；all durable mutation commits before send.
 - Phase change/abort/completion invalidates stale floor evaluation and releases any old current grant without allowing floor cleanup to delay or alter the P1-3 transition.
+- Web strictly parses the three existing v1 floor event payloads and reduces only their safe public fields. It reuses exact-next sequence application、duplicate suppression、gap/sequence-ahead REST reload、bounded reconnect and stale socket generation rejection；no second realtime channel or protocol exists.
+- Web displays current owner、public granted/released/intervention status and safe reason text. It sends no grant/release/scheduler command, and LLM/utterance content remains outside this contract.
 
 Internal grant/release/intervention/schedule commands use the existing session action/digest/aggregate-lock/sequence transaction boundary. Scheduler input is reconstructed only after locking；duplicate action IDs replay the same causal events, a changed digest conflicts, and stale sequence/phase/current grant、ineligible participant or terminal session rejects without floor mutation. Exact domain/persistence, reason metadata and P1-4D～E gates are in [`exec-plans/P1-4_floor-control.md`](exec-plans/P1-4_floor-control.md)。
 
@@ -349,7 +351,7 @@ P0-3D 已完成最小 API、OpenAPI authority、typed config、request correlati
 - P1-2A safe question/session/private projection design freeze 已完成 docs-only；
 - P1-2B persistence/domain/seed、P1-2C safe API/session/Web vertical slice 与 P1-2D independent acceptance 均已完成；P1-2 `DONE`。
 - P1-3A～D 已完成；state/timing/command/event/snapshot、backend durable foundation 与 realtime/Web complete phase flow 已独立验收 `PASS`；P1-3 `DONE`，P1 保持 `IN_PROGRESS`。
-- P1-4A design freeze、P1-4B persistence/domain foundation 与 P1-4C deterministic scheduler 已完成；P1-4 `IN_PROGRESS`。Public OpenAPI/WebSocket command/snapshot/Web UI 均未新增；P1-4D Realtime/Web 未开始并等待单独明确批准，P1-4E independent acceptance 未开始。
+- P1-4A～D 已完成；P1-4 `IN_PROGRESS`。Safe snapshot/WS/Web floor projection 已实现且无 public floor command；P1-4E independent acceptance 未开始并等待单独明确批准。
 
 ### P2 and later
 
@@ -363,7 +365,7 @@ P0-3D 已完成最小 API、OpenAPI authority、typed config、request correlati
 - Implemented：P1-2 safe question reads 和 version-bound session create contract；
 - Implemented：P1-3B `session.start` REST/WS command parsing、generalized state event v2、phase timing snapshot 和 backend durable state-machine foundation；
 - Implemented：P1-3C in-process deadline recovery、connected realtime catch-up/push、Browser authoritative phase/deadline projection 和 complete Chromium phase flow；
-- Implemented internally：P1-4 minimum formal floor facts `floor.granted` / `floor.released` / `floor.intervention_requested` and deterministic schedule → fact orchestration；public commands/snapshot projection await P1-4D；
+- Implemented：P1-4 minimum formal floor facts、deterministic schedule → fact orchestration、owner-only safe snapshot projection and display-only Realtime/Web recovery；public floor commands remain absent；
 - Deferred：P1-4 之后的完整 REST endpoint / WebSocket command/event 集合；
 - Deferred：event retention/compaction、large replay pagination、multi-tab/cross-process delivery 和长期 compatibility policy；
 - TBD：V0.1 之后的 identity expansion、verified recovery flow 与 authorization；

@@ -9,10 +9,13 @@ import threading
 import time
 from collections.abc import Generator
 from contextlib import contextmanager
+from dataclasses import replace
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import BinaryIO
 from urllib.error import HTTPError, URLError
 from urllib.request import urlopen
+from uuid import UUID, uuid4
 
 import psycopg
 from conftest import (
@@ -22,22 +25,34 @@ from conftest import (
     migrate_database,
     temporary_database_context,
 )
-from sqlalchemy import update
+from sqlalchemy import select, update
 
-from group_interview_arena_api.db import PersonaPrivateStance, QuestionVersion
+from group_interview_arena_api.db import (
+    PersonaPrivateStance,
+    QuestionVersion,
+    SimulationSession,
+)
 from group_interview_arena_api.db.runtime import (
     create_database_engine,
     create_database_session_factory,
     dispose_database_engine,
+)
+from group_interview_arena_api.modules.discussion_sessions.domain import SessionStatus
+from group_interview_arena_api.modules.floor_control.scheduler import (
+    V0_1_SCHEDULER_POLICY,
+    ScheduleFloorCommand,
+)
+from group_interview_arena_api.modules.floor_control.service import (
+    apply_scheduler_command,
 )
 from group_interview_arena_api.modules.question_personas.seed import (
     INTERNAL_VALIDATION_BUNDLE,
     seed_question_persona_foundation,
 )
 
-API_ORIGIN = "http://localhost:8000"
 WEB_ORIGIN = "http://localhost:3000"
-API_PORT = 8000
+API_PORT = int(os.environ.get("GIA_E2E_API_PORT", "8000"))
+API_ORIGIN = f"http://localhost:{API_PORT}"
 WEB_PORT = 3000
 STARTUP_TIMEOUT_SECONDS = 60.0
 SHUTDOWN_TIMEOUT_SECONDS = 15.0
@@ -223,6 +238,8 @@ def _run_browser_flow(temporary_database: TemporaryDatabase) -> None:
         web_log = temporary_path / "web.log"
         restart_request = temporary_path / "restart-api.request"
         restart_ready = temporary_path / "restart-api.ready"
+        floor_request = temporary_path / "schedule-floor.request"
+        floor_ready = temporary_path / "schedule-floor.ready"
 
         api_command = [
             sys.executable,
@@ -243,7 +260,7 @@ def _run_browser_flow(temporary_database: TemporaryDatabase) -> None:
             "GIA_API_SESSION_COOKIE_SECURE": "false",
             "GIA_API_SESSION_PHASE_DURATIONS": (
                 '{"preparation_seconds":2,'
-                '"opening_statements_seconds":2,'
+                '"opening_statements_seconds":12,'
                 '"exploration_seconds":2,'
                 '"conflict_and_evaluation_seconds":2,'
                 '"convergence_seconds":2,'
@@ -262,9 +279,16 @@ def _run_browser_flow(temporary_database: TemporaryDatabase) -> None:
         coordinator_errors: list[BaseException] = []
         coordinator_stop = threading.Event()
 
-        def restart_api_when_requested() -> None:
+        def coordinate_floor_and_restart() -> None:
+            floor_scheduled = False
             try:
                 while not coordinator_stop.is_set():
+                    if floor_request.exists() and not floor_scheduled:
+                        session_id = UUID(floor_request.read_text(encoding="utf-8"))
+                        _schedule_browser_floor(temporary_database, session_id)
+                        floor_ready.write_text("ready", encoding="utf-8")
+                        floor_scheduled = True
+                        continue
                     if not restart_request.exists():
                         time.sleep(0.05)
                         continue
@@ -307,15 +331,18 @@ def _run_browser_flow(temporary_database: TemporaryDatabase) -> None:
             ) as web_process:
                 _wait_for_http(WEB_ORIGIN, web_process, web_log)
                 coordinator = threading.Thread(
-                    target=restart_api_when_requested,
-                    name="gia-e2e-api-restart",
+                    target=coordinate_floor_and_restart,
+                    name="gia-e2e-floor-restart",
                 )
                 coordinator.start()
                 try:
                     _run_playwright(
                         environment_overrides={
+                            "GIA_E2E_API_ORIGIN": API_ORIGIN,
                             "GIA_E2E_API_RESTART_REQUEST": str(restart_request),
                             "GIA_E2E_API_RESTART_READY": str(restart_ready),
+                            "GIA_E2E_FLOOR_REQUEST": str(floor_request),
+                            "GIA_E2E_FLOOR_READY": str(floor_ready),
                         }
                     )
                 finally:
@@ -361,15 +388,77 @@ def _verify_session_persistence(temporary_database: TemporaryDatabase) -> None:
         event_sequences = connection.execute(
             "SELECT sequence FROM discussion_events ORDER BY sequence"
         ).fetchall()
+        floor_rows = connection.execute(
+            "SELECT (SELECT count(*) FROM floor_grants), "
+            "(SELECT count(*) FROM floor_releases), current_floor_grant_id "
+            "FROM simulation_sessions"
+        ).fetchall()
 
     if session_rows != [
-        ("COMPLETED", 8, INTERNAL_VALIDATION_BUNDLE.version_id, None, None)
+        ("COMPLETED", 10, INTERNAL_VALIDATION_BUNDLE.version_id, None, None)
     ]:
         raise RuntimeError("Browser E2E session state was not persisted exactly.")
-    if action_count is None or action_count[0] != 1:
-        raise RuntimeError("Browser E2E action idempotency row count was not one.")
-    if event_sequences != [(sequence,) for sequence in range(1, 9)]:
-        raise RuntimeError("Browser E2E formal event sequences were not [1..8].")
+    if action_count is None or action_count[0] != 2:
+        raise RuntimeError("Browser E2E action idempotency row count was not two.")
+    if event_sequences != [(sequence,) for sequence in range(1, 11)]:
+        raise RuntimeError("Browser E2E formal event sequences were not [1..10].")
+    if floor_rows != [(1, 1, None)]:
+        raise RuntimeError("Browser E2E floor lifecycle was not persisted exactly.")
+
+
+async def _schedule_browser_floor_async(
+    temporary_database: TemporaryDatabase,
+    session_id: UUID,
+) -> None:
+    engine = create_database_engine(temporary_database.database_settings())
+    try:
+        session_factory = create_database_session_factory(engine)
+        async with session_factory() as session:
+            aggregate = await session.scalar(
+                select(SimulationSession).where(SimulationSession.id == session_id)
+            )
+            if aggregate is None:
+                raise RuntimeError("Browser E2E floor session was not found.")
+            if SessionStatus(aggregate.status) is not SessionStatus.OPENING_STATEMENTS:
+                raise RuntimeError("Browser E2E floor request missed opening phase.")
+            owner_id = aggregate.owner_user_id
+            command = ScheduleFloorCommand(
+                session_id=session_id,
+                action_id=uuid4(),
+                decision_id=uuid4(),
+                grant_id=uuid4(),
+                intervention_id=uuid4(),
+                expected_phase=SessionStatus.OPENING_STATEMENTS,
+                expected_last_sequence=aggregate.last_sequence,
+                expected_current_floor_grant_id=aggregate.current_floor_grant_id,
+                evaluated_at=datetime.now(UTC),
+                policy=replace(
+                    V0_1_SCHEDULER_POLICY,
+                    deadline_intervention_threshold=timedelta(seconds=1),
+                ),
+            )
+        async with session_factory() as session:
+            events = await apply_scheduler_command(
+                session,
+                owner_id=owner_id,
+                command=command,
+            )
+        if [(event.sequence, event.event_type) for event in events] != [
+            (4, "floor.granted")
+        ]:
+            raise RuntimeError("Browser E2E scheduler did not persist one grant.")
+    finally:
+        await dispose_database_engine(engine)
+
+
+def _schedule_browser_floor(
+    temporary_database: TemporaryDatabase,
+    session_id: UUID,
+) -> None:
+    asyncio.run(
+        _schedule_browser_floor_async(temporary_database, session_id),
+        loop_factory=asyncio.SelectorEventLoop,
+    )
 
 
 async def _seed_browser_question_async(
@@ -432,9 +521,9 @@ def main() -> int:
         _verify_session_persistence(temporary_database)
 
     print(
-        "P1-3C browser E2E passed with immutable question binding, one durable "
-        "start action, sequences [1..8], API restart catch-up, completed phase "
-        "recovery, and private sentinel isolation; "
+        "P1-4D browser E2E passed with immutable question binding, one durable "
+        "start plus one scheduler action, sequences [1..10], live floor grant, "
+        "reload/API-restart recovery, phase-change release, private isolation; "
         "temporary database and servers were cleaned."
     )
     return 0
