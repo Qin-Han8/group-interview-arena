@@ -1,16 +1,16 @@
 # P0 技术架构基线
 
-- Status: P0 Architecture Baseline + P1-1/P1-2/P1-3/P1-4 completed + P1-5A AI Runtime architecture frozen
+- Status: P0 Architecture Baseline + P1-1/P1-2/P1-3/P1-4 completed + P1-5A frozen + P1-5B persistence implemented
 - Current phase: P1 — IN_PROGRESS
 - Architecture baseline established by: P0-2 — DONE
 - P0-3 foundation status: DONE
 - P0-4 database foundation status: DONE
 - P0-5 identity boundary status: DONE
-- Most recently completed subphase: P1-5A docs-only AI Runtime Architecture Freeze — `DONE`
+- Most recently implemented subphase: P1-5B AI Runtime Persistence Foundation
 - P0 status: DONE; P0-1 through P0-7 completed
-- P1 status: IN_PROGRESS; P1-1/P1-2/P1-3/P1-4 DONE; P1-5A DONE; AI Runtime implementation not started
+- P1 status: IN_PROGRESS; P1-1/P1-2/P1-3/P1-4 DONE; P1-5A DONE; P1-5B provider-neutral persistence implemented; model execution deferred
 - Target version: V0.1 Internal Validation
-- Business architecture detail: P1-1 runtime completed; P1-2 question/persona boundary implemented; P1-3 lifecycle independently accepted; P1-4 floor control implemented; P1-5A freezes future AI Runtime/provider/prompt/utterance boundaries only
+- Business architecture detail: P1-1 runtime completed; P1-2 question/persona boundary implemented; P1-3 lifecycle independently accepted; P1-4 floor control implemented; P1-5A freezes authority; P1-5B persists prompt/request/final utterance without a provider caller
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -302,6 +302,13 @@ P1-3 lifecycle authority: phase / deadline
 - 多 provider、cost accounting、enterprise model、audit trace 和 prompt iteration 是 future commercial-readiness boundary；billing、quota、payment、multi-tenant 继续 Deferred。
 
 完整冻结和后续 implementation gates 见 [`exec-plans/P1-5_ai-runtime-foundation.md`](exec-plans/P1-5_ai-runtime-foundation.md)。
+
+### P1-5B implemented persistence boundary
+
+- `modules/ai_runtime` is a provider-neutral domain/application persistence boundary, not an LLM runtime loop。It publishes immutable Prompt Versions and applies explicit request/start/complete/fail commands；there is no SDK import、provider interface/client、prompt renderer、worker or automatic caller。
+- Request/start/complete use the existing owner-scoped session aggregate lock and validate exact current grant、AI participant and phase。Completion atomically stores one final utterance and a `COMPLETED` request；a database composite foreign key prevents an utterance from referencing any other request state。
+- Failure is a typed terminal request record only。It writes no utterance/event, does not release or transfer floor, and cannot mutate session status/phase/deadline/scoring。The future orchestrator remains responsible for invoking this persistence boundary and then using the existing deterministic floor-release service。
+- Historical provenance is recovered by immutable foreign-key paths to Question Version、Persona Assignment、Prompt Version、actual provider/model identifiers and closed non-secret configuration version。No public API/WS/Web projection is introduced。
 
 ## Configuration, secrets and error boundaries
 

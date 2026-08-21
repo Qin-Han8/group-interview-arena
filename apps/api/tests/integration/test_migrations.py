@@ -38,6 +38,7 @@ IDENTITY_REVISION = "4fe43b42641b"
 SESSION_FOUNDATION_REVISION = "f1a11d15c001"
 QUESTION_PERSONA_REVISION = "f1a12b15c002"
 SESSION_PHASE_TIMING_REVISION = "f1a13b15c003"
+FLOOR_CONTROL_FOUNDATION_REVISION = "f1a14b15c004"
 P1_2_PRODUCT_TABLES = frozenset(
     {
         "auth_sessions",
@@ -53,10 +54,13 @@ P1_2_PRODUCT_TABLES = frozenset(
     }
 )
 EXPECTED_PRODUCT_TABLES = P1_2_PRODUCT_TABLES | {
+    "ai_utterances",
     "floor_decisions",
     "floor_grants",
     "floor_interventions",
     "floor_releases",
+    "llm_generation_requests",
+    "prompt_versions",
     "session_participants",
     "speaking_opportunities",
 }
@@ -273,6 +277,35 @@ def test_database_downgrades_to_p1_3_and_reupgrades_to_head(
             revision=SESSION_PHASE_TIMING_REVISION,
             version_table_exists=True,
             product_tables=P1_2_PRODUCT_TABLES,
+        )
+
+        command.upgrade(config, "head")
+        command.current(config, check_heads=True)
+        command.check(config)
+
+        assert _migration_state(temporary_database) == MigrationState(
+            revision=head,
+            version_table_exists=True,
+            product_tables=EXPECTED_PRODUCT_TABLES,
+        )
+
+
+def test_database_downgrades_to_p1_4_and_reupgrades_to_head(
+    temporary_database: TemporaryDatabaseContext,
+) -> None:
+    config = _alembic_config()
+    head = ScriptDirectory.from_config(config).get_current_head()
+    assert head is not None
+
+    with _temporary_migration_environment(temporary_database):
+        command.upgrade(config, "head")
+        command.downgrade(config, FLOOR_CONTROL_FOUNDATION_REVISION)
+
+        assert _migration_state(temporary_database) == MigrationState(
+            revision=FLOOR_CONTROL_FOUNDATION_REVISION,
+            version_table_exists=True,
+            product_tables=EXPECTED_PRODUCT_TABLES
+            - {"ai_utterances", "llm_generation_requests", "prompt_versions"},
         )
 
         command.upgrade(config, "head")

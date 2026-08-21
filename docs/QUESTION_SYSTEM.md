@@ -3,7 +3,7 @@
 - Status: P1-2 completed; design, persistence/domain/seed, safe caller, and independent acceptance complete
 - Current phase: P1 — IN_PROGRESS
 - Target version: V0.1 Internal Validation
-- Current status: P1-2/P1-3/P1-4 DONE；P1-5A docs-only AI Runtime architecture freeze DONE；runtime implementation deferred
+- Current status: P1-2/P1-3/P1-4 DONE；P1-5A freeze and P1-5B AI Runtime persistence DONE；provider execution/prompt orchestration deferred
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -74,13 +74,13 @@ Reference dimensions、hidden conflicts、acceptable outcome patterns、phase pr
 Question Version and Prompt Version are separate immutable assets:
 
 - Question Version owns the exact question content、assignment/private-stance snapshot and question-level internal `phase_prompts` material；
-- Prompt Version owns the future generation template/instruction asset used by AI Runtime；
+- Prompt Version owns the versioned generation template/instruction asset persisted by the P1-5B domain boundary；
 - `phase_prompts` are inputs/material for future prompt assembly, not the complete rendered prompt and not a substitute for Prompt Version identity；
 - publishing a new Question Version does not silently rewrite a Prompt Version, and prompt iteration does not mutate historical Question Versions；
-- each future Generation Request must record both exact Question Version and exact Prompt Version, plus actual provider/model/effective non-secret configuration, so a historical utterance can be explained without following `latest` pointers；
+- each P1-5B Generation Request links the session-bound exact Question Version and exact Prompt Version, plus actual provider/model/effective non-secret configuration version, so a historical utterance can be explained without following `latest` pointers；
 - Persona Template must not absorb prompt content/provider secrets, and ordinary public question projection remains unchanged。
 
-P1-5A adds no prompt schema、question column、migration、API or runtime。Exact Prompt Version storage/rendering is Deferred to a separately approved implementation subphase；see [`exec-plans/P1-5_ai-runtime-foundation.md`](exec-plans/P1-5_ai-runtime-foundation.md)。
+P1-5A added no schema。P1-5B now stores Prompt Version as an independent table and references it from Generation Request；it adds no question/persona column and does not copy prompt into Persona Template。Prompt rendering/orchestration、provider calls、API/Realtime/Web remain Deferred；see [`exec-plans/P1-5_ai-runtime-foundation.md`](exec-plans/P1-5_ai-runtime-foundation.md)。
 
 ## Public and private projections
 

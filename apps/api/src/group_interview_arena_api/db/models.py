@@ -726,6 +726,238 @@ class FloorRelease(Base):
     )
 
 
+class PromptVersion(Base):
+    __tablename__ = "prompt_versions"
+    __table_args__ = (
+        UniqueConstraint(
+            "prompt_key", "version_number", name="uq_prompt_versions_key_version"
+        ),
+        CheckConstraint("length(prompt_key) > 0", name="prompt_key_non_empty"),
+        CheckConstraint("version_number > 0", name="version_number_positive"),
+        CheckConstraint("length(purpose_code) > 0", name="purpose_code_non_empty"),
+        CheckConstraint("length(template_text) > 0", name="template_text_non_empty"),
+        CheckConstraint(
+            "octet_length(content_digest) = 32", name="content_digest_sha256"
+        ),
+        CheckConstraint(
+            "published_at >= created_at", name="publication_after_creation"
+        ),
+        CheckConstraint(
+            "retired_at IS NULL OR retired_at >= published_at",
+            name="retirement_after_publication",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    prompt_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    version_number: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    purpose_code: Mapped[str] = mapped_column(String(64), nullable=False)
+    template_text: Mapped[str] = mapped_column(Text, nullable=False)
+    content_digest: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    published_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    retired_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+
+class LlmGenerationRequest(Base):
+    __tablename__ = "llm_generation_requests"
+    __table_args__ = (
+        UniqueConstraint(
+            "session_id", "id", name="uq_llm_generation_requests_session_id"
+        ),
+        UniqueConstraint(
+            "session_id",
+            "id",
+            "participant_id",
+            "floor_grant_id",
+            "status",
+            name="uq_llm_generation_requests_utterance_context",
+        ),
+        ForeignKeyConstraint(
+            ["session_id", "participant_id"],
+            ["session_participants.session_id", "session_participants.id"],
+            deferrable=True,
+            initially="DEFERRED",
+        ),
+        ForeignKeyConstraint(
+            ["session_id", "floor_grant_id"],
+            ["floor_grants.session_id", "floor_grants.id"],
+            deferrable=True,
+            initially="DEFERRED",
+        ),
+        CheckConstraint(
+            "status IN ('REQUESTED', 'RUNNING', 'COMPLETED', 'FAILED')",
+            name="status_allowed",
+        ),
+        CheckConstraint(
+            "length(provider_identifier) > 0 AND length(model_identifier) > 0",
+            name="provider_model_identifiers_non_empty",
+        ),
+        CheckConstraint(
+            "octet_length(request_digest) = 32", name="request_digest_sha256"
+        ),
+        CheckConstraint(
+            "jsonb_typeof(request_metadata) = 'object' AND "
+            "request_metadata ?& ARRAY['schema_version', 'configuration_version'] "
+            "AND request_metadata - ARRAY['schema_version', 'configuration_version'] "
+            "= '{}'::jsonb AND "
+            "jsonb_typeof(request_metadata->'schema_version') = 'number' AND "
+            "request_metadata->>'schema_version' = '1' AND "
+            "jsonb_typeof(request_metadata->'configuration_version') = 'string' AND "
+            "length(request_metadata->>'configuration_version') > 0",
+            name="request_metadata_safe_shape",
+        ),
+        CheckConstraint(
+            "(status = 'REQUESTED' AND started_at IS NULL "
+            "AND completed_at IS NULL AND failed_at IS NULL "
+            "AND failure_code IS NULL) OR "
+            "(status = 'RUNNING' AND started_at IS NOT NULL "
+            "AND completed_at IS NULL AND failed_at IS NULL "
+            "AND failure_code IS NULL) OR "
+            "(status = 'COMPLETED' AND started_at IS NOT NULL "
+            "AND completed_at IS NOT NULL AND failed_at IS NULL "
+            "AND failure_code IS NULL) OR "
+            "(status = 'FAILED' AND completed_at IS NULL "
+            "AND failed_at IS NOT NULL AND failure_code IS NOT NULL)",
+            name="status_timing_consistent",
+        ),
+        CheckConstraint(
+            "started_at IS NULL OR started_at >= requested_at",
+            name="started_after_requested",
+        ),
+        CheckConstraint(
+            "completed_at IS NULL OR completed_at >= started_at",
+            name="completed_after_started",
+        ),
+        CheckConstraint(
+            "failed_at IS NULL OR failed_at >= requested_at",
+            name="failed_after_requested",
+        ),
+        CheckConstraint(
+            "failure_code IS NULL OR failure_code IN "
+            "('TIMEOUT', 'PROVIDER_UNAVAILABLE', 'RATE_LIMIT', "
+            "'PARTIAL_GENERATION', 'INVALID_OUTPUT', 'INTERNAL_ERROR')",
+            name="failure_code_allowed",
+        ),
+        Index(
+            "ix_llm_generation_requests_session_requested",
+            "session_id",
+            "requested_at",
+            "id",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    session_id: Mapped[UUID] = mapped_column(
+        Uuid,
+        ForeignKey("simulation_sessions.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    participant_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
+    floor_grant_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
+    prompt_version_id: Mapped[UUID] = mapped_column(
+        Uuid,
+        ForeignKey("prompt_versions.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    provider_identifier: Mapped[str] = mapped_column(String(128), nullable=False)
+    model_identifier: Mapped[str] = mapped_column(String(128), nullable=False)
+    request_metadata: Mapped[dict[str, object]] = mapped_column(JSONB, nullable=False)
+    request_digest: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    requested_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    started_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    failed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    failure_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
+
+
+class AiUtterance(Base):
+    __tablename__ = "ai_utterances"
+    __table_args__ = (
+        UniqueConstraint(
+            "generation_request_id", name="uq_ai_utterances_generation_request"
+        ),
+        UniqueConstraint(
+            "session_id", "floor_grant_id", name="uq_ai_utterances_floor_grant"
+        ),
+        ForeignKeyConstraint(
+            ["session_id", "participant_id"],
+            ["session_participants.session_id", "session_participants.id"],
+            deferrable=True,
+            initially="DEFERRED",
+        ),
+        ForeignKeyConstraint(
+            ["session_id", "floor_grant_id"],
+            ["floor_grants.session_id", "floor_grants.id"],
+            deferrable=True,
+            initially="DEFERRED",
+        ),
+        ForeignKeyConstraint(
+            [
+                "session_id",
+                "generation_request_id",
+                "participant_id",
+                "floor_grant_id",
+                "generation_request_status",
+            ],
+            [
+                "llm_generation_requests.session_id",
+                "llm_generation_requests.id",
+                "llm_generation_requests.participant_id",
+                "llm_generation_requests.floor_grant_id",
+                "llm_generation_requests.status",
+            ],
+            deferrable=True,
+            initially="DEFERRED",
+        ),
+        CheckConstraint(
+            "generation_request_status = 'COMPLETED'",
+            name="successful_generation_required",
+        ),
+        CheckConstraint("length(content) > 0", name="content_non_empty"),
+        CheckConstraint(
+            "octet_length(content_digest) = 32", name="content_digest_sha256"
+        ),
+        Index(
+            "ix_ai_utterances_session_persisted",
+            "session_id",
+            "persisted_at",
+            "id",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    session_id: Mapped[UUID] = mapped_column(
+        Uuid,
+        ForeignKey("simulation_sessions.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    participant_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
+    floor_grant_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
+    generation_request_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
+    generation_request_status: Mapped[str] = mapped_column(String(16), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    content_digest: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    persisted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+
+
 class FloorIntervention(Base):
     __tablename__ = "floor_interventions"
     __table_args__ = (

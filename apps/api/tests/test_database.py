@@ -42,14 +42,17 @@ def test_metadata_naming_convention_matches_baseline() -> None:
 
 def test_base_metadata_has_exact_product_tables() -> None:
     assert set(Base.metadata.tables) == {
+        "ai_utterances",
         "auth_sessions",
         "discussion_events",
         "floor_decisions",
         "floor_grants",
         "floor_interventions",
         "floor_releases",
+        "llm_generation_requests",
         "persona_private_stances",
         "persona_templates",
+        "prompt_versions",
         "question_persona_assignments",
         "question_templates",
         "question_versions",

@@ -1,6 +1,6 @@
 # P1-5 AI Runtime Foundation Execution Plan
 
-Status: `P1 IN_PROGRESS`; `P1-5 IN_PROGRESS`; `P1-5A completed`; later P1-5 implementation subphases `NOT_STARTED / awaiting explicit approval`
+Status: `P1 IN_PROGRESS`; `P1-5 IN_PROGRESS`; `P1-5A completed`; `P1-5B completed`; later runtime/provider subphases `NOT_STARTED`
 
 Target version: `V0.1 Internal Validation`
 
@@ -15,6 +15,8 @@ P1-5A baseline: clean committed `main` at `5397cd2b25f36c6a9fbd666b759261091c36a
 冻结 AI Runtime Foundation 的架构边界，使未来实现能够在既有 `floor.granted` 之后为获准 AI participant 生成可追踪、可重试且不破坏 session integrity 的 utterance，同时保持 P1-3 lifecycle authority、P1-4 floor authority、题目/Persona 私有信息隔离和 provider neutrality。
 
 P1-5A 是 docs-only architecture freeze。它不实现 LLM、provider adapter、prompt runtime、utterance persistence、API/Realtime contract、schema、migration、dependency、test 或 CI。
+
+P1-5B 是 separately approved persistence foundation。它只实现 immutable Prompt Version、provider-neutral Generation Request lifecycle、successful final AI Utterance relation and locked transactional domain services；不接入真实 provider、不自动生成、不增加 API/Realtime/Web。
 
 ## Context and authority
 
@@ -109,7 +111,15 @@ requested -> generated -> persisted
 
 Generation Request 与 final Utterance 必须分离：一个 request 至多产生一个 final utterance；retry 复用同一 logical request/idempotency boundary 或建立显式 attempt child，不能生成多个正式 utterances。`generated` 的 partial/raw candidate 在未持久化前不是小组已听到的事实。
 
-具体表名、columns、event vocabulary、streaming chunks 和 Browser projection Deferred 到后续获批实施设计；P1-5A 只冻结 lifecycle/invariants。
+P1-5A 只冻结 lifecycle/invariants。P1-5B 现将 generation attempt 的 durable states 具体化为 `REQUESTED / RUNNING / COMPLETED / FAILED`：`RUNNING` 表示 caller 已开始 attempt；`COMPLETED` 只与同一 transaction 中唯一 formal utterance 一起成立。Conceptual `generated -> persisted` 不作为可崩溃分离的数据库状态，避免 raw/partial output 在正式 utterance 前成为 durable group fact。Event vocabulary、streaming chunks 和 Browser projection 继续 Deferred。
+
+## P1-5B implemented persistence foundation
+
+- `prompt_versions` stores immutable UUID/version identity、stable key/purpose、template text + SHA-256 digest and creation/publication/retirement metadata。Publication is insert-or-exact-replay；Persona Template schema remains unchanged。
+- `llm_generation_requests` records exact session、AI participant、floor grant、Prompt Version、actual provider/model identifiers、closed non-secret configuration version、semantic digest、lifecycle timing and safe typed failure code。One row is one attempt；same request ID exact replay is idempotent and semantic drift is a conflict。
+- `ai_utterances` stores only final displayable content。It has at-most-one relations to generation request and floor grant；a composite deferred foreign key includes request status `COMPLETED`, preventing a formal utterance without a matching successful generation context。
+- Create/start/complete/fail mutations reuse the owner-scoped `simulation_sessions` row lock and short transaction discipline。Create/start/complete validate current session phase、exact grant and eligible AI participant；complete updates request and inserts utterance atomically。Failure writes only terminal request metadata and never mutates phase/deadline/current floor/events。
+- Provenance is recoverable through immutable links: session → Question Version；participant → Persona Assignment/Template/Private Stance；request → Prompt Version + provider/model + configuration version；utterance → successful request。No private stance content、persona calibration、hidden ranking、internal prompt variables、provider secret/raw error is copied into request or utterance storage。
 
 ## Frozen failure and retry boundary
 
@@ -141,8 +151,8 @@ P1-5A 不提前实现 billing、quota、payment、multi-tenant、enterprise acco
 
 - LLM implementation and real model calls；
 - provider SDK/interface/adapter/factory/routing/fallback implementation；
-- prompt orchestration engine、prompt storage/schema/rendering；
-- generation request / attempt / utterance schema and migration；
+- prompt orchestration engine、rendering and internal prompt-variable persistence；
+- additional provider-attempt/fallback hierarchy beyond the current one-request/one-attempt identity；
 - runtime/API/WebSocket/Web implementation and streaming；
 - memory、RAG、embedding/vector store；
 - scoring、evidence extraction、report generation；
@@ -153,11 +163,11 @@ P1-5A 不提前实现 billing、quota、payment、multi-tenant、enterprise acco
 
 ## Later implementation gates
 
-Any later P1-5 implementation subphase requires separate explicit approval and an updated decomposition before code changes. At minimum it must define:
+Any later P1-5 runtime/provider subphase requires separate explicit approval and an updated decomposition before code changes. At minimum it must define:
 
-- exact schema/migration and historical deletion semantics；
+- any additive schema need and historical deletion/retention semantics；
 - provider-neutral request/result/error contract with a real caller；
-- Prompt Version storage and rendering authority；
+- Prompt Version rendering authority；
 - generation/attempt idempotency, concurrency and restart recovery；
 - formal event/API/WS/public projection vocabulary；
 - fake-provider deterministic tests and privacy sentinel tests；
@@ -172,6 +182,15 @@ Any later P1-5 implementation subphase requires separate explicit approval and a
 - `git diff --check` passes and changed Markdown files have final newlines；
 - master-plan SHA-256 and Git object hash remain unchanged；
 - no runtime、tests、schema/migration、dependency/lockfile、CI、API implementation or review bundle change。
+
+## P1-5B validation gates
+
+- Ruff lint、Ruff format check and strict Pyright；
+- domain/model tests for immutable prompt identity、closed metadata、`VARCHAR` lifecycle and completed-generation utterance constraint；
+- real PostgreSQL integration for exact replay/conflict、request lifecycle、ownership/stale-context checks、failed generation isolation、at-most-one utterance and constraint-triggered transaction rollback；
+- fresh/repeat migration、single head、downgrade to P1-4、re-upgrade、exact table catalog and `alembic check`；
+- full API test regression, master-plan hash, changed-file scope and `git diff --check`；
+- no provider SDK/dependency/lockfile/API/WS/Web/CI changes。
 
 ## Decisions
 
@@ -192,5 +211,5 @@ Any later P1-5 implementation subphase requires separate explicit approval and a
 ## Progress
 
 - P1-5A：completed；docs-only AI Runtime Architecture Freeze；validation required before delivery；no blocker。
-- Later P1-5 implementation：not started；requires separate explicit approval。
-
+- P1-5B：completed；provider-neutral persistence foundation；all required gates PASS；no provider/runtime caller。
+- Later P1-5 runtime/provider implementation：not started；requires separate explicit approval。

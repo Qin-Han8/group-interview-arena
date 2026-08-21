@@ -1,14 +1,14 @@
 # AI 候选人与讨论编排骨架
 
-- Status: P1-2/P1-3/P1-4 completed; P1-5A AI Runtime architecture frozen; implementation deferred
+- Status: P1-2/P1-3/P1-4 completed; P1-5A frozen; P1-5B persistence implemented; provider execution deferred
 - Current phase: P1 — IN_PROGRESS
 - Target version: V0.1 Internal Validation
-- Detailed orchestrator/agent design: P1-3A～D and P1-4A～E completed; P1-5A docs-only freeze completed; runtime implementation awaiting separate approval
+- Detailed orchestrator/agent design: P1-3A～D and P1-4A～E completed; P1-5A freeze completed; P1-5B persistence commands implemented without runtime/provider execution
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
 
-本文件记录已确认的 AI 候选人/私有立场基础、P1-3 已实现的讨论状态机、P1-4 floor-control，以及 P1-5A 冻结的 future AI Runtime/provider/prompt/utterance 边界。当前不包含 production Prompt、模型选择、发言生成、结构化记忆或 AI runtime 代码。
+本文件记录已确认的 AI 候选人/私有立场基础、P1-3 已实现的讨论状态机、P1-4 floor-control、P1-5A authority freeze，以及 P1-5B provider-neutral persistence boundary。当前仍不包含 production Prompt orchestration、模型调用、自动发言生成或结构化记忆。
 
 ## Confirmed by PROJECT_MASTER_PLAN
 
@@ -269,6 +269,12 @@ Generation Request 与 final Utterance 是不同 identity。一个 logical reque
 
 完整冻结与 Deferred 实现见 [`exec-plans/P1-5_ai-runtime-foundation.md`](exec-plans/P1-5_ai-runtime-foundation.md)。
 
+### P1-5B persistence semantics
+
+- Durable request states are `REQUESTED -> RUNNING -> COMPLETED` or `REQUESTED/RUNNING -> FAILED`。The P1-5A logical generated/persisted boundary is represented atomically at this foundation: only validated future caller output submitted through `complete_generation_request` becomes a `COMPLETED` request plus formal `ai_utterance` in one transaction；partial output is not stored as utterance。
+- Request creation fixes exact participant、floor grant、Prompt Version、provider/model identifiers and a closed non-secret configuration version。The existing session and participant links recover Question Version and Persona Assignment history without copying Private Stance or prompt variables into request metadata。
+- No automatic generation exists。Future provider/orchestrator code must explicitly call these commands, respect the current grant check, and use the existing floor service for release；failure alone never changes floor or session lifecycle。
+
 ## Implementation guidance
 
 - 大模型负责自然语言和受约束的局部语义决策；项目代码负责状态、时间、发言权、私有信息隔离、记忆和恢复。
@@ -284,7 +290,7 @@ Generation Request 与 final Utterance 是不同 identity。一个 logical reque
 - Confirmed for P1-3：V0.1 状态转换条件、abort 来源、deadline concurrency/recovery 语义；
 - Confirmed and implemented through P1-4D：V0.1 deterministic lexicographic floor policy、single-owner/participant/event/explanation/persistence boundary、pure ranking、locked transactional orchestration and display-only authoritative Web recovery；
 - TBD after real discussion evidence：policy parameter calibration values and conflict-loop content semantics；P1-4 does not use semantic conflict ranking；
-- Frozen logical boundary in P1-5A, implementation TBD：Generation Request / attempt / final Utterance / Prompt Version 的正式 persistence 与 transport Schema；
+- Implemented persistence in P1-5B：Prompt Version、Generation Request lifecycle and final AI Utterance relation；transport schema、provider attempt/fallback orchestration and runtime caller remain TBD/Deferred；
 - TBD：结构化记忆和模型输出 validation 的正式 Schema；
 - TBD：角色盲测样本及通过标准的执行细节。
 
@@ -292,7 +298,7 @@ Generation Request 与 final Utterance 是不同 identity。一个 logical reque
 
 ## Future work
 
-- P1：`IN_PROGRESS`；P1-1～P1-4 `DONE`；P1-5A docs-only architecture freeze `DONE`；LLM/provider/runtime/utterance implementation 与记忆继续 Deferred，等待单独批准。
+- P1：`IN_PROGRESS`；P1-1～P1-4 `DONE`；P1-5A freeze `DONE`；P1-5B persistence implemented；LLM/provider execution、automatic runtime、transport and memory remain Deferred。
 - P2：加入语音、打断、播放停止和恢复语义。
 - P3：建立角色行为与评分证据之间的校准边界。
 - P6/V1.0：扩展到 6～8 种角色和压力模式。

@@ -23,14 +23,17 @@ from group_interview_arena_api.db import (
 )
 
 EXPECTED_PRODUCT_TABLES = {
+    "ai_utterances",
     "auth_sessions",
     "discussion_events",
     "floor_decisions",
     "floor_grants",
     "floor_interventions",
     "floor_releases",
+    "llm_generation_requests",
     "persona_private_stances",
     "persona_templates",
+    "prompt_versions",
     "question_persona_assignments",
     "question_templates",
     "question_versions",
@@ -46,7 +49,7 @@ def _constraint_names(table: Table) -> set[str]:
     return {str(constraint.name) for constraint in table.constraints}
 
 
-def test_metadata_contains_exact_p1_1b_product_tables() -> None:
+def test_metadata_contains_exact_product_tables() -> None:
     assert set(Base.metadata.tables) == EXPECTED_PRODUCT_TABLES
 
 

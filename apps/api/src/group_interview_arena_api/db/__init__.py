@@ -2,14 +2,17 @@
 
 from group_interview_arena_api.db.base import Base
 from group_interview_arena_api.db.models import (
+    AiUtterance,
     AuthSession,
     DiscussionEvent,
     FloorDecision,
     FloorGrant,
     FloorIntervention,
     FloorRelease,
+    LlmGenerationRequest,
     PersonaPrivateStance,
     PersonaTemplate,
+    PromptVersion,
     QuestionPersonaAssignment,
     QuestionTemplate,
     QuestionVersion,
@@ -21,6 +24,7 @@ from group_interview_arena_api.db.models import (
 )
 
 __all__ = [
+    "AiUtterance",
     "AuthSession",
     "Base",
     "DiscussionEvent",
@@ -28,8 +32,10 @@ __all__ = [
     "FloorGrant",
     "FloorIntervention",
     "FloorRelease",
+    "LlmGenerationRequest",
     "PersonaPrivateStance",
     "PersonaTemplate",
+    "PromptVersion",
     "QuestionPersonaAssignment",
     "QuestionTemplate",
     "QuestionVersion",

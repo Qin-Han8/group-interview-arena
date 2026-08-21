@@ -1,17 +1,17 @@
 # 当前任务清单
 
-- Status: P1 in progress; P1-1, P1-2, P1-3, and P1-4 completed; P1-5A docs-only freeze completed
-- Managed scope: P1-5A completed; no LLM/provider/runtime implementation authorized
-- Most recently completed subphase: P1-5A — `DONE`
+- Status: P1 in progress; P1-1, P1-2, P1-3, and P1-4 completed; P1-5A/P1-5B completed
+- Managed scope: P1-5B persistence completed; no LLM/provider execution, automatic generation or transport implementation authorized
+- Most recently completed subphase: P1-5B — `DONE`
 - P0-7 final outcome: initial verdict `BLOCKED` with two documentation findings; remediation completed; finding-only independent recheck `PASS`; new blockers none; P1 readiness `READY`
 - Current phase: P1 — `IN_PROGRESS`
 - Most recently completed task: P1-4 — `DONE`
-- Current task gate: P1-5 — `IN_PROGRESS`; P1-5A `DONE`; implementation subphases `NOT_STARTED` / awaiting separate explicit user approval
+- Current task gate: P1-5 — `IN_PROGRESS`; P1-5A/P1-5B `DONE`; later runtime/provider subphases `NOT_STARTED`
 - P0 status: `DONE`; P0-1 through P0-7 completed
 - Allowed status values: `TODO` / `IN_PROGRESS` / `BLOCKED` / `DONE`
 - Related roadmap: [`ROADMAP.md`](ROADMAP.md)
 
-用户已明确批准正式进入 P1，并已完成 P1-1～P1-4。P1-4E 在修复唯一 documentation finding 后通过 independent recheck，P1-4 已为 `DONE`；P1 保持 `IN_PROGRESS`。用户已批准并完成 P1-5A docs-only AI Runtime Architecture Freeze；不得据此提前开始 LLM/provider/runtime/utterance、prompt engine、记忆、报告、语音、Redis/queue 或 P2～P6 实现。
+用户已明确批准正式进入 P1，并已完成 P1-1～P1-4。P1-4E 在修复唯一 documentation finding 后通过 independent recheck，P1-4 已为 `DONE`；P1 保持 `IN_PROGRESS`。P1-5A AI Runtime Architecture Freeze 与 P1-5B AI Runtime Persistence Foundation 已完成；不得据此提前开始 LLM/provider execution、automatic generation、prompt orchestration、transport、记忆、报告、语音、Redis/queue 或 P2～P6 实现。
 
 ## P0-1 — 仓库与文档治理
 
@@ -586,17 +586,18 @@
 - ID: `P1-5`
 - 名称：AI Runtime Foundation
 - Status: `IN_PROGRESS`
-- Approval state：P1-5A docs-only architecture freeze explicitly approved and completed；later implementation subphases not started / awaiting separate explicit approval。
+- Approval state：P1-5A architecture freeze and P1-5B persistence foundation explicitly approved and completed；later runtime/provider subphases not started。
 - 目标：在既有 immutable question/persona、server-authoritative session lifecycle 与 deterministic floor control 之上，建立 provider-neutral、可追踪、可重试且不破坏 session integrity 的 AI utterance generation boundary。
-- In scope：P1-5A docs-only 冻结 Scheduler/Runtime/provider authority、Prompt Version/model provenance、Participant/Runtime separation、Generation Request/final Utterance lifecycle、failure/retry integrity 和 commercial-readiness evolution boundary。
-- Out of scope：LLM/provider/runtime implementation、provider SDK、prompt engine、utterance/request schema/migration、API/WS/Web、tests、dependencies/lockfiles、CI、memory/RAG、scoring/report、voice、billing/quota/payment/multi-tenant。
+- In scope：P1-5A 冻结 Scheduler/Runtime/provider authority、provenance、Participant/Runtime separation、request/utterance lifecycle and failure integrity；P1-5B 实现 Prompt Version、Generation Request、final AI Utterance persistence、locked transactions and PostgreSQL migration/tests。
+- Out of scope：LLM/provider calls、provider SDK/client/interface、prompt orchestration、automatic generation、streaming、API/WS/Web、dependencies/lockfiles、CI、memory/RAG、scoring/report、voice、Redis/queue/worker、token/cost/billing/quota/payment/multi-tenant。
 - Dependencies：P1-1/P1-2/P1-3/P1-4 `DONE`；Accepted `D-003`、`D-007`、`D-008`、`D-013`、`ADR-006`、`ADR-007`、`ADR-009`、`ADR-011`～`ADR-014`。
-- Acceptance criteria：docs agree that Scheduler decides who and AI Runtime decides what；provider-neutral business boundary is explicit；historical utterance provenance includes Prompt Version/model/config；request and final utterance are separate；timeout/unavailable/rate-limit/partial generation cannot change phase/floor or duplicate utterances；all implementation/deferred scope remains absent；docs-only validation passes。
+- Acceptance criteria：Scheduler/runtime authority remains separated；Prompt Version and request/utterance history are durable and provider-neutral；failed generation creates no utterance and cannot change session/floor；duplicate identity and transaction rollback are safe；linear migration and full API/PostgreSQL gates pass；all deferred runtime/provider scope remains absent。
 
 ### Substep progress
 
 - `P1-5A — AI Runtime Architecture Freeze`：completed；docs-only；
-- later P1-5 implementation subphases：not started；require separate explicit approval and plan update。
+- `P1-5B — AI Runtime Persistence Foundation`：completed；three-table persistence + domain transaction foundation；no provider caller；
+- later P1-5 runtime/provider subphases：not started；require separate explicit approval and plan update。
 
 ### P1-5A completion note
 
@@ -608,6 +609,15 @@
 - 冻结 Generation Request 与 final Utterance 分离及 `requested/generated/persisted/failed` 逻辑生命周期；timeout/unavailable/rate-limit/partial generation 使用有界、幂等、stale-grant-safe 处理，失败不改变 phase/deadline/floor/scoring 且不重复产生 utterance；
 - 多 provider、成本统计、企业模型、审计和 prompt iteration 保留 safely evolvable；billing/quota/payment/multi-tenant 及全部 LLM/provider/runtime/schema/API/test implementation 继续 Deferred；
 - 完整冻结、后续 implementation gates 和 stop conditions 见 [`exec-plans/P1-5_ai-runtime-foundation.md`](exec-plans/P1-5_ai-runtime-foundation.md)。
+
+### P1-5B completion note
+
+- Linear revision `f1a15b15c005` additively creates `prompt_versions`、`llm_generation_requests` and `ai_utterances`；current schema is nineteen product tables with one Alembic head and no native enum。
+- Prompt publication is immutable insert-or-exact replay；request identity uses a semantic SHA-256 digest；durable request lifecycle is `REQUESTED / RUNNING / COMPLETED / FAILED` with closed non-secret configuration metadata and safe typed failure codes。
+- Final utterance is separate and at most one per request/floor grant；a completed-status composite foreign key blocks formal utterances for unsuccessful requests。Completion is atomic；constraint failure rolls the request transition back。
+- Create/start/complete reuse owner-scoped session aggregate locking and exact floor/session/AI participant validation。Failure records no utterance/event and leaves phase、deadline、floor pointer and scheduler facts unchanged。
+- No provider SDK/client/interface、LLM call、prompt execution、streaming、API/WS/Web、dependency/lockfile、CI、queue/worker or other deferred capability was added。
+- Required gates PASS：Ruff、format、Pyright、`385 passed` full API/PostgreSQL suite、migration downgrade/re-upgrade/single-head/catalog/drift、master-plan hash and diff/scope checks。
 
 ## 任务更新规则
 

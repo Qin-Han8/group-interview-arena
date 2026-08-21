@@ -1,6 +1,6 @@
 # 数据库技术基线
 
-- Status: P0 Data Architecture Baseline + P1-1/P1-2/P1-3 schema implemented + P1-4B floor persistence implemented + P1-5A logical data boundary frozen
+- Status: P0 Data Architecture Baseline + P1-1～P1-4 schema implemented + P1-5A frozen + P1-5B AI Runtime persistence implemented
 - Current phase: P1 — IN_PROGRESS
 - Data architecture baseline established by: P0-2 — DONE
 - Local PostgreSQL infrastructure: P0-4B — completed
@@ -13,14 +13,14 @@
 - P0-5B identity persistence: completed
 - P0-5C backend auth runtime: completed
 - Target version: V0.1 Internal Validation
-- Business schema: identity, session, question/persona, durable phase timing, and P1-4B participant/floor audit foundation (sixteen product tables)
+- Business schema: identity, session, question/persona, durable phase timing, participant/floor audit, and AI Runtime persistence foundation (nineteen product tables)
 - P1-1 status: P1-1A～E completed; independent final verdict PASS; P1-1 DONE
-- P1-2/P1-3/P1-4 status: DONE; P1-5A docs-only freeze completed; no new schema/migration
+- P1-2/P1-3/P1-4 status: DONE; P1-5A freeze completed; P1-5B adds three product tables through linear revision `f1a15b15c005`
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
 
-本文件记录 P0-2 已批准的数据技术基线、P0-4 完成状态、P0-5 identity persistence、P1-1 session persistence/transaction callers、P1-2B question/persona persistence foundation、P1-3B durable phase/timing fields，以及 P1-4B participant/floor persistence。迁移目标 product tables 精确为十六张，Alembic single head 为 `f1a14b15c004`。
+本文件记录 P0-2 已批准的数据技术基线、P0-4 完成状态、P0-5 identity persistence、P1-1 session persistence/transaction callers、P1-2B question/persona persistence foundation、P1-3B durable phase/timing fields、P1-4B participant/floor persistence，以及 P1-5B AI Runtime persistence。迁移目标 product tables 精确为十九张，Alembic single head 为 `f1a15b15c005`。
 
 正式决策见 [`DECISIONS.md`](DECISIONS.md) `ADR-005`、`ADR-010`、`ADR-013`、`ADR-015`。
 
@@ -335,7 +335,7 @@ P1-4C adds no migration or column. Its internal scheduler reads the existing par
 
 The exact schema, migration and concurrency gates are in [`exec-plans/P1-4_floor-control.md`](exec-plans/P1-4_floor-control.md)。
 
-## P1-5A logical AI runtime data boundary — no schema implemented
+## P1-5A logical AI runtime data boundary — frozen
 
 P1-5A intentionally creates no table、column、constraint、index or migration。Current Alembic head remains `f1a14b15c004` and product-table count remains sixteen。
 
@@ -357,7 +357,21 @@ Frozen invariants for later schema design:
 - failure does not mutate session phase/deadline/current floor owner or scheduler decision；exact grant release remains a separate deterministic floor fact；
 - deletion/retention must preserve necessary audit explainability while following prompt/input minimization and future user-data deletion rules。
 
-Exact table names、columns、foreign keys、attempt cardinality、event causation、retention and migration are Deferred to a separately approved implementation subphase with a real caller。See [`exec-plans/P1-5_ai-runtime-foundation.md`](exec-plans/P1-5_ai-runtime-foundation.md)。
+P1-5A 当时将 exact table names、columns、foreign keys、attempt cardinality、event causation、retention and migration 留给单独批准的 implementation subphase；P1-5B 已完成其中的最小 persistence foundation。See [`exec-plans/P1-5_ai-runtime-foundation.md`](exec-plans/P1-5_ai-runtime-foundation.md)。
+
+## P1-5B AI Runtime persistence foundation — implemented
+
+Linear revision `f1a15b15c005` preserves all prior revisions and additively creates three provider-neutral tables:
+
+- `prompt_versions`：UUID immutable identity、stable `prompt_key + version_number`、purpose、template text、SHA-256 content digest and creation/publication/retirement lifecycle。Domain publication is insert-or-exact-replay；a stable identity cannot be overwritten。Persona Template remains unchanged and stores neither prompt nor provider binding/secret。
+- `llm_generation_requests`：one AI generation attempt linked to exact session、AI participant、floor grant and Prompt Version；stores provider/model identifiers、closed `{schema_version, configuration_version}` metadata、semantic request digest、timestamps and safe typed failure code。Lifecycle is evolvable `VARCHAR` with checks for `REQUESTED / RUNNING / COMPLETED / FAILED`；no PostgreSQL native enum or raw provider error/body is stored。
+- `ai_utterances`：final displayable content linked to exact session、participant、floor grant and generation request。A composite deferred foreign key includes fixed `COMPLETED` request status, so a requested/running/failed generation cannot own a formal utterance；unique request and floor-grant constraints enforce at most one official utterance。
+
+The application service locks the existing owner-scoped `simulation_sessions` aggregate before request/start/complete/fail mutation。Create/start/complete revalidate exact current grant、AI participant and phase；request identity uses a SHA-256 semantic digest for exact replay versus conflict。Completion changes request state and inserts the utterance in one transaction；constraint failure rolls both back。Failure records only typed reason/timing, creates no utterance, and does not change session status、phase timing、current floor pointer、scheduler fact or event sequence。Floor release remains a separate P1-4 control operation。
+
+Historical generation context is recovered through immutable links: session → Question Version, participant → Persona Assignment/Template/Private Stance, request → Prompt Version + actual provider/model + non-secret configuration version, and utterance → successful request。Private stance content、persona calibration、hidden ranking、internal prompt variables、credential、API key、raw provider body、token/cost fields are absent from these tables and ordinary snapshots。
+
+P1-5B does not add API、WebSocket event、Web projection、provider client/SDK/interface、prompt rendering/orchestration、automatic generation、streaming、token/cost accounting、queue/worker、memory/RAG、scoring/report or voice behavior。
 
 ## Future business schema
 
@@ -365,7 +379,7 @@ Exact table names、columns、foreign keys、attempt cardinality、event causati
 
 除上述已实现 identity/session/question/persona/phase/floor schema 外，其余仍只是长期领域导航：
 
-- P1-5A has frozen logical request/utterance/provenance invariants only；their table names、fields、relations、indexes and deletion strategy remain Deferred；memory、report、evidence、training and feedback schema also remain Deferred；
+- P1-5B implements Prompt Version、Generation Request and final AI Utterance persistence；provider attempts beyond the current one-request/one-attempt identity and detailed retention/deletion policy remain Deferred；memory、report、evidence、training and feedback schema also remain Deferred；
 - V0.1 最小实体集合仍需在 P1 业务设计中确认；
 - 支付、权益、语音和成长数据不得提前进入 V0.1 Schema；
 - P0/V0.1 initial identity boundary 已由 `ADR-015` 确认；公开身份扩展与 recovery 仍 Deferred。
@@ -374,7 +388,7 @@ Exact table names、columns、foreign keys、attempt cardinality、event causati
 
 - Implemented：P1-2 question/persona 五表与 nullable session version reference；
 - Implemented：P1-4B generalized participant、opportunity、decision、grant、release 与 intervention schema；
-- Frozen logical boundary / Deferred implementation：Prompt Version、model configuration、Generation Request/attempt、final Utterance 和 model invocation provenance schema；
+- Implemented in P1-5B：Prompt Version、closed configuration-version provenance、Generation Request lifecycle and successful final AI Utterance relation；
 - Deferred：participant runtime/presence、memory、report 等后续最小实体和正式 Schema；
 - TBD：未来 phone/WeChat identity mapping 的具体 Schema；
 - TBD：verified recovery identity、account recovery 与账号删除的完整数据语义；
@@ -388,7 +402,7 @@ Exact table names、columns、foreign keys、attempt cardinality、event causati
 
 - P0-5C：FastAPI lifespan/request dependency 已成为现有 async DB runtime 的第一个 application caller；真实 PostgreSQL auth integration 只使用迁移到 head 的隔离临时数据库，development DB 保持 head `4fe43b42641b` 且两张表均为 0 rows；
 - P0-5D：completed；browser closure 已实现，existing Cookie/CORS/CSRF/shared trusted-origin boundary 已生效；P1 不得创建第二套 trusted-origin config；
-- P1：`IN_PROGRESS`；P1-1～P1-4 `DONE`；P1-5A docs-only logical boundary `DONE`；current migration head `f1a14b15c004`、精确十六张 product tables保持不变，Generation Request/Prompt Version/utterance、记忆和报告 schema 继续 Deferred；
+- P1：`IN_PROGRESS`；P1-1～P1-4 `DONE`；P1-5A freeze `DONE`；P1-5B persistence implemented；current migration head `f1a15b15c005`、精确十九张 product tables；真实 provider/runtime、记忆和报告继续 Deferred；
 - P2～P4：仅随获批范围增加音频、评分训练和商业化数据。
 
 ## 与其他文档关系

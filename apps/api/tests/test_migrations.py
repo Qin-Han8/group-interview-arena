@@ -14,6 +14,7 @@ SESSION_FOUNDATION_REVISION = "f1a11d15c001"
 QUESTION_PERSONA_FOUNDATION_REVISION = "f1a12b15c002"
 SESSION_PHASE_TIMING_REVISION = "f1a13b15c003"
 FLOOR_CONTROL_FOUNDATION_REVISION = "f1a14b15c004"
+AI_RUNTIME_PERSISTENCE_REVISION = "f1a15b15c005"
 
 
 def _alembic_config() -> Config:
@@ -30,7 +31,7 @@ def test_alembic_config_uses_project_migration_directory_without_url() -> None:
     assert config.get_main_option("sqlalchemy.url") is None
 
 
-def test_migration_history_is_linear_with_single_session_phase_timing_head() -> None:
+def test_migration_history_is_linear_with_single_ai_runtime_head() -> None:
     script = ScriptDirectory.from_config(_alembic_config())
     baseline = script.get_revision(BASELINE_REVISION)
     identity = script.get_revision(IDENTITY_REVISION)
@@ -38,9 +39,11 @@ def test_migration_history_is_linear_with_single_session_phase_timing_head() -> 
     question_persona = script.get_revision(QUESTION_PERSONA_FOUNDATION_REVISION)
     session_phase_timing = script.get_revision(SESSION_PHASE_TIMING_REVISION)
     floor_control = script.get_revision(FLOOR_CONTROL_FOUNDATION_REVISION)
+    ai_runtime = script.get_revision(AI_RUNTIME_PERSISTENCE_REVISION)
 
-    assert script.get_heads() == [FLOOR_CONTROL_FOUNDATION_REVISION]
+    assert script.get_heads() == [AI_RUNTIME_PERSISTENCE_REVISION]
     assert [revision.revision for revision in script.walk_revisions()] == [
+        AI_RUNTIME_PERSISTENCE_REVISION,
         FLOOR_CONTROL_FOUNDATION_REVISION,
         SESSION_PHASE_TIMING_REVISION,
         QUESTION_PERSONA_FOUNDATION_REVISION,
@@ -72,6 +75,10 @@ def test_migration_history_is_linear_with_single_session_phase_timing_head() -> 
     assert floor_control.down_revision == SESSION_PHASE_TIMING_REVISION
     assert floor_control.branch_labels == set()
     assert floor_control.dependencies is None
+    assert ai_runtime.revision == AI_RUNTIME_PERSISTENCE_REVISION
+    assert ai_runtime.down_revision == FLOOR_CONTROL_FOUNDATION_REVISION
+    assert ai_runtime.branch_labels == set()
+    assert ai_runtime.dependencies is None
 
 
 def test_baseline_upgrade_and_downgrade_are_zero_op() -> None:
@@ -95,14 +102,17 @@ def test_baseline_upgrade_and_downgrade_are_zero_op() -> None:
 
 def test_migration_target_metadata_has_exact_product_tables() -> None:
     assert set(Base.metadata.tables) == {
+        "ai_utterances",
         "auth_sessions",
         "discussion_events",
         "floor_decisions",
         "floor_grants",
         "floor_interventions",
         "floor_releases",
+        "llm_generation_requests",
         "persona_private_stances",
         "persona_templates",
+        "prompt_versions",
         "question_persona_assignments",
         "question_templates",
         "question_versions",
