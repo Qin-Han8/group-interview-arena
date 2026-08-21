@@ -15,7 +15,7 @@
 - Target version: V0.1 Internal Validation
 - Business schema: identity, session, question/persona, durable phase timing, and P1-4B participant/floor audit foundation (sixteen product tables)
 - P1-1 status: P1-1A～E completed; independent final verdict PASS; P1-1 DONE
-- P1-2/P1-3 status: DONE; P1-4 IN_PROGRESS; P1-4A～D completed; P1-4E awaiting explicit approval
+- P1-2/P1-3/P1-4 status: DONE; P1-4A～E completed; P1-5 NOT_STARTED / awaiting explicit approval
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -363,7 +363,7 @@ The exact schema, migration and concurrency gates are in [`exec-plans/P1-4_floor
 
 - P0-5C：FastAPI lifespan/request dependency 已成为现有 async DB runtime 的第一个 application caller；真实 PostgreSQL auth integration 只使用迁移到 head 的隔离临时数据库，development DB 保持 head `4fe43b42641b` 且两张表均为 0 rows；
 - P0-5D：completed；browser closure 已实现，existing Cookie/CORS/CSRF/shared trusted-origin boundary 已生效；P1 不得创建第二套 trusted-origin config；
-- P1：`IN_PROGRESS`；P1-1/P1-2/P1-3 `DONE`；P1-4A～D completed；current migration head `f1a14b15c004`、精确十六张 product tables，P1-4C deterministic scheduler 与 P1-4D safe snapshot/Realtime projection 均复用既有 floor schema 且不新增 migration；P1-4E 尚未开始并等待明确批准，utterance、记忆和报告继续 Deferred；
+- P1：`IN_PROGRESS`；P1-1/P1-2/P1-3/P1-4 `DONE`；current migration head `f1a14b15c004`、精确十六张 product tables，P1-4C deterministic scheduler 与 P1-4D safe snapshot/Realtime projection 均复用既有 floor schema 且不新增 migration；P1-4E final independent verdict `PASS`，P1-5 `NOT_STARTED` / awaiting explicit approval，utterance、记忆和报告继续 Deferred；
 - P2～P4：仅随获批范围增加音频、评分训练和商业化数据。
 
 ## 与其他文档关系

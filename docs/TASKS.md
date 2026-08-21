@@ -1,17 +1,17 @@
 # 当前任务清单
 
-- Status: P1 in progress; P1-1, P1-2, and P1-3 completed; P1-4 in progress
-- Managed scope: P1-4A/P1-4B/P1-4C/P1-4D completed; P1-4E remains unstarted and requires explicit approval
-- Most recently completed subphase: P1-4D — `DONE`
+- Status: P1 in progress; P1-1, P1-2, P1-3, and P1-4 completed
+- Managed scope: P1-4A～E completed; independent acceptance final verdict `PASS`
+- Most recently completed subphase: P1-4E — `DONE`
 - P0-7 final outcome: initial verdict `BLOCKED` with two documentation findings; remediation completed; finding-only independent recheck `PASS`; new blockers none; P1 readiness `READY`
 - Current phase: P1 — `IN_PROGRESS`
-- Most recently completed task: P1-4D — `DONE`; P1-4 — `IN_PROGRESS`
-- Next task gate: P1-4E — `TODO` / not started / awaiting explicit user approval
+- Most recently completed task: P1-4 — `DONE`
+- Next task gate: P1-5 — `TODO` / `NOT_STARTED` / awaiting explicit user approval
 - P0 status: `DONE`; P0-1 through P0-7 completed
 - Allowed status values: `TODO` / `IN_PROGRESS` / `BLOCKED` / `DONE`
 - Related roadmap: [`ROADMAP.md`](ROADMAP.md)
 
-用户已明确批准正式进入 P1、P1-2A～D、P1-3、P1-4 和 P1-4B～D；P1-2 与 P1-3 均已在 independent verdict `PASS` 后完成。P1/P1-4 保持 `IN_PROGRESS`；P1-4A～D 已完成，P1-4E 未开始并等待单独明确批准，不得提前开始 independent closeout、LLM/utterance、记忆、报告、语音、Redis/queue 或 P2～P6。
+用户已明确批准正式进入 P1，并已完成 P1-1～P1-4。P1-4E 在修复唯一 documentation finding 后通过 independent recheck，P1-4 已为 `DONE`；P1 保持 `IN_PROGRESS`。P1-5 为 `NOT_STARTED` 并等待单独明确批准，不得提前开始 LLM/utterance、记忆、报告、语音、Redis/queue 或 P2～P6。
 
 ## P0-1 — 仓库与文档治理
 
@@ -521,8 +521,8 @@
 
 - ID: `P1-4`
 - 名称：Floor control / speaker scheduling
-- Status: `IN_PROGRESS`
-- Approval state：用户已明确批准 P1-4/P1-4B/P1-4C/P1-4D；P1-4A～D completed；P1-4E not started / awaiting explicit approval。
+- Status: `DONE`
+- Approval state：P1-4A～E completed；P1-4E independent acceptance final verdict `PASS`。
 - 目标：建立 phase 内 server-authoritative、deterministic、可解释、可恢复且兼容 AI/human/system participant 的单一发言权调度边界；只决定谁说，不生成说什么。
 - In scope：P1-4A docs-only design freeze；后续分别获批的 P1-4B scheduling persistence + domain foundation、P1-4C deterministic scheduler engine、P1-4D realtime/Web floor experience、P1-4E independent acceptance + closeout。
 - Out of scope：LLM/provider、prompt orchestration、utterance generation、scoring/report、memory、Redis/queue、complex ML ranking、multi-agent negotiation、voice/ASR/TTS、emotion detection、human audio/video。
@@ -535,7 +535,7 @@
 - `P1-4B — Scheduling persistence + domain foundation`：completed；
 - `P1-4C — Deterministic scheduler engine`：completed；
 - `P1-4D — Realtime/Web floor experience`：completed；
-- `P1-4E — Independent acceptance + closeout`：not started / awaiting explicit approval。
+- `P1-4E — Independent acceptance + closeout`：completed；final independent verdict `PASS`。
 
 ### P1-4A completion note
 
@@ -573,6 +573,13 @@
 - The existing single versioned session WebSocket channel now has strict Web parsing/projection for `floor.granted`、`floor.released` and `floor.intervention_requested`; it reuses the discussion event sequence、duplicate suppression、gap reload、bounded reconnect and stale-generation guard without adding a second channel/protocol or Browser floor commands。
 - Web renders current owner、public lifecycle status and safe reason text only. Browser cannot schedule、grant、release or mutate phase/deadline；P1-3 remains lifecycle authority and the server scheduler remains floor authority。
 - Backend contract/privacy tests、real PostgreSQL snapshot/live/catch-up regressions、Web lint/typecheck/Vitest/build/OpenAPI derivative and real Chromium grant → live event → reload → API restart/reconnect → phase release flow passed；no migration、dependency、lockfile or Accepted ADR was added。
+
+### P1-4E completion note
+
+- Initial independent review from clean committed `main` HEAD `170be9562c6e7dd3a833613ebf5ea4a53a354285` found one Low current-state documentation mismatch and correctly stopped without closeout；no runtime、test、schema、migration、dependency or CI repair was made during review。
+- The finding was fixed in committed HEAD `e261bc7667366dd863671c6f8a31e4466424a16a` by changing only `ARCHITECTURE.md` from stale P1-4C wording to P1-4D；the finding-only check confirmed the documents agree。
+- Full independent recheck reran governance、API `377 passed`、real PostgreSQL migration/catalog/concurrency/recovery、Ruff/format/Pyright、Alembic head/current/check、Web `57 passed`、lint/format/typecheck/build、current-source OpenAPI drift and Chromium `2 passed`；temporary databases and test ports were clean, and development database state was preserved。
+- Final independent verdict `PASS` with findings `none`；P1-4E completed，P1-4 `DONE`，P1 remains `IN_PROGRESS`，and P1-5 is `NOT_STARTED` / awaiting explicit approval。
 
 ## 任务更新规则
 

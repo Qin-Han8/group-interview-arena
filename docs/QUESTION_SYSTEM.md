@@ -3,7 +3,7 @@
 - Status: P1-2 completed; design, persistence/domain/seed, safe caller, and independent acceptance complete
 - Current phase: P1 — IN_PROGRESS
 - Target version: V0.1 Internal Validation
-- Current status: P1-2/P1-3 DONE；P1-3A～D completed；P1-3 independent verdict `PASS`；P1-4 not started / awaiting explicit approval
+- Current status: P1-2/P1-3/P1-4 DONE；P1-3A～D and P1-4A～E completed；independent verdicts `PASS`；P1-5 `NOT_STARTED` / awaiting explicit approval
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的

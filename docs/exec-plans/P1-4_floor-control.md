@@ -1,6 +1,6 @@
 # P1-4 Floor Control / Speaker Scheduling Execution Plan
 
-Status: `P1 IN_PROGRESS`; `P1-4 IN_PROGRESS`; `P1-4A completed`; `P1-4B completed`; `P1-4C completed`; `P1-4D completed`; `P1-4E not started / awaiting explicit approval`
+Status: `P1 IN_PROGRESS`; `P1-4 DONE`; `P1-4A completed`; `P1-4B completed`; `P1-4C completed`; `P1-4D completed`; `P1-4E completed`; final independent verdict `PASS`; `P1-5 NOT_STARTED / awaiting explicit approval`
 
 Target version: `V0.1 Internal Validation`
 
@@ -34,9 +34,9 @@ P1-4 只决定“谁应该说”，不决定“说什么”。Scheduler 是 proj
 2. **P1-4B — Scheduling persistence + domain foundation**：`completed`。已建立通用 participant、speaking opportunity、current floor、decision/audit facts 的最小 persistence/domain 基础与 migration；未实现自动 speaker selection engine、Realtime/Web 或 LLM。
 3. **P1-4C — Deterministic scheduler engine**：`completed`。已实现 pure deterministic candidate construction/ranking、fairness、monopoly guard、phase policy、silence/deadline intervention、transactional decision → grant/intervention 与 deterministic regressions；不生成 utterance。
 4. **P1-4D — Realtime/Web floor experience**：`completed`。已在既有 ordered session channel 上实现 floor events/safe snapshot projection、Browser current-speaker/lifecycle UI 和真实 PostgreSQL Chromium recovery flow；Browser 不拥有 scheduler，且本轮明确不增加 floor inbound commands。
-5. **P1-4E — Independent acceptance + closeout**：`not started / awaiting explicit approval`。从 committed source 独立复核 persistence、determinism、race/recovery、phase integration、human compatibility、explainability/non-disclosure、Realtime/Web 和 Deferred absence；通过后才可将 P1-4 标为 `DONE`。
+5. **P1-4E — Independent acceptance + closeout**：`completed`。从 committed source 独立复核 persistence、determinism、race/recovery、phase integration、human compatibility、explainability/non-disclosure、Realtime/Web 和 Deferred absence；唯一 documentation finding 修复后 full recheck final verdict `PASS`，P1-4 已为 `DONE`。
 
-P1-4B～D 已分别获得明确批准并完成；P1-4E 仍须单独明确批准。P1-4D 完成不授权 independent closeout、LLM/utterance、memory、scoring/report、Redis/queue、voice 或下一阶段实现。
+P1-4A～E 已分别获得明确批准并完成；P1-4 final independent verdict 为 `PASS`。P1-5、LLM/utterance、memory、scoring/report、Redis/queue、voice 或下一阶段实现仍须单独明确批准。
 
 ## Frozen floor ownership model
 
@@ -307,7 +307,7 @@ P1-4 does not implement or prebuild:
 - P1-4B：completed；linear migration `f1a14b15c004`、participant/floor persistence、internal command lifecycle、durable audit、phase integration and required validation `PASS`；no blocker。
 - P1-4C：completed；deterministic scheduler、locked transactional orchestration and required validation `PASS`；no blocker。
 - P1-4D：completed；safe REST/WS/Web floor projection and recovery validation `PASS`；no blocker。
-- P1-4E：not started / awaiting explicit user approval。
+- P1-4E：completed；initial review `BLOCKED` on one Low documentation finding，修复后 full independent recheck final verdict `PASS`；no blocker。
 
 ### P1-4B implementation record
 
@@ -326,4 +326,11 @@ P1-4 does not implement or prebuild:
 - Real PostgreSQL tests cover live WS delivery、owner-only snapshot equivalence and reconnect catch-up；Chromium covers phase entry → scheduler grant → live event → reload → API restart/reconnect → authoritative restore → phase-change release. Existing P1-1/P1-3/P1-4B/C regressions remain green.
 - No migration、dependency、lockfile、second realtime channel/protocol or Accepted ADR was added. All explicit Deferred scope remains absent.
 
-Next governance-approved action: review the P1-4D diff; only explicit user approval may start P1-4E independent acceptance + closeout.
+### P1-4E independent acceptance record
+
+- Initial independent review from clean committed `main` HEAD `170be9562c6e7dd3a833613ebf5ea4a53a354285` stopped on one Low documentation mismatch: `ARCHITECTURE.md` still named P1-4C as the most recently completed task。
+- Committed HEAD `e261bc7667366dd863671c6f8a31e4466424a16a` changed only that current-state line to P1-4D；master-plan SHA-256 remained `2388A9660320406CB35D5354126AD71C6849A98DB7C4A356796CA951BF372F26`。
+- Full independent recheck passed API `377` tests、real PostgreSQL migration/catalog/concurrency/recovery、Ruff/format/Pyright、Alembic head/current/check、Web `57` tests、lint/format/typecheck/build、current-source OpenAPI drift and Chromium `2` tests；development database state was preserved and temporary databases/ports were clean。
+- Final findings：none。P1-4E completed，P1-4 `DONE`，P1 remains `IN_PROGRESS`，P1-5 `NOT_STARTED` / awaiting explicit approval。
+
+Next governance-approved action: review the P1-4 docs-only closeout diff；P1-5 remains `NOT_STARTED` and requires explicit user approval.

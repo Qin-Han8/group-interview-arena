@@ -10,7 +10,7 @@
 - P1-1 contract: scoped/frozen by P1-1A; P1-1B persistence, P1-1C REST/WebSocket runtime, P1-1D Web realtime caller and P1-1E independent final review completed
 - P1-2 contract: P1-2A/B/C completed; safe question reads and immutable version-bound session creation implemented
 - P1-3 contract: P1-3A～D completed; independent verdict `PASS`; P1-3 `DONE`
-- P1-4 contract: P1-4A～D completed; deterministic scheduler remains server-owned, safe floor snapshot/WS/Web projection implemented, and P1-4E awaits explicit approval
+- P1-4 contract: P1-4A～E completed; final independent verdict `PASS`; deterministic scheduler remains server-owned and safe floor snapshot/WS/Web projection is implemented
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -351,7 +351,7 @@ P0-3D 已完成最小 API、OpenAPI authority、typed config、request correlati
 - P1-2A safe question/session/private projection design freeze 已完成 docs-only；
 - P1-2B persistence/domain/seed、P1-2C safe API/session/Web vertical slice 与 P1-2D independent acceptance 均已完成；P1-2 `DONE`。
 - P1-3A～D 已完成；state/timing/command/event/snapshot、backend durable foundation 与 realtime/Web complete phase flow 已独立验收 `PASS`；P1-3 `DONE`，P1 保持 `IN_PROGRESS`。
-- P1-4A～D 已完成；P1-4 `IN_PROGRESS`。Safe snapshot/WS/Web floor projection 已实现且无 public floor command；P1-4E independent acceptance 未开始并等待单独明确批准。
+- P1-4A～E 已完成；P1-4 `DONE`，final independent verdict `PASS`。Safe snapshot/WS/Web floor projection 已实现且无 public floor command；P1-5 `NOT_STARTED` / awaiting explicit approval。
 
 ### P2 and later
 

@@ -1,9 +1,9 @@
 # AI 候选人与讨论编排骨架
 
-- Status: P1-2/P1-3 completed; P1-4A～D floor design, foundation, deterministic scheduler and safe Web projection completed; AI runtime deferred
+- Status: P1-2/P1-3/P1-4 completed; floor design, foundation, deterministic scheduler, safe Web projection and independent acceptance passed; AI runtime deferred
 - Current phase: P1 — IN_PROGRESS
 - Target version: V0.1 Internal Validation
-- Detailed orchestrator/agent design: P1-3A～D completed; independent verdict `PASS`; P1-4A～D completed; P1-4E awaiting explicit approval
+- Detailed orchestrator/agent design: P1-3A～D and P1-4A～E completed; independent verdict `PASS`; P1-5 awaiting explicit approval
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -221,7 +221,7 @@ Scheduler only answers **who should speak**. Future LLM/provider may answer **wh
 - P1-4D exposes only participant safe identity、current grant and latest allowlisted lifecycle fact through the owner-only snapshot. The existing ordered WS channel projects the same three floor facts；Web uses exact sequence/gap/reconnect/stale-generation recovery and only displays current owner、lifecycle and safe reason.
 - Browser sends no floor command and never decides grant/release/scheduler state. Public projection omits decision metadata、ranking/weights、Private Stance/persona calibration、prompt/provider and scoring data；utterance/content remains a later separately approved concern.
 
-Full D～E scope、recovery boundary、validation and stop conditions are in [`exec-plans/P1-4_floor-control.md`](exec-plans/P1-4_floor-control.md)。P1-4D is completed；P1-4E remains not started / awaiting explicit approval.
+Full D～E scope、recovery boundary、validation and stop conditions are in [`exec-plans/P1-4_floor-control.md`](exec-plans/P1-4_floor-control.md)。P1-4D and P1-4E are completed；final independent verdict is `PASS`, and P1-5 remains separately gated.
 
 ## Implementation guidance
 
@@ -245,7 +245,7 @@ Full D～E scope、recovery boundary、validation and stop conditions are in [`e
 
 ## Future work
 
-- P1：`IN_PROGRESS`；P1-1 session foundation、P1-2 question/persona foundation 与 P1-3 session state machine 均为 `DONE`；P1-4A～D completed，P1-4 `IN_PROGRESS`；P1-4E 未开始并等待明确批准；记忆和 AI runtime 继续 Deferred。
+- P1：`IN_PROGRESS`；P1-1 session foundation、P1-2 question/persona foundation、P1-3 session state machine 与 P1-4 floor control 均为 `DONE`；P1-5 `NOT_STARTED` / awaiting explicit approval；记忆和 AI runtime 继续 Deferred。
 - P2：加入语音、打断、播放停止和恢复语义。
 - P3：建立角色行为与评分证据之间的校准边界。
 - P6/V1.0：扩展到 6～8 种角色和压力模式。
