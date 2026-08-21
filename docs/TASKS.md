@@ -1,17 +1,17 @@
 # 当前任务清单
 
-- Status: P1 in progress; P1-1, P1-2, P1-3, and P1-4 completed
-- Managed scope: P1-4A～E completed; independent acceptance final verdict `PASS`
-- Most recently completed subphase: P1-4E — `DONE`
+- Status: P1 in progress; P1-1, P1-2, P1-3, and P1-4 completed; P1-5A docs-only freeze completed
+- Managed scope: P1-5A completed; no LLM/provider/runtime implementation authorized
+- Most recently completed subphase: P1-5A — `DONE`
 - P0-7 final outcome: initial verdict `BLOCKED` with two documentation findings; remediation completed; finding-only independent recheck `PASS`; new blockers none; P1 readiness `READY`
 - Current phase: P1 — `IN_PROGRESS`
 - Most recently completed task: P1-4 — `DONE`
-- Next task gate: P1-5 — `TODO` / `NOT_STARTED` / awaiting explicit user approval
+- Current task gate: P1-5 — `IN_PROGRESS`; P1-5A `DONE`; implementation subphases `NOT_STARTED` / awaiting separate explicit user approval
 - P0 status: `DONE`; P0-1 through P0-7 completed
 - Allowed status values: `TODO` / `IN_PROGRESS` / `BLOCKED` / `DONE`
 - Related roadmap: [`ROADMAP.md`](ROADMAP.md)
 
-用户已明确批准正式进入 P1，并已完成 P1-1～P1-4。P1-4E 在修复唯一 documentation finding 后通过 independent recheck，P1-4 已为 `DONE`；P1 保持 `IN_PROGRESS`。P1-5 为 `NOT_STARTED` 并等待单独明确批准，不得提前开始 LLM/utterance、记忆、报告、语音、Redis/queue 或 P2～P6。
+用户已明确批准正式进入 P1，并已完成 P1-1～P1-4。P1-4E 在修复唯一 documentation finding 后通过 independent recheck，P1-4 已为 `DONE`；P1 保持 `IN_PROGRESS`。用户已批准并完成 P1-5A docs-only AI Runtime Architecture Freeze；不得据此提前开始 LLM/provider/runtime/utterance、prompt engine、记忆、报告、语音、Redis/queue 或 P2～P6 实现。
 
 ## P0-1 — 仓库与文档治理
 
@@ -580,6 +580,34 @@
 - The finding was fixed in committed HEAD `e261bc7667366dd863671c6f8a31e4466424a16a` by changing only `ARCHITECTURE.md` from stale P1-4C wording to P1-4D；the finding-only check confirmed the documents agree。
 - Full independent recheck reran governance、API `377 passed`、real PostgreSQL migration/catalog/concurrency/recovery、Ruff/format/Pyright、Alembic head/current/check、Web `57 passed`、lint/format/typecheck/build、current-source OpenAPI drift and Chromium `2 passed`；temporary databases and test ports were clean, and development database state was preserved。
 - Final independent verdict `PASS` with findings `none`；P1-4E completed，P1-4 `DONE`，P1 remains `IN_PROGRESS`，and P1-5 is `NOT_STARTED` / awaiting explicit approval。
+
+## P1-5 — AI Runtime Foundation
+
+- ID: `P1-5`
+- 名称：AI Runtime Foundation
+- Status: `IN_PROGRESS`
+- Approval state：P1-5A docs-only architecture freeze explicitly approved and completed；later implementation subphases not started / awaiting separate explicit approval。
+- 目标：在既有 immutable question/persona、server-authoritative session lifecycle 与 deterministic floor control 之上，建立 provider-neutral、可追踪、可重试且不破坏 session integrity 的 AI utterance generation boundary。
+- In scope：P1-5A docs-only 冻结 Scheduler/Runtime/provider authority、Prompt Version/model provenance、Participant/Runtime separation、Generation Request/final Utterance lifecycle、failure/retry integrity 和 commercial-readiness evolution boundary。
+- Out of scope：LLM/provider/runtime implementation、provider SDK、prompt engine、utterance/request schema/migration、API/WS/Web、tests、dependencies/lockfiles、CI、memory/RAG、scoring/report、voice、billing/quota/payment/multi-tenant。
+- Dependencies：P1-1/P1-2/P1-3/P1-4 `DONE`；Accepted `D-003`、`D-007`、`D-008`、`D-013`、`ADR-006`、`ADR-007`、`ADR-009`、`ADR-011`～`ADR-014`。
+- Acceptance criteria：docs agree that Scheduler decides who and AI Runtime decides what；provider-neutral business boundary is explicit；historical utterance provenance includes Prompt Version/model/config；request and final utterance are separate；timeout/unavailable/rate-limit/partial generation cannot change phase/floor or duplicate utterances；all implementation/deferred scope remains absent；docs-only validation passes。
+
+### Substep progress
+
+- `P1-5A — AI Runtime Architecture Freeze`：completed；docs-only；
+- later P1-5 implementation subphases：not started；require separate explicit approval and plan update。
+
+### P1-5A completion note
+
+- 从 clean committed `main` HEAD `5397cd2b25f36c6a9fbd666b759261091c36a8c0` 恢复总纲、Accepted Decisions、P1-4 actual source、相关领域文档和现有 tests/config；HEAD 与 `origin/main` 一致；总纲 SHA-256 baseline 为 `2388A9660320406CB35D5354126AD71C6849A98DB7C4A356796CA951BF372F26`；
+- 冻结 `floor.granted -> AI Runtime -> LLM Provider -> final Utterance -> deterministic Floor release`，明确 P1-3 lifecycle、P1-4 floor 和 future AI Runtime content authority 分离；
+- 冻结业务代码 provider-neutral、SDK object 不穿透 domain、hosted/enterprise/local evolution，以及 provider failure 不影响 session integrity；
+- 冻结 Prompt 为版本资产，历史 utterance 必须关联 exact Question Version、Persona/Assignment、Prompt Version、provider/model 和 effective non-secret configuration provenance；
+- 冻结 AI Participant 是 session role identity、Runtime 是 generation capability；Persona Template 不保存 prompt/provider secret；
+- 冻结 Generation Request 与 final Utterance 分离及 `requested/generated/persisted/failed` 逻辑生命周期；timeout/unavailable/rate-limit/partial generation 使用有界、幂等、stale-grant-safe 处理，失败不改变 phase/deadline/floor/scoring 且不重复产生 utterance；
+- 多 provider、成本统计、企业模型、审计和 prompt iteration 保留 safely evolvable；billing/quota/payment/multi-tenant 及全部 LLM/provider/runtime/schema/API/test implementation 继续 Deferred；
+- 完整冻结、后续 implementation gates 和 stop conditions 见 [`exec-plans/P1-5_ai-runtime-foundation.md`](exec-plans/P1-5_ai-runtime-foundation.md)。
 
 ## 任务更新规则
 

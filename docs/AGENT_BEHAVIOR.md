@@ -1,14 +1,14 @@
 # AI 候选人与讨论编排骨架
 
-- Status: P1-2/P1-3/P1-4 completed; floor design, foundation, deterministic scheduler, safe Web projection and independent acceptance passed; AI runtime deferred
+- Status: P1-2/P1-3/P1-4 completed; P1-5A AI Runtime architecture frozen; implementation deferred
 - Current phase: P1 — IN_PROGRESS
 - Target version: V0.1 Internal Validation
-- Detailed orchestrator/agent design: P1-3A～D and P1-4A～E completed; independent verdict `PASS`; P1-5 awaiting explicit approval
+- Detailed orchestrator/agent design: P1-3A～D and P1-4A～E completed; P1-5A docs-only freeze completed; runtime implementation awaiting separate approval
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
 
-本文件记录已确认的 AI 候选人/私有立场基础、P1-3 已实现的讨论状态机、P1-4A 冻结的 floor-control 领域/确定性策略边界、P1-4B participant/floor persistence、P1-4C deterministic scheduler，以及 P1-4D display-only Realtime/Web floor projection。当前不包含 production Prompt、模型选择、发言生成、结构化记忆或 AI runtime 代码。
+本文件记录已确认的 AI 候选人/私有立场基础、P1-3 已实现的讨论状态机、P1-4 floor-control，以及 P1-5A 冻结的 future AI Runtime/provider/prompt/utterance 边界。当前不包含 production Prompt、模型选择、发言生成、结构化记忆或 AI runtime 代码。
 
 ## Confirmed by PROJECT_MASTER_PLAN
 
@@ -221,7 +221,53 @@ Scheduler only answers **who should speak**. Future LLM/provider may answer **wh
 - P1-4D exposes only participant safe identity、current grant and latest allowlisted lifecycle fact through the owner-only snapshot. The existing ordered WS channel projects the same three floor facts；Web uses exact sequence/gap/reconnect/stale-generation recovery and only displays current owner、lifecycle and safe reason.
 - Browser sends no floor command and never decides grant/release/scheduler state. Public projection omits decision metadata、ranking/weights、Private Stance/persona calibration、prompt/provider and scoring data；utterance/content remains a later separately approved concern.
 
-Full D～E scope、recovery boundary、validation and stop conditions are in [`exec-plans/P1-4_floor-control.md`](exec-plans/P1-4_floor-control.md)。P1-4D and P1-4E are completed；final independent verdict is `PASS`, and P1-5 remains separately gated.
+Full D～E scope、recovery boundary、validation and stop conditions are in [`exec-plans/P1-4_floor-control.md`](exec-plans/P1-4_floor-control.md)。P1-4D and P1-4E are completed；final independent verdict is `PASS`。
+
+## P1-5A AI Participant and Runtime boundary
+
+### Participant is identity; Runtime is capability
+
+- AI Participant 是 session-scoped 群面身份，拥有 participant/seat、Persona Assignment、自己的 Private Stance 和 floor history。
+- AI Runtime 是生成能力：在 exact `floor.granted` 下加载最小授权上下文、解析 Prompt Version/model configuration、调用 provider、验证输出并提交 generation result。
+- Runtime 不是 participant，不拥有 seat、stance、phase、deadline、floor 或 next-speaker authority。Human Participant 不依赖 LLM Runtime。
+- Persona Template 只保存稳定行为参数和展示 metadata；不得直接保存 prompt content/version、provider/model binding、API key 或其他 provider secret。
+- 每次调用只能加载获准 participant 自己的 Persona behavior/Assignment/Private Stance；其他席位 Private Stance 不进入 prompt/provider/log/error。
+
+### Who versus what
+
+```text
+floor.granted
+  -> AI Runtime generation request
+  -> provider-neutral LLM call
+  -> validated final Utterance
+  -> deterministic floor release
+```
+
+Scheduler 决定 **who speaks**；AI Runtime 决定 **what the already-granted AI says**。LLM/provider 不得选择下一位 speaker、覆盖 scheduler decision、改变 phase/deadline、修改 scoring 或绕过 domain service 写数据库。
+
+### Prompt and model provenance
+
+Prompt 是可追踪版本资产。Generation Request 必须固定 exact Question Version、Persona Template/Assignment/Private Stance、Prompt Version，以及实际 provider/model/effective non-secret configuration。历史 final utterance 必须从自己的 request 解释这些来源，不能依赖 mutable latest pointer。
+
+现有 Question Version `phase_prompts` 只是题目级内部素材，不等于完整 Prompt Version。Persona Template 也不承担 prompt storage。Rendered prompt、chain-of-thought、provider raw body 和 secret 应最小化，不因审计要求默认完整保存。
+
+### Generation Request and Utterance lifecycle
+
+- `requested`：exact participant/grant/provenance 下的 generation intent 已建立；
+- `generated`：provider-neutral output 已返回并通过 future validation，但尚未成为正式历史内容；
+- `persisted`：final Utterance 已关联 request/participant/grant/phase/provenance 持久化；
+- `failed`：没有 final utterance，只有 safe typed failure/audit identity。
+
+Generation Request 与 final Utterance 是不同 identity。一个 logical request 至多产生一个 final utterance；retry 复用 logical identity 或显式 attempt child，不能重复制造正式内容。Partial output 默认不是小组已听到的事实。
+
+### Failure/retry integrity
+
+- Timeout、provider unavailable、rate limit、partial/invalid output 和 stale grant 使用 typed、有界、幂等处理；provider internal retry 不能绕过 application identity。
+- 每次提交前重新验证 exact session/phase/participant/current grant；late result 在 grant/phase 变化后丢弃。
+- Failure 不改变 phase、deadline、floor owner、scheduler decision 或 scoring。Project-owned control path 负责 exact-once-safe floor release/intervention，provider 不拥有 release policy。
+- Crash/restart 后未来实现必须从 durable request/grant truth 判断 retry/fail/no-op，不能仅靠 process memory。
+
+完整冻结与 Deferred 实现见 [`exec-plans/P1-5_ai-runtime-foundation.md`](exec-plans/P1-5_ai-runtime-foundation.md)。
 
 ## Implementation guidance
 
@@ -238,14 +284,15 @@ Full D～E scope、recovery boundary、validation and stop conditions are in [`e
 - Confirmed for P1-3：V0.1 状态转换条件、abort 来源、deadline concurrency/recovery 语义；
 - Confirmed and implemented through P1-4D：V0.1 deterministic lexicographic floor policy、single-owner/participant/event/explanation/persistence boundary、pure ranking、locked transactional orchestration and display-only authoritative Web recovery；
 - TBD after real discussion evidence：policy parameter calibration values and conflict-loop content semantics；P1-4 does not use semantic conflict ranking；
-- TBD：结构化记忆和模型输出的正式 Schema；
+- Frozen logical boundary in P1-5A, implementation TBD：Generation Request / attempt / final Utterance / Prompt Version 的正式 persistence 与 transport Schema；
+- TBD：结构化记忆和模型输出 validation 的正式 Schema；
 - TBD：角色盲测样本及通过标准的执行细节。
 
 除特别注明的总纲问题外，其余是派生 TBD，不是新的 D-xxx。
 
 ## Future work
 
-- P1：`IN_PROGRESS`；P1-1 session foundation、P1-2 question/persona foundation、P1-3 session state machine 与 P1-4 floor control 均为 `DONE`；P1-5 `NOT_STARTED` / awaiting explicit approval；记忆和 AI runtime 继续 Deferred。
+- P1：`IN_PROGRESS`；P1-1～P1-4 `DONE`；P1-5A docs-only architecture freeze `DONE`；LLM/provider/runtime/utterance implementation 与记忆继续 Deferred，等待单独批准。
 - P2：加入语音、打断、播放停止和恢复语义。
 - P3：建立角色行为与评分证据之间的校准边界。
 - P6/V1.0：扩展到 6～8 种角色和压力模式。

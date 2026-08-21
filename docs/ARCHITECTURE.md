@@ -1,16 +1,16 @@
 # P0 技术架构基线
 
-- Status: P0 Architecture Baseline + P1-1/P1-2/P1-3/P1-4 completed
+- Status: P0 Architecture Baseline + P1-1/P1-2/P1-3/P1-4 completed + P1-5A AI Runtime architecture frozen
 - Current phase: P1 — IN_PROGRESS
 - Architecture baseline established by: P0-2 — DONE
 - P0-3 foundation status: DONE
 - P0-4 database foundation status: DONE
 - P0-5 identity boundary status: DONE
-- Most recently completed task: P1-4 independent acceptance + closeout — `PASS`; P1-4 `DONE`
+- Most recently completed subphase: P1-5A docs-only AI Runtime Architecture Freeze — `DONE`
 - P0 status: DONE; P0-1 through P0-7 completed
-- P1 status: IN_PROGRESS; P1-1/P1-2/P1-3/P1-4 DONE; P1-5 NOT_STARTED / awaiting explicit approval
+- P1 status: IN_PROGRESS; P1-1/P1-2/P1-3/P1-4 DONE; P1-5A DONE; AI Runtime implementation not started
 - Target version: V0.1 Internal Validation
-- Business architecture detail: P1-1 runtime completed; P1-2 question/persona boundary implemented; P1-3 state/timing/recovery/realtime/Web flow independently accepted; P1-4 floor-control design, persistence/domain foundation and deterministic scheduler implemented
+- Business architecture detail: P1-1 runtime completed; P1-2 question/persona boundary implemented; P1-3 lifecycle independently accepted; P1-4 floor control implemented; P1-5A freezes future AI Runtime/provider/prompt/utterance boundaries only
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -277,7 +277,31 @@ WebSocket 使用独立版本化事件契约，至少表达 event type、schema v
 - P1-4C implements the pure policy in `modules/floor_control/scheduler.py`. All input enumeration is explicitly sorted；first opportunity、monopoly guard、phase-aware fairness and stable seat/UUID form a closed lexicographic key, while injected UTC is used only for silence/deadline thresholds. Candidate lists/fairness counters remain runtime-only.
 - Internal `floor.schedule` orchestration reconstructs participant/opportunity/history facts only after acquiring the existing session aggregate row lock, validates exact phase/sequence/current-grant preconditions, then persists action digest、safe decision and grant/intervention plus one formal event in the same transaction. Concurrent evaluation cannot create a second owner；duplicate action replays and stale evaluation fails closed.
 - The three frozen formal floor facts remain on the existing single session channel and discussion sequence. P1-4D additively exposes an owner-only safe snapshot projection (generalized participant identity、current grant、latest lifecycle fact), strict Web parsing/reduction and display-only current-owner/lifecycle/reason UI. Existing exact-next sequence、duplicate suppression、gap reload、bounded reconnect and stale-generation rules recover floor state without a second channel/protocol.
-- Browser has no floor command and cannot select、grant or release a speaker. Public projection is purpose-built and excludes decision metadata、hidden ranking/weights、Private Stance/persona calibration、prompt/provider and scoring data；P1-4E independent acceptance passed, and P1-5 remains separately gated. Full design is in [`exec-plans/P1-4_floor-control.md`](exec-plans/P1-4_floor-control.md).
+- Browser has no floor command and cannot select、grant or release a speaker. Public projection is purpose-built and excludes decision metadata、hidden ranking/weights、Private Stance/persona calibration、prompt/provider and scoring data；P1-4E independent acceptance passed. Full design is in [`exec-plans/P1-4_floor-control.md`](exec-plans/P1-4_floor-control.md).
+
+### P1-5A AI Runtime architecture — docs-only frozen boundary
+
+P1-5A 冻结未来实现边界，但当前 `providers/` 仍未创建，也不存在 LLM、prompt runtime、generation request 或 utterance runtime/schema。
+
+```text
+P1-3 lifecycle authority: phase / deadline
+  -> P1-4 floor authority: who speaks / floor.granted
+  -> P1-5 AI Runtime: what the granted AI says
+  -> provider adapter: model I/O only
+  -> validated final Utterance
+  -> project-owned deterministic floor release
+```
+
+- AI Runtime 只能消费 exact active AI participant + floor grant，并按 application/domain service 提交结果；它不能推进 session、修改 deadline、选择 speaker、覆盖 scheduler decision、修改 scoring 或直接绕过 domain service 写数据库。
+- Business/domain code 依赖 project-owned provider-neutral request/result/error contract，不直接依赖 OpenAI、Anthropic 或其他单一 SDK。Hosted、enterprise 和 local model 是未来 portability target，不是本轮 adapter/routing implementation。
+- Prompt 是 immutable/versioned asset。每个 generation request 必须固定 Question Version、获准 participant 的 Persona Template/Assignment/Private Stance、Prompt Version，以及 provider/model/effective non-secret configuration provenance；不得以 mutable `latest` 重解释历史 utterance。
+- AI Participant 是 session role identity；AI Runtime 是 generation capability。Runtime 不拥有 participant seat、stance、floor 或 lifecycle，Persona Template 不保存 prompt/provider/model binding 或 secret。
+- Generation Request 与 final Utterance 分离；逻辑状态为 `requested`、`generated`、`persisted`、`failed`。一个 logical request 至多产生一个 final utterance，late result 在 phase/grant stale 后必须丢弃。
+- Timeout、provider unavailable、rate limit、partial/invalid generation 使用 typed、bounded、idempotent failure/retry policy。失败不改变 phase/deadline/floor/scoring；control path 必须安全 release exact grant 或请求既有 intervention，且不能重复 release/utterance。
+- Provider/model raw response、credential、chain-of-thought 和不必要的完整 rendered prompt 不进入 public/error/log surfaces。审计保留足以解释 prompt/model/config 的最小 provenance。
+- 多 provider、cost accounting、enterprise model、audit trace 和 prompt iteration 是 future commercial-readiness boundary；billing、quota、payment、multi-tenant 继续 Deferred。
+
+完整冻结和后续 implementation gates 见 [`exec-plans/P1-5_ai-runtime-foundation.md`](exec-plans/P1-5_ai-runtime-foundation.md)。
 
 ## Configuration, secrets and error boundaries
 
@@ -302,6 +326,7 @@ WebSocket 使用独立版本化事件契约，至少表达 event type、schema v
 - P1-2：closed domain/schema validation、真实 PostgreSQL immutable-version/seed/history integration、private non-disclosure 和最小 browser vertical-slice regression；fake provider 仍等真实 provider caller；
 - P1-3：pure transition/timing tests、真实 PostgreSQL concurrency/deadline/restart recovery、historical event compatibility 和 authoritative Browser phase-flow regression；不以 Browser timer test 替代 server correctness；
 - P1-4：generalized participant/single-owner persistence、pure deterministic scheduling、enumeration-order invariance、fairness/monopoly/phase/intervention、真实 PostgreSQL race/restart recovery、safe explanation/non-disclosure 和 authoritative Browser floor-flow regression；
+- P1-5A：docs-only links/state/scope/hash/diff checks；fake provider、runtime unit/integration 和真实 LLM tests 均未运行且未进入实现；
 - P0-5D 已因真实跨应用 auth flow 加入 `@playwright/test 1.62.1`，只运行 Chromium，并由 test-only 编排器使用迁移后的隔离 `gia_p05d_*` PostgreSQL database；
 - 真实 LLM tests 必须显式执行，不进入默认 CI。
 
@@ -352,7 +377,7 @@ Redis 只在多 API workers、横向扩容、跨进程 WebSocket broadcast、dis
 - P0-5D：completed；真实 browser Cookie/CORS/CSRF 闭环已通过 Chromium 验证；
 - P0-5E：completed；final outcome `PASS after findings remediation and independent recheck`；
 - P0：`DONE`；P0-1～P0-7 completed；P0-7 finding-only independent recheck `PASS`，P1 readiness `READY`；其后用户已明确批准进入 P1；
-- P1：`IN_PROGRESS`；P1-1、P1-2、P1-3、P1-4 均已完成且 independent verdict `PASS`；P1-5 `NOT_STARTED` / awaiting explicit approval；LLM/utterance、记忆和基础报告继续 Deferred；
+- P1：`IN_PROGRESS`；P1-1～P1-4 均已完成且 independent verdict `PASS`；P1-5A docs-only architecture freeze 已完成；LLM/provider/runtime/utterance、记忆和基础报告 implementation 继续 Deferred；
 - P2 以后：只在对应阶段获批后增加语音、评分训练和商业化能力。
 
 ## 与其他文档关系

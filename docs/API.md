@@ -1,6 +1,6 @@
 # API 与事件技术基线
 
-- Status: P0 API Architecture Baseline + P1-1/P1-2/P1-3 completed + P1-4A～D completed
+- Status: P0 API Architecture Baseline + P1-1/P1-2/P1-3/P1-4 completed + P1-5A logical contract frozen
 - Current phase: P1 — IN_PROGRESS
 - API architecture baseline established by: P0-2 — DONE
 - Target version: V0.1 Internal Validation
@@ -11,6 +11,7 @@
 - P1-2 contract: P1-2A/B/C completed; safe question reads and immutable version-bound session creation implemented
 - P1-3 contract: P1-3A～D completed; independent verdict `PASS`; P1-3 `DONE`
 - P1-4 contract: P1-4A～E completed; final independent verdict `PASS`; deterministic scheduler remains server-owned and safe floor snapshot/WS/Web projection is implemented
+- P1-5 contract: P1-5A docs-only freeze completed; no generation/utterance API, event or implementation exists
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -282,6 +283,20 @@ Hand raises/opportunities、candidate lists、fairness calculations、timer tick
 
 Internal grant/release/intervention/schedule commands use the existing session action/digest/aggregate-lock/sequence transaction boundary. Scheduler input is reconstructed only after locking；duplicate action IDs replay the same causal events, a changed digest conflicts, and stale sequence/phase/current grant、ineligible participant or terminal session rejects without floor mutation. Exact domain/persistence, reason metadata and P1-4D～E gates are in [`exec-plans/P1-4_floor-control.md`](exec-plans/P1-4_floor-control.md)。
 
+## P1-5A future generation/utterance contract boundary — logical freeze only
+
+P1-5A does not add REST endpoints、WebSocket commands/events、OpenAPI fields or Browser projection. It freezes the rules any later contract must satisfy:
+
+- `floor.granted` is the authoritative trigger/precondition for an AI Generation Request；provider “thinking” or raw output is not a formal session fact。
+- Generation Request identity is separate from final Utterance identity。A future public/durable utterance must reference exact request、AI participant、grant、phase and prompt/model provenance；one logical request produces at most one final utterance。
+- Logical request states are `requested`、`generated`、`persisted`、`failed`。Only `persisted` content is an authoritative historical utterance；partial/generated-but-unpersisted content is not considered heard by the group。
+- A future contract must preserve the order `floor.granted -> generation -> persisted utterance -> floor release` without allowing the LLM/provider to emit state-transition、speaker-selection、scoring or database-mutation commands。
+- Retry/fallback uses stable project-owned request identity and records the actual provider/model/config used。Late output after phase/grant change is rejected and must not be projected。
+- Timeout、unavailable、rate-limit、partial/invalid-output errors are typed internal generation outcomes, not session state changes。Public errors/events expose only safe allowlisted status/reason；provider exception body、credential、rendered prompt、other participants' Private Stance and chain-of-thought remain private。
+- Streaming chunks、request/attempt events、utterance event name/version、REST read/write endpoints and Browser rendering remain Deferred until a real caller and exact recovery requirement are separately approved。
+
+The full authority, provenance and failure boundary is in [`exec-plans/P1-5_ai-runtime-foundation.md`](exec-plans/P1-5_ai-runtime-foundation.md)。
+
 ## Unified error semantics
 
 REST error model 至少表达：
@@ -351,7 +366,8 @@ P0-3D 已完成最小 API、OpenAPI authority、typed config、request correlati
 - P1-2A safe question/session/private projection design freeze 已完成 docs-only；
 - P1-2B persistence/domain/seed、P1-2C safe API/session/Web vertical slice 与 P1-2D independent acceptance 均已完成；P1-2 `DONE`。
 - P1-3A～D 已完成；state/timing/command/event/snapshot、backend durable foundation 与 realtime/Web complete phase flow 已独立验收 `PASS`；P1-3 `DONE`，P1 保持 `IN_PROGRESS`。
-- P1-4A～E 已完成；P1-4 `DONE`，final independent verdict `PASS`。Safe snapshot/WS/Web floor projection 已实现且无 public floor command；P1-5 `NOT_STARTED` / awaiting explicit approval。
+- P1-4A～E 已完成；P1-4 `DONE`，final independent verdict `PASS`。Safe snapshot/WS/Web floor projection 已实现且无 public floor command。
+- P1-5A docs-only AI Runtime Architecture Freeze 已完成；没有新增 generation/utterance endpoint、event、OpenAPI 或 Web implementation，后续 implementation 仍需单独批准。
 
 ### P2 and later
 
@@ -367,6 +383,7 @@ P0-3D 已完成最小 API、OpenAPI authority、typed config、request correlati
 - Implemented：P1-3C in-process deadline recovery、connected realtime catch-up/push、Browser authoritative phase/deadline projection 和 complete Chromium phase flow；
 - Implemented：P1-4 minimum formal floor facts、deterministic schedule → fact orchestration、owner-only safe snapshot projection and display-only Realtime/Web recovery；public floor commands remain absent；
 - Deferred：P1-4 之后的完整 REST endpoint / WebSocket command/event 集合；
+- Frozen logical boundary / Deferred implementation：Generation Request、attempt、final Utterance 和 provider failure 的正式 REST/WS/event vocabulary；
 - Deferred：event retention/compaction、large replay pagination、multi-tab/cross-process delivery 和长期 compatibility policy；
 - TBD：V0.1 之后的 identity expansion、verified recovery flow 与 authorization；
 - TBD：音频上传和短期签名协议；

@@ -3,7 +3,7 @@
 - Status: P1-2 completed; design, persistence/domain/seed, safe caller, and independent acceptance complete
 - Current phase: P1 — IN_PROGRESS
 - Target version: V0.1 Internal Validation
-- Current status: P1-2/P1-3/P1-4 DONE；P1-3A～D and P1-4A～E completed；independent verdicts `PASS`；P1-5 `NOT_STARTED` / awaiting explicit approval
+- Current status: P1-2/P1-3/P1-4 DONE；P1-5A docs-only AI Runtime architecture freeze DONE；runtime implementation deferred
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -68,6 +68,19 @@ P1-2B 不得用单一 `content` / `payload` JSONB 存整道题，也不得让 ar
 每个结构都有 count/length/key uniqueness/unknown-field validation；question-type-specific rules 在 domain publication boundary 验证。P1-2B 不创建 generic extension/metadata JSON escape hatch。
 
 Reference dimensions、hidden conflicts、acceptable outcome patterns、phase prompts 和 safety tags 属于 internal calibration/orchestration data，不进入普通 browser question response。总纲中的 `agent_private_information` 在 P1-2 被正规化为 version-specific Persona Assignment / Private Stance，见 [`AGENT_BEHAVIOR.md`](AGENT_BEHAVIOR.md)。Scoring overrides 保持 Deferred。
+
+## P1-5A Prompt Version relationship
+
+Question Version and Prompt Version are separate immutable assets:
+
+- Question Version owns the exact question content、assignment/private-stance snapshot and question-level internal `phase_prompts` material；
+- Prompt Version owns the future generation template/instruction asset used by AI Runtime；
+- `phase_prompts` are inputs/material for future prompt assembly, not the complete rendered prompt and not a substitute for Prompt Version identity；
+- publishing a new Question Version does not silently rewrite a Prompt Version, and prompt iteration does not mutate historical Question Versions；
+- each future Generation Request must record both exact Question Version and exact Prompt Version, plus actual provider/model/effective non-secret configuration, so a historical utterance can be explained without following `latest` pointers；
+- Persona Template must not absorb prompt content/provider secrets, and ordinary public question projection remains unchanged。
+
+P1-5A adds no prompt schema、question column、migration、API or runtime。Exact Prompt Version storage/rendering is Deferred to a separately approved implementation subphase；see [`exec-plans/P1-5_ai-runtime-foundation.md`](exec-plans/P1-5_ai-runtime-foundation.md)。
 
 ## Public and private projections
 

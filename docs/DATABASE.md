@@ -1,6 +1,6 @@
 # 数据库技术基线
 
-- Status: P0 Data Architecture Baseline + P1-1/P1-2/P1-3 schema implemented + P1-4B floor persistence implemented
+- Status: P0 Data Architecture Baseline + P1-1/P1-2/P1-3 schema implemented + P1-4B floor persistence implemented + P1-5A logical data boundary frozen
 - Current phase: P1 — IN_PROGRESS
 - Data architecture baseline established by: P0-2 — DONE
 - Local PostgreSQL infrastructure: P0-4B — completed
@@ -15,7 +15,7 @@
 - Target version: V0.1 Internal Validation
 - Business schema: identity, session, question/persona, durable phase timing, and P1-4B participant/floor audit foundation (sixteen product tables)
 - P1-1 status: P1-1A～E completed; independent final verdict PASS; P1-1 DONE
-- P1-2/P1-3/P1-4 status: DONE; P1-4A～E completed; P1-5 NOT_STARTED / awaiting explicit approval
+- P1-2/P1-3/P1-4 status: DONE; P1-5A docs-only freeze completed; no new schema/migration
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -335,13 +335,37 @@ P1-4C adds no migration or column. Its internal scheduler reads the existing par
 
 The exact schema, migration and concurrency gates are in [`exec-plans/P1-4_floor-control.md`](exec-plans/P1-4_floor-control.md)。
 
+## P1-5A logical AI runtime data boundary — no schema implemented
+
+P1-5A intentionally creates no table、column、constraint、index or migration。Current Alembic head remains `f1a14b15c004` and product-table count remains sixteen。
+
+Future persistence must represent these separate logical identities without collapsing them into `discussion_events.payload` or a provider raw-response blob:
+
+- versioned Prompt asset identity；
+- effective non-secret model configuration snapshot/version；
+- logical Generation Request tied to exact session、AI participant、floor grant、phase、Question Version、Persona Assignment/Private Stance and Prompt Version；
+- optional explicit provider attempt records when retry/fallback audit requires them；
+- final Utterance tied to exactly one logical request and exact provenance；
+- safe typed terminal failure when no final utterance exists。
+
+Frozen invariants for later schema design:
+
+- one logical generation request produces zero or one final utterance；retry/fallback cannot duplicate final content；
+- historical utterance provenance does not follow mutable `latest` pointers and identifies the actual provider/model/effective configuration；
+- provider credential、chain-of-thought、unnecessary complete rendered prompt/raw response and other participants' Private Stance are not persistence requirements；
+- phase/grant stale output cannot become a final utterance；
+- failure does not mutate session phase/deadline/current floor owner or scheduler decision；exact grant release remains a separate deterministic floor fact；
+- deletion/retention must preserve necessary audit explainability while following prompt/input minimization and future user-data deletion rules。
+
+Exact table names、columns、foreign keys、attempt cardinality、event causation、retention and migration are Deferred to a separately approved implementation subphase with a real caller。See [`exec-plans/P1-5_ai-runtime-foundation.md`](exec-plans/P1-5_ai-runtime-foundation.md)。
+
 ## Future business schema
 
 总纲提到 `users`、题目版本、角色模板、会话、参与者、阶段、发言、讨论事件、结构化记忆、报告、证据、训练、反馈、模型调用和审计等未来领域概念。
 
 除上述已实现 identity/session/question/persona/phase/floor schema 外，其余仍只是长期领域导航：
 
-- utterance、memory、report、evidence、training、feedback 和 model-call 等实体的表名、字段、关系、索引和删除策略尚未冻结；
+- P1-5A has frozen logical request/utterance/provenance invariants only；their table names、fields、relations、indexes and deletion strategy remain Deferred；memory、report、evidence、training and feedback schema also remain Deferred；
 - V0.1 最小实体集合仍需在 P1 业务设计中确认；
 - 支付、权益、语音和成长数据不得提前进入 V0.1 Schema；
 - P0/V0.1 initial identity boundary 已由 `ADR-015` 确认；公开身份扩展与 recovery 仍 Deferred。
@@ -350,7 +374,8 @@ The exact schema, migration and concurrency gates are in [`exec-plans/P1-4_floor
 
 - Implemented：P1-2 question/persona 五表与 nullable session version reference；
 - Implemented：P1-4B generalized participant、opportunity、decision、grant、release 与 intervention schema；
-- Deferred：participant runtime/presence、utterance、memory、report 等后续最小实体和正式 Schema；
+- Frozen logical boundary / Deferred implementation：Prompt Version、model configuration、Generation Request/attempt、final Utterance 和 model invocation provenance schema；
+- Deferred：participant runtime/presence、memory、report 等后续最小实体和正式 Schema；
 - TBD：未来 phone/WeChat identity mapping 的具体 Schema；
 - TBD：verified recovery identity、account recovery 与账号删除的完整数据语义；
 - TBD：原始音频是否默认完全不保存（总纲第 37 节）；
@@ -363,7 +388,7 @@ The exact schema, migration and concurrency gates are in [`exec-plans/P1-4_floor
 
 - P0-5C：FastAPI lifespan/request dependency 已成为现有 async DB runtime 的第一个 application caller；真实 PostgreSQL auth integration 只使用迁移到 head 的隔离临时数据库，development DB 保持 head `4fe43b42641b` 且两张表均为 0 rows；
 - P0-5D：completed；browser closure 已实现，existing Cookie/CORS/CSRF/shared trusted-origin boundary 已生效；P1 不得创建第二套 trusted-origin config；
-- P1：`IN_PROGRESS`；P1-1/P1-2/P1-3/P1-4 `DONE`；current migration head `f1a14b15c004`、精确十六张 product tables，P1-4C deterministic scheduler 与 P1-4D safe snapshot/Realtime projection 均复用既有 floor schema 且不新增 migration；P1-4E final independent verdict `PASS`，P1-5 `NOT_STARTED` / awaiting explicit approval，utterance、记忆和报告继续 Deferred；
+- P1：`IN_PROGRESS`；P1-1～P1-4 `DONE`；P1-5A docs-only logical boundary `DONE`；current migration head `f1a14b15c004`、精确十六张 product tables保持不变，Generation Request/Prompt Version/utterance、记忆和报告 schema 继续 Deferred；
 - P2～P4：仅随获批范围增加音频、评分训练和商业化数据。
 
 ## 与其他文档关系
