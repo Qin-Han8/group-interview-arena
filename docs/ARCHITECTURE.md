@@ -6,7 +6,7 @@
 - P0-3 foundation status: DONE
 - P0-4 database foundation status: DONE
 - P0-5 identity boundary status: DONE
-- Most recently completed task: P1-4C deterministic scheduler engine — `PASS`; P1-4 `IN_PROGRESS`
+- Most recently completed task: P1-4D realtime/Web floor experience — `PASS`; P1-4 `IN_PROGRESS`
 - P0 status: DONE; P0-1 through P0-7 completed
 - P1 status: IN_PROGRESS; P1-1/P1-2/P1-3 DONE; P1-4 IN_PROGRESS; P1-4A～D completed; P1-4E awaiting explicit approval
 - Target version: V0.1 Internal Validation
