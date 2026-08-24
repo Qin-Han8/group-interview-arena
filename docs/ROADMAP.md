@@ -2,11 +2,11 @@
 
 - Status: Active baseline
 - Most recently completed development phase: P0 — `DONE`
-- Most recently completed subphase: P1-5D — `DONE` (first real provider integration)
+- Most recently completed subphase: P1-5E-1 — `DONE` (automatic orchestration design freeze)
 - P0-7 final outcome: initial `BLOCKED`; two documentation findings remediated; finding-only independent recheck `PASS`; P1 readiness `READY`
 - Current phase: P1 — `IN_PROGRESS`
 - Most recently completed task: P1-4 — `DONE`
-- Current task gate: P1-5 — `IN_PROGRESS`; P1-5A/P1-5B/P1-5C/P1-5D `DONE`; P1-5E/F `NOT_STARTED`
+- Current task gate: P1-5 — `IN_PROGRESS`; P1-5A/P1-5B/P1-5C/P1-5D/P1-5E-1 `DONE`; P1-5E `IN_PROGRESS`; P1-5E-2/P1-5E-3/P1-5F `NOT_STARTED`
 - P0 status: `DONE`; P0-1 through P0-7 completed
 - Target product version: V0.1 — Internal Validation
 - Source: [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) §30–31
@@ -18,7 +18,7 @@
 - `P0～P6`：研发推进阶段，描述按什么顺序建立能力；
 - `V0.1 / V0.5 / V1.0`：产品交付版本，描述某个可验证版本包含什么。
 
-阶段不是版本，P0-x/P1-x 也不是新增产品版本。P0 已完成不代表 V0.1 的全部业务能力已经实现；用户已明确批准进入 P1，P1-1～P1-4 均已完成。P1-4E final independent verdict 为 `PASS`；P1 保持 `IN_PROGRESS`。P1-5A architecture freeze、P1-5B persistence foundation、P1-5C deterministic runtime vertical slice 与 P1-5D first real provider integration 已完成；P1-5D 的两次 actual-source review 和 final user-run sanitized real-provider acceptance smoke 均为 `PASS`。Automatic floor-triggered generation and transport 仍未开始，P1-5E/F 保持 `NOT_STARTED`。
+阶段不是版本，P0-x/P1-x 也不是新增产品版本。P0 已完成不代表 V0.1 的全部业务能力已经实现；用户已明确批准进入 P1，P1-1～P1-4 均已完成。P1-4E final independent verdict 为 `PASS`；P1 保持 `IN_PROGRESS`。P1-5A architecture freeze、P1-5B persistence foundation、P1-5C deterministic runtime vertical slice 与 P1-5D first real provider integration 已完成；P1-5D 的两次 actual-source review 和 final user-run sanitized real-provider acceptance smoke 均为 `PASS`。P1-5E 已获批准并保持 `IN_PROGRESS`；P1-5E-1 docs-only automatic orchestration design freeze actual-source review 为 `PASS`、findings none，现为 `DONE`；automatic implementation and transport 尚未开始，P1-5E-2/P1-5E-3/P1-5F 保持 `NOT_STARTED`。
 
 ## 2. 开发阶段
 
@@ -96,16 +96,19 @@ P1-3A 已冻结 V0.1 单向 path、合法 abort、server-authoritative transitio
 
 P1-4A 已冻结 phase lifecycle 与 within-phase floor authority 分离、single current owner、AI/human/system participant compatibility、deterministic policy、最小 floor facts 与 non-disclosure。P1-4B 已实现 generalized persistence、single-current-grant invariant、immutable audit history、idempotency/concurrency 与 lifecycle protection。P1-4C 已实现 pure deterministic scheduler、fairness/monopoly/phase-aware ordering、stable tie-break、explainable intervention 和 locked decision → fact orchestration。P1-4D 已在既有 REST snapshot + single ordered WS channel 上实现 allowlisted floor projection、strict Web parser/current-owner lifecycle UI、duplicate/gap/stale-generation recovery，以及真实 PostgreSQL Chromium reload/API-restart flow；没有 Browser scheduler authority 或新 realtime protocol。P1-4E 在唯一 documentation finding 修复后完成 full independent recheck，final verdict `PASS`。Scheduler 只决定谁说，未来 LLM/provider 只决定获准 AI 说什么。P1-4 已为 `DONE`；其后 P1-5A 已按下述边界完成。完整 P1-4 scope/gates 见 [`exec-plans/P1-4_floor-control.md`](exec-plans/P1-4_floor-control.md)。
 
-`P1-5 — AI Runtime Foundation` 已启动，当前分解为：
+`P1-5 — AI Runtime Foundation` 已启动；P1-5E 的已批准分解为：
 
 - `P1-5A — AI Runtime Architecture Freeze`：completed；docs-only；
 - `P1-5B — AI Runtime Persistence Foundation`：completed；provider-neutral persistence only；
 - `P1-5C — Runtime Contract & Deterministic Generation Vertical Slice`：completed；deterministic local runtime only；
 - `P1-5D — First Real Provider Integration`：completed；actual-source reviews and final user-run sanitized real-provider acceptance smoke `PASS`；
-- `P1-5E — Automatic AI Runtime Orchestration`：not started；
+- `P1-5E — Automatic AI Runtime Orchestration`：in progress；
+- `P1-5E-1 — Automatic AI Runtime Orchestration Design Freeze`：completed；docs-only actual-source review `PASS`；findings none；
+- `P1-5E-2 — Single AI Turn Orchestration Kernel`：not started；
+- `P1-5E-3 — Continuous AI Drive + Composition Acceptance`：not started；
 - `P1-5F — Realtime/Web Integration + Independent Acceptance`：not started。
 
-P1-5A 冻结 Scheduler 决定 who、AI Runtime 决定 what、provider 只负责 model I/O。P1-5B additively implements immutable Prompt Version、Generation Request and final AI Utterance persistence with exact grant/participant provenance、locked transactions、typed failure and at-most-one successful utterance；provider failure 不改变 phase/deadline/floor/scoring。P1-5C 已实现 closed prompt/context assembly、typed deterministic harness and short-transaction application orchestration。P1-5D implements the minimal project-owned provider contract and thin non-streaming Zhipu HTTPX adapter with lazy server-only credential/model configuration、current development model `glm-4.7-flashx`、model-independent `ZHIPU_CHAT_DEV_V1` provenance、typed safe failures、application retry `0` and network-free automated tests。Changing the P1-5D model remains configuration plus API restart rather than Python/adapter/schema changes；future DB/admin-managed selection and production/default provider/model policy remain deferred。Both actual-source reviews and the final user-run sanitized real-provider acceptance smoke passed，so P1-5D is `DONE`；P1-5E/F still require separate explicit approval。完整边界见 [`exec-plans/P1-5_ai-runtime-foundation.md`](exec-plans/P1-5_ai-runtime-foundation.md)。
+P1-5A 冻结 Scheduler 决定 who、AI Runtime 决定 what、provider 只负责 model I/O。P1-5B additively implements immutable Prompt Version、Generation Request and final AI Utterance persistence with exact grant/participant provenance、locked transactions、typed failure and at-most-one successful utterance；provider failure 不改变 phase/deadline/floor/scoring。P1-5C 已实现 closed prompt/context assembly、typed deterministic harness and short-transaction application orchestration。P1-5D implements the minimal project-owned provider contract and thin non-streaming Zhipu HTTPX adapter with lazy server-only credential/model configuration、current development model `glm-4.7-flashx`、model-independent `ZHIPU_CHAT_DEV_V1` provenance、typed safe failures、application retry `0` and network-free automated tests。P1-5E-1 freezes state-driven automatic coordination over existing lifecycle/floor/runtime authorities、deterministic per-grant request/content/release/schedule identities、terminal/stale/uncertain outcome policy、crash/concurrency recovery、one-turn kernel/continuous-drive boundaries and a no-schema conclusion；it implements none of them。P1-5E-2、P1-5E-3 and P1-5F still require separate explicit approval。完整边界见 [`exec-plans/P1-5_ai-runtime-foundation.md`](exec-plans/P1-5_ai-runtime-foundation.md)。
 
 ## 5. 产品版本
 

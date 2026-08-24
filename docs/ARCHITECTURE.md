@@ -1,16 +1,16 @@
 # P0 技术架构基线
 
-- Status: P0 Architecture Baseline + P1-1/P1-2/P1-3/P1-4 completed + P1-5A/P1-5B/P1-5C/P1-5D completed
+- Status: P0 Architecture Baseline + P1-1/P1-2/P1-3/P1-4 completed + P1-5A/P1-5B/P1-5C/P1-5D/P1-5E-1 completed
 - Current phase: P1 — IN_PROGRESS
 - Architecture baseline established by: P0-2 — DONE
 - P0-3 foundation status: DONE
 - P0-4 database foundation status: DONE
 - P0-5 identity boundary status: DONE
-- Most recently implemented subphase: P1-5D First Real Provider Integration checkpoint
+- Most recently implemented subphase: P1-5D First Real Provider Integration checkpoint；most recently completed docs-only subphase: P1-5E-1
 - P0 status: DONE; P0-1 through P0-7 completed
-- P1 status: IN_PROGRESS; P1-1/P1-2/P1-3/P1-4 DONE; P1-5A/P1-5B/P1-5C/P1-5D DONE; P1-5E/F NOT_STARTED
+- P1 status: IN_PROGRESS; P1-1/P1-2/P1-3/P1-4 DONE; P1-5A/P1-5B/P1-5C/P1-5D/P1-5E-1 DONE; P1-5E IN_PROGRESS; P1-5E-2/P1-5E-3/P1-5F NOT_STARTED
 - Target version: V0.1 Internal Validation
-- Business architecture detail: P1-1 runtime completed; P1-2 question/persona boundary implemented; P1-3 lifecycle independently accepted; P1-4 floor control implemented; P1-5A freezes authority; P1-5B persists prompt/request/final utterance; P1-5C adds deterministic internal generation orchestration; P1-5D adds the first thin real-provider adapter without automatic orchestration or public transport
+- Business architecture detail: P1-1 runtime completed; P1-2 question/persona boundary implemented; P1-3 lifecycle independently accepted; P1-4 floor control implemented; P1-5A freezes authority; P1-5B persists prompt/request/final utterance; P1-5C adds deterministic internal generation orchestration; P1-5D adds the first thin real-provider adapter; P1-5E-1 freezes state-driven automatic coordination without implementing it or public transport
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -297,7 +297,7 @@ P1-3 lifecycle authority: phase / deadline
 - Prompt 是 immutable/versioned asset。每个 generation request 必须固定 Question Version、获准 participant 的 Persona Template/Assignment/Private Stance、Prompt Version，以及 provider/model/effective non-secret configuration provenance；不得以 mutable `latest` 重解释历史 utterance。
 - AI Participant 是 session role identity；AI Runtime 是 generation capability。Runtime 不拥有 participant seat、stance、floor 或 lifecycle，Persona Template 不保存 prompt/provider/model binding 或 secret。
 - Generation Request 与 final Utterance 分离；逻辑状态为 `requested`、`generated`、`persisted`、`failed`。一个 logical request 至多产生一个 final utterance，late result 在 phase/grant stale 后必须丢弃。
-- Timeout、provider unavailable、rate limit、partial/invalid generation 使用 typed、bounded、idempotent failure policy。P1-5D application retry 固定为 `0`；失败不改变 phase/deadline/floor/scoring，且 automatic floor release/intervention remains deferred to P1-5E。
+- Timeout、provider unavailable、rate limit、partial/invalid generation 使用 typed、bounded、idempotent failure policy。P1-5D application retry 固定为 `0`；失败不改变 phase/deadline/floor/scoring。P1-5E-1 now freezes the future automatic release/intervention coordination policy without implementation。
 - Provider/model raw response、credential、chain-of-thought 和不必要的完整 rendered prompt 不进入 public/error/log surfaces。审计保留足以解释 prompt/model/config 的最小 provenance。
 - 多 provider、cost accounting、enterprise model、audit trace 和 prompt iteration 是 future commercial-readiness boundary；a DB/admin-managed server-side model source may later replace P1-5D environment configuration without changing the runtime contract，but no model table/admin API/UI/hot reload/registry/routing exists now；billing、quota、payment、multi-tenant 继续 Deferred。
 
@@ -324,7 +324,22 @@ P1-3 lifecycle authority: phase / deadline
 - `ZhipuGenerationProvider` uses one `httpx.AsyncClient` request with required lazy `ZhipuProviderSettings.model` (currently `glm-4.7-flashx`)。It requires configured/input/outbound/response/durable model alignment and model-independent `ZHIPU_CHAT_DEV_V1` provenance，rejects mismatch before or after HTTP as appropriate，disables redirects/retries/streaming/thinking，applies bounded timeouts and normalizes only safe typed outcomes。
 - `ZhipuProviderSettings` is a separate lazy server-only boundary with required `GIA_API_ZHIPU_API_KEY: SecretStr` and required bounded non-secret `GIA_API_ZHIPU_MODEL: str`。Ordinary API startup requires neither；changing the model requires configuration plus API restart but no Python、adapter or schema change。Both identifiers remain internal provenance，and the key、rendered prompt、request/response body、provider exception and reasoning content are not logged or persisted。
 - Provider execution still uses the existing P1-5C explicit runtime callable outside database transactions。Durable `RUNNING` remains reconciliation-required/no automatic re-call；late results、overdue reconciliation、concurrent claims and at-most-one utterance retain the P1-3/P1-5C authority rules。
-- Automated provider/runtime tests use injected `httpx.MockTransport` and make zero real GLM calls。Implementation and config-driven patch actual-source reviews passed。Final user-run sanitized real-provider acceptance smoke：`PASS`；`zhipu` / `glm-4.7-flashx` / `ZHIPU_CHAT_DEV_V1` returned `RawGenerationSuccess` and satisfied the intended Chinese group-interview smoke expectation，without recording credentials or raw provider data。P1-5D is `DONE`；P1-5E automatic floor-triggered orchestration remains `NOT_STARTED`。
+- Automated provider/runtime tests use injected `httpx.MockTransport` and make zero real GLM calls。Implementation and config-driven patch actual-source reviews passed。Final user-run sanitized real-provider acceptance smoke：`PASS`；`zhipu` / `glm-4.7-flashx` / `ZHIPU_CHAT_DEV_V1` returned `RawGenerationSuccess` and satisfied the intended Chinese group-interview smoke expectation，without recording credentials or raw provider data。P1-5D is `DONE`；P1-5E-1 now freezes the next automatic-orchestration design without implementing it。
+
+### P1-5E-1 automatic orchestration architecture — design frozen, not implemented
+
+- P1-5E is an application-level、state-driven coordination layer。P1-3 remains lifecycle authority；P1-4 Floor Scheduler decides who；P1-5 AI Runtime decides what。The coordinator never directly writes current-grant/phase/deadline/floor facts or selects a participant。
+- Correctness is recovered from durable session/current-grant、FloorGrant/Release、GenerationRequest/AiUtterance、SessionAction/scheduler children and ordered discussion-event state。`floor.granted` may wake the drive，but no exactly-once event listener、Redis、queue、distributed lock or in-memory mutex is authoritative。
+- Exact existing calls are `generate_ai_utterance(...)`，then `apply_floor_command(...ReleaseFloorCommand...)` after confirmed terminal truth，then `apply_scheduler_command(...ScheduleFloorCommand...)` after release commit。Provider I/O remains outside all transactions/row locks。
+- One exact AI grant maps to deterministic generation request、utterance、release action、next-schedule action and scheduler child UUID identities。An existing request reuses its durable timestamp/prompt/provider/model/configuration；an existing action/decision is consumed through current `SessionAction` replay/conflict semantics rather than replaced by a random identity。
+- New runtime configuration resolves stable `AI_CANDIDATE_TURN` version `1` to an exact immutable Prompt Version ID；provider is `zhipu`，model comes from lazy server-side `GIA_API_ZHIPU_MODEL`，and configuration is `ZHIPU_CHAT_DEV_V1`。No DB UUID or implicit latest prompt is hardcoded。
+- `COMPLETED`/replay with an exact durable utterance releases the still-current grant as `SPEAKER_FINISHED`。`FAILED`/replay releases the still-current grant as `INTERRUPTED` while retaining the typed generation failure as authoritative。`RUNNING`/reconciliation、conflict、internal or otherwise uncertain truth stops without release/scheduling/provider re-call。
+- `CONTEXT_REJECTED` and `STALE_RESULT` force authoritative re-read and never justify stale release。`SUPERSEDED` may release only after proving the unique winning utterance for the same still-current grant；otherwise it stops/re-enters safely。
+- P1-3 overdue reconciliation wins before generation/release/schedule mutation。If it releases or changes phase，the orchestrator consumes those committed facts and never overwrites lifecycle reason、deadline or sequence。
+- Release commits before scheduling。Scheduler `GRANT` is classified by the newly durable actor kind；`NO_GRANT` and `REQUEST_INTERVENTION` stop the drive，with intervention persisted by existing scheduler authority。
+- Concurrent drives converge through deterministic identities、one request claimant、unique utterance/grant constraints、aggregate lock and exact sequence/current-grant preconditions。A losing conflict reads the deterministic durable winner and never changes IDs。
+- P1-5E-2 is the separately approved future one-AI-turn kernel plus one release and one scheduler call。P1-5E-3 is the future continuous loop，bounded by `MAX_AUTOMATED_AI_TURNS_PER_DRIVE = 8` and stopped by HUMAN/no-grant/intervention/lifecycle/reconciliation/budget boundaries。
+- Existing schema is sufficient for orchestration correctness；no orchestration table or migration is planned。API/WebSocket/Web、public utterance projection、human-side transport behavior and independent acceptance remain P1-5F。Full outcome/restart matrices are in [`exec-plans/P1-5_ai-runtime-foundation.md`](exec-plans/P1-5_ai-runtime-foundation.md)。
 
 ## Configuration, secrets and error boundaries
 
@@ -403,7 +418,7 @@ Redis 只在多 API workers、横向扩容、跨进程 WebSocket broadcast、dis
 - P0-5D：completed；真实 browser Cookie/CORS/CSRF 闭环已通过 Chromium 验证；
 - P0-5E：completed；final outcome `PASS after findings remediation and independent recheck`；
 - P0：`DONE`；P0-1～P0-7 completed；P0-7 finding-only independent recheck `PASS`，P1 readiness `READY`；其后用户已明确批准进入 P1；
-- P1：`IN_PROGRESS`；P1-1～P1-4 均已完成且 independent verdict `PASS`；P1-5A/P1-5B/P1-5C/P1-5D 已完成；automatic runtime/transport、记忆和基础报告 implementation 继续 Deferred，P1-5E/F 尚未开始；
+- P1：`IN_PROGRESS`；P1-1～P1-4 均已完成且 independent verdict `PASS`；P1-5A/P1-5B/P1-5C/P1-5D/P1-5E-1 已完成；P1-5E 保持 `IN_PROGRESS`；automatic runtime implementation、transport、记忆和基础报告继续 Deferred，P1-5E-2/P1-5E-3/P1-5F 尚未开始；
 - P2 以后：只在对应阶段获批后增加语音、评分训练和商业化能力。
 
 ## 与其他文档关系

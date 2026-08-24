@@ -1,9 +1,9 @@
 # 隐私、安全、合规与反作弊基线
 
-- Status: Active baseline through completed P1-5D first-provider integration
+- Status: Active baseline through completed P1-5D first-provider integration + completed P1-5E-1 automatic orchestration design freeze
 - Current phase: P1 — IN_PROGRESS
 - Target version: V0.1 Internal Validation
-- Detailed design: Not started
+- Detailed design: P1-5E-1 automatic orchestration privacy/safety boundary frozen；full production/privacy design remains incomplete
 - Security boundaries: Active from project start
 - P0-5A identity security boundary: completed / approved
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
@@ -121,6 +121,16 @@ P0-5B 已实现显式参数的 Argon2id hash/verify/verify-and-update、username
 - Sentinel tests cover settings/provider/result repr and serialization、captured application logs、typed failures and PostgreSQL request/utterance metadata。All automated provider tests use injected HTTPX MockTransport；Codex made zero real GLM calls。
 - Implementation/config-driven patch actual-source reviews and the final user-run sanitized real-provider acceptance smoke are `PASS`。Only allowlisted acceptance facts are recorded：`zhipu`、`glm-4.7-flashx`、`ZHIPU_CHAT_DEV_V1`、`RawGenerationSuccess` and satisfaction of the intended Chinese group-interview smoke expectation；credential、raw provider response、sensitive headers、verbatim generated content and diagnostic payloads are not recorded。Production supplier processing、data residency、retention、cross-border terms and production/default provider/model policy remain TBD。
 
+## P1-5E-1 automatic orchestration privacy/safety freeze — no telemetry implementation
+
+- Automatic coordination consumes only owner-scoped session/current-grant、participant eligibility、exact Prompt Version、Generation Request/AiUtterance and allowlisted floor/scheduler facts。It does not expand provider prompt content、Private Stance visibility or user-facing provider/model exposure。
+- The orchestrator must never persist/log/expose the Zhipu key、Authorization header、rendered private prompt、raw provider request/response、raw exception text、reasoning content、another participant's Private Stance or hidden persona calibration。Deterministic IDs are opaque project identities，not containers for sensitive input。
+- Durable provenance remains allowlisted：session/grant/request/utterance identities、exact Prompt Version identity、provider/model/configuration identifiers and typed safe generation failure code。`FloorRelease.reason = INTERRUPTED` for terminal AI failure does not replace or weaken the request's typed failure truth。
+- `RUNNING`、request conflict、internal/persistence uncertainty and stale/unproved state stop automatic progression。Safety favors uncertain durable truth over retry/progress；no second provider call、synthetic failure、stale release or next scheduling is allowed。
+- HUMAN ownership is a hard safety boundary：no automatic generation、fabrication、release or scheduling over the human。P1-5F must preserve that boundary when transport is later introduced。
+- Future internal diagnostics may allowlist `session_id`、`floor_grant_id`、`generation_request_id`、orchestration outcome code、provider/model provenance and aggregate latency/counters only。P1-5E-1 adds no log field、trace span、metric、table、dependency or telemetry exporter。
+- Automatic tests in P1-5E-2/P1-5E-3 must remain network-free and include privacy sentinels。Any sanitized real-provider composition smoke remains user-run/separately approved and must record no credential、raw response/header、verbatim prompt/output or diagnostic payload。
+
 ## Implementation guidance
 
 - 每个新数据字段都应说明目的、保留、删除、访问和日志处理。
@@ -147,7 +157,7 @@ P0-5B 已实现显式参数的 Argon2id hash/verify/verify-and-update、username
 
 - P0-2：在架构决策中记录基础信任边界；完整威胁建模随实际接口、数据和 Provider 逐步细化。
 - P0-5C～P0-5E：backend/browser authentication、Cookie/CORS/CSRF 与最小日志边界已实现；P0-5E final outcome 为 `PASS after findings remediation and independent recheck`，P0-5 已转为 `DONE`。
-- P0：`DONE`；P1 is `IN_PROGRESS`，P1-1～P1-4 and P1-5A/B/C/D are completed；Codex made no real-model call and recorded no provider secret/raw response；P1-5E automatic orchestration is not started。
+- P0：`DONE`；P1 is `IN_PROGRESS`，P1-1～P1-4 and P1-5A/B/C/D/P1-5E-1 are completed；P1-5E remains `IN_PROGRESS`；Codex made no real-model call and recorded no provider secret/raw response；P1-5E-2/P1-5E-3 automatic implementation and P1-5F transport are not started。
 - P2：完成语音同意、上传、保存和删除设计。
 - P4/P5：完成支付审计、公开隐私设置、投诉和发布合规检查。
 

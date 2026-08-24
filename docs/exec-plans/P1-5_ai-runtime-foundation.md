@@ -1,6 +1,6 @@
 # P1-5 AI Runtime Foundation Execution Plan
 
-Status: `P1 IN_PROGRESS`; `P1-5 IN_PROGRESS`; `P1-5A completed`; `P1-5B completed`; `P1-5C completed`; `P1-5D DONE`; `P1-5E/P1-5F NOT_STARTED`
+Status: `P1 IN_PROGRESS`; `P1-5 IN_PROGRESS`; `P1-5A completed`; `P1-5B completed`; `P1-5C completed`; `P1-5D DONE`; `P1-5E IN_PROGRESS`; `P1-5E-1 DONE`; `P1-5E-2/P1-5E-3/P1-5F NOT_STARTED`
 
 Target version: `V0.1 Internal Validation`
 
@@ -11,6 +11,8 @@ Accepted decisions: [`D-003`](../DECISIONS.md#2-已确认产品决策索引), [`
 P1-5A baseline: clean committed `main` at `5397cd2b25f36c6a9fbd666b759261091c36a8c0`, equal to `origin/main`; [`PROJECT_MASTER_PLAN.md`](../PROJECT_MASTER_PLAN.md) SHA-256 `2388A9660320406CB35D5354126AD71C6849A98DB7C4A356796CA951BF372F26`
 
 P1-5D design-freeze baseline: clean committed `main` at `371d5a57ffb952a7ccb664170819e07b606b5688`, equal to `origin/main`; P1-5C is committed；[`PROJECT_MASTER_PLAN.md`](../PROJECT_MASTER_PLAN.md) SHA-256 remains `2388A9660320406CB35D5354126AD71C6849A98DB7C4A356796CA951BF372F26`
+
+P1-5E-1 design-freeze baseline: clean committed `main` at `a416d955920ec407c011c32602ac720a6d8080fd`, equal to `origin/main`; P1-5D is committed and `DONE`；P1-5E was `NOT_STARTED` before this approved checkpoint；[`PROJECT_MASTER_PLAN.md`](../PROJECT_MASTER_PLAN.md) SHA-256 remains `2388A9660320406CB35D5354126AD71C6849A98DB7C4A356796CA951BF372F26`
 
 ## Goal
 
@@ -28,10 +30,13 @@ P1-5C 是 separately approved deterministic runtime vertical slice。它在不�
 - `P1-5B — AI Runtime Persistence Foundation`：`DONE`；
 - `P1-5C — Runtime Contract & Deterministic Generation Vertical Slice`：`DONE`；
 - `P1-5D — First Real Provider Integration`：`DONE`；implementation and config-driven model patch actual-source reviews `PASS`，final user-run sanitized real-provider acceptance smoke `PASS`；
-- `P1-5E — Automatic AI Runtime Orchestration`：`NOT_STARTED`；
+- `P1-5E — Automatic AI Runtime Orchestration`：`IN_PROGRESS`；
+  - `P1-5E-1 — Automatic AI Runtime Orchestration Design Freeze`：`DONE`；docs-only actual-source review `PASS`；findings none；
+  - `P1-5E-2 — Single AI Turn Orchestration Kernel`：`NOT_STARTED`；
+  - `P1-5E-3 — Continuous AI Drive + Composition Acceptance`：`NOT_STARTED`；
 - `P1-5F — Realtime/Web Integration + Independent Acceptance`：`NOT_STARTED`。
 
-P1-5D design freeze、implementation and config-driven model patch were separately approved；both actual-source reviews and the final user-run sanitized real-provider acceptance smoke passed，so P1-5D is closed as `DONE`。Codex made no real-model call and recorded no credential、raw provider response or sensitive header。P1-5E～F remain outside the authorized scope and require separate explicit user approval。
+P1-5D design freeze、implementation and config-driven model patch were separately approved；both actual-source reviews and the final user-run sanitized real-provider acceptance smoke passed，so P1-5D is closed as `DONE`。The user has now separately approved P1-5E and this P1-5E-1 docs-only freeze。Codex makes no real-model call and records no credential、raw provider response or sensitive header。P1-5E-2、P1-5E-3 and P1-5F remain outside this checkpoint and require their own later approval。
 
 ## Context and authority
 
@@ -278,6 +283,151 @@ No change is made to domain persistence services、ORM models、migration histor
 - HEAD and `origin/main` remain at the recorded baseline；staged changes、commits and pushes remain zero。
 - No provider endpoint was contacted and no secret/quota was used in the design freeze。At that checkpoint P1-5D remained open for implementation review and final user-run acceptance evidence；both later gates are now closed as recorded in the current acceptance section。
 
+## P1-5E-1 design freeze — Automatic AI Runtime Orchestration
+
+P1-5E is an application-level、state-driven coordination layer over existing authorities。A future minimal implementation candidate is `modules/ai_runtime/orchestration.py`，but P1-5E-1 creates no Python file、test、fixture、schema or migration。
+
+The frozen authority chain is:
+
+```text
+durable current floor grant
+  -> identify exact current participant
+  -> HUMAN: stop and wait for human-side transport/action
+  -> AI: resolve exact immutable runtime configuration
+  -> create/replay one deterministic generation identity
+  -> generate_ai_utterance(...)
+  -> persist one final AI utterance or one typed terminal failure
+  -> release the exact AI grant through Floor Control
+  -> invoke Floor Scheduler
+  -> inspect the newly durable current state
+  -> continue only while the current owner is an eligible AI candidate
+```
+
+Floor Scheduler decides **WHO**；AI Runtime decides **WHAT**；the Automatic Orchestrator only coordinates these existing authorities。It is not a new domain authority and cannot directly update `simulation_sessions.current_floor_grant_id`、insert floor facts、choose a participant、change phase/deadline、bypass AI Runtime utterance persistence or own API/WebSocket/Web behavior。
+
+### Exact existing application authorities
+
+- Exact AI content entry point：`generate_ai_utterance(...)` in `modules/ai_runtime/runtime.py`。It owns request create/claim/replay、provider-neutral execution outside transactions and terminal request/utterance persistence。
+- Exact floor-release entry point：`apply_floor_command(..., ReleaseFloorCommand(...))` in `modules/floor_control/service.py`。It owns `session_actions` replay/conflict、aggregate locking、exact phase/sequence/current-grant validation、`floor_releases` and ordered `floor.released`。
+- Exact next-speaker entry point：`apply_scheduler_command(..., ScheduleFloorCommand(...))` in `modules/floor_control/service.py`。It owns locked scheduler input reconstruction、P1-3 reconciliation、phase/sequence/current-grant preconditions、`FloorDecision` and the resulting grant/intervention/no-grant fact。
+- Exact lifecycle reconciliation entry point remains `reconcile_due_for_locked_aggregate(...)` in `modules/discussion_sessions/service.py`。The existing generation、release and scheduler services invoke this authority under the session aggregate lock where applicable；the orchestrator consumes the committed result and never overwrites it。
+
+### State-driven invocation and authoritative re-entry
+
+`floor.granted` is a durable trigger condition，not an exactly-once in-memory delivery requirement。Correctness must survive duplicate invocation、concurrent invocation、process restart and crashes between committed steps。Redis、event bus、queue、distributed lock and in-memory mutex are not correctness dependencies。
+
+Every entry/re-entry first reads owner-scoped authoritative state：`simulation_sessions.status/current_floor_grant_id/last_sequence`、the exact `FloorGrant`/`FloorRelease`、participant actor/role/availability、durable `LlmGenerationRequest`、durable `AiUtterance`、`SessionAction` plus deterministic scheduler child facts and ordered `discussion_events`。The event sequence orders control facts；the utterance's exact request/grant links prove content completion。No public utterance event or transport projection is introduced here。
+
+If the session is not in a floor-enabled phase，the drive stops as not applicable。If the current grant belongs to an eligible HUMAN candidate，the drive stops successfully and does not generate、release、schedule over or fabricate content for that participant。If no current grant exists，recovery may schedule only when it can prove that the latest unfinished automatic step is the deterministic next-schedule action for an exact AI grant already released by this orchestration chain；a P1-3 lifecycle release、human release or unrelated empty-floor state is not enough。
+
+### Deterministic identities and replay payloads
+
+One exact AI `floor_grant_id` maps to one logical automated turn。Project-owned deterministic UUIDs are derived from stable inputs under one fixed project namespace:
+
+- `generation_request_id = deterministic(session_id, floor_grant_id, "ai-generation-request")`；
+- `utterance_id = deterministic(session_id, floor_grant_id, "ai-utterance")`；
+- `release_action_id = deterministic(session_id, floor_grant_id, "ai-floor-release")`；
+- `next_schedule_action_id = deterministic(session_id, floor_grant_id, "ai-next-schedule")`；
+- the scheduler `decision_id`、possible `grant_id` and possible `intervention_id` are deterministic children of that exact next-schedule action。
+
+P1-5E-2 may use a fixed project UUID namespace plus standard-library UUIDv5 or an equivalent deterministic standard-library mechanism；the exact constant/helper name is an implementation detail，while the mappings above are frozen。A caller never mints a random replacement identity to escape a conflict、`RUNNING` state or stale precondition。
+
+Existing digests include semantic payload fields beyond UUID identity，so replay must also preserve those fields:
+
+- A new generation request chooses one server-authoritative `occurred_at`。If the deterministic request already exists，re-entry reconstructs the command from its exact durable `requested_at`、Prompt Version、provider/model and configuration version；it does not substitute current time/current latest configuration and therefore avoids `REQUEST_CONFLICT` or provenance drift。
+- The release command uses the exact grant、phase、pre-release sequence and reason。An accepted deterministic release action replays through existing `SessionAction` digest semantics；its single causal release event also proves the committed pre-release sequence。
+- The scheduler command uses the deterministic action/child IDs、post-release phase/sequence/current-grant preconditions、closed policy and one evaluated UTC。If the deterministic `SessionAction`/`FloorDecision` already exists，re-entry consumes that durable decision and child fact rather than minting another action。An exact reconstructed payload may use native replay；a concurrent same-ID/different-evaluation digest conflict means another caller won and requires a durable re-read，not a new ID。
+
+This preserves current `SessionAction` semantics：same identity + same digest replays original causal events；same identity + different digest conflicts without mutation。Deterministic child IDs、the aggregate lock、current-grant pointer and scheduler preconditions prevent two formal next-floor winners。
+
+### Invocation configuration resolution
+
+For a new deterministic request，the server-owned V0.1 configuration is:
+
+- `provider_identifier = "zhipu"`；
+- `model_identifier = GIA_API_ZHIPU_MODEL` from lazy server-only settings；
+- `configuration_version = "ZHIPU_CHAT_DEV_V1"`；
+- `prompt_key = "AI_CANDIDATE_TURN"`；
+- `prompt_version_number = 1`。
+
+Committed runtime fixtures consistently use `AI_CANDIDATE_TURN` version `1` with purpose `CANDIDATE_UTTERANCE`，so this freeze does not invent a second prompt identity。The orchestrator resolves that exact stable key/version to one immutable published `PromptVersion.id` before request creation；it never hardcodes a database UUID and never selects implicit latest。If the exact key/version is absent、ambiguous、not yet published or retired for a new request，the drive stops safely before provider I/O。
+
+For an existing deterministic request，its durable Prompt Version/provider/model/configuration/requested timestamp are authoritative。The injected `GenerationProvider` and current composition must exactly satisfy that provenance；a restart after a server model/config change cannot reinterpret or replace the request。If the exact stored configuration cannot be supplied，automatic progression stops for reconciliation/configuration recovery without a second request or provider call。
+
+### Runtime outcome matrix
+
+No new `RuntimeGenerationOutcome` is added in P1-5E-1。The orchestrator applies the following exact policy after re-reading durable state:
+
+- `COMPLETED` / `COMPLETED_REPLAY`：require the exact request to be `COMPLETED` and one durable `AiUtterance` to match the request/grant。If that exact grant is still current，release it with `SPEAKER_FINISHED`；if lifecycle or another valid action already released/replaced it，do not mutate the stale grant and continue only from the new authoritative state。
+- `FAILED` / `FAILED_REPLAY`：require the exact request to be durably `FAILED`。If that exact grant is still current，release it with `INTERRUPTED` and preserve the request's typed `failure_code` as the failure truth。Here `INTERRUPTED` means the granted AI turn ended without a formal utterance after a confirmed terminal runtime failure；it does not erase or replace the typed generation failure。No migration adds `AI_GENERATION_FAILED` in V0.1。
+- `RECONCILIATION_REQUIRED`：stop。This includes durable `RUNNING` and any state where provider contact may already have occurred。Do not call provider again、release、schedule or synthesize `FAILED`。
+- `REQUEST_CONFLICT` / `INTERNAL_ERROR`：stop with a reconciliation-required orchestration result。Do not release、schedule、retry provider or mint another identity。
+- `CONTEXT_REJECTED`：re-read the session/grant/lifecycle facts。If P1-3 or another authority already changed state，follow that durable state；if the same grant remains current but context is still rejected，stop。Never release solely because context was rejected。
+- `STALE_RESULT`：the old generation result is not authority for the current floor。Re-read lifecycle/current grant；never release or schedule from the stale grant。A new authoritative eligible AI grant may be handled only as a new exact state-driven turn；otherwise stop at the current human/non-floor/reconciliation boundary。
+- `SUPERSEDED`：current source semantics mean another durable formal utterance won the unique floor-grant slot。First verify the exact winning `AiUtterance` and current state without another provider call。If the same grant is still current，treat the verified winning utterance as content completion and release with `SPEAKER_FINISHED`；if the grant is no longer current，make no stale mutation。If the winner cannot be proved，stop for reconciliation。
+
+### Release and next-schedule ordering
+
+The required commit order is strict:
+
+1. generation reaches confirmed durable terminal truth；
+2. revalidate exact current grant、phase and sequence；
+3. release through `apply_floor_command`；
+4. release transaction commits；
+5. re-read authoritative session、release and sequence；
+6. schedule through `apply_scheduler_command`；
+7. scheduler transaction commits；
+8. inspect deterministic `FloorDecision` and newly durable current grant；
+9. continue only if that current grant belongs to an eligible AI candidate。
+
+Provider I/O、release and scheduler execution are never wrapped in one database transaction。Provider I/O remains outside every transaction/row lock，and every next step consumes a committed prior step。
+
+If scheduler outcome is `GRANT`，the durable current grant decides whether the caller stops for HUMAN or may continue for AI。If outcome is `NO_GRANT`，the deterministic decision is durable and the drive stops without mutating phase/current grant。If outcome is `REQUEST_INTERVENTION`，the existing scheduler authority persists `FloorIntervention` plus `floor.intervention_requested` and the drive stops；the AI orchestrator does not decide moderator/UI behavior。
+
+### P1-3 reconciliation interaction
+
+P1-3 lifecycle truth wins at every boundary。Generation create/claim/completion already reconciles overdue state under the session lock。Floor release also reconciles before applying its exact phase/sequence command；if reconciliation released the grant or changed phase，the automatic release becomes stale and must not overwrite the P1-3 facts。Scheduler likewise reconciles and validates exact phase/sequence/current-grant preconditions before deciding。
+
+After any reconciliation-caused `floor.released` / `session.state_changed` facts，the orchestrator commits/returns to authoritative re-entry。It may continue only if the resulting phase is floor-enabled and the resulting exact current state independently permits it；it never rewrites lifecycle reason、phase、deadline or sequence facts。
+
+### Concurrency and idempotency
+
+Two concurrent drive invocations may observe the same AI grant。Both derive the same generation/request/utterance/release/schedule identities。Existing request digest + claim semantics allow one logical request and one executor claimant；an observed `RUNNING` is fail-closed。The unique `AiUtterance` request/grant constraints allow one formal content winner。
+
+After terminal truth，the deterministic release action plus session aggregate lock/current-grant/sequence guards make exact release replay safe。After release，the deterministic schedule action/children plus expected phase/sequence/current-null-grant preconditions allow only one scheduling decision and at most one new current grant。A losing caller re-reads the durable winner；it never escapes by changing IDs。No distributed lock or authoritative in-memory mutex is introduced。
+
+### Crash/restart matrix
+
+- A — crash before request creation：re-entry derives the same request/utterance IDs and safely creates the request once。
+- B — crash after `REQUESTED` but before `RUNNING`：re-entry loads the durable request payload/timestamp and may claim it under existing semantics；no new identity is created。
+- C — crash while `RUNNING` or after provider may have been contacted：re-entry returns reconciliation required and never automatically contacts the provider again。
+- D — crash after `COMPLETED` utterance but before release：re-entry replays durable completion and releases the exact still-current grant without provider I/O。
+- E — crash after release but before scheduling：re-entry proves the deterministic automatic release and absent next-schedule action，then runs that exact deterministic scheduling step without provider I/O。
+- F — crash after scheduler commit/grant：re-entry reads the deterministic decision and new current grant；it stops for HUMAN，drives the new exact AI grant when eligible，or stops on no-grant/intervention/non-floor state。
+
+### Structured orchestration results and continuous-drive boundary
+
+P1-5E-2/3 may implement provider-neutral structured result categories for：waiting for human、single AI turn completed/released、single AI turn failed/released、next AI granted、next human granted、no grant、intervention requested、not applicable lifecycle state、reconciliation required and drive budget exhausted。These are internal application results，not new `RuntimeGenerationOutcome` values、public events or telemetry schema。
+
+`P1-5E-2 — Single AI Turn Orchestration Kernel` receives `owner_id + session_id + orchestration configuration + injected GenerationProvider`，inspects one authoritative current grant，drives at most that one AI grant through generation、safe terminal release and one scheduler invocation，then returns the structured result/new current state。It is fully testable with the deterministic harness or MockTransport and Codex makes no real-provider call。
+
+`P1-5E-3 — Continuous AI Drive + Composition Acceptance` repeatedly invokes the single-turn kernel across consecutive AI grants and composes the existing Zhipu provider only from lazy server settings。The kernel remains provider-neutral and automated tests remain network-free。A sanitized user-run real-provider composition smoke may be requested separately if needed。
+
+Continuous drive stops when the current grant belongs to HUMAN、scheduler returns `NO_GRANT`、scheduler requests intervention、session leaves a floor-enabled phase、lifecycle reconciliation changes/terminates applicability、durable truth is uncertain or the per-invocation safety budget is exhausted。The frozen application guard is `MAX_AUTOMATED_AI_TURNS_PER_DRIVE = 8`。Exhaustion does not release/mutate the current grant、fail a request or change phase；it returns safe `drive budget exhausted / resume allowed` and a later invocation resumes from durable state。This is not a user-facing product limit。
+
+### Schema conclusion and explicit deferrals
+
+Actual-source analysis confirms no orchestration table or migration is required for the frozen invariants。Existing `simulation_sessions`、`session_actions`、`discussion_events`、`floor_decisions`、`floor_grants`、`floor_releases`、`llm_generation_requests`、`ai_utterances` and `prompt_versions` already provide current-state authority、deterministic action replay/conflict、single-owner sequence guards、request lifecycle and unique utterance/grant truth。Scheduler interventions use the existing `floor_interventions` table。
+
+This conclusion is limited to automatic orchestration correctness。P1-5E-1 does not add a public utterance event、human utterance transport、REST/WebSocket/Web projection、streaming/chunks、telemetry、Redis、queue/worker、retry/fallback/routing、model registry/admin configuration、RAG/memory、scoring/report、billing/quota、voice or schema。P1-5F owns transport/realtime/Web invocation and observation、human-side action/floor behavior、formal public utterance/error projection and independent acceptance；none is implemented or pre-decided here beyond preserving the internal authority boundary。
+
+### P1-5E-1 acceptance
+
+- Only approved documentation is changed；no Python/source/test/fixture/schema/migration/dependency/lock/config/API/WS/Web/CI artifact changes。
+- Current-state/status、outcome、crash/restart、concurrency/action replay、privacy and schema conclusions agree across this plan and synchronized domain/governance docs。
+- Markdown relative links、final newlines、secret/static leakage、master-plan hash、scope and `git diff --check` pass。
+- Provider calls、staged changes、commit and push remain zero。P1-5E-1 actual-source review is `PASS` with findings none；reviewed bundle SHA-256 is `dae10e722244b1b6e73a5a360f6064c948bfaf5aa138c0d4b89b1f9961f35055`；P1-5E-1 is `DONE`；P1-5E-2/P1-5E-3/P1-5F remain `NOT_STARTED`。
+
 ## Frozen failure and retry boundary
 
 适用 failure classes：timeout、provider unavailable、rate limit、partial generation、invalid/unsafe output 和 caller cancellation/stale grant。
@@ -321,12 +471,12 @@ Implemented in P1-5D current checkpoint:
 - exact `provider_identifier` / configured `model_identifier` / model-independent `ZHIPU_CHAT_DEV_V1` provenance，with model changes requiring configuration plus API restart rather than Python、adapter or schema changes；
 - network-free mocked-transport provider tests plus final user-run sanitized real-provider acceptance smoke `PASS`。
 
-Still Deferred beyond P1-5D:
+Still Deferred after the P1-5E-1 docs-only freeze:
 
 - provider SDK、multi-provider registry/routing/fallback and automatic retry；
 - production prompt orchestration beyond the closed P1-5C renderer and internal prompt-variable persistence；
 - additional provider-attempt/fallback hierarchy beyond the current one-request/one-attempt identity；
-- automatic floor-triggered generation、transport/API/WebSocket/Web and streaming；
+- automatic orchestration implementation remains deferred to P1-5E-2/P1-5E-3；transport/API/WebSocket/Web and streaming remain deferred to P1-5F or later approved work；
 - memory、RAG、embedding/vector store；
 - scoring、evidence extraction、report generation；
 - voice、ASR、TTS、audio interruption；
@@ -336,7 +486,7 @@ Still Deferred beyond P1-5D:
 
 ## Later implementation gates
 
-P1-5D implementation and config-driven patch followed the frozen section above without scope expansion；both actual-source reviews and the final user-run sanitized real-provider acceptance smoke passed，and P1-5D is `DONE`。P1-5E/F require their own later approval and updated decomposition。Any later provider/automatic/transport subphase must define:
+P1-5D implementation and config-driven patch followed the frozen section above without scope expansion；both actual-source reviews and the final user-run sanitized real-provider acceptance smoke passed，and P1-5D is `DONE`。P1-5E is now decomposed and its P1-5E-1 docs-only design freeze is `DONE` after actual-source review `PASS` with findings none；P1-5E-2、P1-5E-3 and P1-5F each require their own later approval。Any later implementation/transport subphase must preserve:
 
 - any additive schema need and historical deletion/retention semantics；
 - provider-neutral request/result/error contract with a real caller；
@@ -393,6 +543,10 @@ P1-5D implementation and config-driven patch followed the frozen section above w
 - The current development provider/model is Zhipu `glm-4.7-flashx` through a thin HTTPX adapter，selected by lazy server-side configuration。The earlier `glm-4.7-flash` manual access attempt's rate-limit/availability result is not a permanent unavailability claim；neither Zhipu nor FlashX is permanent production policy。
 - `provider_identifier`、actual configured `model_identifier` and model-independent invocation `configuration_version` are distinct durable provenance dimensions。A model-only change keeps `ZHIPU_CHAT_DEV_V1`；parameter-policy changes require a later version。
 - Existing P1-5B provenance schema is sufficient；HTTPX is now promoted from dev-only to the single runtime dependency declaration for the implemented caller。
+- P1-5E automatic orchestration is application-level and state-driven；durable current state/actions provide correctness while P1-3/P1-4/P1-5 authorities remain unchanged。
+- One AI grant owns deterministic generation、utterance、release and next-schedule identities；existing `SessionAction` replay/conflict and scheduler children provide restart/concurrency convergence without an orchestration table。
+- Confirmed success releases `SPEAKER_FINISHED`；confirmed terminal failure releases `INTERRUPTED` while preserving typed generation failure；uncertain/stale truth never drives stale release or scheduling。
+- Release and scheduler are separate committed operations，and continuous drive has the fixed per-invocation guard `MAX_AUTOMATED_AI_TURNS_PER_DRIVE = 8`。
 
 ## Risks and stop conditions
 
@@ -404,6 +558,9 @@ P1-5D implementation and config-driven patch followed the frozen section above w
 - **Provider contract drift**：stop if outbound provider/model/config differs from durable provenance or if an HTTPX/provider object crosses into domain/runtime results.
 - **Credential leakage**：stop if the API key、Authorization header、raw response body or exception text can reach persistence、logs、traces、tests、errors or review artifacts.
 - **Duplicate paid work**：stop if restart/RUNNING handling or hidden client retry can issue an untracked second real call.
+- **Action replay drift**：stop if deterministic release/schedule identity cannot reconstruct or consume the original semantic payload without minting a replacement action。
+- **Unsafe progression**：stop if an uncertain/stale generation or lifecycle result would require release/scheduling before exact durable revalidation。
+- **Schema contradiction**：stop if P1-5E-2 actual-source implementation proves existing action/floor/request/utterance facts cannot recover a crash boundary without a new durable fact；request separate approval before migration。
 
 ## Progress
 
@@ -411,4 +568,5 @@ P1-5D implementation and config-driven patch followed the frozen section above w
 - P1-5B：completed；provider-neutral persistence foundation；all required gates PASS；no provider/runtime caller。
 - P1-5C：completed；deterministic runtime contract/vertical slice and PostgreSQL orchestration gates PASS；no real provider or transport。
 - P1-5D：`DONE`；design freeze、implementation、findings remediation、config-driven model patch、both actual-source reviews and final user-run sanitized real-provider acceptance smoke completed without a Codex real-model call or sensitive-data recording。
-- P1-5E/P1-5F：not started；require separate explicit approval。
+- P1-5E：`IN_PROGRESS`；P1-5E-1 docs-only automatic-orchestration design freeze is `DONE` after actual-source review `PASS` with findings none；P1-5E-2/P1-5E-3 are `NOT_STARTED`。
+- P1-5F：`NOT_STARTED`；requires separate explicit approval。

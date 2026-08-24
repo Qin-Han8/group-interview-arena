@@ -1,17 +1,17 @@
 # 当前任务清单
 
-- Status: P1 in progress; P1-1, P1-2, P1-3, and P1-4 completed; P1-5A/P1-5B/P1-5C/P1-5D completed; P1-5E/P1-5F not started
-- Managed scope: P1-5D final closeout completed; P1-5E remains unauthorized and `NOT_STARTED`
-- Most recently completed subphase: P1-5D — `DONE`
+- Status: P1 in progress; P1-1, P1-2, P1-3, and P1-4 completed; P1-5A/P1-5B/P1-5C/P1-5D/P1-5E-1 completed; P1-5E in progress; P1-5E-2/P1-5E-3/P1-5F not started
+- Managed scope: P1-5E-1 docs-only closeout completed; no implementation/P1-5E-2/P1-5E-3/P1-5F
+- Most recently completed subphase: P1-5E-1 — `DONE`
 - P0-7 final outcome: initial verdict `BLOCKED` with two documentation findings; remediation completed; finding-only independent recheck `PASS`; new blockers none; P1 readiness `READY`
 - Current phase: P1 — `IN_PROGRESS`
 - Most recently completed task: P1-4 — `DONE`
-- Current task gate: P1-5 — `IN_PROGRESS`; P1-5A/P1-5B/P1-5C/P1-5D `DONE`; P1-5E/P1-5F `NOT_STARTED`
+- Current task gate: P1-5 — `IN_PROGRESS`; P1-5A/P1-5B/P1-5C/P1-5D/P1-5E-1 `DONE`; P1-5E `IN_PROGRESS`; P1-5E-2/P1-5E-3/P1-5F `NOT_STARTED`
 - P0 status: `DONE`; P0-1 through P0-7 completed
 - Allowed status values: `TODO` / `IN_PROGRESS` / `BLOCKED` / `DONE`
 - Related roadmap: [`ROADMAP.md`](ROADMAP.md)
 
-用户已明确批准正式进入 P1，并已完成 P1-1～P1-4。P1-4E 在修复唯一 documentation finding 后通过 independent recheck，P1-4 已为 `DONE`；P1 保持 `IN_PROGRESS`。P1-5A AI Runtime Architecture Freeze、P1-5B AI Runtime Persistence Foundation、P1-5C deterministic runtime vertical slice 与 P1-5D first-provider integration 均已完成。P1-5D implementation/config-driven patch actual-source reviews and the final user-run sanitized real-provider acceptance smoke are `PASS`。Codex 不得开始 automatic floor-triggered generation、transport、记忆、报告、语音、Redis/queue、P1-5E/F 或 P2～P6。
+用户已明确批准正式进入 P1，并已完成 P1-1～P1-4。P1-4E 在修复唯一 documentation finding 后通过 independent recheck，P1-4 已为 `DONE`；P1 保持 `IN_PROGRESS`。P1-5A AI Runtime Architecture Freeze、P1-5B AI Runtime Persistence Foundation、P1-5C deterministic runtime vertical slice 与 P1-5D first-provider integration 均已完成。P1-5D implementation/config-driven patch actual-source reviews and the final user-run sanitized real-provider acceptance smoke are `PASS`。P1-5E 已获批准；P1-5E-1 docs-only design freeze actual-source review 为 `PASS`、findings none，现为 `DONE`。Codex 不得开始 Python implementation、P1-5E-2/P1-5E-3、transport、记忆、报告、语音、Redis/queue、P1-5F 或 P2～P6。
 
 ## P0-1 — 仓库与文档治理
 
@@ -586,12 +586,12 @@
 - ID: `P1-5`
 - 名称：AI Runtime Foundation
 - Status: `IN_PROGRESS`
-- Approval state：P1-5A architecture freeze、P1-5B persistence foundation、P1-5C deterministic runtime vertical slice and P1-5D first-provider integration explicitly approved and completed；P1-5E/P1-5F not started。
+- Approval state：P1-5A architecture freeze、P1-5B persistence foundation、P1-5C deterministic runtime vertical slice、P1-5D first-provider integration and P1-5E-1 docs-only design freeze completed；P1-5E approved/in progress；P1-5E-2/P1-5E-3/P1-5F not started。
 - 目标：在既有 immutable question/persona、server-authoritative session lifecycle 与 deterministic floor control 之上，建立 provider-neutral、可追踪、可重试且不破坏 session integrity 的 AI utterance generation boundary。
-- In scope：P1-5A 冻结 Scheduler/Runtime/provider authority、provenance、Participant/Runtime separation、request/utterance lifecycle and failure integrity；P1-5B 实现 Prompt Version、Generation Request、final AI Utterance persistence、locked transactions and PostgreSQL migration/tests；P1-5C 实现 closed deterministic prompt rendering、only-own-context assembly、typed local generation harness and application orchestration；P1-5D implements the minimal provider Protocol、lazy server-side Zhipu credential/model settings、thin non-streaming HTTPX adapter、runtime dependency promotion and network-free provider/runtime tests。
-- Out of scope for this checkpoint：real GLM calls、schema/migration、API/WS/Web、automatic floor-triggered generation/release、streaming、registry/routing/fallback/automatic retry、memory/RAG、scoring/report、voice、Redis/queue/worker、CI、token/cost/billing/quota/payment/multi-tenant and P1-5E/F。
+- In scope：P1-5A 冻结 Scheduler/Runtime/provider authority、provenance、Participant/Runtime separation、request/utterance lifecycle and failure integrity；P1-5B 实现 Prompt Version、Generation Request、final AI Utterance persistence、locked transactions and PostgreSQL migration/tests；P1-5C 实现 closed deterministic prompt rendering、only-own-context assembly、typed local generation harness and application orchestration；P1-5D implements the minimal provider Protocol、lazy server-side Zhipu credential/model settings、thin non-streaming HTTPX adapter、runtime dependency promotion and network-free provider/runtime tests；P1-5E-1 freezes state-driven automatic coordination、deterministic per-grant identities、outcome/recovery/concurrency policy、single-turn/continuous boundaries and no-schema conclusion as docs only。
+- Out of scope for this checkpoint：Python/source/tests/fixtures、real GLM calls、schema/migration、dependency/lock/config、API/WS/Web、P1-5E-2/P1-5E-3 implementation、streaming、registry/routing/fallback/automatic retry、memory/RAG、scoring/report、voice、Redis/queue/worker、CI、token/cost/billing/quota/payment/multi-tenant and P1-5F。
 - Dependencies：P1-1/P1-2/P1-3/P1-4 `DONE`；Accepted `D-003`、`D-007`、`D-008`、`D-013`、`ADR-006`、`ADR-007`、`ADR-009`、`ADR-011`～`ADR-014`。
-- Acceptance result：the frozen Zhipu/configured-model/model-independent-configuration/request/timeouts are exact；provider/domain separation、safe error mapping、secret non-disclosure、one-request/no-retry behavior and existing P1-5C lifecycle/provenance invariants passed network-free tests and full PostgreSQL regression；HTTPX remains the single runtime dependency；no schema/API/WS/Web/P1-5E scope was added；both actual-source reviews and the sanitized user smoke passed，so P1-5D is `DONE`。
+- P1-5D acceptance result：the frozen Zhipu/configured-model/model-independent-configuration/request/timeouts are exact；provider/domain separation、safe error mapping、secret non-disclosure、one-request/no-retry behavior and existing P1-5C lifecycle/provenance invariants passed network-free tests and full PostgreSQL regression；HTTPX remains the single runtime dependency；no schema/API/WS/Web or automatic implementation was added；both actual-source reviews and the sanitized user smoke passed，so P1-5D is `DONE`。P1-5E-1 has separately passed its docs-only actual-source review with findings none and is `DONE`。
 
 ### Substep progress
 
@@ -599,9 +599,26 @@
 - `P1-5B — AI Runtime Persistence Foundation`：completed；three-table persistence + domain transaction foundation；no provider caller；
 - `P1-5C — Runtime Contract & Deterministic Generation Vertical Slice`：completed；closed prompt/context、typed deterministic harness、short-transaction orchestration and durable replay/concurrency/stale-result behavior；
 - `P1-5D — First Real Provider Integration`：`DONE`；implementation/config-driven patch actual-source reviews and final user-run sanitized real-provider acceptance smoke `PASS`；
-- `P1-5E — Automatic AI Runtime Orchestration`：not started；
+- `P1-5E — Automatic AI Runtime Orchestration`：`IN_PROGRESS`；
+- `P1-5E-1 — Automatic AI Runtime Orchestration Design Freeze`：`DONE`；docs-only actual-source review `PASS`；findings none；
+- `P1-5E-2 — Single AI Turn Orchestration Kernel`：`NOT_STARTED`；
+- `P1-5E-3 — Continuous AI Drive + Composition Acceptance`：`NOT_STARTED`；
 - `P1-5F — Realtime/Web Integration + Independent Acceptance`：not started；
-- P1-5D implementation was separately approved；P1-5E～F each still require separate explicit approval。
+- P1-5E and its P1-5E-1 design freeze were separately approved；P1-5E-2、P1-5E-3 and P1-5F each still require separate explicit approval。
+
+### P1-5E-1 completion note
+
+- Baseline is clean committed `main` / `origin/main` `a416d955920ec407c011c32602ac720a6d8080fd` with P1-5D `DONE` and unchanged master-plan SHA-256 `2388A9660320406CB35D5354126AD71C6849A98DB7C4A356796CA951BF372F26`；
+- Freeze P1-5E as an application-level、state-driven coordinator：P1-3 owns lifecycle，P1-4 Floor Scheduler decides who，P1-5 AI Runtime decides what；durable state rather than exactly-once event delivery provides correctness；
+- Existing exact authorities are `generate_ai_utterance(...)`、`apply_floor_command(...ReleaseFloorCommand...)` and `apply_scheduler_command(...ScheduleFloorCommand...)`；the orchestrator never directly writes floor/session facts or chooses a participant；
+- One exact AI grant deterministically maps to generation request、utterance、release action、next-schedule action and scheduler child identities。Existing request timestamps/provenance and `SessionAction` digest semantics are replayed rather than replaced；
+- Exact prompt selection is stable `AI_CANDIDATE_TURN` version `1` resolved to immutable `PromptVersion.id`；current development invocation is `zhipu` / server-configured model / `ZHIPU_CHAT_DEV_V1`；no hardcoded DB UUID or implicit latest；
+- Confirmed completed utterance releases the exact current AI grant as `SPEAKER_FINISHED`；confirmed failed request releases it as `INTERRUPTED` while preserving typed `failure_code`；uncertain、conflict、internal、`RUNNING` or stale truth stops/re-reads without unsafe progression；
+- Commit order is terminal generation → exact release → re-read → scheduler → re-read。P1-3 reconciliation facts always win；provider I/O remains outside transactions；
+- Two concurrent drives converge through deterministic identities、one request claimant、unique utterance/grant constraints、aggregate lock、sequence/current-grant preconditions and deterministic scheduler children；no distributed lock or in-memory authority；
+- P1-5E-2 is one AI turn + one release + one scheduler call；P1-5E-3 loops consecutive AI turns with `MAX_AUTOMATED_AI_TURNS_PER_DRIVE = 8` and stops at human/no-grant/intervention/lifecycle/reconciliation/budget boundaries；
+- Existing nineteen-table schema plus deterministic `SessionAction`/floor/request/utterance facts is sufficient；no orchestration table/migration is planned。Full matrices and deferrals are in [`exec-plans/P1-5_ai-runtime-foundation.md`](exec-plans/P1-5_ai-runtime-foundation.md)。
+- Actual-source review：`PASS`；findings：none；reviewed bundle SHA-256：`dae10e722244b1b6e73a5a360f6064c948bfaf5aa138c0d4b89b1f9961f35055`。P1-5E-1 is `DONE`；P1-5E remains `IN_PROGRESS`；P1-5E-2/P1-5E-3/P1-5F remain `NOT_STARTED`。
 
 ### P1-5D design and implementation checkpoint note
 
@@ -613,7 +630,7 @@
 - The minimal `GenerationProvider` Protocol and `ZhipuGenerationProvider` implement the frozen one-request non-streaming path without an SDK、registry、routing、fallback or automatic retry；lazy provider settings keep ordinary API startup independent of `GIA_API_ZHIPU_API_KEY` / `GIA_API_ZHIPU_MODEL`。Changing the model requires configuration plus API restart but no Python、adapter or schema change；future DB/admin configuration remains deferred；
 - User-supplied manual access evidence selected FlashX for current development：`glm-4.7-flash` repeatedly encountered rate-limit/availability failures，while the same credential/endpoint returned HTTP `200` for `glm-4.7-flashx`。This does not claim permanent Flash unavailability or permanent Zhipu/FlashX production policy；
 - All automated tests use HTTPX mocked/injected transport and remain network-free；config/provider focused results are `55 passed` / `47 passed`，provider/config/generation targeted is `111 passed`，PostgreSQL orchestration is `8 passed`，and fresh full backend/PostgreSQL is `469 passed` with 1 existing Starlette deprecation warning。Codex made zero real GLM calls；
-- Final user-run sanitized real-provider acceptance smoke：`PASS`；provider `zhipu`、model `glm-4.7-flashx` and configuration version `ZHIPU_CHAT_DEV_V1` returned `RawGenerationSuccess`，and output satisfied the intended Chinese group-interview smoke expectation。No credential、raw provider response、sensitive header、verbatim output or diagnostic payload is recorded。P1-5D is `DONE`；P1-5E/F remain not started。
+- Final user-run sanitized real-provider acceptance smoke：`PASS`；provider `zhipu`、model `glm-4.7-flashx` and configuration version `ZHIPU_CHAT_DEV_V1` returned `RawGenerationSuccess`，and output satisfied the intended Chinese group-interview smoke expectation。No credential、raw provider response、sensitive header、verbatim output or diagnostic payload is recorded。P1-5D is `DONE`；P1-5E-1 now freezes the next automatic-orchestration design，while P1-5E-2/P1-5E-3/P1-5F remain not started。
 
 ### P1-5C completion note
 

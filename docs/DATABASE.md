@@ -1,6 +1,6 @@
 # 数据库技术基线
 
-- Status: P0 Data Architecture Baseline + P1-1～P1-4 schema implemented + P1-5A/P1-5B/P1-5C completed; P1-5C adds no schema
+- Status: P0 Data Architecture Baseline + P1-1～P1-4 schema implemented + P1-5A/P1-5B/P1-5C/P1-5D/P1-5E-1 completed; P1-5C/P1-5D/P1-5E-1 add no schema
 - Current phase: P1 — IN_PROGRESS
 - Data architecture baseline established by: P0-2 — DONE
 - Local PostgreSQL infrastructure: P0-4B — completed
@@ -15,7 +15,7 @@
 - Target version: V0.1 Internal Validation
 - Business schema: identity, session, question/persona, durable phase timing, participant/floor audit, and AI Runtime persistence foundation (nineteen product tables)
 - P1-1 status: P1-1A～E completed; independent final verdict PASS; P1-1 DONE
-- P1-2/P1-3/P1-4 status: DONE; P1-5A freeze completed; P1-5B adds three product tables through linear revision `f1a15b15c005`
+- P1-2/P1-3/P1-4 status: DONE; P1-5A～P1-5D and P1-5E-1 completed; P1-5B adds the latest three product tables through linear revision `f1a15b15c005`
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -375,6 +375,23 @@ P1-5B itself added no API、WebSocket event、Web projection、provider client/S
 
 P1-5C adds application-only deterministic prompt/context assembly and generation orchestration while reusing these nineteen tables unchanged。Before authoritative generation create/claim/final-completion mutation, it holds the existing session aggregate row lock and reuses P1-3 `reconcile_due_for_locked_aggregate(...)` with server-authoritative current UTC。AI generation success/failure does not independently mutate lifecycle or floor authority；if overdue reconciliation advances phase/deadline, releases the old grant, appends ordered `floor.released` / `session.state_changed` events or advances discussion sequence, those persisted changes are P1-3 lifecycle facts, and the stale generation fails closed without an `ai_utterances` row。No migration or column is added。The development database was forward-migrated from the P1-4 revision to existing head `f1a15b15c005` before final validation；all original sixteen product-table row counts were preserved and the three P1-5B tables remained empty before tests。
 
+## P1-5E-1 automatic orchestration schema assessment — no migration planned
+
+P1-5E-1 is docs-only and leaves the current nineteen-table schema and Alembic head `f1a15b15c005` unchanged。Actual-source analysis confirms the automatic coordination invariants can be recovered from existing facts:
+
+- `simulation_sessions` supplies owner-scoped lifecycle、last sequence and zero-or-one current grant under aggregate locking；
+- `floor_grants` / `floor_releases` prove the exact turn and whether/how it ended；
+- `llm_generation_requests` / `ai_utterances` prove deterministic request lifecycle、typed failure or the unique formal content winner for that grant；
+- `session_actions` plus semantic digest provide exact release/schedule replay/conflict，with causal `discussion_events` for emitted floor facts；
+- `floor_decisions` plus existing grant/intervention children record deterministic scheduler `GRANT` / `NO_GRANT` / `REQUEST_INTERVENTION` outcomes after restart；
+- `prompt_versions` resolves stable `AI_CANDIDATE_TURN` version `1` to immutable identity without a hardcoded UUID or latest pointer。
+
+The deterministic UUID mappings are application identities，not new rows beyond their existing target facts。One AI grant maps to one generation request、one possible utterance、one release action and one next-schedule action；scheduler decision/grant/intervention child IDs are deterministic under that scheduling action。Existing uniqueness、aggregate lock、current-grant pointer and sequence/precondition checks prevent duplicate utterances、releases or next-floor winners。
+
+No `orchestration_runs`/cursor/lease/lock table is planned。Crash after release but before scheduling is recoverable by the exact automatic `FloorRelease`/causal action and absence of the deterministic next-schedule action；crash after scheduling is recoverable from the deterministic `SessionAction`/`FloorDecision` and child fact。`RUNNING` generation remains fail-closed rather than requiring an orchestration lease。
+
+This sufficiency conclusion covers internal automatic-orchestration correctness only。Public utterance ordering/events、human-side transport and Web projection remain P1-5F concerns；P1-5E-1 does not authorize schema、migration、event vocabulary、telemetry or retention changes。If P1-5E-2 actual implementation disproves an invariant above，it must stop and request separate schema approval rather than create a migration。
+
 ## Future business schema
 
 总纲提到 `users`、题目版本、角色模板、会话、参与者、阶段、发言、讨论事件、结构化记忆、报告、证据、训练、反馈、模型调用和审计等未来领域概念。
@@ -404,7 +421,7 @@ P1-5C adds application-only deterministic prompt/context assembly and generation
 
 - P0-5C：FastAPI lifespan/request dependency 已成为现有 async DB runtime 的第一个 application caller；真实 PostgreSQL auth integration 只使用迁移到 head 的隔离临时数据库，development DB 保持 head `4fe43b42641b` 且两张表均为 0 rows；
 - P0-5D：completed；browser closure 已实现，existing Cookie/CORS/CSRF/shared trusted-origin boundary 已生效；P1 不得创建第二套 trusted-origin config；
-- P1：`IN_PROGRESS`；P1-1～P1-4 `DONE`；P1-5A/P1-5B/P1-5C `DONE`；current migration head `f1a15b15c005`、精确十九张 product tables；P1-5C schema delta 为零；真实 provider、automatic runtime、记忆和报告继续 Deferred；
+- P1：`IN_PROGRESS`；P1-1～P1-4 and P1-5A～P1-5D/P1-5E-1 `DONE`；P1-5E `IN_PROGRESS`；current migration head `f1a15b15c005`、精确十九张 product tables；P1-5C/P1-5D/P1-5E-1 schema delta 为零；automatic implementation、记忆和报告继续 Deferred；
 - P2～P4：仅随获批范围增加音频、评分训练和商业化数据。
 
 ## 与其他文档关系
