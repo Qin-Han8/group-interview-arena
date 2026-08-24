@@ -1,6 +1,6 @@
 # 数据库技术基线
 
-- Status: P0 Data Architecture Baseline + P1-1～P1-4 schema implemented + P1-5A frozen + P1-5B AI Runtime persistence implemented
+- Status: P0 Data Architecture Baseline + P1-1～P1-4 schema implemented + P1-5A/P1-5B/P1-5C completed; P1-5C adds no schema
 - Current phase: P1 — IN_PROGRESS
 - Data architecture baseline established by: P0-2 — DONE
 - Local PostgreSQL infrastructure: P0-4B — completed
@@ -371,7 +371,9 @@ The application service locks the existing owner-scoped `simulation_sessions` ag
 
 Historical generation context is recovered through immutable links: session → Question Version, participant → Persona Assignment/Template/Private Stance, request → Prompt Version + actual provider/model + non-secret configuration version, and utterance → successful request。Private stance content、persona calibration、hidden ranking、internal prompt variables、credential、API key、raw provider body、token/cost fields are absent from these tables and ordinary snapshots。
 
-P1-5B does not add API、WebSocket event、Web projection、provider client/SDK/interface、prompt rendering/orchestration、automatic generation、streaming、token/cost accounting、queue/worker、memory/RAG、scoring/report or voice behavior。
+P1-5B itself added no API、WebSocket event、Web projection、provider client/SDK/interface、prompt rendering/orchestration、automatic generation、streaming、token/cost accounting、queue/worker、memory/RAG、scoring/report or voice behavior。
+
+P1-5C adds application-only deterministic prompt/context assembly and generation orchestration while reusing these nineteen tables unchanged。Before authoritative generation create/claim/final-completion mutation, it holds the existing session aggregate row lock and reuses P1-3 `reconcile_due_for_locked_aggregate(...)` with server-authoritative current UTC。AI generation success/failure does not independently mutate lifecycle or floor authority；if overdue reconciliation advances phase/deadline, releases the old grant, appends ordered `floor.released` / `session.state_changed` events or advances discussion sequence, those persisted changes are P1-3 lifecycle facts, and the stale generation fails closed without an `ai_utterances` row。No migration or column is added。The development database was forward-migrated from the P1-4 revision to existing head `f1a15b15c005` before final validation；all original sixteen product-table row counts were preserved and the three P1-5B tables remained empty before tests。
 
 ## Future business schema
 
@@ -402,7 +404,7 @@ P1-5B does not add API、WebSocket event、Web projection、provider client/SDK/
 
 - P0-5C：FastAPI lifespan/request dependency 已成为现有 async DB runtime 的第一个 application caller；真实 PostgreSQL auth integration 只使用迁移到 head 的隔离临时数据库，development DB 保持 head `4fe43b42641b` 且两张表均为 0 rows；
 - P0-5D：completed；browser closure 已实现，existing Cookie/CORS/CSRF/shared trusted-origin boundary 已生效；P1 不得创建第二套 trusted-origin config；
-- P1：`IN_PROGRESS`；P1-1～P1-4 `DONE`；P1-5A freeze `DONE`；P1-5B persistence implemented；current migration head `f1a15b15c005`、精确十九张 product tables；真实 provider/runtime、记忆和报告继续 Deferred；
+- P1：`IN_PROGRESS`；P1-1～P1-4 `DONE`；P1-5A/P1-5B/P1-5C `DONE`；current migration head `f1a15b15c005`、精确十九张 product tables；P1-5C schema delta 为零；真实 provider、automatic runtime、记忆和报告继续 Deferred；
 - P2～P4：仅随获批范围增加音频、评分训练和商业化数据。
 
 ## 与其他文档关系

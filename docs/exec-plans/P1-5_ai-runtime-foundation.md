@@ -1,6 +1,6 @@
 # P1-5 AI Runtime Foundation Execution Plan
 
-Status: `P1 IN_PROGRESS`; `P1-5 IN_PROGRESS`; `P1-5A completed`; `P1-5B completed`; later runtime/provider subphases `NOT_STARTED`
+Status: `P1 IN_PROGRESS`; `P1-5 IN_PROGRESS`; `P1-5A completed`; `P1-5B completed`; `P1-5C completed`; `P1-5D/P1-5E/P1-5F NOT_STARTED`
 
 Target version: `V0.1 Internal Validation`
 
@@ -17,6 +17,19 @@ P1-5A baseline: clean committed `main` at `5397cd2b25f36c6a9fbd666b759261091c36a
 P1-5A 是 docs-only architecture freeze。它不实现 LLM、provider adapter、prompt runtime、utterance persistence、API/Realtime contract、schema、migration、dependency、test 或 CI。
 
 P1-5B 是 separately approved persistence foundation。它只实现 immutable Prompt Version、provider-neutral Generation Request lifecycle、successful final AI Utterance relation and locked transactional domain services；不接入真实 provider、不自动生成、不增加 API/Realtime/Web。
+
+P1-5C 是 separately approved deterministic runtime vertical slice。它在不调用真实 LLM、不增加 schema/API/Realtime/Web/dependency 的前提下，实现 exact Prompt Version rendering、single-participant authorized context assembly、typed immutable generation input/result、deterministic local harness 和 application orchestration，并复用 P1-5B lifecycle 原子提交唯一 final AI Utterance。
+
+后续拆分固定为：
+
+- `P1-5A — AI Runtime Architecture Freeze`：`DONE`；
+- `P1-5B — AI Runtime Persistence Foundation`：`DONE`；
+- `P1-5C — Runtime Contract & Deterministic Generation Vertical Slice`：`DONE`；
+- `P1-5D — First Real Provider Integration`：`NOT_STARTED`；
+- `P1-5E — Automatic AI Runtime Orchestration`：`NOT_STARTED`；
+- `P1-5F — Realtime/Web Integration + Independent Acceptance`：`NOT_STARTED`。
+
+P1-5D～F 不是本轮授权范围，仍需新的 explicit user approval。
 
 ## Context and authority
 
@@ -121,6 +134,47 @@ P1-5A 只冻结 lifecycle/invariants。P1-5B 现将 generation attempt 的 durab
 - Create/start/complete/fail mutations reuse the owner-scoped `simulation_sessions` row lock and short transaction discipline。Create/start/complete validate current session phase、exact grant and eligible AI participant；complete updates request and inserts utterance atomically。Failure writes only terminal request metadata and never mutates phase/deadline/current floor/events。
 - Provenance is recoverable through immutable links: session → Question Version；participant → Persona Assignment/Template/Private Stance；request → Prompt Version + provider/model + configuration version；utterance → successful request。No private stance content、persona calibration、hidden ranking、internal prompt variables、provider secret/raw error is copied into request or utterance storage。
 
+## P1-5C approved runtime slice
+
+### Goals and current callers
+
+- Current caller is a deterministic local runtime harness used to prove runtime correctness；it performs no network or model SDK I/O。
+- Runtime resolves the exact session-bound Question Version、exact current AI floor grant、that participant's exact Assignment/Persona Template/Private Stance and exact request-bound Prompt Version。
+- A single project-owned prompt boundary renders a closed allowlisted variable vocabulary with deterministic standard-library substitution；unknown/invalid/missing variables fail closed and rendered private prompts are neither persisted nor logged。
+- The executor receives only a typed immutable provider-neutral input, not ORM objects、credentials、headers、database configuration、other participants' Private Stance or scoring/scheduler internals。
+- Application orchestration creates/replays and claims the P1-5B request in short transactions, executes outside every database transaction, and atomically persists at most one final utterance。Before authoritative generation create/claim/final-completion mutation, it holds the session aggregate row lock and reuses P1-3 `reconcile_due_for_locked_aggregate(...)` with server-authoritative current UTC；reconciliation and generation-context validation share the required lock/transaction boundary。
+
+### Allowed implementation scope
+
+- `apps/api/src/group_interview_arena_api/modules/ai_runtime/`：pure prompt/rendering contract、typed deterministic generation harness、runtime orchestrator and the minimum persistence-service claim result required by the real deterministic caller；
+- `apps/api/tests/`：targeted domain/harness tests and real PostgreSQL lifecycle/concurrency/privacy regressions；
+- this execution plan plus `TASKS.md`、`ROADMAP.md`、`ARCHITECTURE.md`、`DATABASE.md`、`API.md`、`AGENT_BEHAVIOR.md` and `QUESTION_SYSTEM.md` current-state synchronization。
+
+### Explicit deferrals and stop gates
+
+- No schema/migration unless actual-source correctness proves an additive need；such a need must be reported for approval before implementation。
+- No provider SDK、production adapter、factory、routing、fallback、registry or `providers/` directory。
+- A minimum callable/async callable type may exist only because the deterministic runtime harness is a current real caller；it has no provider-specific semantics and P1-5D must recalibrate the formal provider abstraction when a real model caller exists。
+- No API、WebSocket、Web、streaming/chunks、automatic floor-triggered generation、floor release/reassignment、memory/RAG/vector store、scoring/report、voice、Redis、queue/worker、billing/quota or CI workflow change。
+- P1-3 remains phase/deadline authority and P1-4 remains floor/speaker authority；AI generation success/failure does not independently mutate either boundary。Before authoritative generation mutation, P1-5C must nevertheless reuse P1-3 overdue reconciliation under the aggregate lock；any resulting lifecycle/floor/event-sequence changes remain P1-3 facts rather than AI Runtime decisions。
+
+### Crash/restart and concurrency policy
+
+- `REQUESTED` may be durably claimed exactly once for execution；exact replay remains idempotent。
+- A caller that observes an already `RUNNING` request does not assume whether an earlier execution is live or lost and does not auto-retry；it returns a safe deterministic reconciliation-required no-op。
+- This fail-closed policy is sufficient for the local deterministic P1-5C harness and must be reevaluated in P1-5D before real provider retry/recovery semantics are approved。
+- `COMPLETED` replays the durable utterance；`FAILED` replays the safe typed failure；neither state invokes the executor again。
+- Concurrent exact callers have at most one executor claimant and at most one final utterance；stale phase/released or replaced grant results fail closed without an utterance or AI-owned floor/session mutation。A due phase discovered during locked pre-mutation validation may first persist authoritative P1-3 reconciliation facts, after which generation still fails closed。
+
+### P1-5C acceptance gates
+
+- Prompt renderer tests cover stable bytes、escaping、closed vocabulary、unknown/invalid/missing variables and immutable exact Prompt Version use。
+- Authorized-context tests prove exact session-bound Question Version and only the granted participant's Persona/Private Stance are assembled。
+- Deterministic harness tests cover success、timeout、unavailable、rate-limit、invalid output、partial generation and internal failure with stable provider-neutral results。
+- Real PostgreSQL tests cover success lifecycle、exact replay、concurrent invocation、completed replay、RUNNING recovery no-op、stale grant、changed phase、released/replaced grant、wrong participant/human participant and failed-generation isolation。
+- Privacy sentinels prove current private stance is available only to the generation context while other-participant stance、provider secret、Cookie/auth token、database URL and raw exception text do not enter generation input where forbidden、safe results、durable metadata/failure state or ordinary structured logs。
+- Full API/PostgreSQL regression、Ruff、format、strict Pyright、frozen lock、Alembic single-head/current/drift/migration suite、temporary database cleanup、master-plan hash、scope and `git diff --check` pass。
+
 ## Frozen failure and retry boundary
 
 适用 failure classes：timeout、provider unavailable、rate limit、partial generation、invalid/unsafe output 和 caller cancellation/stale grant。
@@ -131,7 +185,8 @@ P1-5A 只冻结 lifecycle/invariants。P1-5B 现将 generation attempt 的 durab
 - 每次 attempt 在提交结果前重新验证 exact session、phase、participant 和 current grant；phase/grant 已变化时丢弃 late result，不持久化 utterance。
 - timeout/unavailable/rate-limit 可按未来获批 policy 重试或降级；provider fallback 仍必须记录实际 provider/model/config provenance。
 - partial generation 默认不是 final utterance。除非未来明确冻结 partial-commit contract，否则 partial output 必须丢弃或作为非公开诊断最小化处理。
-- failure 不改变 phase、不延长/缩短 deadline、不转移 floor、不修改 scheduler decision、不触发 scoring。
+- AI generation failure itself does not independently change phase、extend/shorten deadline、transfer floor、modify scheduler decision or trigger scoring。
+- Before authoritative generation mutation, P1-5C reuses P1-3 `reconcile_due_for_locked_aggregate(...)` under the same aggregate lock with server-authoritative current UTC。That reconciliation may advance phase/deadline, release the old grant, append ordered `floor.released` / `session.state_changed` events and advance discussion sequence；these are P1-3 lifecycle facts, not effects decided by the AI generation outcome。
 - failure resolution 必须通过 deterministic control path release exact grant 或请求已有 floor intervention；不能让 floor 永久悬挂，也不能重复 release。
 - crash/restart 后必须能从 durable request/grant truth 判断 retry、fail 或 no-op，不能仅靠 process memory 猜测是否已产生 utterance。
 
@@ -149,11 +204,19 @@ P1-5A 不提前实现 billing、quota、payment、multi-tenant、enterprise acco
 
 ## Explicit deferred scope
 
-- LLM implementation and real model calls；
+Implemented in P1-5C current state:
+
+- closed deterministic exact Prompt Version rendering；
+- authorized context assembly for the exact session-bound Question Version and only the granted AI participant's Assignment/Persona/Private Stance；
+- deterministic internal runtime/application caller with a network-free local executor harness。
+
+Still Deferred:
+
+- real-provider prompt/model execution、LLM implementation and real model calls；
 - provider SDK/interface/adapter/factory/routing/fallback implementation；
-- prompt orchestration engine、rendering and internal prompt-variable persistence；
+- production prompt orchestration beyond the closed P1-5C renderer and internal prompt-variable persistence；
 - additional provider-attempt/fallback hierarchy beyond the current one-request/one-attempt identity；
-- runtime/API/WebSocket/Web implementation and streaming；
+- automatic floor-triggered generation、transport/API/WebSocket/Web and streaming；
 - memory、RAG、embedding/vector store；
 - scoring、evidence extraction、report generation；
 - voice、ASR、TTS、audio interruption；
@@ -163,7 +226,7 @@ P1-5A 不提前实现 billing、quota、payment、multi-tenant、enterprise acco
 
 ## Later implementation gates
 
-Any later P1-5 runtime/provider subphase requires separate explicit approval and an updated decomposition before code changes. At minimum it must define:
+Any P1-5D or later provider/automatic/transport subphase requires separate explicit approval and an updated decomposition before code changes. At minimum it must define:
 
 - any additive schema need and historical deletion/retention semantics；
 - provider-neutral request/result/error contract with a real caller；
@@ -192,6 +255,15 @@ Any later P1-5 runtime/provider subphase requires separate explicit approval and
 - full API test regression, master-plan hash, changed-file scope and `git diff --check`；
 - no provider SDK/dependency/lockfile/API/WS/Web/CI changes。
 
+## P1-5C validation result
+
+- Closed Prompt Version rendering、typed immutable runtime contract and deterministic local success/failure harness are implemented without network I/O；
+- authorized-context assembly resolves the exact session-bound Question Version、current AI grant、that participant's Assignment/Persona/Private Stance and exact Prompt Version, with no cross-seat private context；
+- short database transactions surround an executor call that runs outside all transaction/row-lock scopes；P1-5B request claim、terminal replay and atomic completion remain the durable truth；
+- real PostgreSQL tests cover success、safe failures、completed/RUNNING replay、concurrent exact/different request identities、stale phase/released/replaced grants and overdue phase reconciliation before executor/result mutation；AI generation outcome/failure does not independently mutate lifecycle/floor authority, while any authoritative phase/deadline/floor/event-sequence change remains a P1-3 reconciliation fact and no stale utterance is persisted；
+- final full backend regression is `406 passed` with 1 existing Starlette deprecation warning；Ruff、format、strict Pyright、frozen dependency checks、Alembic head/current/check and governance/scope checks pass；
+- no schema/migration、dependency/lockfile、provider SDK/abstraction、API/WS/Web、automatic floor trigger/release、queue/worker、memory/RAG or scoring/report implementation was added。
+
 ## Decisions
 
 - No new Accepted or Proposed ADR is required. P1-5A specializes total-plan §22 and existing `ADR-014` within the explicitly approved task without selecting a provider or changing product direction.
@@ -202,7 +274,7 @@ Any later P1-5 runtime/provider subphase requires separate explicit approval and
 
 ## Risks and stop conditions
 
-- **Authority drift**：stop if runtime design needs to mutate phase/deadline, choose speaker or override floor decisions.
+- **Authority drift**：stop if runtime design needs to independently mutate phase/deadline, choose speaker or override floor decisions；reusing the existing locked P1-3 overdue reconciliation path is required lifecycle validation, not AI Runtime authority.
 - **Duplicate content**：stop if retry/restart cannot prove at-most-one final utterance per logical request.
 - **Untraceable output**：stop if an utterance cannot identify prompt/model/config provenance without mutable latest pointers.
 - **Private leakage**：stop if rendered prompt, other participants' stance, secrets or raw provider bodies enter public/log/error surfaces.
@@ -212,4 +284,5 @@ Any later P1-5 runtime/provider subphase requires separate explicit approval and
 
 - P1-5A：completed；docs-only AI Runtime Architecture Freeze；validation required before delivery；no blocker。
 - P1-5B：completed；provider-neutral persistence foundation；all required gates PASS；no provider/runtime caller。
-- Later P1-5 runtime/provider implementation：not started；requires separate explicit approval。
+- P1-5C：completed；deterministic runtime contract/vertical slice and PostgreSQL orchestration gates PASS；no real provider or transport。
+- P1-5D/P1-5E/P1-5F：not started；require separate explicit approval。

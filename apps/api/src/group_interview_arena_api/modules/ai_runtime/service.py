@@ -1,5 +1,6 @@
 import hashlib
 import json
+from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import select
@@ -23,6 +24,7 @@ from group_interview_arena_api.modules.ai_runtime.domain import (
     GenerationRequestMetadata,
     GenerationRequestSnapshot,
     GenerationRequestStatus,
+    GenerationStartClaim,
     GenerationStateError,
     PersistUtteranceCommand,
     PromptVersionDefinition,
@@ -31,6 +33,13 @@ from group_interview_arena_api.modules.ai_runtime.domain import (
     StartGenerationCommand,
 )
 from group_interview_arena_api.modules.discussion_sessions.domain import ACTIVE_PHASES
+from group_interview_arena_api.modules.discussion_sessions.service import (
+    reconcile_due_for_locked_aggregate,
+)
+
+
+def _utc_now() -> datetime:
+    return datetime.now(UTC)
 
 
 def _sha256_text(value: str) -> bytes:
@@ -175,6 +184,22 @@ async def _validate_live_generation_context(
         raise GenerationContextError("Generation context is ineligible.")
 
 
+async def _reconcile_due_before_generation_mutation(
+    session: AsyncSession,
+    aggregate: SimulationSession,
+) -> bool:
+    event_rows = await reconcile_due_for_locked_aggregate(
+        session,
+        aggregate,
+        now=_utc_now(),
+    )
+    if not event_rows:
+        return False
+    session.add_all(event_rows)
+    await session.flush()
+    return True
+
+
 def _to_snapshot(
     request: LlmGenerationRequest,
     *,
@@ -230,6 +255,8 @@ async def create_generation_request(
     command: RequestGenerationCommand,
 ) -> GenerationRequestSnapshot:
     digest = _request_digest(command)
+    pending_context_error: GenerationContextError | None = None
+    snapshot: GenerationRequestSnapshot | None = None
     try:
         async with session.begin():
             aggregate = await _lock_owned_session(
@@ -241,57 +268,75 @@ async def create_generation_request(
                     raise GenerationRequestConflictError(
                         "Generation request identity conflicts with its original payload."
                     )
-                return _to_snapshot(existing)
+                utterance_id = None
+                if existing.status == GenerationRequestStatus.COMPLETED.value:
+                    utterance_id = await session.scalar(
+                        select(AiUtterance.id).where(
+                            AiUtterance.generation_request_id == existing.id
+                        )
+                    )
+                return _to_snapshot(existing, utterance_id=utterance_id)
 
-            await _validate_live_generation_context(
-                session,
-                aggregate=aggregate,
-                participant_id=command.participant_id,
-                floor_grant_id=command.floor_grant_id,
-            )
-            prompt = await session.get(PromptVersion, command.prompt_version_id)
-            if (
-                prompt is None
-                or prompt.published_at > command.requested_at
-                or (
-                    prompt.retired_at is not None
-                    and prompt.retired_at <= command.requested_at
+            if await _reconcile_due_before_generation_mutation(session, aggregate):
+                pending_context_error = GenerationContextError(
+                    "The floor grant is no longer active."
                 )
-            ):
-                raise GenerationContextError("Prompt version is unavailable.")
+            else:
+                await _validate_live_generation_context(
+                    session,
+                    aggregate=aggregate,
+                    participant_id=command.participant_id,
+                    floor_grant_id=command.floor_grant_id,
+                )
+                prompt = await session.get(PromptVersion, command.prompt_version_id)
+                if (
+                    prompt is None
+                    or prompt.published_at > command.requested_at
+                    or (
+                        prompt.retired_at is not None
+                        and prompt.retired_at <= command.requested_at
+                    )
+                ):
+                    raise GenerationContextError("Prompt version is unavailable.")
 
-            request = LlmGenerationRequest(
-                id=command.request_id,
-                session_id=command.session_id,
-                participant_id=command.participant_id,
-                floor_grant_id=command.floor_grant_id,
-                prompt_version_id=command.prompt_version_id,
-                provider_identifier=command.provider_identifier,
-                model_identifier=command.model_identifier,
-                request_metadata=command.request_metadata.model_dump(mode="json"),
-                request_digest=digest,
-                status=GenerationRequestStatus.REQUESTED.value,
-                requested_at=command.requested_at,
-                started_at=None,
-                completed_at=None,
-                failed_at=None,
-                failure_code=None,
-            )
-            session.add(request)
-            await session.flush()
-            return _to_snapshot(request)
-    except SQLAlchemyError as error:
+                request = LlmGenerationRequest(
+                    id=command.request_id,
+                    session_id=command.session_id,
+                    participant_id=command.participant_id,
+                    floor_grant_id=command.floor_grant_id,
+                    prompt_version_id=command.prompt_version_id,
+                    provider_identifier=command.provider_identifier,
+                    model_identifier=command.model_identifier,
+                    request_metadata=command.request_metadata.model_dump(mode="json"),
+                    request_digest=digest,
+                    status=GenerationRequestStatus.REQUESTED.value,
+                    requested_at=command.requested_at,
+                    started_at=None,
+                    completed_at=None,
+                    failed_at=None,
+                    failure_code=None,
+                )
+                session.add(request)
+                await session.flush()
+                snapshot = _to_snapshot(request)
+    except (SQLAlchemyError, ValueError) as error:
         raise AiRuntimePersistenceError(
             "Generation request transaction failed."
         ) from error
+    if pending_context_error is not None:
+        raise pending_context_error
+    assert snapshot is not None
+    return snapshot
 
 
-async def start_generation_request(
+async def claim_generation_request(
     session: AsyncSession,
     *,
     owner_id: UUID,
     command: StartGenerationCommand,
-) -> GenerationRequestSnapshot:
+) -> GenerationStartClaim:
+    pending_context_error: GenerationContextError | None = None
+    claim: GenerationStartClaim | None = None
     try:
         async with session.begin():
             aggregate = await _lock_owned_session(
@@ -302,26 +347,69 @@ async def start_generation_request(
                 session_id=command.session_id,
                 request_id=command.generation_request_id,
             )
-            if request.status == GenerationRequestStatus.RUNNING.value:
-                return _to_snapshot(request)
             if request.status != GenerationRequestStatus.REQUESTED.value:
-                raise GenerationStateError("Only a requested generation can start.")
+                return GenerationStartClaim(
+                    snapshot=_to_snapshot(
+                        request,
+                        utterance_id=(
+                            await session.scalar(
+                                select(AiUtterance.id).where(
+                                    AiUtterance.generation_request_id == request.id
+                                )
+                            )
+                            if request.status == GenerationRequestStatus.COMPLETED.value
+                            else None
+                        ),
+                    ),
+                    claimed=False,
+                )
             if command.started_at < request.requested_at:
                 raise GenerationStateError("Generation cannot start before request.")
-            await _validate_live_generation_context(
-                session,
-                aggregate=aggregate,
-                participant_id=request.participant_id,
-                floor_grant_id=request.floor_grant_id,
-            )
-            request.status = GenerationRequestStatus.RUNNING.value
-            request.started_at = command.started_at
-            await session.flush()
-            return _to_snapshot(request)
-    except SQLAlchemyError as error:
+            if await _reconcile_due_before_generation_mutation(session, aggregate):
+                pending_context_error = GenerationContextError(
+                    "The floor grant is no longer active."
+                )
+            else:
+                await _validate_live_generation_context(
+                    session,
+                    aggregate=aggregate,
+                    participant_id=request.participant_id,
+                    floor_grant_id=request.floor_grant_id,
+                )
+                request.status = GenerationRequestStatus.RUNNING.value
+                request.started_at = command.started_at
+                await session.flush()
+                claim = GenerationStartClaim(
+                    snapshot=_to_snapshot(request),
+                    claimed=True,
+                )
+    except (SQLAlchemyError, ValueError) as error:
         raise AiRuntimePersistenceError(
             "Generation start transaction failed."
         ) from error
+    if pending_context_error is not None:
+        raise pending_context_error
+    assert claim is not None
+    return claim
+
+
+async def start_generation_request(
+    session: AsyncSession,
+    *,
+    owner_id: UUID,
+    command: StartGenerationCommand,
+) -> GenerationRequestSnapshot:
+    claim = await claim_generation_request(
+        session,
+        owner_id=owner_id,
+        command=command,
+    )
+    if (
+        not claim.claimed
+        and claim.snapshot.status is not GenerationRequestStatus.RUNNING
+    ):
+        raise GenerationStateError("Only a requested generation can start.")
+    return claim.snapshot
 
 
 async def complete_generation_request(
@@ -331,6 +419,8 @@ async def complete_generation_request(
     command: PersistUtteranceCommand,
 ) -> GenerationRequestSnapshot:
     content_digest = _sha256_text(command.content)
+    pending_context_error: GenerationContextError | None = None
+    snapshot: GenerationRequestSnapshot | None = None
     try:
         async with session.begin():
             aggregate = await _lock_owned_session(
@@ -362,33 +452,42 @@ async def complete_generation_request(
                 raise GenerationStateError("Only a running generation can complete.")
             if request.started_at is None or command.persisted_at < request.started_at:
                 raise GenerationStateError("Utterance cannot precede generation start.")
-            await _validate_live_generation_context(
-                session,
-                aggregate=aggregate,
-                participant_id=request.participant_id,
-                floor_grant_id=request.floor_grant_id,
-            )
+            if await _reconcile_due_before_generation_mutation(session, aggregate):
+                pending_context_error = GenerationContextError(
+                    "The floor grant is no longer active."
+                )
+            else:
+                await _validate_live_generation_context(
+                    session,
+                    aggregate=aggregate,
+                    participant_id=request.participant_id,
+                    floor_grant_id=request.floor_grant_id,
+                )
 
-            request.status = GenerationRequestStatus.COMPLETED.value
-            request.completed_at = command.persisted_at
-            utterance = AiUtterance(
-                id=command.utterance_id,
-                session_id=request.session_id,
-                participant_id=request.participant_id,
-                floor_grant_id=request.floor_grant_id,
-                generation_request_id=request.id,
-                generation_request_status=GenerationRequestStatus.COMPLETED.value,
-                content=command.content,
-                content_digest=content_digest,
-                persisted_at=command.persisted_at,
-            )
-            session.add(utterance)
-            await session.flush()
-            return _to_snapshot(request, utterance_id=utterance.id)
-    except SQLAlchemyError as error:
+                request.status = GenerationRequestStatus.COMPLETED.value
+                request.completed_at = command.persisted_at
+                utterance = AiUtterance(
+                    id=command.utterance_id,
+                    session_id=request.session_id,
+                    participant_id=request.participant_id,
+                    floor_grant_id=request.floor_grant_id,
+                    generation_request_id=request.id,
+                    generation_request_status=GenerationRequestStatus.COMPLETED.value,
+                    content=command.content,
+                    content_digest=content_digest,
+                    persisted_at=command.persisted_at,
+                )
+                session.add(utterance)
+                await session.flush()
+                snapshot = _to_snapshot(request, utterance_id=utterance.id)
+    except (SQLAlchemyError, ValueError) as error:
         raise AiRuntimePersistenceError(
             "Generation completion transaction failed."
         ) from error
+    if pending_context_error is not None:
+        raise pending_context_error
+    assert snapshot is not None
+    return snapshot
 
 
 async def fail_generation_request(

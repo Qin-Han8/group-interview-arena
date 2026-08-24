@@ -163,6 +163,11 @@ class GenerationRequestSnapshot(ClosedDomainModel):
     utterance_id: UUID4 | None = None
 
 
+class GenerationStartClaim(ClosedDomainModel):
+    snapshot: GenerationRequestSnapshot
+    claimed: bool
+
+
 class PromptVersionMutationError(RuntimeError):
     """A stable prompt identity already exists with different immutable content."""
 

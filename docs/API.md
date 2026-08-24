@@ -1,6 +1,6 @@
 # API 与事件技术基线
 
-- Status: P0 API Architecture Baseline + P1-1/P1-2/P1-3/P1-4 completed + P1-5A frozen + P1-5B internal persistence implemented
+- Status: P0 API Architecture Baseline + P1-1/P1-2/P1-3/P1-4 completed + P1-5A/P1-5B/P1-5C internal boundaries implemented
 - Current phase: P1 — IN_PROGRESS
 - API architecture baseline established by: P0-2 — DONE
 - Target version: V0.1 Internal Validation
@@ -11,7 +11,7 @@
 - P1-2 contract: P1-2A/B/C completed; safe question reads and immutable version-bound session creation implemented
 - P1-3 contract: P1-3A～D completed; independent verdict `PASS`; P1-3 `DONE`
 - P1-4 contract: P1-4A～E completed; final independent verdict `PASS`; deterministic scheduler remains server-owned and safe floor snapshot/WS/Web projection is implemented
-- P1-5 contract: P1-5A freeze completed; P1-5B adds internal prompt/request/utterance persistence only; no generation/utterance REST, WebSocket event or Browser contract exists
+- P1-5 contract: P1-5A freeze, P1-5B persistence and P1-5C deterministic internal runtime completed; no generation/utterance REST, WebSocket event or Browser contract exists
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -283,9 +283,9 @@ Hand raises/opportunities、candidate lists、fairness calculations、timer tick
 
 Internal grant/release/intervention/schedule commands use the existing session action/digest/aggregate-lock/sequence transaction boundary. Scheduler input is reconstructed only after locking；duplicate action IDs replay the same causal events, a changed digest conflicts, and stale sequence/phase/current grant、ineligible participant or terminal session rejects without floor mutation. Exact domain/persistence, reason metadata and P1-4D～E gates are in [`exec-plans/P1-4_floor-control.md`](exec-plans/P1-4_floor-control.md)。
 
-## P1-5A/P1-5B generation/utterance contract boundary — no transport contract
+## P1-5A～C generation/utterance contract boundary — no transport contract
 
-P1-5A froze the rules below。P1-5B implements only internal persistence/domain commands and still adds no REST endpoint、WebSocket command/event、OpenAPI field or Browser projection:
+P1-5A froze the rules below。P1-5B implements internal persistence/domain commands；P1-5C adds an internal application caller and deterministic local harness。Neither adds a REST endpoint、WebSocket command/event、OpenAPI field or Browser projection:
 
 - `floor.granted` is the authoritative trigger/precondition for an AI Generation Request；provider “thinking” or raw output is not a formal session fact。
 - Generation Request identity is separate from final Utterance identity。A future public/durable utterance must reference exact request、AI participant、grant、phase and prompt/model provenance；one logical request produces at most one final utterance。
@@ -294,6 +294,8 @@ P1-5A froze the rules below。P1-5B implements only internal persistence/domain 
 - Retry/fallback uses stable project-owned request identity and records the actual provider/model/config used。Late output after phase/grant change is rejected and must not be projected。
 - Timeout、unavailable、rate-limit、partial/invalid-output errors are typed internal generation outcomes, not session state changes。Public errors/events expose only safe allowlisted status/reason；provider exception body、credential、rendered prompt、other participants' Private Stance and chain-of-thought remain private。
 - Streaming chunks、request/attempt events、utterance event name/version、REST read/write endpoints and Browser rendering remain Deferred until a real caller and exact recovery requirement are separately approved。
+
+P1-5C's callable contract is Python-internal only。It assembles the exact authorized context, renders the exact Prompt Version, invokes a typed local executor outside database transactions and commits/replays the P1-5B durable result。It neither consumes nor emits transport messages, and it never auto-triggers from `floor.granted` or auto-releases floor。
 
 The full authority, provenance and failure boundary is in [`exec-plans/P1-5_ai-runtime-foundation.md`](exec-plans/P1-5_ai-runtime-foundation.md)。
 
@@ -367,7 +369,7 @@ P0-3D 已完成最小 API、OpenAPI authority、typed config、request correlati
 - P1-2B persistence/domain/seed、P1-2C safe API/session/Web vertical slice 与 P1-2D independent acceptance 均已完成；P1-2 `DONE`。
 - P1-3A～D 已完成；state/timing/command/event/snapshot、backend durable foundation 与 realtime/Web complete phase flow 已独立验收 `PASS`；P1-3 `DONE`，P1 保持 `IN_PROGRESS`。
 - P1-4A～E 已完成；P1-4 `DONE`，final independent verdict `PASS`。Safe snapshot/WS/Web floor projection 已实现且无 public floor command。
-- P1-5A AI Runtime Architecture Freeze 已完成；P1-5B 只实现 internal persistence；没有新增 generation/utterance endpoint、event、OpenAPI 或 Web implementation，后续 transport/runtime 仍需单独批准。
+- P1-5A AI Runtime Architecture Freeze、P1-5B internal persistence 与 P1-5C deterministic internal runtime 已完成；没有新增 generation/utterance endpoint、event、OpenAPI 或 Web implementation，后续 real provider/automatic runtime/transport 仍需单独批准。
 
 ### P2 and later
 

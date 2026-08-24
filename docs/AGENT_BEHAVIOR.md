@@ -8,7 +8,7 @@
 
 ## 文档目的
 
-本文件记录已确认的 AI 候选人/私有立场基础、P1-3 已实现的讨论状态机、P1-4 floor-control、P1-5A authority freeze，以及 P1-5B provider-neutral persistence boundary。当前仍不包含 production Prompt orchestration、模型调用、自动发言生成或结构化记忆。
+本文件记录已确认的 AI 候选人/私有立场基础、P1-3 已实现的讨论状态机、P1-4 floor-control、P1-5A authority freeze、P1-5B provider-neutral persistence boundary，以及 P1-5C deterministic internal runtime。当前仍不包含真实 provider/model execution、automatic floor-triggered generation、transport 或结构化记忆。
 
 ## Confirmed by PROJECT_MASTER_PLAN
 
@@ -275,6 +275,15 @@ Generation Request 与 final Utterance 是不同 identity。一个 logical reque
 - Request creation fixes exact participant、floor grant、Prompt Version、provider/model identifiers and a closed non-secret configuration version。The existing session and participant links recover Question Version and Persona Assignment history without copying Private Stance or prompt variables into request metadata。
 - No automatic generation exists。Future provider/orchestrator code must explicitly call these commands, respect the current grant check, and use the existing floor service for release；failure alone never changes floor or session lifecycle。
 
+### P1-5C deterministic runtime semantics
+
+- Runtime context is assembled from the exact session-bound Question Version、current AI floor grant、that participant's exact Assignment/Persona Template/Private Stance and the exact Prompt Version。The renderer accepts only a closed variable vocabulary and produces stable bytes；it never follows a latest pointer or loads another participant's stance。
+- The provider-neutral generation input/result is immutable and validated before persistence。A deterministic local harness covers success、timeout、unavailable、rate-limit、invalid output、partial output and internal failure without model/network I/O or a speculative provider abstraction。
+- Context/request claim and terminal persistence use separate short transactions；the executor runs outside transaction/row-lock scope。Only one caller claims `REQUESTED`；`RUNNING` returns a reconciliation-required no-op, while `COMPLETED`/`FAILED` replay durable truth without reinvocation。
+- Before authoritative generation create/claim/final-completion mutation, P1-5C holds the session aggregate row lock and reuses P1-3 `reconcile_due_for_locked_aggregate(...)` with server-authoritative current UTC；overdue reconciliation and generation-context validation therefore share the required lock/transaction boundary。
+- AI generation success/failure does not independently mutate phase、deadline、floor policy/current owner、scheduler decision、lifecycle events or discussion sequence。If overdue reconciliation advances phase/deadline, releases the old grant, appends ordered `floor.released` / `session.state_changed` events or advances sequence, those are P1-3 lifecycle facts rather than AI Runtime decisions；the stale generation path then fails closed without persisting an utterance。
+- This is an explicit internal caller, not automatic orchestration：`floor.granted` does not auto-trigger generation and Runtime does not release floor。Real provider/retry policy must reevaluate durable `RUNNING` recovery in P1-5D。
+
 ## Implementation guidance
 
 - 大模型负责自然语言和受约束的局部语义决策；项目代码负责状态、时间、发言权、私有信息隔离、记忆和恢复。
@@ -290,7 +299,7 @@ Generation Request 与 final Utterance 是不同 identity。一个 logical reque
 - Confirmed for P1-3：V0.1 状态转换条件、abort 来源、deadline concurrency/recovery 语义；
 - Confirmed and implemented through P1-4D：V0.1 deterministic lexicographic floor policy、single-owner/participant/event/explanation/persistence boundary、pure ranking、locked transactional orchestration and display-only authoritative Web recovery；
 - TBD after real discussion evidence：policy parameter calibration values and conflict-loop content semantics；P1-4 does not use semantic conflict ranking；
-- Implemented persistence in P1-5B：Prompt Version、Generation Request lifecycle and final AI Utterance relation；transport schema、provider attempt/fallback orchestration and runtime caller remain TBD/Deferred；
+- Implemented through P1-5C：Prompt Version、Generation Request lifecycle、final AI Utterance relation、closed prompt/context assembly、typed deterministic harness and explicit internal runtime caller；transport schema、real provider attempt/fallback and automatic orchestration remain TBD/Deferred；
 - TBD：结构化记忆和模型输出 validation 的正式 Schema；
 - TBD：角色盲测样本及通过标准的执行细节。
 
@@ -298,7 +307,7 @@ Generation Request 与 final Utterance 是不同 identity。一个 logical reque
 
 ## Future work
 
-- P1：`IN_PROGRESS`；P1-1～P1-4 `DONE`；P1-5A freeze `DONE`；P1-5B persistence implemented；LLM/provider execution、automatic runtime、transport and memory remain Deferred。
+- P1：`IN_PROGRESS`；P1-1～P1-4 `DONE`；P1-5A/P1-5B/P1-5C `DONE`；real LLM/provider execution、automatic runtime、transport and memory remain Deferred。
 - P2：加入语音、打断、播放停止和恢复语义。
 - P3：建立角色行为与评分证据之间的校准边界。
 - P6/V1.0：扩展到 6～8 种角色和压力模式。
