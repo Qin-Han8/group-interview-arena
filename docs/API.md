@@ -1,6 +1,6 @@
 # API 与事件技术基线
 
-- Status: P0 API Architecture Baseline + P1-1/P1-2/P1-3/P1-4 completed + P1-5A/P1-5B/P1-5C/P1-5D internal boundaries implemented + P1-5E-1 internal design freeze completed
+- Status: P0 API Architecture Baseline + P1-1/P1-2/P1-3/P1-4 completed + P1-5A/P1-5B/P1-5C/P1-5D internal boundaries implemented + P1-5E-1/P1-5E-2 completed
 - Current phase: P1 — IN_PROGRESS
 - API architecture baseline established by: P0-2 — DONE
 - Target version: V0.1 Internal Validation
@@ -11,7 +11,7 @@
 - P1-2 contract: P1-2A/B/C completed; safe question reads and immutable version-bound session creation implemented
 - P1-3 contract: P1-3A～D completed; independent verdict `PASS`; P1-3 `DONE`
 - P1-4 contract: P1-4A～E completed; final independent verdict `PASS`; deterministic scheduler remains server-owned and safe floor snapshot/WS/Web projection is implemented
-- P1-5 contract: P1-5A freeze, P1-5B persistence, P1-5C deterministic internal runtime and P1-5D first provider adapter implemented; P1-5E-1 freezes automatic internal coordination only; no generation/utterance REST, WebSocket event or Browser contract exists
+- P1-5 contract: P1-5A freeze, P1-5B persistence, P1-5C deterministic internal runtime and P1-5D first provider adapter implemented; P1-5E-1 freezes automatic internal coordination and P1-5E-2 implements its internal single-turn kernel; no generation/utterance REST, WebSocket event or Browser contract exists
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -283,7 +283,7 @@ Hand raises/opportunities、candidate lists、fairness calculations、timer tick
 
 Internal grant/release/intervention/schedule commands use the existing session action/digest/aggregate-lock/sequence transaction boundary. Scheduler input is reconstructed only after locking；duplicate action IDs replay the same causal events, a changed digest conflicts, and stale sequence/phase/current grant、ineligible participant or terminal session rejects without floor mutation. Exact domain/persistence, reason metadata and P1-4D～E gates are in [`exec-plans/P1-4_floor-control.md`](exec-plans/P1-4_floor-control.md)。
 
-## P1-5A～P1-5E-1 generation/utterance boundary — no public transport contract
+## P1-5A～P1-5E-2 generation/utterance boundary — no public transport contract
 
 P1-5A froze the rules below。P1-5B implements internal persistence/domain commands；P1-5C adds an internal application caller and deterministic local harness；P1-5D adds a Python-internal project-owned provider Protocol and thin Zhipu HTTP adapter。None adds a REST endpoint、WebSocket command/event、OpenAPI field or Browser projection:
 
@@ -301,7 +301,9 @@ P1-5D's Zhipu HTTP request is an outbound infrastructure adapter, not a product/
 
 P1-5E-1 freezes only Python-internal application coordination。A durable `floor.granted` condition or a recovery caller may invoke a state-driven drive，but correctness does not rely on delivery of a new event type。The internal sequence is exact current AI grant → deterministic generation identity → confirmed terminal request/utterance truth → existing deterministic floor release → release commit → existing scheduler → committed next-floor decision。HUMAN current grants、no-grant、intervention、non-floor lifecycle、uncertain state and the 8-turn safety budget stop the internal drive。
 
-No P1-5E-1 public contract is added:
+P1-5E-2 implements the single-turn portion as the Python-internal `drive_single_ai_turn(...)` application boundary。It returns a closed provider-neutral result，drives at most one exact AI grant and one post-release scheduler checkpoint，and does not add a second AI turn、transport entry point or public event。
+
+No P1-5E-2 public contract is added:
 
 - no REST endpoint or OpenAPI field starts/observes the automatic drive；
 - no WebSocket command/event exposes generation request、provider/model、prompt、automatic release result or budget state；
@@ -383,7 +385,7 @@ P0-3D 已完成最小 API、OpenAPI authority、typed config、request correlati
 - P1-2B persistence/domain/seed、P1-2C safe API/session/Web vertical slice 与 P1-2D independent acceptance 均已完成；P1-2 `DONE`。
 - P1-3A～D 已完成；state/timing/command/event/snapshot、backend durable foundation 与 realtime/Web complete phase flow 已独立验收 `PASS`；P1-3 `DONE`，P1 保持 `IN_PROGRESS`。
 - P1-4A～E 已完成；P1-4 `DONE`，final independent verdict `PASS`。Safe snapshot/WS/Web floor projection 已实现且无 public floor command。
-- P1-5A AI Runtime Architecture Freeze、P1-5B internal persistence、P1-5C deterministic internal runtime、P1-5D first provider adapter 与 P1-5E-1 docs-only automatic orchestration freeze 已完成；P1-5E remains `IN_PROGRESS`。No generation/utterance endpoint、event、OpenAPI or Web implementation was added；P1-5E-2/P1-5E-3 automatic implementation and P1-5F public transport remain `NOT_STARTED` / separately deferred。
+- P1-5A AI Runtime Architecture Freeze、P1-5B internal persistence、P1-5C deterministic internal runtime、P1-5D first provider adapter、P1-5E-1 docs-only automatic orchestration freeze 与 P1-5E-2 internal single-turn kernel 已完成；P1-5E remains `IN_PROGRESS`。P1-5E-2 added no generation/utterance endpoint、event、OpenAPI or Web implementation；P1-5E-3 and P1-5F remain `NOT_STARTED` / separately deferred。
 
 ### P2 and later
 

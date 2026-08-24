@@ -1,14 +1,14 @@
 # AI 候选人与讨论编排骨架
 
-- Status: P1-2/P1-3/P1-4 and P1-5A/B/C/D/P1-5E-1 completed; P1-5E in progress; P1-5E-2/P1-5E-3/P1-5F not started
+- Status: P1-2/P1-3/P1-4 and P1-5A/B/C/D/P1-5E-1/P1-5E-2 completed; P1-5E in progress; P1-5E-3/P1-5F not started
 - Current phase: P1 — IN_PROGRESS
 - Target version: V0.1 Internal Validation
-- Detailed orchestrator/agent design: P1-3A～D and P1-4A～E completed; P1-5A/B/C/D completed; P1-5E-1 freezes automatic-drive behavior without implementation
+- Detailed orchestrator/agent design: P1-3A～D and P1-4A～E completed; P1-5A/B/C/D completed; P1-5E-1 freezes automatic-drive behavior; P1-5E-2 implements the internal single-turn kernel
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
 
-本文件记录已确认的 AI 候选人/私有立场基础、P1-3 已实现的讨论状态机、P1-4 floor-control、P1-5A authority freeze、P1-5B provider-neutral persistence、P1-5C deterministic internal runtime，以及 P1-5D first-provider adapter。当前仍不包含 automatic floor-triggered generation、public transport、streaming 或结构化记忆。
+本文件记录已确认的 AI 候选人/私有立场基础、P1-3 已实现的讨论状态机、P1-4 floor-control、P1-5A authority freeze、P1-5B provider-neutral persistence、P1-5C deterministic internal runtime、P1-5D first-provider adapter，以及 P1-5E-2 internal single-turn automatic coordination。当前仍不包含 continuous AI drive、public transport、streaming 或结构化记忆。
 
 ## Confirmed by PROJECT_MASTER_PLAN
 
@@ -298,13 +298,13 @@ Generation Request 与 final Utterance 是不同 identity。一个 logical reque
 - HUMAN current owner is a successful stop boundary。The drive never generates for、releases、schedules over or fabricates an utterance for a human；P1-5F owns future human/UI transport behavior。
 - Eligible AI current owner resolves exact `AI_CANDIDATE_TURN` version `1` plus `zhipu` / server-configured model / `ZHIPU_CHAT_DEV_V1` for a new request。One floor grant deterministically owns one generation request and utterance identity；existing request provenance/timestamp wins on re-entry。
 - Confirmed exact completed utterance ends the still-current AI turn as `SPEAKER_FINISHED`。Confirmed durable failure ends it as `INTERRUPTED` while the Generation Request retains the real typed `failure_code`。`INTERRUPTED` is only the current V0.1 floor vocabulary for an AI turn ending without formal content；it is not the generation failure taxonomy。
-- `RUNNING`/`RECONCILIATION_REQUIRED`、request conflict、internal/persistence uncertainty and unproved winner stop automatic progression without provider retry、release or scheduling。`CONTEXT_REJECTED`/`STALE_RESULT` first re-read state and never mutate a stale grant。
+- `RUNNING`/`RECONCILIATION_REQUIRED`、request conflict、internal uncertainty and unproved winner stop automatic progression without provider retry、release or scheduling。`CONTEXT_REJECTED`/`STALE_RESULT` first re-read exact session/current-grant truth：a changed grant/lifecycle is `STATE_CHANGED`，while the same exact current grant is `RECONCILIATION_REQUIRED`；neither path mutates the grant。
 - `SUPERSEDED` first proves the unique durable utterance winner for the same grant。Only if that grant remains exact current may the winning content justify `SPEAKER_FINISHED` release；otherwise no stale mutation occurs。
-- Release uses existing Floor Control and commits before the existing Floor Scheduler is invoked。The scheduler alone selects the next owner and persists grant/no-grant/intervention。The drive stops on HUMAN、`NO_GRANT`、`REQUEST_INTERVENTION`、non-floor lifecycle or reconciliation uncertainty。
+- Release uses existing Floor Control and commits before the existing Floor Scheduler is invoked。After a release/scheduler `SessionPersistenceError`，the drive re-reads authority：it recovers an exact proved durable result，returns `STATE_CHANGED` for another proved authoritative change，and otherwise returns `RECONCILIATION_REQUIRED` without synthesizing or retrying progress。The scheduler alone selects the next owner and persists grant/no-grant/intervention。
 - P1-3 overdue reconciliation remains authoritative at generation/release/schedule boundaries。Its phase/deadline/release/events are never overwritten；the drive resumes only from the resulting committed state。
-- Two concurrent drives derive identical request/utterance/release/schedule identities。One request claimant/provider execution、unique formal utterance and locked release/schedule preconditions make duplicates converge；`RUNNING` remains fail-closed and no distributed/in-memory lock owns correctness。
+- Two concurrent drives derive identical request/utterance/release/schedule identities。One request claimant/provider execution、unique formal utterance and locked release/schedule preconditions make duplicates converge；two callers recovering the same post-release crash boundary also converge on exactly one scheduler action/decision and at most one next winner。`RUNNING` remains fail-closed and no distributed/in-memory lock owns correctness。
 - Crash recovery is durable：same request before creation；claimable `REQUESTED`；stop on `RUNNING`；release without provider after `COMPLETED`；schedule from the proved automatic release；inspect the already committed scheduler decision/grant after the final crash boundary。
-- P1-5E-2 future scope is one exact AI grant through generation、release and one scheduler call。P1-5E-3 future scope loops consecutive AI grants with `MAX_AUTOMATED_AI_TURNS_PER_DRIVE = 8`；budget exhaustion leaves current durable state unchanged and returns resume-allowed。
+- P1-5E-2 completed scope is one exact AI grant through generation、release and one scheduler call。P1-5E-3 future scope loops consecutive AI grants with `MAX_AUTOMATED_AI_TURNS_PER_DRIVE = 8`；budget exhaustion leaves current durable state unchanged and returns resume-allowed。
 - No prompt/provider body、other participant stance、secret or raw exception becomes orchestration state/logging。No API/WS/Web/public utterance behavior is added in P1-5E-1。Full outcome and crash matrices are in [`exec-plans/P1-5_ai-runtime-foundation.md`](exec-plans/P1-5_ai-runtime-foundation.md)。
 
 ## Implementation guidance
@@ -322,7 +322,7 @@ Generation Request 与 final Utterance 是不同 identity。一个 logical reque
 - Confirmed for P1-3：V0.1 状态转换条件、abort 来源、deadline concurrency/recovery 语义；
 - Confirmed and implemented through P1-4D：V0.1 deterministic lexicographic floor policy、single-owner/participant/event/explanation/persistence boundary、pure ranking、locked transactional orchestration and display-only authoritative Web recovery；
 - TBD after real discussion evidence：policy parameter calibration values and conflict-loop content semantics；P1-4 does not use semantic conflict ranking；
-- Implemented through P1-5D：Prompt Version、Generation Request lifecycle、final AI Utterance relation、closed prompt/context assembly、typed deterministic harness、explicit internal runtime caller and one thin Zhipu provider adapter；P1-5E-1 freezes automatic orchestration design only；public transport schema、provider routing/fallback and automatic implementation remain Deferred；
+- Implemented through P1-5E-2：Prompt Version、Generation Request lifecycle、final AI Utterance relation、closed prompt/context assembly、typed deterministic harness、one thin Zhipu provider adapter and the provider-neutral single-turn automatic coordinator；public transport schema、provider routing/fallback and continuous-drive implementation remain Deferred；
 - TBD：结构化记忆和模型输出 validation 的正式 Schema；
 - TBD：角色盲测样本及通过标准的执行细节。
 
@@ -330,7 +330,7 @@ Generation Request 与 final Utterance 是不同 identity。一个 logical reque
 
 ## Future work
 
-- P1：`IN_PROGRESS`；P1-1～P1-4 and P1-5A/P1-5B/P1-5C/P1-5D/P1-5E-1 `DONE`；P1-5E remains `IN_PROGRESS`；P1-5E-2/P1-5E-3/P1-5F are `NOT_STARTED`，and automatic implementation、public transport and memory remain Deferred。
+- P1：`IN_PROGRESS`；P1-1～P1-4 and P1-5A/P1-5B/P1-5C/P1-5D/P1-5E-1/P1-5E-2 `DONE`；P1-5E remains `IN_PROGRESS`；P1-5E-3/P1-5F are `NOT_STARTED`，and continuous drive、public transport and memory remain Deferred。
 - P2：加入语音、打断、播放停止和恢复语义。
 - P3：建立角色行为与评分证据之间的校准边界。
 - P6/V1.0：扩展到 6～8 种角色和压力模式。
