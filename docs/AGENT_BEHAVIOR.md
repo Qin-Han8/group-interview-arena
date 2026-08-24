@@ -1,14 +1,14 @@
 # AI 候选人与讨论编排骨架
 
-- Status: P1-2/P1-3/P1-4 completed; P1-5A frozen; P1-5B persistence implemented; provider execution deferred
+- Status: P1-2/P1-3/P1-4 and P1-5A/B/C/D completed; P1-5E/F not started
 - Current phase: P1 — IN_PROGRESS
 - Target version: V0.1 Internal Validation
-- Detailed orchestrator/agent design: P1-3A～D and P1-4A～E completed; P1-5A freeze completed; P1-5B persistence commands implemented without runtime/provider execution
+- Detailed orchestrator/agent design: P1-3A～D and P1-4A～E completed; P1-5A/B/C completed; P1-5D adds one explicit real-provider caller without automatic orchestration
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
 
-本文件记录已确认的 AI 候选人/私有立场基础、P1-3 已实现的讨论状态机、P1-4 floor-control、P1-5A authority freeze、P1-5B provider-neutral persistence boundary，以及 P1-5C deterministic internal runtime。当前仍不包含真实 provider/model execution、automatic floor-triggered generation、transport 或结构化记忆。
+本文件记录已确认的 AI 候选人/私有立场基础、P1-3 已实现的讨论状态机、P1-4 floor-control、P1-5A authority freeze、P1-5B provider-neutral persistence、P1-5C deterministic internal runtime，以及 P1-5D first-provider adapter。当前仍不包含 automatic floor-triggered generation、public transport、streaming 或结构化记忆。
 
 ## Confirmed by PROJECT_MASTER_PLAN
 
@@ -282,7 +282,15 @@ Generation Request 与 final Utterance 是不同 identity。一个 logical reque
 - Context/request claim and terminal persistence use separate short transactions；the executor runs outside transaction/row-lock scope。Only one caller claims `REQUESTED`；`RUNNING` returns a reconciliation-required no-op, while `COMPLETED`/`FAILED` replay durable truth without reinvocation。
 - Before authoritative generation create/claim/final-completion mutation, P1-5C holds the session aggregate row lock and reuses P1-3 `reconcile_due_for_locked_aggregate(...)` with server-authoritative current UTC；overdue reconciliation and generation-context validation therefore share the required lock/transaction boundary。
 - AI generation success/failure does not independently mutate phase、deadline、floor policy/current owner、scheduler decision、lifecycle events or discussion sequence。If overdue reconciliation advances phase/deadline, releases the old grant, appends ordered `floor.released` / `session.state_changed` events or advances sequence, those are P1-3 lifecycle facts rather than AI Runtime decisions；the stale generation path then fails closed without persisting an utterance。
-- This is an explicit internal caller, not automatic orchestration：`floor.granted` does not auto-trigger generation and Runtime does not release floor。Real provider/retry policy must reevaluate durable `RUNNING` recovery in P1-5D。
+- This is an explicit internal caller, not automatic orchestration：`floor.granted` does not auto-trigger generation and Runtime does not release floor。P1-5D keeps durable `RUNNING` fail closed as reconciliation-required/no automatic re-call and sets application retry to `0`。
+
+### P1-5D completed first-provider semantics
+
+- `GenerationProvider` formalizes the existing provider-neutral async callable without changing `RuntimeGenerationInput` or raw result shapes。The deterministic harness and thin Zhipu adapter satisfy the same contract；no provider-specific object reaches business/domain/runtime state。
+- The only implemented adapter path is `zhipu` / required server-configured model (currently `glm-4.7-flashx`) / model-independent `ZHIPU_CHAT_DEV_V1` over one non-streaming HTTPX request。It requires configured/input/outbound/response/durable model alignment，rejects provenance mismatch before I/O，uses one rendered-prompt user message，disables thinking/streaming/redirects/retries，and accepts only an exact-model `assistant` / `finish_reason="stop"` textual result。
+- Timeout/408、429、transport/5xx、non-stop finish、malformed output and other safe failures normalize to existing typed codes without provider body、exception text、reasoning content or credential leakage。One invocation performs at most one request。
+- `GIA_API_ZHIPU_API_KEY` and non-secret `GIA_API_ZHIPU_MODEL` are required only in lazy server-only provider settings；ordinary API startup remains independent of both。Changing the P1-5D model requires configuration plus API restart，not Python、adapter or schema changes；provider/model/config identifiers remain internal and are not projected to current UI/API/report surfaces。Future DB/admin-managed selection remains deferred。Automated tests use MockTransport，and Codex made zero real GLM calls。
+- Existing P1-5C transaction、P1-3 overdue reconciliation、stale result、single claimant、at-most-one utterance and durable replay semantics are unchanged。P1-5D implementation/config-driven patch actual-source reviews passed。Final user-run sanitized real-provider acceptance smoke：`PASS`；`zhipu` / `glm-4.7-flashx` / `ZHIPU_CHAT_DEV_V1` returned `RawGenerationSuccess` and satisfied the intended Chinese group-interview smoke expectation。P1-5D is `DONE`；P1-5E automatic orchestration is `NOT_STARTED`。
 
 ## Implementation guidance
 
@@ -294,12 +302,12 @@ Generation Request 与 final Utterance 是不同 identity。一个 logical reque
 ## TBD
 
 - TBD：标准模式 AI 发言人数和总时长（总纲第 37 节）；
-- TBD：具体 LLM 供应商（总纲第 37 节）；
+- TBD：production/default LLM supplier/model policy（总纲第 37 节）；P1-5D current non-permanent development selection is Zhipu `glm-4.7-flashx` from server-side configuration；
 - TBD：P1-2B initial numeric seed 经过真实讨论后的校准方法和 blind-test threshold；
 - Confirmed for P1-3：V0.1 状态转换条件、abort 来源、deadline concurrency/recovery 语义；
 - Confirmed and implemented through P1-4D：V0.1 deterministic lexicographic floor policy、single-owner/participant/event/explanation/persistence boundary、pure ranking、locked transactional orchestration and display-only authoritative Web recovery；
 - TBD after real discussion evidence：policy parameter calibration values and conflict-loop content semantics；P1-4 does not use semantic conflict ranking；
-- Implemented through P1-5C：Prompt Version、Generation Request lifecycle、final AI Utterance relation、closed prompt/context assembly、typed deterministic harness and explicit internal runtime caller；transport schema、real provider attempt/fallback and automatic orchestration remain TBD/Deferred；
+- Implemented through P1-5D：Prompt Version、Generation Request lifecycle、final AI Utterance relation、closed prompt/context assembly、typed deterministic harness、explicit internal runtime caller and one thin Zhipu provider adapter；public transport schema、provider routing/fallback and automatic orchestration remain Deferred；
 - TBD：结构化记忆和模型输出 validation 的正式 Schema；
 - TBD：角色盲测样本及通过标准的执行细节。
 
@@ -307,7 +315,7 @@ Generation Request 与 final Utterance 是不同 identity。一个 logical reque
 
 ## Future work
 
-- P1：`IN_PROGRESS`；P1-1～P1-4 `DONE`；P1-5A/P1-5B/P1-5C `DONE`；real LLM/provider execution、automatic runtime、transport and memory remain Deferred。
+- P1：`IN_PROGRESS`；P1-1～P1-4 and P1-5A/P1-5B/P1-5C/P1-5D `DONE`；P1-5E/F are `NOT_STARTED`，and automatic runtime、public transport and memory remain Deferred。
 - P2：加入语音、打断、播放停止和恢复语义。
 - P3：建立角色行为与评分证据之间的校准边界。
 - P6/V1.0：扩展到 6～8 种角色和压力模式。

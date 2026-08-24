@@ -8,6 +8,7 @@ from group_interview_arena_api.modules.ai_runtime.domain import GenerationFailur
 from group_interview_arena_api.modules.ai_runtime.generation import (
     DeterministicGenerationHarness,
     DeterministicGenerationMode,
+    GenerationProvider,
     RuntimeGenerationInput,
     validate_generation_result,
 )
@@ -61,6 +62,14 @@ def test_deterministic_harness_success_is_stable() -> None:
     assert validated.content is not None
     assert validated.failure_code is None
     assert str(generation_input.participant_id) in validated.content
+
+
+def test_deterministic_harness_satisfies_generation_provider_contract() -> None:
+    provider: GenerationProvider = DeterministicGenerationHarness(
+        DeterministicGenerationMode.SUCCESS
+    )
+
+    assert callable(provider)
 
 
 @pytest.mark.parametrize(

@@ -38,6 +38,28 @@ class DatabaseSettings(BaseSettings):
     database_url: SecretStr
 
 
+class ZhipuProviderSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="GIA_API_ZHIPU_", extra="ignore")
+
+    api_key: SecretStr
+    model: str
+
+    @field_validator("api_key")
+    @classmethod
+    def reject_blank_api_key(cls, api_key: SecretStr) -> SecretStr:
+        if not api_key.get_secret_value().strip():
+            raise ValueError("Zhipu API key must not be blank")
+        return api_key
+
+    @field_validator("model")
+    @classmethod
+    def normalize_model(cls, model: str) -> str:
+        normalized = model.strip()
+        if not normalized or len(normalized) > 128:
+            raise ValueError("Zhipu model must contain 1 to 128 characters")
+        return normalized
+
+
 class SessionPhaseDurations(BaseModel):
     preparation_seconds: int = Field(default=240, gt=0, strict=True)
     opening_statements_seconds: int = Field(default=240, gt=0, strict=True)

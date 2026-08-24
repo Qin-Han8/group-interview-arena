@@ -1,16 +1,16 @@
 # P0 技术架构基线
 
-- Status: P0 Architecture Baseline + P1-1/P1-2/P1-3/P1-4 completed + P1-5A/P1-5B/P1-5C implemented
+- Status: P0 Architecture Baseline + P1-1/P1-2/P1-3/P1-4 completed + P1-5A/P1-5B/P1-5C/P1-5D completed
 - Current phase: P1 — IN_PROGRESS
 - Architecture baseline established by: P0-2 — DONE
 - P0-3 foundation status: DONE
 - P0-4 database foundation status: DONE
 - P0-5 identity boundary status: DONE
-- Most recently implemented subphase: P1-5C Runtime Contract & Deterministic Generation Vertical Slice
+- Most recently implemented subphase: P1-5D First Real Provider Integration checkpoint
 - P0 status: DONE; P0-1 through P0-7 completed
-- P1 status: IN_PROGRESS; P1-1/P1-2/P1-3/P1-4 DONE; P1-5A/P1-5B/P1-5C DONE; real model execution deferred
+- P1 status: IN_PROGRESS; P1-1/P1-2/P1-3/P1-4 DONE; P1-5A/P1-5B/P1-5C/P1-5D DONE; P1-5E/F NOT_STARTED
 - Target version: V0.1 Internal Validation
-- Business architecture detail: P1-1 runtime completed; P1-2 question/persona boundary implemented; P1-3 lifecycle independently accepted; P1-4 floor control implemented; P1-5A freezes authority; P1-5B persists prompt/request/final utterance; P1-5C adds deterministic internal generation orchestration without a real provider
+- Business architecture detail: P1-1 runtime completed; P1-2 question/persona boundary implemented; P1-3 lifecycle independently accepted; P1-4 floor control implemented; P1-5A freezes authority; P1-5B persists prompt/request/final utterance; P1-5C adds deterministic internal generation orchestration; P1-5D adds the first thin real-provider adapter without automatic orchestration or public transport
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -93,7 +93,7 @@ providers/    provider adapters that have actual callers
 
 禁止 full DDD ceremony、repository/service/controller 多层空壳、global giant `services.py`，以及提前创建未来全部 module。
 
-P0-3D 已实现的 API 技术基础使用 CPython `3.14.7`、uv `0.12.3`、FastAPI `0.141.1`、Pydantic `2.13.4`、pydantic-settings `2.15.0` 与 Uvicorn `0.52.1`。项目采用 packaged `src/group_interview_arena_api` layout；`api/` 当前只有 health transport，`core/` 包含 typed settings、安全错误语义、标准库 JSON logging 与 UUIDv4 `request_id`。P0-4C 已建立 `db/` persistence infrastructure，使用 SQLAlchemy `2.0.52`、psycopg/psycopg-binary `3.3.4`、`postgresql+psycopg://`、`DeclarativeBase`、async engine/session factory 与显式 dispose helper；P0-4D 已加入 Alembic `1.18.5` async migration environment 与 zero-op baseline revision。P1-1C 已因真实 session caller 创建 `modules/discussion_sessions` 与 WebSocket transport，并在 actual-source review finding F1 remediation 中加入 direct `websockets>=16.0,<17` 作为 Uvicorn WebSocket network runtime backend；未采用 `uvicorn[standard]`，因此没有引入无 caller 的 loop、HTTP parser 或 file-watcher extras。`providers/` 仍未创建。
+P0-3D 已实现的 API 技术基础使用 CPython `3.14.7`、uv `0.12.3`、FastAPI `0.141.1`、Pydantic `2.13.4`、pydantic-settings `2.15.0` 与 Uvicorn `0.52.1`。项目采用 packaged `src/group_interview_arena_api` layout；`api/` 当前只有 health transport，`core/` 包含 typed settings、安全错误语义、标准库 JSON logging 与 UUIDv4 `request_id`。P0-4C 已建立 `db/` persistence infrastructure，使用 SQLAlchemy `2.0.52`、psycopg/psycopg-binary `3.3.4`、`postgresql+psycopg://`、`DeclarativeBase`、async engine/session factory 与显式 dispose helper；P0-4D 已加入 Alembic `1.18.5` async migration environment 与 zero-op baseline revision。P1-1C 已因真实 session caller 创建 `modules/discussion_sessions` 与 WebSocket transport，并在 actual-source review finding F1 remediation 中加入 direct `websockets>=16.0,<17` 作为 Uvicorn WebSocket network runtime backend；未采用 `uvicorn[standard]`，因此没有引入无 caller 的 loop、HTTP parser 或 file-watcher extras。P1-5D 因首个真实 caller 创建 `providers/`，其中只有 thin Zhipu HTTP adapter；现有 `httpx>=0.28.1` 已从 dev-only 提升为单一 runtime dependency，没有 provider SDK 或第二 HTTP client。
 
 P0-6D 为 `core/` 增加 OpenTelemetry API/SDK/OTLP HTTP exporter `1.44.0` tracing foundation；它是 cross-cutting infrastructure，不是业务 provider adapter。实现不设置 process-global provider，不采用 contrib auto-instrumentation，并保持默认 disabled。
 
@@ -279,9 +279,9 @@ WebSocket 使用独立版本化事件契约，至少表达 event type、schema v
 - The three frozen formal floor facts remain on the existing single session channel and discussion sequence. P1-4D additively exposes an owner-only safe snapshot projection (generalized participant identity、current grant、latest lifecycle fact), strict Web parsing/reduction and display-only current-owner/lifecycle/reason UI. Existing exact-next sequence、duplicate suppression、gap reload、bounded reconnect and stale-generation rules recover floor state without a second channel/protocol.
 - Browser has no floor command and cannot select、grant or release a speaker. Public projection is purpose-built and excludes decision metadata、hidden ranking/weights、Private Stance/persona calibration、prompt/provider and scoring data；P1-4E independent acceptance passed. Full design is in [`exec-plans/P1-4_floor-control.md`](exec-plans/P1-4_floor-control.md).
 
-### P1-5A AI Runtime architecture — docs-only frozen boundary
+### P1-5 AI Runtime architecture — frozen authority and current implementation
 
-P1-5A 冻结未来实现边界。当前仍未创建 `providers/` 或真实 LLM caller；P1-5B 已增加 generation request/final utterance persistence，P1-5C 已增加 deterministic internal prompt/runtime orchestration。
+P1-5A 冻结 authority boundary；P1-5B 已增加 generation request/final utterance persistence，P1-5C 已增加 deterministic internal prompt/runtime orchestration，P1-5D 已增加首个 project-owned provider Protocol 与 thin Zhipu HTTP adapter，current development model is server-configured `glm-4.7-flashx`。它仍是显式 internal caller，不是 automatic orchestration 或 public transport。
 
 ```text
 P1-3 lifecycle authority: phase / deadline
@@ -293,13 +293,13 @@ P1-3 lifecycle authority: phase / deadline
 ```
 
 - AI Runtime 只能消费 exact active AI participant + floor grant，并按 application/domain service 提交结果；它不能推进 session、修改 deadline、选择 speaker、覆盖 scheduler decision、修改 scoring 或直接绕过 domain service 写数据库。
-- Business/domain code 依赖 project-owned provider-neutral request/result/error contract，不直接依赖 OpenAI、Anthropic 或其他单一 SDK。Hosted、enterprise 和 local model 是未来 portability target，不是本轮 adapter/routing implementation。
+- Business/domain code 依赖 project-owned provider-neutral request/result/error contract，不直接依赖单一 SDK。P1-5D 的 Zhipu adapter 位于外部 `providers/` boundary；hosted/enterprise/local routing、registry 和 fallback 仍未实现。
 - Prompt 是 immutable/versioned asset。每个 generation request 必须固定 Question Version、获准 participant 的 Persona Template/Assignment/Private Stance、Prompt Version，以及 provider/model/effective non-secret configuration provenance；不得以 mutable `latest` 重解释历史 utterance。
 - AI Participant 是 session role identity；AI Runtime 是 generation capability。Runtime 不拥有 participant seat、stance、floor 或 lifecycle，Persona Template 不保存 prompt/provider/model binding 或 secret。
 - Generation Request 与 final Utterance 分离；逻辑状态为 `requested`、`generated`、`persisted`、`failed`。一个 logical request 至多产生一个 final utterance，late result 在 phase/grant stale 后必须丢弃。
-- Timeout、provider unavailable、rate limit、partial/invalid generation 使用 typed、bounded、idempotent failure/retry policy。失败不改变 phase/deadline/floor/scoring；control path 必须安全 release exact grant 或请求既有 intervention，且不能重复 release/utterance。
+- Timeout、provider unavailable、rate limit、partial/invalid generation 使用 typed、bounded、idempotent failure policy。P1-5D application retry 固定为 `0`；失败不改变 phase/deadline/floor/scoring，且 automatic floor release/intervention remains deferred to P1-5E。
 - Provider/model raw response、credential、chain-of-thought 和不必要的完整 rendered prompt 不进入 public/error/log surfaces。审计保留足以解释 prompt/model/config 的最小 provenance。
-- 多 provider、cost accounting、enterprise model、audit trace 和 prompt iteration 是 future commercial-readiness boundary；billing、quota、payment、multi-tenant 继续 Deferred。
+- 多 provider、cost accounting、enterprise model、audit trace 和 prompt iteration 是 future commercial-readiness boundary；a DB/admin-managed server-side model source may later replace P1-5D environment configuration without changing the runtime contract，but no model table/admin API/UI/hot reload/registry/routing exists now；billing、quota、payment、multi-tenant 继续 Deferred。
 
 完整冻结和后续 implementation gates 见 [`exec-plans/P1-5_ai-runtime-foundation.md`](exec-plans/P1-5_ai-runtime-foundation.md)。
 
@@ -318,11 +318,20 @@ P1-3 lifecycle authority: phase / deadline
 - Before authoritative generation create/claim/final-completion mutation, the application holds the existing session aggregate row lock and invokes P1-3 `reconcile_due_for_locked_aggregate(...)` with server-authoritative current UTC；reconciliation and generation-context validation share the required transaction boundary。
 - AI generation success/failure does not independently mutate phase、deadline、floor policy/current owner、scheduler decision、lifecycle events or discussion sequence。An overdue reconciliation may authoritatively advance phase/deadline, release the old grant, append ordered `floor.released` / `session.state_changed` events and advance sequence；those writes are P1-3 lifecycle facts, not AI Runtime decisions, and the stale generation then fails closed without an utterance。Automatic floor-triggered generation/release and all transport remain Deferred。
 
+### P1-5D completed first-provider boundary
+
+- `GenerationProvider` is the smallest project-owned async callable Protocol over existing provider-neutral input/result types；the deterministic harness remains compatible and no factory、registry、router、fallback hierarchy or provider-specific domain object was added。
+- `ZhipuGenerationProvider` uses one `httpx.AsyncClient` request with required lazy `ZhipuProviderSettings.model` (currently `glm-4.7-flashx`)。It requires configured/input/outbound/response/durable model alignment and model-independent `ZHIPU_CHAT_DEV_V1` provenance，rejects mismatch before or after HTTP as appropriate，disables redirects/retries/streaming/thinking，applies bounded timeouts and normalizes only safe typed outcomes。
+- `ZhipuProviderSettings` is a separate lazy server-only boundary with required `GIA_API_ZHIPU_API_KEY: SecretStr` and required bounded non-secret `GIA_API_ZHIPU_MODEL: str`。Ordinary API startup requires neither；changing the model requires configuration plus API restart but no Python、adapter or schema change。Both identifiers remain internal provenance，and the key、rendered prompt、request/response body、provider exception and reasoning content are not logged or persisted。
+- Provider execution still uses the existing P1-5C explicit runtime callable outside database transactions。Durable `RUNNING` remains reconciliation-required/no automatic re-call；late results、overdue reconciliation、concurrent claims and at-most-one utterance retain the P1-3/P1-5C authority rules。
+- Automated provider/runtime tests use injected `httpx.MockTransport` and make zero real GLM calls。Implementation and config-driven patch actual-source reviews passed。Final user-run sanitized real-provider acceptance smoke：`PASS`；`zhipu` / `glm-4.7-flashx` / `ZHIPU_CHAT_DEV_V1` returned `RawGenerationSuccess` and satisfied the intended Chinese group-interview smoke expectation，without recording credentials or raw provider data。P1-5D is `DONE`；P1-5E automatic floor-triggered orchestration remains `NOT_STARTED`。
+
 ## Configuration, secrets and error boundaries
 
 - 配置采用类型化、启动时校验的方式；
 - `.env.example` 只提供安全占位符，私有环境文件不得提交；
 - 服务端密钥不得进入浏览器 bundle、公开构建产物或日志；
+- Zhipu key/model only load through lazy `GIA_API_ZHIPU_API_KEY` / `GIA_API_ZHIPU_MODEL` settings when the provider is explicitly constructed；neither has a default，missing/blank values fail closed，and the model is server-only non-secret configuration rather than a public/API/UI setting；
 - 生产环境不得接受不安全开发身份默认值；
 - REST 使用标准 HTTP status、稳定 machine-readable error code、安全 message、request correlation 和可选安全 details；
 - WebSocket error event 与 REST error semantics 对齐；
@@ -343,6 +352,7 @@ P1-3 lifecycle authority: phase / deadline
 - P1-4：generalized participant/single-owner persistence、pure deterministic scheduling、enumeration-order invariance、fairness/monopoly/phase/intervention、真实 PostgreSQL race/restart recovery、safe explanation/non-disclosure 和 authoritative Browser floor-flow regression；
 - P1-5A：docs-only links/state/scope/hash/diff checks；fake provider、runtime unit/integration 和真实 LLM tests 均未运行且未进入实现；
 - P1-5C：closed prompt/context unit tests、deterministic harness cases、real PostgreSQL success/failure/replay/concurrency/stale-result integration and full backend regression；真实 LLM tests remain absent；
+- P1-5D：HTTPX MockTransport exact-request/error/privacy/no-retry tests plus real PostgreSQL mocked-provider provenance/replay integration；all automated tests are network-free and the final user-run sanitized real-provider acceptance smoke is `PASS`；
 - P0-5D 已因真实跨应用 auth flow 加入 `@playwright/test 1.62.1`，只运行 Chromium，并由 test-only 编排器使用迁移后的隔离 `gia_p05d_*` PostgreSQL database；
 - 真实 LLM tests 必须显式执行，不进入默认 CI。
 
@@ -393,7 +403,7 @@ Redis 只在多 API workers、横向扩容、跨进程 WebSocket broadcast、dis
 - P0-5D：completed；真实 browser Cookie/CORS/CSRF 闭环已通过 Chromium 验证；
 - P0-5E：completed；final outcome `PASS after findings remediation and independent recheck`；
 - P0：`DONE`；P0-1～P0-7 completed；P0-7 finding-only independent recheck `PASS`，P1 readiness `READY`；其后用户已明确批准进入 P1；
-- P1：`IN_PROGRESS`；P1-1～P1-4 均已完成且 independent verdict `PASS`；P1-5A/P1-5B/P1-5C 已完成；真实 LLM/provider、automatic runtime/transport、记忆和基础报告 implementation 继续 Deferred；
+- P1：`IN_PROGRESS`；P1-1～P1-4 均已完成且 independent verdict `PASS`；P1-5A/P1-5B/P1-5C/P1-5D 已完成；automatic runtime/transport、记忆和基础报告 implementation 继续 Deferred，P1-5E/F 尚未开始；
 - P2 以后：只在对应阶段获批后增加语音、评分训练和商业化能力。
 
 ## 与其他文档关系

@@ -285,10 +285,11 @@ ADR-007 在 P0-2 建立时将具体 OpenAPI generator package 保持 Deferred；
 - Status: Accepted
 - Type: Architecture
 - Source: 用户批准并经外部审核修订的 P0-2 技术架构决策；PROJECT_MASTER_PLAN V1.0 §22
+- Amendment: 2026-08-24 用户批准 P1-5D config-driven model selection specialization。
 - Context: 供应商尚未决定，核心讨论状态必须由项目代码掌控。
-- Decision: 业务领域不得直接绑定厂商 SDK；概念边界包括 LLM Provider、ASR Provider、TTS Provider 和可选 Embedding Provider，SDK object 不得穿透 domain layer，structured output 必须 Schema validate。V0.1 不使用 LangGraph，核心 discussion orchestrator 使用自定义、确定性、可测试状态机。
+- Decision: 业务领域不得直接绑定厂商 SDK；概念边界包括 LLM Provider、ASR Provider、TTS Provider 和可选 Embedding Provider，SDK object 不得穿透 domain layer，structured output 必须 Schema validate。LLM provider、actual model identity and versioned non-secret invocation configuration are distinct provenance dimensions；model selection is server-side configuration rather than adapter-owned identity。P1-5D uses lazy environment configuration plus API restart；a later DB/admin-managed source may replace that configuration source without changing the provider-neutral runtime contract。V0.1 不使用 LangGraph，核心 discussion orchestrator 使用自定义、确定性、可测试状态机。
 - Rationale: 降低厂商锁定并保持核心状态和行为可验证。
-- Consequences: LLMProvider 在 P1 首次真实 LLM 调用时建立，ASRProvider/TTSProvider 在 P2 首次接入时建立，Embedding 仅在实际需要时建立。**不为了 deferred technology 创建无实际调用方的空 interface、adapter、factory 或目录。** 局部离线报告或复杂 retry workflow 达到明显复杂度后，可单独重新评估 LangGraph。
+- Consequences: LLMProvider 在 P1 首次真实 LLM 调用时建立，ASRProvider/TTSProvider 在 P2 首次接入时建立，Embedding 仅在实际需要时建立。P1-5D 不实现 model table、admin API/UI、hot reload、registry、routing or fallback；changing its configured model requires configuration change and API restart but no Python/provider/schema change。**不为了 deferred technology 创建无实际调用方的空 interface、adapter、factory 或目录。** 局部离线报告或复杂 retry workflow 达到明显复杂度后，可单独重新评估 LangGraph。
 - Alternatives: 领域代码直接依赖厂商 SDK；P0-3 创建所有 Provider 空接口；让 LangGraph 控制完整群面状态机。
 - Related documents: [`ARCHITECTURE.md`](ARCHITECTURE.md)、[`AGENT_BEHAVIOR.md`](AGENT_BEHAVIOR.md)
 
@@ -322,7 +323,7 @@ ADR-007 在 P0-2 建立时将具体 OpenAPI generator package 保持 Deferred；
 
 以下都是派生 TBD，不是总纲原始 D-xxx：
 
-- TBD：具体 LLM provider 和 model；
+- TBD：production/default LLM provider and model policy；
 - TBD：ASR provider；
 - TBD：TTS provider；
 - TBD：支付供应商与正式价格；

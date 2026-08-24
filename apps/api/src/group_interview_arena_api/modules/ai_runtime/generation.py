@@ -1,6 +1,5 @@
-from collections.abc import Awaitable, Callable
 from enum import StrEnum
-from typing import Self
+from typing import Protocol, Self
 
 from pydantic import UUID4, TypeAdapter, ValidationError, model_validator
 
@@ -38,9 +37,17 @@ class RawGenerationFailure(ClosedDomainModel):
 
 
 type RawGenerationResult = RawGenerationSuccess | RawGenerationFailure
-type GenerationExecutor = Callable[
-    [RuntimeGenerationInput], Awaitable[RawGenerationResult]
-]
+
+
+class GenerationProvider(Protocol):
+    async def __call__(
+        self,
+        generation_input: RuntimeGenerationInput,
+        /,
+    ) -> RawGenerationResult: ...
+
+
+type GenerationExecutor = GenerationProvider
 
 
 class ValidatedGenerationResult(ClosedDomainModel):

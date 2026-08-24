@@ -1,6 +1,6 @@
 # P1-5 AI Runtime Foundation Execution Plan
 
-Status: `P1 IN_PROGRESS`; `P1-5 IN_PROGRESS`; `P1-5A completed`; `P1-5B completed`; `P1-5C completed`; `P1-5D/P1-5E/P1-5F NOT_STARTED`
+Status: `P1 IN_PROGRESS`; `P1-5 IN_PROGRESS`; `P1-5A completed`; `P1-5B completed`; `P1-5C completed`; `P1-5D DONE`; `P1-5E/P1-5F NOT_STARTED`
 
 Target version: `V0.1 Internal Validation`
 
@@ -9,6 +9,8 @@ Product baseline: [`PROJECT_MASTER_PLAN.md`](../PROJECT_MASTER_PLAN.md)
 Accepted decisions: [`D-003`](../DECISIONS.md#2-已确认产品决策索引), [`D-007`](../DECISIONS.md#2-已确认产品决策索引), [`D-008`](../DECISIONS.md#2-已确认产品决策索引), [`D-013`](../DECISIONS.md#2-已确认产品决策索引), [`ADR-006`](../DECISIONS.md#adr-006--rest-与-websocket-通信边界), [`ADR-007`](../DECISIONS.md#adr-007--api-契约生成策略), [`ADR-009`](../DECISIONS.md#adr-009--独立后台任务队列延后), [`ADR-011`](../DECISIONS.md#adr-011--轻量领域导向混合模块架构), [`ADR-012`](../DECISIONS.md#adr-012--分阶段测试与质量工具策略), [`ADR-013`](../DECISIONS.md#adr-013--配置错误与结构化日志基线), [`ADR-014`](../DECISIONS.md#adr-014--provider-neutral-ai-与自定义讨论编排)
 
 P1-5A baseline: clean committed `main` at `5397cd2b25f36c6a9fbd666b759261091c36a8c0`, equal to `origin/main`; [`PROJECT_MASTER_PLAN.md`](../PROJECT_MASTER_PLAN.md) SHA-256 `2388A9660320406CB35D5354126AD71C6849A98DB7C4A356796CA951BF372F26`
+
+P1-5D design-freeze baseline: clean committed `main` at `371d5a57ffb952a7ccb664170819e07b606b5688`, equal to `origin/main`; P1-5C is committed；[`PROJECT_MASTER_PLAN.md`](../PROJECT_MASTER_PLAN.md) SHA-256 remains `2388A9660320406CB35D5354126AD71C6849A98DB7C4A356796CA951BF372F26`
 
 ## Goal
 
@@ -25,11 +27,11 @@ P1-5C 是 separately approved deterministic runtime vertical slice。它在不�
 - `P1-5A — AI Runtime Architecture Freeze`：`DONE`；
 - `P1-5B — AI Runtime Persistence Foundation`：`DONE`；
 - `P1-5C — Runtime Contract & Deterministic Generation Vertical Slice`：`DONE`；
-- `P1-5D — First Real Provider Integration`：`NOT_STARTED`；
+- `P1-5D — First Real Provider Integration`：`DONE`；implementation and config-driven model patch actual-source reviews `PASS`，final user-run sanitized real-provider acceptance smoke `PASS`；
 - `P1-5E — Automatic AI Runtime Orchestration`：`NOT_STARTED`；
 - `P1-5F — Realtime/Web Integration + Independent Acceptance`：`NOT_STARTED`。
 
-P1-5D～F 不是本轮授权范围，仍需新的 explicit user approval。
+P1-5D design freeze、implementation and config-driven model patch were separately approved；both actual-source reviews and the final user-run sanitized real-provider acceptance smoke passed，so P1-5D is closed as `DONE`。Codex made no real-model call and recorded no credential、raw provider response or sensitive header。P1-5E～F remain outside the authorized scope and require separate explicit user approval。
 
 ## Context and authority
 
@@ -175,6 +177,107 @@ P1-5A 只冻结 lifecycle/invariants。P1-5B 现将 generation attempt 的 durab
 - Privacy sentinels prove current private stance is available only to the generation context while other-participant stance、provider secret、Cookie/auth token、database URL and raw exception text do not enter generation input where forbidden、safe results、durable metadata/failure state or ordinary structured logs。
 - Full API/PostgreSQL regression、Ruff、format、strict Pyright、frozen lock、Alembic single-head/current/drift/migration suite、temporary database cleanup、master-plan hash、scope and `git diff --check` pass。
 
+## P1-5D design freeze — First Real Provider Integration
+
+The completed design-freeze checkpoint established the first real-provider boundary without code or a GLM call。The separately approved implementation checkpoint now realizes that design through one explicit internal Zhipu provider while preserving every existing P1-3/P1-4/P1-5C lifecycle invariant。Codex still makes zero real GLM calls。
+
+### Provider, endpoint and versioned development configuration
+
+- First provider identity is exactly `provider_identifier = "zhipu"`；actual `model_identifier` comes from required lazy server-side `GIA_API_ZHIPU_MODEL` configuration。The current development selection is `glm-4.7-flashx`。
+- The only approved transport is non-streaming `POST https://open.bigmodel.cn/api/paas/v4/chat/completions` with `Authorization: Bearer <server-only-api-key>` and JSON content。The endpoint and Bearer form were checked against the live official [Chat Completions reference](https://docs.bigmodel.cn/api-reference/%E6%A8%A1%E5%9E%8B-api/%E5%AF%B9%E8%AF%9D%E8%A1%A5%E5%85%A8) on 2026-08-24；the user's successful pre-implementation real API smoke is accepted evidence and will not be repeated by Codex。
+- The code-owned non-secret invocation configuration version is exactly `ZHIPU_CHAT_DEV_V1`：`thinking = {"type": "disabled"}`、`stream = false`、`max_tokens = 512`、`temperature = 0.7` and application-level automatic retry `0`。Configuration version is independent of model identity；a model-only switch keeps `ZHIPU_CHAT_DEV_V1`，while a future parameter/timeout/retry-policy change requires a new version。This is development configuration, not permanent provider/model/product policy；the thinking field follows the live official [Thinking reference](https://docs.bigmodel.cn/cn/guide/capabilities/thinking)。
+- The outbound message list is exactly one `user` message whose content is the already rendered P1-5C Prompt Version。The adapter adds no hidden system prompt、tool、response format、session metadata or provider-specific prompt suffix。
+- Transport timeouts are explicit and bounded for this development configuration：connect `5s`、read `60s`、write `10s`、pool `5s`。Redirect following and client/application retries remain disabled。Changing these values requires a new configuration version or a documented transport-policy revision；it must not silently reinterpret historical generation provenance。
+
+### Minimal project-owned provider boundary
+
+The frozen call path is:
+
+```text
+P1-5C Runtime
+  -> project-owned GenerationProvider contract
+  -> Zhipu HTTP adapter
+  -> BigModel chat completions endpoint
+  -> normalized RawGenerationSuccess / RawGenerationFailure
+  -> existing P1-5C completion/failure lifecycle
+```
+
+- P1-5D implements one minimal `GenerationProvider` `Protocol` retaining the current async `__call__(RuntimeGenerationInput) -> RawGenerationResult` shape。The existing executor alias now points to that Protocol，so deterministic and real callers remain compatible without lifecycle rewrites。
+- Business/runtime code continues to depend only on project-owned `RuntimeGenerationInput`、`RawGenerationSuccess`、`RawGenerationFailure` and typed failure codes。HTTPX request/response/exception/client objects never cross the adapter boundary。
+- The only adapter is `providers/zhipu.py`。No registry、factory hierarchy、multi-provider interface family、routing、fallback or SDK wrapper is created。
+- The adapter uses `httpx.AsyncClient` and owns explicit client close/context-manager semantics。Tests may inject `httpx.MockTransport` / `AsyncBaseTransport`；production code does not accept arbitrary provider response objects as domain input。
+- `zai-sdk` / `zhipuai` is not added。The existing `httpx>=0.28.1` constraint is promoted from dev-only to the single runtime dependency declaration and `uv.lock` is refreshed；no second HTTP client is added。
+
+### Server-only secret and configuration boundary
+
+- Implementation adds lazy `ZhipuProviderSettings` with environment prefix `GIA_API_ZHIPU_`、required `api_key: SecretStr` and required bounded `model: str`。The exact variables are `GIA_API_ZHIPU_API_KEY` and server-only non-secret `GIA_API_ZHIPU_MODEL`；ordinary API startup remains independent of these settings until an explicit provider caller loads them，and missing/blank values fail closed。
+- The API key may exist only in server-side settings and the outbound Authorization header。It must not enter database rows、`RuntimeGenerationInput`、raw/validated generation result、request metadata、error messages、structured logs、trace spans、test fixtures or review bundles。
+- `.env.example` may contain only a non-secret placeholder；no committed `.env`、example、test or documentation contains a real key。
+- Provider/model/configuration mismatch is rejected before HTTP I/O：the adapter accepts only `zhipu`、the exact `ZhipuProviderSettings.model` value and `ZHIPU_CHAT_DEV_V1`。The same configured model is sent outbound and required in the successful provider response，keeping selected/outbound/confirmed/durable model provenance aligned without a model-specific branch。
+- Changing the P1-5D Zhipu model requires only `GIA_API_ZHIPU_MODEL` configuration change plus API restart；it requires no Python、adapter or schema change。A future DB/admin-managed source may replace the environment source without changing the provider-neutral runtime contract，but no table、admin API/UI、hot reload、registry or routing is implemented now。
+
+### Response acceptance and safe error normalization
+
+- A successful HTTP response is accepted only when JSON reports the exact configured model、the selected choice has `finish_reason = "stop"`、`choices[0].message.role = "assistant"`, and content is a non-empty textual value accepted by the existing P1-5C `UtteranceText` validation。No reasoning content、tool call or provider metadata becomes utterance content。
+- `finish_reason = "length"` or any other non-`stop` string is `PARTIAL_GENERATION` and no partial text is persisted。Missing/non-string finish reason、malformed JSON/shape、empty/non-string content or an unusable successful response is `INVALID_OUTPUT`；existing P1-5C validation also rejects whitespace-only or otherwise invalid utterance text before persistence。
+- `httpx.TimeoutException` (including connect/read timeout) maps to `TIMEOUT`；HTTP `429` maps to `RATE_LIMIT`；network/transport failures and HTTP `5xx` map to `PROVIDER_UNAVAILABLE`；other safe unexpected adapter/HTTP failures map to `INTERNAL_ERROR`。
+- Raw response bodies、raw exception text、request headers and credential-bearing request objects are never returned、persisted or logged。Only the existing allowlisted typed failure code reaches durable/runtime state。
+
+### Provenance and schema assessment
+
+- Every current development real-provider command must durably use `provider_identifier = "zhipu"`、`model_identifier = ZhipuProviderSettings.model` (currently `glm-4.7-flashx`) and `request_metadata.configuration_version = "ZHIPU_CHAT_DEV_V1"`。
+- Actual source confirms the existing P1-5B `llm_generation_requests.provider_identifier`、`model_identifier` and closed `request_metadata.configuration_version` fields are sufficient。No schema/migration is authorized or required for P1-5D as designed。
+- Rendered private prompt、raw provider request/response、reasoning content and API key remain transient and are not persistence requirements。
+- If implementation discovers that exact actual provider/model/configuration provenance cannot be represented without a schema change, stop and report the additive need；do not create or edit a migration in P1-5D without new approval。
+
+### Runtime, concurrency, restart and retry policy
+
+- Provider execution remains outside every database transaction and row lock。Authoritative create/claim/final mutation reuses the existing aggregate-lock semantics, P1-3 `reconcile_due_for_locked_aggregate(...)`, exact phase/current-grant validation and atomic completion/failure persistence。
+- A late/stale result never creates an utterance；one formal utterance remains the maximum per request and floor grant；AI outcome does not acquire lifecycle/floor/scheduler authority。
+- Existing durable `RUNNING` remains fail-closed and returns reconciliation-required/no-op。It never automatically calls GLM again after restart or uncertain completion, preventing duplicate generation and duplicate cost。
+- Application-level automatic retry is exactly `0`。Timeout、429、unavailable、partial、invalid and internal adapter outcomes produce one typed failed attempt；no fallback、routing or implicit provider retry is allowed。
+
+### Exact P1-5D implementation files
+
+The approved implementation changes are:
+
+- modify `apps/api/src/group_interview_arena_api/modules/ai_runtime/generation.py` — formal minimal `GenerationProvider` protocol while preserving provider-neutral input/result/error types and the deterministic harness；
+- keep `apps/api/src/group_interview_arena_api/modules/ai_runtime/runtime.py` unchanged — actual source already consumes the structurally compatible async callable outside lifecycle transactions；
+- modify `apps/api/src/group_interview_arena_api/core/config.py` — lazy server-only `ZhipuProviderSettings`；
+- add `apps/api/src/group_interview_arena_api/providers/__init__.py` and `apps/api/src/group_interview_arena_api/providers/zhipu.py` — the first real HTTP adapter and no framework around it；
+- modify `apps/api/pyproject.toml` and `apps/api/uv.lock` — promote existing `httpx>=0.28.1` from dev-only to runtime dependency；
+- modify `.env.example` — safe `GIA_API_ZHIPU_API_KEY=<server-only-zhipu-api-key>` placeholder and server-only non-secret `GIA_API_ZHIPU_MODEL=glm-4.7-flashx` selection。
+
+No change is made to domain persistence services、ORM models、migration history、REST/OpenAPI、WebSocket、Web or CI。
+
+### Implemented network-free automated test files
+
+- add `apps/api/tests/test_zhipu_provider.py` — exact URL/header/body/model/config shape；thinking disabled；stream false；success、timeout、429、5xx/network、malformed JSON/shape、empty content、length truncation and raw body/exception/API-key secrecy through `httpx.MockTransport`；
+- modify `apps/api/tests/test_config.py` — lazy required server-only key、`SecretStr` representation and environment isolation；
+- modify `apps/api/tests/test_ai_runtime_generation.py` — deterministic harness compatibility with the formal provider protocol and absence of credential fields；
+- modify `apps/api/tests/integration/test_ai_runtime_orchestration.py` — one mocked-transport provider-through-runtime success/failure proof while retaining all stale/deadline/concurrency/idempotency regressions；
+- rerun the complete existing P1-5C targeted and full API/PostgreSQL suites。No automated test contacts the real GLM endpoint。
+
+### Manual verification and implementation acceptance
+
+- Manual access evidence supplied by the user：the original `glm-4.7-flash` verification repeatedly encountered provider rate-limit/availability failures，while the same valid credential and endpoint returned HTTP `200` for `glm-4.7-flashx`。This is the reason FlashX is the current development selection；it does not establish permanent unavailability or permanent production provider/model policy。Codex does not repeat either call。
+- Final user-run sanitized real-provider acceptance smoke：`PASS`；`provider_identifier = "zhipu"`、server-configured `model_identifier = "glm-4.7-flashx"` from `GIA_API_ZHIPU_MODEL` and `configuration_version = "ZHIPU_CHAT_DEV_V1"`。`ZhipuGenerationProvider` returned `RawGenerationSuccess`，and output satisfied the intended Chinese group-interview smoke expectation。No credential、raw provider response、sensitive header、verbatim output or diagnostic payload is recorded。
+- Implementation actual-source review and config-driven model patch actual-source review both returned `PASS`。All automated/network-free implementation gates and the final user-run sanitized real-provider acceptance smoke are satisfied；P1-5D is `DONE`。
+
+### Explicit P1-5D stop gates and out of scope
+
+- Stop on any required schema/migration、provider SDK、second HTTP client、credential-bearing persisted/logged/public state、automatic retry/fallback/routing、or lifecycle/floor authority drift。
+- Do not implement automatic `floor.granted -> generation`、automatic floor release/reassignment、streaming、API/WS/Web、memory/RAG、scoring/report、voice、Redis/queue/worker、billing/quota or any P1-5E/F capability。
+- Do not implement a model table、admin model API/UI、runtime hot reload、registry、routing、fallback、A/B/cost/per-plan/per-question selection；these remain future commercial evolution。
+- The implementation checkpoint did not edit schema/migrations、runtime lifecycle control、API/WS/Web or CI and Codex did not contact BigModel。Final closeout is documentation-only and does not authorize P1-5E。
+
+### P1-5D design-freeze acceptance
+
+- The only working-tree changes are this execution plan、`TASKS.md` and `ROADMAP.md`；source、tests、schema/migrations、dependencies/lockfiles、configuration、API/WS/Web and CI remain unchanged。
+- All Markdown relative links resolve、changed files retain final newlines、`git diff --check` passes and the master-plan hash remains unchanged from the recorded baseline。
+- HEAD and `origin/main` remain at the recorded baseline；staged changes、commits and pushes remain zero。
+- No provider endpoint was contacted and no secret/quota was used in the design freeze。At that checkpoint P1-5D remained open for implementation review and final user-run acceptance evidence；both later gates are now closed as recorded in the current acceptance section。
+
 ## Frozen failure and retry boundary
 
 适用 failure classes：timeout、provider unavailable、rate limit、partial generation、invalid/unsafe output 和 caller cancellation/stale grant。
@@ -197,6 +300,7 @@ P1-5A 只冻结 lifecycle/invariants。P1-5B 现将 generation attempt 的 durab
 - multiple providers and provider routing；
 - token/latency/cost accounting；
 - enterprise model endpoints；
+- DB/admin-managed server-side model configuration replacing the current environment source without changing the runtime provenance contract；
 - audit trace from utterance to prompt/model/config；
 - prompt iteration and version comparison。
 
@@ -210,10 +314,16 @@ Implemented in P1-5C current state:
 - authorized context assembly for the exact session-bound Question Version and only the granted AI participant's Assignment/Persona/Private Stance；
 - deterministic internal runtime/application caller with a network-free local executor harness。
 
-Still Deferred:
+Implemented in P1-5D current checkpoint:
 
-- real-provider prompt/model execution、LLM implementation and real model calls；
-- provider SDK/interface/adapter/factory/routing/fallback implementation；
+- one non-streaming Zhipu path using the minimal project-owned provider protocol and thin HTTPX adapter，with current configured model `glm-4.7-flashx`；
+- lazy server-only Zhipu credential/model loading from `GIA_API_ZHIPU_API_KEY` / `GIA_API_ZHIPU_MODEL` and promotion of existing HTTPX to runtime dependency；
+- exact `provider_identifier` / configured `model_identifier` / model-independent `ZHIPU_CHAT_DEV_V1` provenance，with model changes requiring configuration plus API restart rather than Python、adapter or schema changes；
+- network-free mocked-transport provider tests plus final user-run sanitized real-provider acceptance smoke `PASS`。
+
+Still Deferred beyond P1-5D:
+
+- provider SDK、multi-provider registry/routing/fallback and automatic retry；
 - production prompt orchestration beyond the closed P1-5C renderer and internal prompt-variable persistence；
 - additional provider-attempt/fallback hierarchy beyond the current one-request/one-attempt identity；
 - automatic floor-triggered generation、transport/API/WebSocket/Web and streaming；
@@ -226,7 +336,7 @@ Still Deferred:
 
 ## Later implementation gates
 
-Any P1-5D or later provider/automatic/transport subphase requires separate explicit approval and an updated decomposition before code changes. At minimum it must define:
+P1-5D implementation and config-driven patch followed the frozen section above without scope expansion；both actual-source reviews and the final user-run sanitized real-provider acceptance smoke passed，and P1-5D is `DONE`。P1-5E/F require their own later approval and updated decomposition。Any later provider/automatic/transport subphase must define:
 
 - any additive schema need and historical deletion/retention semantics；
 - provider-neutral request/result/error contract with a real caller；
@@ -264,13 +374,25 @@ Any P1-5D or later provider/automatic/transport subphase requires separate expli
 - final full backend regression is `406 passed` with 1 existing Starlette deprecation warning；Ruff、format、strict Pyright、frozen dependency checks、Alembic head/current/check and governance/scope checks pass；
 - no schema/migration、dependency/lockfile、provider SDK/abstraction、API/WS/Web、automatic floor trigger/release、queue/worker、memory/RAG or scoring/report implementation was added。
 
+## P1-5D implementation checkpoint validation result
+
+- Original implementation TDD preserved its two meaningful collection RED gates。The config-driven model patch then produced a focused meaningful RED of `9 failed`：settings had no required model validation and the hardcoded adapter could not switch `glm-4.7-flashx` / `glm-4.7` from configuration。Current focused GREEN results are config `55 passed` and provider `47 passed`。
+- Network-free provider/config/generation targeted tests are `111 passed`；real PostgreSQL AI runtime orchestration is `8 passed`。Coverage includes two code-free configured model selections、outbound/response/durable exact model alignment、model-independent configuration version、pre-I/O mismatch、safe error/secret boundaries and existing lifecycle/replay behavior。
+- Fresh full backend/PostgreSQL regression is `469 passed` with 1 existing Starlette deprecation warning。No test constructs an unmocked Zhipu provider；Codex made zero real GLM calls and used no provider secret/quota。
+- Ruff lint、Ruff format check (`109 files`)、strict Pyright、`uv sync --frozen` and `uv lock --check` pass。HTTPX has one runtime declaration，with no provider SDK or second HTTP client。
+- Alembic single head/current/check remains `f1a15b15c005` with no new upgrade operations；migration/schema source is unchanged and temporary PostgreSQL database residual is `0`。
+- Markdown relative links、final newlines for all current changed/untracked files、master-plan hash、exact scope、secret/static boundary and `git diff --check` pass。Implementation and config-driven patch actual-source reviews are `PASS`；the sanitized user smoke is `PASS`；staged/commit/push remain zero and P1-5D is `DONE`。
+
 ## Decisions
 
-- No new Accepted or Proposed ADR is required. P1-5A specializes total-plan §22 and existing `ADR-014` within the explicitly approved task without selecting a provider or changing product direction.
+- The user-approved config-driven model-selection specialization is recorded as a 2026-08-24 amendment to existing `ADR-014`；no separate new ADR or master-plan change is required。
 - Floor Scheduler owns who; AI Runtime owns what; provider owns only model I/O.
 - Prompt/model provenance is required for every historical AI utterance while raw sensitive prompt/provider data remains minimized.
 - Generation Request and final Utterance are distinct identities/lifecycles.
 - Provider failure is contained inside the generation boundary and cannot corrupt session/floor integrity.
+- The current development provider/model is Zhipu `glm-4.7-flashx` through a thin HTTPX adapter，selected by lazy server-side configuration。The earlier `glm-4.7-flash` manual access attempt's rate-limit/availability result is not a permanent unavailability claim；neither Zhipu nor FlashX is permanent production policy。
+- `provider_identifier`、actual configured `model_identifier` and model-independent invocation `configuration_version` are distinct durable provenance dimensions。A model-only change keeps `ZHIPU_CHAT_DEV_V1`；parameter-policy changes require a later version。
+- Existing P1-5B provenance schema is sufficient；HTTPX is now promoted from dev-only to the single runtime dependency declaration for the implemented caller。
 
 ## Risks and stop conditions
 
@@ -279,10 +401,14 @@ Any P1-5D or later provider/automatic/transport subphase requires separate expli
 - **Untraceable output**：stop if an utterance cannot identify prompt/model/config provenance without mutable latest pointers.
 - **Private leakage**：stop if rendered prompt, other participants' stance, secrets or raw provider bodies enter public/log/error surfaces.
 - **Premature infrastructure**：stop before adding provider SDK、queue、Redis、RAG、billing or speculative schema without a separately approved real caller.
+- **Provider contract drift**：stop if outbound provider/model/config differs from durable provenance or if an HTTPX/provider object crosses into domain/runtime results.
+- **Credential leakage**：stop if the API key、Authorization header、raw response body or exception text can reach persistence、logs、traces、tests、errors or review artifacts.
+- **Duplicate paid work**：stop if restart/RUNNING handling or hidden client retry can issue an untracked second real call.
 
 ## Progress
 
 - P1-5A：completed；docs-only AI Runtime Architecture Freeze；validation required before delivery；no blocker。
 - P1-5B：completed；provider-neutral persistence foundation；all required gates PASS；no provider/runtime caller。
 - P1-5C：completed；deterministic runtime contract/vertical slice and PostgreSQL orchestration gates PASS；no real provider or transport。
-- P1-5D/P1-5E/P1-5F：not started；require separate explicit approval。
+- P1-5D：`DONE`；design freeze、implementation、findings remediation、config-driven model patch、both actual-source reviews and final user-run sanitized real-provider acceptance smoke completed without a Codex real-model call or sensitive-data recording。
+- P1-5E/P1-5F：not started；require separate explicit approval。

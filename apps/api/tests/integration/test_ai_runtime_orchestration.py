@@ -6,11 +6,16 @@ from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol
 from uuid import UUID, uuid4
 
+import httpx
 import pytest
+from pydantic import SecretStr
 from sqlalchemy import URL, func, select
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
-from group_interview_arena_api.core.config import DatabaseSettings
+from group_interview_arena_api.core.config import (
+    DatabaseSettings,
+    ZhipuProviderSettings,
+)
 from group_interview_arena_api.db import (
     AiUtterance,
     DiscussionEvent,
@@ -77,6 +82,7 @@ from group_interview_arena_api.modules.question_personas.seed import (
     INTERNAL_VALIDATION_BUNDLE,
     seed_question_persona_foundation,
 )
+from group_interview_arena_api.providers.zhipu import ZhipuGenerationProvider
 
 pytestmark = pytest.mark.integration
 NOW = datetime(2026, 8, 24, 8, 0, tzinfo=UTC)
@@ -290,6 +296,9 @@ def _command(
     participant_id: UUID | None = None,
     request_id: UUID | None = None,
     utterance_id: UUID | None = None,
+    provider_identifier: str = "local-deterministic-executor",
+    model_identifier: str = "p1-5c-harness-v1",
+    configuration_version: str = "P1_5C_DETERMINISTIC",
 ) -> GenerateAiUtteranceCommand:
     return GenerateAiUtteranceCommand(
         generation_request_id=request_id or uuid4(),
@@ -298,10 +307,10 @@ def _command(
         participant_id=participant_id or context.participants[1].id,
         floor_grant_id=context.grant_id,
         prompt_version_id=PROMPT_ID,
-        provider_identifier="local-deterministic-executor",
-        model_identifier="p1-5c-harness-v1",
+        provider_identifier=provider_identifier,
+        model_identifier=model_identifier,
         request_metadata=GenerationRequestMetadata(
-            configuration_version="P1_5C_DETERMINISTIC"
+            configuration_version=configuration_version
         ),
         occurred_at=NOW,
     )
@@ -439,6 +448,100 @@ def test_runtime_success_replay_context_isolation_and_no_long_row_lock(
     assert CURRENT_STANCE_SENTINEL not in caplog.text
     assert OTHER_STANCE_SENTINEL not in caplog.text
     assert LATEST_PROMPT_SENTINEL not in caplog.text
+
+
+async def _zhipu_mocked_provider_success_and_provenance(
+    temporary_database: TemporaryDatabaseContext,
+) -> None:
+    async with _runtime_context(temporary_database) as context:
+        request_count = 0
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            nonlocal request_count
+            request_count += 1
+            assert request.headers["Authorization"] == (
+                f"Bearer {PROVIDER_SECRET_SENTINEL}"
+            )
+            return httpx.Response(
+                200,
+                json={
+                    "model": "glm-4.7-flashx",
+                    "choices": [
+                        {
+                            "finish_reason": "stop",
+                            "message": {
+                                "role": "assistant",
+                                "content": "Use the shared criteria to compare options.",
+                            },
+                        }
+                    ],
+                },
+            )
+
+        provider = ZhipuGenerationProvider(
+            ZhipuProviderSettings(
+                api_key=SecretStr(PROVIDER_SECRET_SENTINEL),
+                model="glm-4.7-flashx",
+            ),
+            transport=httpx.MockTransport(handler),
+        )
+        command = _command(
+            context,
+            provider_identifier="zhipu",
+            model_identifier="glm-4.7-flashx",
+            configuration_version="ZHIPU_CHAT_DEV_V1",
+        )
+
+        result = await generate_ai_utterance(
+            context.session_factory,
+            owner_id=context.owner_id,
+            command=command,
+            executor=provider,
+        )
+        replay = await generate_ai_utterance(
+            context.session_factory,
+            owner_id=context.owner_id,
+            command=command,
+            executor=provider,
+        )
+
+        assert result.outcome is RuntimeGenerationOutcome.COMPLETED
+        assert result.request_status is GenerationRequestStatus.COMPLETED
+        assert result.utterance_id == command.utterance_id
+        assert replay.outcome is RuntimeGenerationOutcome.COMPLETED_REPLAY
+        assert request_count == 1
+
+        async with context.session_factory() as session:
+            request = await session.get(
+                LlmGenerationRequest,
+                command.generation_request_id,
+            )
+            utterance = await session.get(AiUtterance, command.utterance_id)
+            utterance_count = await session.scalar(
+                select(func.count()).select_from(AiUtterance)
+            )
+        assert request is not None
+        assert request.status == "COMPLETED"
+        assert request.provider_identifier == "zhipu"
+        assert request.model_identifier == "glm-4.7-flashx"
+        assert request.request_metadata == {
+            "schema_version": 1,
+            "configuration_version": "ZHIPU_CHAT_DEV_V1",
+        }
+        assert utterance is not None
+        assert utterance.content == "Use the shared criteria to compare options."
+        assert utterance_count == 1
+        assert PROVIDER_SECRET_SENTINEL not in repr(request.request_metadata)
+        assert PROVIDER_SECRET_SENTINEL not in repr(result)
+        assert PROVIDER_SECRET_SENTINEL not in utterance.content
+
+
+def test_zhipu_mocked_provider_uses_existing_runtime_and_durable_provenance(
+    migrated_database: TemporaryDatabaseContext,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    run_async(lambda: _zhipu_mocked_provider_success_and_provenance(migrated_database))
+    assert PROVIDER_SECRET_SENTINEL not in caplog.text
 
 
 async def _failures_are_typed_and_isolated(

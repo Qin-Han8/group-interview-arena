@@ -2,11 +2,11 @@
 
 - Status: Active baseline
 - Most recently completed development phase: P0 — `DONE`
-- Most recently completed subphase: P1-5C — `DONE` (deterministic AI Runtime vertical slice)
+- Most recently completed subphase: P1-5D — `DONE` (first real provider integration)
 - P0-7 final outcome: initial `BLOCKED`; two documentation findings remediated; finding-only independent recheck `PASS`; P1 readiness `READY`
 - Current phase: P1 — `IN_PROGRESS`
 - Most recently completed task: P1-4 — `DONE`
-- Current task gate: P1-5 — `IN_PROGRESS`; P1-5A/P1-5B/P1-5C `DONE`; P1-5D～F `NOT_STARTED`
+- Current task gate: P1-5 — `IN_PROGRESS`; P1-5A/P1-5B/P1-5C/P1-5D `DONE`; P1-5E/F `NOT_STARTED`
 - P0 status: `DONE`; P0-1 through P0-7 completed
 - Target product version: V0.1 — Internal Validation
 - Source: [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) §30–31
@@ -18,7 +18,7 @@
 - `P0～P6`：研发推进阶段，描述按什么顺序建立能力；
 - `V0.1 / V0.5 / V1.0`：产品交付版本，描述某个可验证版本包含什么。
 
-阶段不是版本，P0-x/P1-x 也不是新增产品版本。P0 已完成不代表 V0.1 的全部业务能力已经实现；用户已明确批准进入 P1，P1-1～P1-4 均已完成。P1-4E final independent verdict 为 `PASS`；P1 保持 `IN_PROGRESS`。P1-5A architecture freeze、P1-5B persistence foundation 与 P1-5C deterministic runtime vertical slice 已完成；真实 LLM/provider、automatic floor-triggered generation and transport 仍未开始。
+阶段不是版本，P0-x/P1-x 也不是新增产品版本。P0 已完成不代表 V0.1 的全部业务能力已经实现；用户已明确批准进入 P1，P1-1～P1-4 均已完成。P1-4E final independent verdict 为 `PASS`；P1 保持 `IN_PROGRESS`。P1-5A architecture freeze、P1-5B persistence foundation、P1-5C deterministic runtime vertical slice 与 P1-5D first real provider integration 已完成；P1-5D 的两次 actual-source review 和 final user-run sanitized real-provider acceptance smoke 均为 `PASS`。Automatic floor-triggered generation and transport 仍未开始，P1-5E/F 保持 `NOT_STARTED`。
 
 ## 2. 开发阶段
 
@@ -101,11 +101,11 @@ P1-4A 已冻结 phase lifecycle 与 within-phase floor authority 分离、single
 - `P1-5A — AI Runtime Architecture Freeze`：completed；docs-only；
 - `P1-5B — AI Runtime Persistence Foundation`：completed；provider-neutral persistence only；
 - `P1-5C — Runtime Contract & Deterministic Generation Vertical Slice`：completed；deterministic local runtime only；
-- `P1-5D — First Real Provider Integration`：not started；
+- `P1-5D — First Real Provider Integration`：completed；actual-source reviews and final user-run sanitized real-provider acceptance smoke `PASS`；
 - `P1-5E — Automatic AI Runtime Orchestration`：not started；
 - `P1-5F — Realtime/Web Integration + Independent Acceptance`：not started。
 
-P1-5A 冻结 Scheduler 决定 who、AI Runtime 决定 what、provider 只负责 model I/O。P1-5B additively implements immutable Prompt Version、Generation Request and final AI Utterance persistence with exact grant/participant provenance、locked transactions、typed failure and at-most-one successful utterance；provider failure 不改变 phase/deadline/floor/scoring。P1-5C 已实现 closed prompt/context assembly、typed deterministic harness and short-transaction application orchestration，且未增加 schema、network provider、transport 或 automatic floor trigger。P1-5D～F 仍需 separate explicit approval。完整边界见 [`exec-plans/P1-5_ai-runtime-foundation.md`](exec-plans/P1-5_ai-runtime-foundation.md)。
+P1-5A 冻结 Scheduler 决定 who、AI Runtime 决定 what、provider 只负责 model I/O。P1-5B additively implements immutable Prompt Version、Generation Request and final AI Utterance persistence with exact grant/participant provenance、locked transactions、typed failure and at-most-one successful utterance；provider failure 不改变 phase/deadline/floor/scoring。P1-5C 已实现 closed prompt/context assembly、typed deterministic harness and short-transaction application orchestration。P1-5D implements the minimal project-owned provider contract and thin non-streaming Zhipu HTTPX adapter with lazy server-only credential/model configuration、current development model `glm-4.7-flashx`、model-independent `ZHIPU_CHAT_DEV_V1` provenance、typed safe failures、application retry `0` and network-free automated tests。Changing the P1-5D model remains configuration plus API restart rather than Python/adapter/schema changes；future DB/admin-managed selection and production/default provider/model policy remain deferred。Both actual-source reviews and the final user-run sanitized real-provider acceptance smoke passed，so P1-5D is `DONE`；P1-5E/F still require separate explicit approval。完整边界见 [`exec-plans/P1-5_ai-runtime-foundation.md`](exec-plans/P1-5_ai-runtime-foundation.md)。
 
 ## 5. 产品版本
 

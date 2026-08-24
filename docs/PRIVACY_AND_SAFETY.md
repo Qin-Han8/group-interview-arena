@@ -1,7 +1,7 @@
 # 隐私、安全、合规与反作弊基线
 
-- Status: Skeleton / Baseline
-- Current phase: P0
+- Status: Active baseline through completed P1-5D first-provider integration
+- Current phase: P1 — IN_PROGRESS
 - Target version: V0.1 Internal Validation
 - Detailed design: Not started
 - Security boundaries: Active from project start
@@ -113,6 +113,14 @@ P0-5B 已实现显式参数的 Argon2id hash/verify/verify-and-update、username
 - Session creation 只返回 safe `question_version_id`；assignment/private completeness 仅在 server-side transaction 内验证，没有为了未来 LLM caller 创建内部 endpoint。
 - PostgreSQL/REST/OpenAPI/Web/Chromium negative sentinel tests 验证内部私有值不会出现在 JSON、generated contract、日志或 DOM；owner、CSRF/CORS/Origin 与 WebSocket safe-error 边界保持不变。
 
+## P1-5D completed first-provider secret/data boundary
+
+- Zhipu API key only exists in lazy server-only `GIA_API_ZHIPU_API_KEY` `SecretStr` settings and the outbound Authorization header。Required `GIA_API_ZHIPU_MODEL` is non-secret but remains lazy server-only configuration；neither value is collected by global settings or exposed through `NEXT_PUBLIC_*`。Both have no default；missing or whitespace-only values fail closed only when provider settings are explicitly loaded，while ordinary API startup remains independent。
+- Provider input contains only the existing rendered authorized prompt and non-secret provenance。Project-owned `provider_identifier`、configured `model_identifier` and model-independent `configuration_version` remain durable allowlisted internal provenance and are not projected to current user-facing UI/API/report surfaces。Provider request/response IDs、provider response headers、raw provider metadata、raw request/response bodies、reasoning content、credentials and raw exception messages are not copied into durable metadata/results、ordinary logs、traces or public exceptions。
+- Adapter failures discard provider error bodies and normalize only allowlisted `TIMEOUT`、`RATE_LIMIT`、`PROVIDER_UNAVAILABLE`、`PARTIAL_GENERATION`、`INVALID_OUTPUT` or `INTERNAL_ERROR` codes。There is no adapter logging and application retry is `0`。
+- Sentinel tests cover settings/provider/result repr and serialization、captured application logs、typed failures and PostgreSQL request/utterance metadata。All automated provider tests use injected HTTPX MockTransport；Codex made zero real GLM calls。
+- Implementation/config-driven patch actual-source reviews and the final user-run sanitized real-provider acceptance smoke are `PASS`。Only allowlisted acceptance facts are recorded：`zhipu`、`glm-4.7-flashx`、`ZHIPU_CHAT_DEV_V1`、`RawGenerationSuccess` and satisfaction of the intended Chinese group-interview smoke expectation；credential、raw provider response、sensitive headers、verbatim generated content and diagnostic payloads are not recorded。Production supplier processing、data residency、retention、cross-border terms and production/default provider/model policy remain TBD。
+
 ## Implementation guidance
 
 - 每个新数据字段都应说明目的、保留、删除、访问和日志处理。
@@ -139,7 +147,7 @@ P0-5B 已实现显式参数的 Argon2id hash/verify/verify-and-update、username
 
 - P0-2：在架构决策中记录基础信任边界；完整威胁建模随实际接口、数据和 Provider 逐步细化。
 - P0-5C～P0-5E：backend/browser authentication、Cookie/CORS/CSRF 与最小日志边界已实现；P0-5E final outcome 为 `PASS after findings remediation and independent recheck`，P0-5 已转为 `DONE`。
-- P0：`DONE`；P0-1～P0-7 completed；P0-7 finding-only independent recheck `PASS`，new blockers none，P1 readiness `READY`；P1 保持 `NOT_STARTED` 并等待用户明确批准。
+- P0：`DONE`；P1 is `IN_PROGRESS`，P1-1～P1-4 and P1-5A/B/C/D are completed；Codex made no real-model call and recorded no provider secret/raw response；P1-5E automatic orchestration is not started。
 - P2：完成语音同意、上传、保存和删除设计。
 - P4/P5：完成支付审计、公开隐私设置、投诉和发布合规检查。
 

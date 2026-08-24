@@ -9,6 +9,7 @@ from group_interview_arena_api.core.config import (
     LogLevel,
     SessionPhaseDurations,
     Settings,
+    ZhipuProviderSettings,
 )
 
 DATABASE_PASSWORD = "database-settings-secret"
@@ -16,6 +17,8 @@ DATABASE_URL = (
     "postgresql+psycopg://group_interview_arena:"
     f"{DATABASE_PASSWORD}@127.0.0.1:5432/group_interview_arena"
 )
+ZHIPU_API_KEY = "zhipu-provider-settings-secret"
+ZHIPU_MODEL = "glm-4.7-flashx"
 
 
 def _clear_api_environment(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -27,6 +30,8 @@ def _clear_api_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("GIA_API_OTEL_TRACING_ENABLED", raising=False)
     monkeypatch.delenv("GIA_API_OTEL_SERVICE_NAME", raising=False)
     monkeypatch.delenv("GIA_API_OTEL_OTLP_HTTP_ENDPOINT", raising=False)
+    monkeypatch.delenv("GIA_API_ZHIPU_API_KEY", raising=False)
+    monkeypatch.delenv("GIA_API_ZHIPU_MODEL", raising=False)
 
 
 def test_development_settings_can_be_created(
@@ -216,6 +221,108 @@ def test_database_settings_repr_redacts_password() -> None:
 
     assert DATABASE_PASSWORD not in repr(settings)
     assert "**********" in repr(settings)
+
+
+def test_zhipu_provider_settings_load_required_scoped_secret(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _clear_api_environment(monkeypatch)
+    monkeypatch.setenv("GIA_API_ZHIPU_API_KEY", ZHIPU_API_KEY)
+    monkeypatch.setenv("GIA_API_ZHIPU_MODEL", ZHIPU_MODEL)
+
+    settings = ZhipuProviderSettings()  # pyright: ignore[reportCallIssue]
+
+    assert settings.api_key.get_secret_value() == ZHIPU_API_KEY
+
+
+@pytest.mark.parametrize(
+    ("configured", "expected"),
+    [
+        ("glm-4.7-flashx", "glm-4.7-flashx"),
+        ("  glm-4.7  ", "glm-4.7"),
+    ],
+)
+def test_zhipu_provider_settings_load_configured_model(
+    monkeypatch: pytest.MonkeyPatch,
+    configured: str,
+    expected: str,
+) -> None:
+    _clear_api_environment(monkeypatch)
+    monkeypatch.setenv("GIA_API_ZHIPU_API_KEY", ZHIPU_API_KEY)
+    monkeypatch.setenv("GIA_API_ZHIPU_MODEL", configured)
+
+    settings = ZhipuProviderSettings()  # pyright: ignore[reportCallIssue]
+
+    assert settings.model == expected
+
+
+def test_zhipu_provider_settings_require_model(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _clear_api_environment(monkeypatch)
+    monkeypatch.setenv("GIA_API_ZHIPU_API_KEY", ZHIPU_API_KEY)
+
+    with pytest.raises(ValidationError):
+        ZhipuProviderSettings()  # pyright: ignore[reportCallIssue]
+
+
+@pytest.mark.parametrize("model", ["", " ", "\t\r\n", "m" * 129])
+def test_zhipu_provider_settings_reject_invalid_model(
+    monkeypatch: pytest.MonkeyPatch,
+    model: str,
+) -> None:
+    _clear_api_environment(monkeypatch)
+    monkeypatch.setenv("GIA_API_ZHIPU_API_KEY", ZHIPU_API_KEY)
+    monkeypatch.setenv("GIA_API_ZHIPU_MODEL", model)
+
+    with pytest.raises(ValidationError):
+        ZhipuProviderSettings()  # pyright: ignore[reportCallIssue]
+
+
+def test_zhipu_provider_settings_require_api_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _clear_api_environment(monkeypatch)
+    monkeypatch.setenv("GIA_API_ZHIPU_MODEL", ZHIPU_MODEL)
+
+    with pytest.raises(ValidationError):
+        ZhipuProviderSettings()  # pyright: ignore[reportCallIssue]
+
+
+@pytest.mark.parametrize("api_key", ["", " ", "\t\r\n"])
+def test_zhipu_provider_settings_reject_whitespace_only_secret(
+    monkeypatch: pytest.MonkeyPatch,
+    api_key: str,
+) -> None:
+    _clear_api_environment(monkeypatch)
+    monkeypatch.setenv("GIA_API_ZHIPU_API_KEY", api_key)
+    monkeypatch.setenv("GIA_API_ZHIPU_MODEL", ZHIPU_MODEL)
+
+    with pytest.raises(ValidationError):
+        ZhipuProviderSettings()  # pyright: ignore[reportCallIssue]
+
+
+def test_zhipu_provider_settings_repr_and_serialization_redact_api_key() -> None:
+    settings = ZhipuProviderSettings(
+        api_key=SecretStr(ZHIPU_API_KEY),
+        model=ZHIPU_MODEL,
+    )
+
+    assert ZHIPU_API_KEY not in repr(settings)
+    assert ZHIPU_API_KEY not in str(settings.model_dump())
+    assert ZHIPU_API_KEY not in settings.model_dump_json()
+    assert "**********" in repr(settings)
+
+
+def test_global_settings_do_not_collect_zhipu_model(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _clear_api_environment(monkeypatch)
+    monkeypatch.setenv("GIA_API_ZHIPU_MODEL", ZHIPU_MODEL)
+
+    settings = Settings()
+
+    assert "model" not in settings.model_dump()
 
 
 def test_application_construction_does_not_require_database_url(
