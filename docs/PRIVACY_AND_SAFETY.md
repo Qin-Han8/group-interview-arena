@@ -1,9 +1,9 @@
 # 隐私、安全、合规与反作弊基线
 
-- Status: Active baseline through completed P1-5D first-provider integration + completed P1-5E automatic orchestration (P1-5E-1/P1-5E-2/P1-5E-3)
+- Status: Active baseline through completed P1-5D first-provider integration + completed P1-5E automatic orchestration (P1-5E-1/P1-5E-2/P1-5E-3) + completed P1-5F-1 public contract privacy freeze; P1-5F remains in progress
 - Current phase: P1 — IN_PROGRESS
 - Target version: V0.1 Internal Validation
-- Detailed design: P1-5E-1 automatic orchestration privacy/safety boundary frozen；P1-5E-2 single-turn and P1-5E-3 continuous/configured composition remain provider-neutral；automated tests are network-free and the separately user-run sanitized composition smoke is `PASS`；full production/privacy design remains incomplete
+- Detailed design: P1-5E-1 automatic orchestration privacy/safety boundary frozen；P1-5E-2 single-turn and P1-5E-3 continuous/configured composition remain provider-neutral；P1-5F-1 freezes public utterance/transcript/redaction/logging behavior docs-only；automated tests are network-free and the separately user-run sanitized composition smoke is `PASS`；full production/privacy design remains incomplete
 - Security boundaries: Active from project start
 - P0-5A identity security boundary: completed / approved
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
@@ -127,9 +127,23 @@ P0-5B 已实现显式参数的 Argon2id hash/verify/verify-and-update、username
 - The orchestrator must never persist/log/expose the Zhipu key、Authorization header、rendered private prompt、raw provider request/response、raw exception text、reasoning content、another participant's Private Stance or hidden persona calibration。Deterministic IDs are opaque project identities，not containers for sensitive input。
 - Durable provenance remains allowlisted：session/grant/request/utterance identities、exact Prompt Version identity、provider/model/configuration identifiers and typed safe generation failure code。`FloorRelease.reason = INTERRUPTED` for terminal AI failure does not replace or weaken the request's typed failure truth。
 - `RUNNING`、request conflict、internal uncertainty and stale/unproved state stop automatic progression。After release/scheduler persistence uncertainty，only an exact proved durable result may be recovered；another proved authority change returns `STATE_CHANGED`，and otherwise the drive returns `RECONCILIATION_REQUIRED`。Safety favors uncertain durable truth over retry/progress；no second provider call、synthetic result、stale release or unproved next scheduling is allowed。
-- HUMAN ownership is a hard safety boundary：no automatic generation、fabrication、release or scheduling over the human。P1-5F must preserve that boundary when transport is later introduced。
+- HUMAN ownership is a hard safety boundary：no automatic generation、fabrication、release or scheduling over the human。P1-5F-1 freezes the transport enforcement below without implementing it。
 - Future internal diagnostics may allowlist `session_id`、`floor_grant_id`、`generation_request_id`、orchestration outcome code、provider/model provenance and aggregate latency/counters only。P1-5E-1 adds no log field、trace span、metric、table、dependency or telemetry exporter。
 - P1-5E-2/P1-5E-3 automatic tests remain network-free and include privacy sentinels。The configured composition reads secrets only through lazy `SecretStr` settings at explicit invocation；missing configuration raises one generic safe error before provider/drive work，and no secret enters result serialization。Codex made zero real-provider calls。The separately user-run sanitized composition smoke is `PASS`；no credential、Authorization header、raw provider response、rendered prompt、Private Stance or verbatim model output was recorded，and its temporary test file was removed from project source。
+
+## P1-5F-1 public utterance/transcript privacy freeze — no implementation
+
+- Human submission identity is derived from authenticated owner plus the exact authoritative current `HUMAN` grant。The client cannot provide participant、actor、grant、phase or AI/provider/runtime identifiers。Missing/non-owner transcript reads keep the same `404 SESSION_NOT_FOUND` non-disclosure policy。
+- A state/content-rejected syntactically valid Human command receives only `UTTERANCE_REJECTED` / `You cannot submit an utterance right now.`。It does not reveal AI speaking、stale grant、phase/deadline reconciliation or any internal cause；the socket remains open。
+- Public formal utterance payload is allowlisted to utterance、participant、actor kind、floor grant、phase and content。The envelope adds only session、sequence、timestamp and nullable action ID。Generation request、provider/model/configuration、Prompt Version/rendered prompt、Private Stance、raw response and internal generation failure taxonomy never cross REST/WS/error boundaries。
+- The original Human action ID is public only where needed to confirm its utterance/release replay。AI utterance v1 and new floor-event v2 automatic scheduler/release/intervention projections use null action ID；v2 exposes a UUID4 only for directly causal public client action identity。Internal deterministic action IDs remain durable/private and do not enter new P1-5F events、errors、transcript items or Browser state。Historical floor-event v1 retains its already-published non-null grant/intervention and nullable release semantics and remains parseable；it is not silently rewritten under v2 privacy semantics。
+- Human pending action/content is memory-only。It is not stored in localStorage/sessionStorage and not rendered as formal transcript before a durable matching action fact。Disconnect reuses the original action ID rather than minting an identity that could duplicate content。
+- Utterance content is a legitimate user-visible transcript fact but is not copied into ordinary application logs、WS rejection/error logs、trace spans or telemetry。Safe operational allowlist may contain session/participant/utterance/action identity、sequence、actor kind、safe outcome and latency only。
+- Logs/traces/telemetry never include utterance content、prompt、Private Stance、provider raw request/response、credential、Authorization or raw provider exception body。Browser failure UX never includes HTTP status、`RATE_LIMIT`、provider、model、configuration or raw exception。
+- Public transcript durability is a privacy and integrity obligation：future event retention/compaction/read-model changes must first create an equivalent durable transcript projection，while later user deletion/retention policy must still be applied deliberately。Compaction cannot accidentally erase history and ordinary logging cannot become a shadow transcript。
+- Automated F2/F3/F4 tests must use attacker-controlled sentinels across REST、WS、errors、logs、Browser and transcript projection；provider automation remains fake/mock/network-free。Any optional real-provider Browser smoke requires explicit user instruction and records no credential、prompt、Private Stance、raw response or verbatim provider output。
+
+The exact public fields、atomicity/recovery matrix and later acceptance are in [`exec-plans/P1-5_ai-runtime-foundation.md`](exec-plans/P1-5_ai-runtime-foundation.md)。
 
 ## Implementation guidance
 
@@ -157,7 +171,7 @@ P0-5B 已实现显式参数的 Argon2id hash/verify/verify-and-update、username
 
 - P0-2：在架构决策中记录基础信任边界；完整威胁建模随实际接口、数据和 Provider 逐步细化。
 - P0-5C～P0-5E：backend/browser authentication、Cookie/CORS/CSRF 与最小日志边界已实现；P0-5E final outcome 为 `PASS after findings remediation and independent recheck`，P0-5 已转为 `DONE`。
-- P0：`DONE`；P1 is `IN_PROGRESS`，P1-1～P1-4 and P1-5A/B/C/D/P1-5E/P1-5E-1/P1-5E-2/P1-5E-3 are completed；Codex made no real-model call and recorded no provider secret/raw response；P1-5F transport is `NOT_STARTED` and requires separate explicit approval。
+- P0：`DONE`；P1 is `IN_PROGRESS`，P1-1～P1-4 and P1-5A/B/C/D/P1-5E/P1-5E-1/P1-5E-2/P1-5E-3/P1-5F-1 are completed；Codex made no real-model call and recorded no provider secret/raw response；P1-5F remains `IN_PROGRESS`，while F2～F4 implementation remains `NOT_STARTED`。
 - P2：完成语音同意、上传、保存和删除设计。
 - P4/P5：完成支付审计、公开隐私设置、投诉和发布合规检查。
 

@@ -1,6 +1,6 @@
 # P1-5 AI Runtime Foundation Execution Plan
 
-Status: `P1 IN_PROGRESS`; `P1-5 IN_PROGRESS`; `P1-5A completed`; `P1-5B completed`; `P1-5C completed`; `P1-5D DONE`; `P1-5E DONE`; `P1-5E-1 DONE`; `P1-5E-2 DONE`; `P1-5E-3 DONE`; `P1-5F NOT_STARTED`
+Status: `P1 IN_PROGRESS`; `P1-5 IN_PROGRESS`; `P1-5A completed`; `P1-5B completed`; `P1-5C completed`; `P1-5D DONE`; `P1-5E DONE`; `P1-5E-1 DONE`; `P1-5E-2 DONE`; `P1-5E-3 DONE`; `P1-5F IN_PROGRESS`; `P1-5F-1 DONE`; `P1-5F-2/P1-5F-3/P1-5F-4 NOT_STARTED`
 
 Target version: `V0.1 Internal Validation`
 
@@ -15,6 +15,8 @@ P1-5D design-freeze baseline: clean committed `main` at `371d5a57ffb952a7ccb6641
 P1-5E-1 design-freeze baseline: clean committed `main` at `a416d955920ec407c011c32602ac720a6d8080fd`, equal to `origin/main`; P1-5D is committed and `DONE`；P1-5E was `NOT_STARTED` before this approved checkpoint；[`PROJECT_MASTER_PLAN.md`](../PROJECT_MASTER_PLAN.md) SHA-256 remains `2388A9660320406CB35D5354126AD71C6849A98DB7C4A356796CA951BF372F26`
 
 P1-5E-3 implementation baseline: clean committed `main` at `de6ffdc5f98b2ec4549037f7fa3f96eeb83c7d31`, equal to `origin/main`; P1-5E-1/P1-5E-2 are committed and `DONE`；[`PROJECT_MASTER_PLAN.md`](../PROJECT_MASTER_PLAN.md) SHA-256 remains `2388A9660320406CB35D5354126AD71C6849A98DB7C4A356796CA951BF372F26`
+
+P1-5F-1 design-freeze baseline: clean committed `main` at `fa4e8b0123d55044c9c621068311db06524b93c6`, equal to `origin/main`; P1-5E is committed and `DONE`；P1-5F was `NOT_STARTED` before this approved checkpoint；[`PROJECT_MASTER_PLAN.md`](../PROJECT_MASTER_PLAN.md) SHA-256 remains `2388a9660320406cb35d5354126ad71c6849a98db7c4a356796ca951bf372f26`
 
 ## Goal
 
@@ -36,9 +38,13 @@ P1-5C 是 separately approved deterministic runtime vertical slice。它在不�
   - `P1-5E-1 — Automatic AI Runtime Orchestration Design Freeze`：`DONE`；docs-only actual-source review `PASS`；findings none；
   - `P1-5E-2 — Single AI Turn Orchestration Kernel`：`DONE`；initial actual-source review `BLOCKED` on 3 findings；all remediated；remediation actual-source re-review `PASS`，findings none；
   - `P1-5E-3 — Continuous AI Drive + Composition Acceptance`：`DONE`；implementation actual-source review `PASS`，findings none；sanitized real-provider composition smoke `PASS`；
-- `P1-5F — Realtime/Web Integration + Independent Acceptance`：`NOT_STARTED`。
+- `P1-5F — Realtime/Web Integration + Independent Acceptance`：`IN_PROGRESS`；
+- `P1-5F-1 — Realtime/Public Contract Design Freeze`：`DONE`；docs-only；finding-only external re-review `PASS` with findings none；
+  - `P1-5F-2 — Backend Text Discussion Transport`：`NOT_STARTED`；
+  - `P1-5F-3 — Web Discussion Experience`：`NOT_STARTED`；
+  - `P1-5F-4 — Composition E2E + Independent Acceptance`：`NOT_STARTED`。
 
-P1-5D design freeze、implementation and config-driven model patch were separately approved；both actual-source reviews and its final user-run sanitized real-provider acceptance smoke passed，so P1-5D is `DONE`。P1-5E-1、P1-5E-2 and P1-5E-3 are also `DONE` after their required reviews；P1-5E-3's user-run sanitized real-provider composition smoke passed，closing P1-5E automatic orchestration as `DONE`。Codex made no real-model call and records no credential、raw provider response or sensitive header。P1-5F remains outside this checkpoint and requires later approval。
+P1-5D design freeze、implementation and config-driven model patch were separately approved；both actual-source reviews and its final user-run sanitized real-provider acceptance smoke passed，so P1-5D is `DONE`。P1-5E-1、P1-5E-2 and P1-5E-3 are also `DONE` after their required reviews；P1-5E-3's user-run sanitized real-provider composition smoke passed，closing P1-5E automatic orchestration as `DONE`。Codex made no real-model call and records no credential、raw provider response or sensitive header。The separately approved P1-5F-1 checkpoint freezes only the public realtime/transcript contract below；P1-5F-2～F4 remain outside this checkpoint。
 
 ## Context and authority
 
@@ -133,7 +139,7 @@ requested -> generated -> persisted
 
 Generation Request 与 final Utterance 必须分离：一个 request 至多产生一个 final utterance；retry 复用同一 logical request/idempotency boundary 或建立显式 attempt child，不能生成多个正式 utterances。`generated` 的 partial/raw candidate 在未持久化前不是小组已听到的事实。
 
-P1-5A 只冻结 lifecycle/invariants。P1-5B 现将 generation attempt 的 durable states 具体化为 `REQUESTED / RUNNING / COMPLETED / FAILED`：`RUNNING` 表示 caller 已开始 attempt；`COMPLETED` 只与同一 transaction 中唯一 formal utterance 一起成立。Conceptual `generated -> persisted` 不作为可崩溃分离的数据库状态，避免 raw/partial output 在正式 utterance 前成为 durable group fact。Event vocabulary、streaming chunks 和 Browser projection 继续 Deferred。
+P1-5A 只冻结 lifecycle/invariants。P1-5B 现将 generation attempt 的 durable states 具体化为 `REQUESTED / RUNNING / COMPLETED / FAILED`：`RUNNING` 表示 caller 已开始 attempt；`COMPLETED` 只与同一 transaction 中唯一 formal utterance 一起成立。Conceptual `generated -> persisted` 不作为可崩溃分离的数据库状态，避免 raw/partial output 在正式 utterance 前成为 durable group fact。At the P1-5B checkpoint event vocabulary、streaming chunks and Browser projection were Deferred；F1 now freezes the formal event docs-only while streaming and implementation remain Deferred。
 
 ## P1-5B implemented persistence foundation
 
@@ -421,7 +427,7 @@ Continuous drive stops when the current grant belongs to HUMAN、scheduler retur
 
 Actual-source analysis confirms no orchestration table or migration is required for the frozen invariants。Existing `simulation_sessions`、`session_actions`、`discussion_events`、`floor_decisions`、`floor_grants`、`floor_releases`、`llm_generation_requests`、`ai_utterances` and `prompt_versions` already provide current-state authority、deterministic action replay/conflict、single-owner sequence guards、request lifecycle and unique utterance/grant truth。Scheduler interventions use the existing `floor_interventions` table。
 
-This conclusion is limited to automatic orchestration correctness。P1-5E-1 does not add a public utterance event、human utterance transport、REST/WebSocket/Web projection、streaming/chunks、telemetry、Redis、queue/worker、retry/fallback/routing、model registry/admin configuration、RAG/memory、scoring/report、billing/quota、voice or schema。P1-5F owns transport/realtime/Web invocation and observation、human-side action/floor behavior、formal public utterance/error projection and independent acceptance；none is implemented or pre-decided here beyond preserving the internal authority boundary。
+This conclusion is limited to automatic orchestration correctness。P1-5E-1 did not add a public utterance event、human utterance transport、REST/WebSocket/Web projection、streaming/chunks、telemetry、Redis、queue/worker、retry/fallback/routing、model registry/admin configuration、RAG/memory、scoring/report、billing/quota、voice or schema。At that checkpoint P1-5F owned later transport/public behavior and nothing was pre-decided there；the separately approved F1 section below now freezes those contracts docs-only。
 
 ### P1-5E-1 acceptance
 
@@ -478,7 +484,7 @@ Still Deferred after the P1-5E-1 docs-only freeze:
 - provider SDK、multi-provider registry/routing/fallback and automatic retry；
 - production prompt orchestration beyond the closed P1-5C renderer and internal prompt-variable persistence；
 - additional provider-attempt/fallback hierarchy beyond the current one-request/one-attempt identity；
-- P1-5E-3 now implements only bounded in-process continuous automatic orchestration and configured composition；transport/API/WebSocket/Web、startup/background invocation and streaming remain deferred to P1-5F or later approved work；
+- P1-5E-3 implements only bounded in-process continuous automatic orchestration and configured composition；P1-5F-1 now freezes transport/API/WebSocket/Web semantics docs-only，while all implementation、startup/background invocation and streaming remain deferred to P1-5F-2～F4 or later approved work；
 - memory、RAG、embedding/vector store；
 - scoring、evidence extraction、report generation；
 - voice、ASR、TTS、audio interruption；
@@ -488,7 +494,7 @@ Still Deferred after the P1-5E-1 docs-only freeze:
 
 ## Later implementation gates
 
-P1-5D implementation and config-driven patch followed the frozen section above without scope expansion；both actual-source reviews and the final user-run sanitized real-provider acceptance smoke passed，and P1-5D is `DONE`。P1-5E-1 is `DONE` after actual-source review `PASS`，P1-5E-2 is `DONE` after its initial 3 findings were remediated and re-review passed，and P1-5E-3 is `DONE` after implementation actual-source review `PASS` with findings none and sanitized real-provider composition smoke `PASS`。P1-5F requires its own later approval。Any later implementation/transport subphase must preserve:
+P1-5D implementation and config-driven patch followed the frozen section above without scope expansion；both actual-source reviews and the final user-run sanitized real-provider acceptance smoke passed，and P1-5D is `DONE`。P1-5E-1 is `DONE` after actual-source review `PASS`，P1-5E-2 is `DONE` after its initial 3 findings were remediated and re-review passed，and P1-5E-3 is `DONE` after implementation actual-source review `PASS` with findings none and sanitized real-provider composition smoke `PASS`。P1-5F-1 is now separately approved docs-only；P1-5F-2～F4 require their own later approvals。Any later implementation/transport subphase must preserve:
 
 - any additive schema need and historical deletion/retention semantics；
 - provider-neutral request/result/error contract with a real caller；
@@ -554,7 +560,259 @@ P1-5D implementation and config-driven patch followed the frozen section above w
 - External implementation actual-source review verdict is `PASS` with findings none；reviewed implementation bundle SHA-256 is `a2b453846f1ad1e94fa17b74ca507efe462c176d67471cae87278893bb907dd0`。
 - User-run sanitized real-provider composition smoke is `PASS`：`continuous_outcome = WAITING_FOR_HUMAN`、`automated_ai_turns_advanced = 1`、`generation_request_count = 1`、`provider_identifier = zhipu`、`model_identifier = glm-4.7-flashx`、`configuration_version = ZHIPU_CHAT_DEV_V1`、generation request `COMPLETED`、formal `AiUtterance` persisted、AI `FloorRelease = SPEAKER_FINISHED` and resulting current floor actor `HUMAN`；pytest smoke is `1 passed in 5.56s`。
 - No credential、Authorization header、raw provider response、rendered prompt、Private Stance or verbatim model output was recorded。The temporary manual smoke test file was removed and is excluded from project/review scope。
-- No schema/migration、dependency/lock/config、E2 orchestration、runtime/service、API/WS/Web implementation change。P1-5E/P1-5E-3 are `DONE`；P1-5F remains `NOT_STARTED` and requires separate explicit approval。
+- No schema/migration、dependency/lock/config、E2 orchestration、runtime/service、API/WS/Web implementation change。At the P1-5E-3 closeout checkpoint，P1-5E/P1-5E-3 became `DONE` and P1-5F remained `NOT_STARTED`；the current P1-5F-1 status is superseded by the design-freeze section below。
+
+## P1-5F-1 design freeze — Realtime/Public Contract
+
+P1-5F-1 is the separately approved docs-only architectural freeze for exposing the completed P1-5E automatic AI orchestration through a public text-discussion contract。It creates no backend、Web、WebSocket、REST、schema、migration、test、generated contract、dependency、configuration or infrastructure implementation。P1-5F/P1-5/P1 remain `IN_PROGRESS`；P1-5F-1 is `DONE` after external actual-source re-review；P1-5F-2～F4 remain `NOT_STARTED`。
+
+### Public protocol and deployment boundary
+
+- WebSocket is the client-facing realtime protocol for active discussion commands and ordered incremental session events。REST remains authoritative for resource、snapshot and history reads。
+- WebSocket does not promise a permanent deployment topology。Future Redis/NATS/Kafka、realtime gateway or multi-worker routing may replace internal delivery without changing this public REST/WS contract。
+- Human text utterance submission uses WebSocket，not REST。P1-5F-1 adds no SSE、REST command fallback、Redis、queue、worker or realtime gateway。
+- The approved command is `participant.utterance.submit` with `schema_version = 1` and the existing command envelope：
+
+```text
+schema_version = 1
+type = "participant.utterance.submit"
+session_id
+action_id
+payload:
+  content
+```
+
+- The client must not provide `participant_id`、`actor_kind`、`floor_grant_id`、`phase` or any AI/provider/runtime identity。The server derives identity and context from the authenticated user plus the exact authoritative current floor。
+
+### Human authorization, reconciliation and text validation
+
+A syntactically valid Human utterance is accepted only when one locked aggregate operation proves all of the following after lifecycle/deadline reconciliation：
+
+- the session belongs to the current authenticated owner；
+- the session remains in a floor-enabled active phase；
+- an exact current、unreleased floor grant exists；
+- the grant participant belongs to the session and the grant phase remains exact；
+- the participant has `actor_kind = HUMAN` and belongs to the authenticated user；
+- the exact authoritative phase/current grant did not advance during reconciliation。
+
+A late command after authoritative phase/grant advancement is rejected and never becomes an utterance in the old turn。A syntactically valid command rejected by current authority or content rules uses the recoverable WS business error `UTTERANCE_REJECTED` with the exact safe message `You cannot submit an utterance right now.`；the socket remains open。The error does not reveal whether rejection came from an AI floor、stale grant、phase transition、deadline reconciliation、content rule or another internal state reason。Malformed envelopes remain `PROTOCOL_ERROR`。Existing safe concepts remain `ACTION_ID_CONFLICT`、`SEQUENCE_AHEAD` and `INTERNAL_ERROR`。
+
+V0.1 Human `content` is frozen as：
+
+- `1..4000` Unicode code points；
+- `content.strip()` must not be empty；
+- U+0000 is rejected；
+- no Unicode normalization；
+- accepted content is not automatically trimmed；
+- the accepted original content is persisted exactly。
+
+The 4000-code-point bound is a V0.1 safety/abuse limit，not a permanent commercial product limit。
+
+### Unified formal utterance event、versioned floor compatibility and public allowlist
+
+Human and AI formal public utterances use one event only：`participant.utterance.created`，`schema_version = 1`。There is no `human.utterance.created`、`ai.utterance.created`、`message.created`、`ai.generation.started` or `ai.generation.failed` event。
+
+The existing formal envelope owns `session_id`、`sequence`、`occurred_at` and nullable `action_id`。The payload is exactly：
+
+```text
+utterance_id
+participant_id
+actor_kind        # HUMAN | AI
+floor_grant_id
+phase
+content
+```
+
+Envelope fields are not duplicated in the payload。A Human utterance event carries the original `participant.utterance.submit` `action_id`；an AI utterance event carries `action_id = null`。
+
+Historical P1-4 floor-event `schema_version = 1` semantics remain unchanged：`floor.granted` and `floor.intervention_requested` require a non-null UUID4 `action_id`，while `floor.released` permits UUID4 or null。Existing persisted v1 facts、backend serialization and Web parsing keep those exact semantics；v1 events are not rewritten、redacted in place or reinterpreted as the new meaning。
+
+P1-5F freezes additive public floor-event `schema_version = 2`。Event names and payload meanings remain `floor.granted`、`floor.released` and `floor.intervention_requested`。The v2 envelope keeps `action_id` always present and nullable，but the field represents only a public client action identity：an event directly caused by the Human `participant.utterance.submit` command may expose that original Human action ID where applicable；internal automatic scheduler、release or intervention causation must serialize `action_id = null`。Internal `SessionAction` causation remains durable/private for idempotency and replay。
+
+Floor-event v2 is an additive public compatibility layer under ADR-007's independently versioned WS contract，not a change to historical v1。P1-5F-2 must preserve historical v1 serialization/replay while producing v2 for new P1-5F public floor projections；P1-5F-3 must parse/project both versions and enforce each version's exact action semantics。`participant.utterance.created` remains independently frozen at `schema_version = 1`。
+
+New P1-5F utterance/floor REST/WS projections and errors never expose `generation_request_id`、provider/model identifiers、configuration version、Prompt Version identity/content、rendered prompt、Private Stance、provider raw response、generation internal failure taxonomy、internal automatic orchestration release/schedule/intervention action IDs、secrets or Authorization headers。Historical floor-event v1 remains readable with its already-published action semantics。
+
+### Authoritative transcript REST contract
+
+The independent authoritative transcript read endpoint is：
+
+```text
+GET /sessions/{session_id}/utterances
+```
+
+The whole transcript is not added to `GET /sessions/{session_id}`。The endpoint requires authentication but no CSRF mutation header。Missing and non-owner sessions both follow existing `SESSION_NOT_FOUND` / `404` non-disclosure semantics。
+
+Pagination uses `after_sequence >= 0` as an exclusive cursor，`limit = 100` by default and `limit <= 200`，ordered by full discussion `sequence ASC`。Offset/page-number pagination is not used。The response is：
+
+```json
+{
+  "items": [
+    {
+      "utterance_id": "...",
+      "sequence": 18,
+      "occurred_at": "...",
+      "action_id": "... or null",
+      "participant_id": "...",
+      "actor_kind": "HUMAN | AI",
+      "floor_grant_id": "...",
+      "phase": "...",
+      "content": "..."
+    }
+  ],
+  "next_after_sequence": 18
+}
+```
+
+`next_after_sequence` is the last returned transcript sequence when another page exists，otherwise `null`。`action_id` is always present and nullable：Human items use the original client action ID；AI items use `null`。This lets reconnect prove whether a pending Human command already became durable。
+
+### Current transcript persistence and future retention safety
+
+- `DiscussionEvent` is the current durable ordered public transcript/event persistence implementation。The public transcript read is a purpose-built projection over its `participant.utterance.created` facts。
+- Human utterance does not require a `human_utterances` table。Existing `AiUtterance` remains the internal AI provenance/content fact；its ID is the AI public `utterance_id`。
+- Public clients depend only on the REST/WS contracts，not on `DiscussionEvent` as a permanent physical-storage promise。
+- If event retention、compaction or a replacement read model is introduced later，an equivalent durable transcript projection must exist before deleting the only user-visible transcript copy。Compaction must never accidentally destroy historical transcript。
+- P1-5F does not redesign `AiUtterance` into a generic table and does not add a Human utterance table。
+
+### Human identity, idempotency and atomic release
+
+The existing `(session_id, action_id)` identity remains the Human command idempotency boundary。Same action ID plus exactly the same semantic content is exact replay：no second utterance、release、scheduling or AI drive。Same action ID plus different content is `ACTION_ID_CONFLICT`。
+
+Human `utterance_id` is server-owned and deterministic from the accepted session/Human command identity。Replay returns the same ID；the client cannot choose it。P1-5F-2 may finalize the namespace/helper，but the result must follow the existing project convention of deterministic bytes with UUID4-compatible public identity。
+
+The accepted Human utterance and release of that exact Human floor grant are one locked aggregate transaction：
+
+```text
+lifecycle/deadline reconciliation
+  -> validate exact HUMAN current grant
+  -> persist SessionAction(participant.utterance.submit)
+  -> persist participant.utterance.created   sequence N
+  -> persist FloorRelease(SPEAKER_FINISHED)
+  -> clear current_floor_grant_id
+  -> persist floor.released                  sequence N+1
+  -> commit
+```
+
+The `participant.utterance.created` v1 event and causal `floor.released` v2 event both carry the original Human action ID。The system never exposes a durable intermediate state in which the Human utterance exists but that exact successful Human grant remains authoritative/current because release was omitted。Successful public order is always `N participant.utterance.created` then `N+1 floor.released / SPEAKER_FINISHED`。
+
+### Separate scheduler checkpoint and P1-5E composition
+
+The Human transaction never chooses the next speaker。After Human+release commit，P1-4's deterministic Floor Scheduler runs as a separate locked transaction and produces `floor.granted`、intervention or no grant。Human progression uses deterministic scheduler/action/child identities tied to the exact session and released Human grant，so crash/re-entry converges on the same logical checkpoint without minting a new schedule identity。
+
+No orchestration table is planned。If P1-5F-2 proves that existing durable release/action/scheduler facts cannot recover this checkpoint，implementation must stop for separate schema review。
+
+If the post-Human scheduler grants an AI participant，transport calls the existing configured P1-5E composition path `drive_configured_ai_session(...)`。Transport does not duplicate AI Runtime、Generation Request lifecycle、Floor Scheduler、release logic、continuous drive loop or provider selection。P1-5E remains application-level、state-driven and reentrant。
+
+### AI public-event atomicity
+
+For successful AI generation，these three facts must commit atomically in the existing locked generation-completion transaction：
+
+```text
+LlmGenerationRequest -> COMPLETED
+AiUtterance
+participant.utterance.created
+```
+
+The event uses the same `AiUtterance.id` as public `utterance_id`，increments the authoritative discussion sequence and has `action_id = null`。This prevents a crash after `AiUtterance` commit from permanently omitting the public transcript fact。After that commit，existing P1-5E progression continues in separate commits：release `SPEAKER_FINISHED`，then scheduler。AI terminal failure creates no fabricated utterance event；existing typed generation failure remains internal while the authoritative public control flow is `floor.released / INTERRUPTED` then scheduler。
+
+### Commit-before-send and progression invocation
+
+All WebSocket delivery happens after the authoritative database transaction commits：always `DB commit -> WS/catch-up delivery`，never `WS send -> DB commit`。Disconnect/send failure after commit does not roll back、regenerate、duplicate the utterance or mint a replacement action identity；reconnect/catch-up recovers durable truth。The socket is delivery，not truth。
+
+V0.1 transport may use bounded best-effort in-process invocation after the Human commit to resume progression，but correctness cannot depend on the task surviving。Progression remains state-driven、reentrant、concurrency-safe、restart-safe and may be re-entered by reconnect/resume。P1-5F-1 adds no Redis、Celery、Kafka、NATS、distributed worker or dedicated realtime gateway。
+
+### Crash and restart matrix
+
+- A — crash before Human transaction commit：no utterance fact；the original action can safely retry。
+- B — Human utterance+release committed，crash before scheduler：the Human utterance remains；the deterministic same scheduler checkpoint resumes。
+- C — scheduler committed an AI grant，crash before provider：the durable current AI grant drives existing P1-5E。
+- D — provider may have been contacted and request is `RUNNING`：preserve existing P1-5E fail-closed behavior；never automatically issue a second paid call。
+- E — AI utterance+public event committed，crash before AI release：existing P1-5E resumes the exact release without regeneration。
+- F — AI release committed，crash before next scheduler：existing P1-5E crash-E scheduler recovery applies。
+- G — any business commit succeeded but WS send failed：reconnect/catch-up only；no repeated business mutation。
+
+### Browser AI UX and Human pending rules
+
+No public AI Runtime lifecycle event、provider status or ETA/countdown is introduced。The Browser derives processing only from authoritative current floor：when the current grant actor is AI，it may show `AI 候选人正在组织发言…`。Success is observed through the formal utterance then normal floor progression。Terminal failure has no utterance；`floor.released / INTERRUPTED` is authoritative and the Browser may show a non-transcript、non-durable generic notice such as `该 AI 候选人本轮未能完成发言，讨论已继续。`。It never shows HTTP status、`RATE_LIMIT`、provider/model/configuration or raw exception。
+
+Human input is enabled only when authoritative state proves an active floor-enabled session whose current grant belongs to the authenticated Human participant。AI floor、another participant、no current floor and terminal session disable input。Client disablement is UX only；the backend always revalidates。
+
+After submit，the Browser may keep an in-memory pending state but must not render pending text as a formal transcript bubble before a durable `participant.utterance.created` fact arrives。Pending is confirmed by matching WS event `action_id` or，after reconnect，matching transcript item `action_id`。Pending action/content is never stored in localStorage/sessionStorage。Disconnect does not justify a new action ID；retry reuses the original ID。
+
+### Browser restore and transcript convergence
+
+Initial load/reload is frozen conceptually as：
+
+```text
+GET /sessions/{id}
+  -> authoritative snapshot and watermark S
+GET /sessions/{id}/utterances
+  -> durable transcript
+connect WS with after_sequence=S
+  -> S-after ordered incremental session events
+```
+
+REST/WS races converge by stable identity。`utterance_id` is transcript primary identity and `sequence` is authoritative order：a new ID inserts；an identical replay is ignored；the same ID with conflicting authoritative fields is an integrity mismatch that stops local inference and reloads both authoritative session and transcript。Transcript sequence is filtered from the full `DiscussionEvent` stream and is not contiguous；for example `18, 21, 25` is valid。Transcript-only items never use sequence-gap detection；gap detection remains a property of the complete WS formal event stream。
+
+Authoritative reload merges by identity and does not deliberately clear already confirmed transcript first，avoiding an unnecessary empty/flicker cycle。
+
+### Logging, privacy and public redaction
+
+Utterance content is not duplicated into ordinary logs、WS error logs、traces or telemetry merely because it is a legitimate transcript fact。Safe operational metadata may include `session_id`、`participant_id`、`utterance_id`、`action_id`、`sequence`、`actor_kind`、a safe outcome category and latency。Logs/telemetry never contain utterance content、prompt、Private Stance、provider raw response、credential、Authorization or raw provider exception body。
+
+Purpose-built floor-event v2 serialization strips internal automatic scheduler/release/intervention action IDs while preserving them in internal durable facts when required for replay。Historical floor-event v1 remains unchanged and dual-readable；generation request/provider/model/configuration/prompt/failure internals remain excluded from new transcript、formal events、errors and Browser state。
+
+### P1-5F subphases and later acceptance
+
+- `P1-5F-1 — Realtime/Public Contract Design Freeze`：this docs-only checkpoint。
+- `P1-5F-2 — Backend Text Discussion Transport`：Human WS command；durable unified public utterance event；historical floor-event v1 preservation plus additive v2 serialization；atomic Human utterance+release；transcript REST；AI completion event projection；post-Human scheduler plus existing E3 composition invocation；backend recovery/idempotency/privacy tests。Web UI remains out of scope。
+- `P1-5F-3 — Web Discussion Experience`：existing session-panel/realtime integration；strict dual parsing/projection of historical floor-event v1 and additive v2；transcript rendering；Human input/pending；AI processing；generic interrupted notice；REST/WS merge；reload/reconnect/gap recovery。No major visual redesign。
+- `P1-5F-4 — Composition E2E + Independent Acceptance`：PostgreSQL+backend+WS+Browser/Chromium end-to-end with fake/mock network-free provider；independent acceptance；an optional final user-run sanitized one-call real-provider Browser smoke only when explicitly instructed。
+
+P1-5F-2 acceptance must prove exact Human-floor authorization、Human event+release atomicity、exact replay/conflict、AI completion+public-event atomicity、transcript pagination/owner isolation、deterministic post-Human scheduling、reuse of E3、crash recovery、disconnect/send-failure recovery、historical floor-event v1 preservation、new v2 serialization/action semantics、privacy/public-projection sentinels and network-free provider tests。
+
+P1-5F-3 acceptance must prove exact floor-event v1/v2 dual parsing and projection；Human-floor input enablement；AI/other/no-floor disablement；pending is not formal transcript；WS and REST reconnect confirmation；REST/WS duplicate merge；sequence-gap reload；`UTTERANCE_REJECTED` and `ACTION_ID_CONFLICT` handling；generic AI `INTERRUPTED` UX。
+
+P1-5F-4 end-to-end path is：
+
+```text
+Browser
+  -> Human WS command
+  -> durable Human utterance
+  -> release
+  -> scheduler
+  -> AI grant
+  -> configured composition
+  -> durable AI utterance/public event
+  -> release
+  -> scheduler
+  -> Browser receives transcript
+  -> reload
+  -> transcript remains complete
+```
+
+Automated CI/E2E never uses real provider quota。A potential final user-run real-provider Browser smoke requires explicit instruction，approximately one Human turn and one real generation，and records only sanitized proof that the AI formal event became visible、floor progressed and reload restored transcript。Credential、rendered prompt、Private Stance、raw response and verbatim provider output never become governance evidence。
+
+### Actual-source sufficiency and stop-condition assessment
+
+P1-5F-1 actual-source inspection found no approved stop condition：
+
+- `DiscussionEvent` already has session-scoped ordered sequence、nullable action causation、JSON payload and owner-session deletion semantics，so the unified public utterance fact and sequence-cursor transcript do not contradict current event semantics。
+- `SessionParticipant.user_id`、the session aggregate row lock、`FloorGrant`/`FloorRelease` and reusable lifecycle release helper are sufficient for exact Human authorization and one Human utterance+release transaction without a Human table。
+- `complete_generation_request(...)` already locks the session aggregate and atomically commits `COMPLETED + AiUtterance`，so P1-5F-2 can add the corresponding `DiscussionEvent` and sequence allocation to that same transaction without changing P1-5E authority。
+- Existing deterministic UUID4-compatible derivation、`SessionAction` digest semantics and scheduler child facts are sufficient to define a Human post-release checkpoint from stable session/grant identity；P1-5F-2 must freeze the exact label/helper and test it before implementation acceptance。
+- Actual committed source confirms the historical floor-event v1 constraints：backend and Web require non-null UUID4 `action_id` for `floor.granted` and `floor.intervention_requested`，while `floor.released` is nullable。Therefore F2/F3 must add the independently versioned v2 projection and dual-version parsing rather than alter v1；this is an expected transport compatibility delta under ADR-007，not a schema、authority or ADR contradiction。
+
+If later actual-source implementation disproves any of those facts，requires a new durable schema fact、cannot make AI completion/event atomic、cannot recover the Human scheduler checkpoint、contradicts sequence semantics or changes P1-5E authority，the affected implementation stops for separate review。A discovered need is not permission to implement schema or architecture changes in P1-5F-1。
+
+### P1-5F-1 validation and closeout state
+
+- Exact scope is documentation only：`TASKS.md`、`ROADMAP.md`、`ARCHITECTURE.md`、`API.md`、`DATABASE.md`、`AGENT_BEHAVIOR.md`、`PRIVACY_AND_SAFETY.md` and this execution plan。
+- No source、test、OpenAPI generated schema、package/dependency/lock、DB model/migration、provider/runtime/orchestration/floor/lifecycle、REST/WS/Web、CI、Docker/infra、prompt/seed or provider configuration change is authorized。
+- Validation is limited to baseline/changed-file scope、Markdown relative links、final newlines、terminology/status、secret/static leakage、master-plan hash、`git diff --check` and staged count。No backend/Web/provider test、browser smoke or real-model call runs。
+- The initial external actual-source review was `BLOCKED` by one floor-event v1 `action_id` compatibility finding。Remediation preserved historical v1 semantics and froze additive floor-event v2 without changing source、schema or ADR authority。
+- The finding-only external re-review verdict is `PASS` with findings none。Reviewed bundle：`group-interview-arena-review-20260825-110115.zip`；SHA-256：`6603b1f0377aa449d3a209e475fb3afbb74f9f83c9be38f84df97918eeb1ac0c`。
+- P1-5F-1 is `DONE`。P1-5F/P1-5/P1 remain `IN_PROGRESS`；P1-5F-2～F4 remain `NOT_STARTED`。No commit or push is authorized；P1-5F-2 must not start。
 
 ## Decisions
 
@@ -570,6 +828,10 @@ P1-5D implementation and config-driven patch followed the frozen section above w
 - One AI grant owns deterministic generation、utterance、release and next-schedule identities；existing `SessionAction` replay/conflict and scheduler children provide restart/concurrency convergence without an orchestration table。
 - Confirmed success releases `SPEAKER_FINISHED`；confirmed terminal failure releases `INTERRUPTED` while preserving typed generation failure；uncertain/stale truth never drives stale release or scheduling。
 - Release and scheduler are separate committed operations，and continuous drive has the fixed per-invocation guard `MAX_AUTOMATED_AI_TURNS_PER_DRIVE = 8`。
+- Public Human text commands use WebSocket；REST owns snapshots/history；one unified `participant.utterance.created` event and owner-only sequence-cursor transcript represent Human and AI formal speech。
+- Human utterance and exact-grant release are one transaction；next-speaker scheduling is a separate deterministic checkpoint；AI completion、`AiUtterance` and its public event are one transaction。
+- `participant.utterance.created` remains v1；historical floor-event v1 remains unchanged；additive floor-event v2 exposes the original Human action ID only for applicable direct client causation and maps internal automatic scheduler/release/intervention action IDs to null。F2/F3 preserve and parse both floor versions；provider/runtime/prompt/failure internals remain private。
+- `DiscussionEvent` is the current durable transcript implementation，but future compaction cannot remove the only transcript copy without an equivalent durable projection。
 
 ## Risks and stop conditions
 
@@ -584,6 +846,9 @@ P1-5D implementation and config-driven patch followed the frozen section above w
 - **Action replay drift**：stop if deterministic release/schedule identity cannot reconstruct or consume the original semantic payload without minting a replacement action。
 - **Unsafe progression**：stop if an uncertain/stale generation or lifecycle result would require release/scheduling before exact durable revalidation。
 - **Schema contradiction**：stop if P1-5E-2 actual-source implementation proves existing action/floor/request/utterance facts cannot recover a crash boundary without a new durable fact；request separate approval before migration。
+- **Transcript loss**：stop before event retention/compaction can delete the only durable user-visible transcript without an equivalent projection。
+- **Public causation/version drift**：stop if a new floor-event v2 projection exposes an internal automatic scheduler/release/intervention action identity，if F2/F3 break historical v1 compatibility，or if generation request/provider/model/configuration/prompt/private/failure internals reach a new REST/WS event、error or Browser projection。
+- **Atomicity drift**：stop if Human utterance+release or AI completion+AiUtterance+public event cannot be committed in their frozen atomic boundaries using the locked aggregate。
 
 ## Progress
 
@@ -592,4 +857,8 @@ P1-5D implementation and config-driven patch followed the frozen section above w
 - P1-5C：completed；deterministic runtime contract/vertical slice and PostgreSQL orchestration gates PASS；no real provider or transport。
 - P1-5D：`DONE`；design freeze、implementation、findings remediation、config-driven model patch、both actual-source reviews and final user-run sanitized real-provider acceptance smoke completed without a Codex real-model call or sensitive-data recording。
 - P1-5E：`DONE`；P1-5E-1 design freeze、P1-5E-2 single-turn kernel and P1-5E-3 bounded continuous drive/configured composition are `DONE` after required reviews and the sanitized composition smoke。
-- P1-5F：`NOT_STARTED`；requires separate explicit approval。
+- P1-5F：`IN_PROGRESS`；
+- P1-5F-1：`DONE`；docs-only public REST/WS/Browser contract freeze accepted after finding remediation and finding-only external re-review `PASS`；
+  - P1-5F-2：`NOT_STARTED`；backend text discussion transport requires separate approval；
+  - P1-5F-3：`NOT_STARTED`；Web discussion experience requires separate approval；
+  - P1-5F-4：`NOT_STARTED`；composition E2E and independent acceptance require separate approval。

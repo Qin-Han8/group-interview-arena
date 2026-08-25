@@ -1,6 +1,6 @@
 # 数据库技术基线
 
-- Status: P0 Data Architecture Baseline + P1-1～P1-4 schema implemented + P1-5A/P1-5B/P1-5C/P1-5D/P1-5E/P1-5E-1/P1-5E-2/P1-5E-3 completed; P1-5C/P1-5D/P1-5E-1/P1-5E-2/P1-5E-3 add no schema
+- Status: P0 Data Architecture Baseline + P1-1～P1-4 schema implemented + P1-5A/P1-5B/P1-5C/P1-5D/P1-5E/P1-5E-1/P1-5E-2/P1-5E-3/P1-5F-1 completed + P1-5F in progress; P1-5C/P1-5D/P1-5E-1/P1-5E-2/P1-5E-3/P1-5F-1 add no schema
 - Current phase: P1 — IN_PROGRESS
 - Data architecture baseline established by: P0-2 — DONE
 - Local PostgreSQL infrastructure: P0-4B — completed
@@ -15,7 +15,7 @@
 - Target version: V0.1 Internal Validation
 - Business schema: identity, session, question/persona, durable phase timing, participant/floor audit, and AI Runtime persistence foundation (nineteen product tables)
 - P1-1 status: P1-1A～E completed; independent final verdict PASS; P1-1 DONE
-- P1-2/P1-3/P1-4 status: DONE; P1-5A～P1-5E/P1-5E-1/P1-5E-2/P1-5E-3 completed; P1-5E-3 has zero schema delta; P1-5B adds the latest three product tables through linear revision `f1a15b15c005`
+- P1-2/P1-3/P1-4 status: DONE; P1-5A～P1-5E/P1-5E-1/P1-5E-2/P1-5E-3/P1-5F-1 completed; P1-5F in progress; P1-5E-3/P1-5F-1 have zero schema delta; P1-5B adds the latest three product tables through linear revision `f1a15b15c005`
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -390,11 +390,34 @@ The deterministic UUID mappings are application identities，not new rows beyond
 
 No `orchestration_runs`/cursor/lease/lock table is planned。Crash after release but before scheduling is recoverable by the exact automatic `FloorRelease`/causal action and absence of the deterministic next-schedule action；crash after scheduling is recoverable from the deterministic `SessionAction`/`FloorDecision` and child fact。`RUNNING` generation remains fail-closed rather than requiring an orchestration lease。
 
-This sufficiency conclusion covers internal automatic-orchestration correctness only。Public utterance ordering/events、human-side transport and Web projection remain P1-5F concerns；P1-5E-1 does not authorize schema、migration、event vocabulary、telemetry or retention changes。If P1-5E-2 actual implementation disproves an invariant above，it must stop and request separate schema approval rather than create a migration。
+This sufficiency conclusion covers internal automatic-orchestration correctness only。At P1-5E-1，public utterance ordering/events、human-side transport and Web projection remained future P1-5F concerns；P1-5F-1 now freezes those contracts below without authorizing schema、migration、telemetry or retention implementation。If later implementation disproves an invariant，it must stop and request separate schema approval rather than create a migration。
 
 P1-5E-2 implementation confirms the frozen sufficiency conclusion：the coordinator reads these existing facts and mutates only through the existing AI Runtime、floor and scheduler services。Alembic remains at single head `f1a15b15c005` with no new upgrade operations，and the product schema remains exactly nineteen tables。
 
 P1-5E-3 continuous drive and configured composition add no durable cursor、budget、lease、provider-configuration or orchestration fact。The loop reconstructs progress from E2's exact release/next-grant result and authoritative existing rows；its per-invocation budget is an in-memory safety guard rather than persisted product state。PostgreSQL progression、crash-E recovery、concurrency and cancellation/re-entry tests confirm the same nineteen-table recovery model without a migration。
+
+## P1-5F-1 public transcript persistence boundary — frozen, no migration
+
+P1-5F-1 leaves the current nineteen-table schema and Alembic head `f1a15b15c005` unchanged。The approved current implementation model is：
+
+- `discussion_events` is the current durable ordered public event/transcript store。`participant.utterance.created` v1 uses its existing session sequence、nullable action causation、JSON payload and timestamp columns。
+- Human formal utterance content is stored once in the public event payload；no `human_utterances` or generic `utterances` table is added。
+- Existing `ai_utterances` remains the internal AI provenance/content fact。Its `id` is the AI public `utterance_id`；a matching public event projects the allowlisted content/participant/grant/phase without exposing the generation request or provenance internals。
+- Public clients depend on the owner-only transcript REST and ordered WS contracts，not on the `discussion_events` physical table as a permanent storage promise。
+
+Human acceptance uses the existing aggregate row lock and one transaction：reconcile lifecycle/deadline，validate the owner-bound Human/current grant，insert `SessionAction(participant.utterance.submit)`，append `participant.utterance.created` at sequence N，insert exact `FloorRelease(SPEAKER_FINISHED)`，clear `current_floor_grant_id`，append `floor.released` at N+1，then commit。Same `(session_id, action_id)` plus identical content replays both events；different content conflicts。Human `utterance_id` is a deterministic UUID4-compatible projection from stable session/action identity，not a client column or new row identity。
+
+Successful AI completion extends the existing locked `complete_generation_request(...)` transaction so `LlmGenerationRequest.COMPLETED`、one `AiUtterance`、the session sequence increment and corresponding `participant.utterance.created` commit atomically。Failure writes no utterance event。P1-5E release and scheduler continue as later commits。
+
+The transcript REST query filters `participant.utterance.created` by owner session and `sequence > after_sequence`，orders by the composite primary-key sequence and uses a bounded limit。Transcript sequence is a filtered view and is not contiguous。`participant.utterance.created` remains v1 and its `action_id` is projected nullable：Human preserves the original command action；AI is null。
+
+Existing persisted P1-4 floor-event v1 facts and their action semantics remain unchanged：grant/intervention require a non-null UUID4 and release permits UUID4 or null。The additive floor-event v2 needs no schema or migration；its public serializer maps automatic scheduler/release/intervention causation to null while a directly causal Human command may retain its original action ID。Internal deterministic `SessionAction` causation remains durable/private，and F2/F3 must preserve/read historical v1 alongside v2。
+
+Post-Human scheduling remains a separate deterministic action/decision checkpoint keyed from stable session+released-grant identity。Existing `SessionAction`、`FloorDecision` and grant/intervention children are sufficient for crash/re-entry；no orchestration/cursor table is planned。
+
+Future retention safety is mandatory：before discussion-event compaction、retention or read-model replacement can delete the only transcript copy，an equivalent durable user-visible transcript projection must be established。Event compaction may never accidentally destroy historical transcript。P1-5F does not redesign `AiUtterance` into a generic table。
+
+Actual-source assessment found no schema stop condition：the Human participant already carries exact `user_id` ownership，the floor lifecycle helper can release inside the same transaction，the event store already owns ordered sequence，and generation completion already owns the required aggregate-locked atomic boundary。If F2 implementation disproves any invariant，it must stop for separate schema review rather than create a migration。
 
 ## Future business schema
 
@@ -425,7 +448,7 @@ P1-5E-3 continuous drive and configured composition add no durable cursor、budg
 
 - P0-5C：FastAPI lifespan/request dependency 已成为现有 async DB runtime 的第一个 application caller；真实 PostgreSQL auth integration 只使用迁移到 head 的隔离临时数据库，development DB 保持 head `4fe43b42641b` 且两张表均为 0 rows；
 - P0-5D：completed；browser closure 已实现，existing Cookie/CORS/CSRF/shared trusted-origin boundary 已生效；P1 不得创建第二套 trusted-origin config；
-- P1：`IN_PROGRESS`；P1-1～P1-4 and P1-5A～P1-5E/P1-5E-1/P1-5E-2/P1-5E-3 `DONE`；current migration head `f1a15b15c005`、精确十九张 product tables；P1-5C/P1-5D/P1-5E-1/P1-5E-2/P1-5E-3 schema delta 为零；P1-5F、记忆和报告继续 Deferred；
+- P1：`IN_PROGRESS`；P1-1～P1-4 and P1-5A～P1-5E/P1-5E-1/P1-5E-2/P1-5E-3/P1-5F-1 `DONE`；P1-5F remains `IN_PROGRESS`；current migration head `f1a15b15c005`、精确十九张 product tables；P1-5C/P1-5D/P1-5E-1/P1-5E-2/P1-5E-3/P1-5F-1 schema delta 为零；F2～F4 implementation、记忆和报告继续 Deferred；
 - P2～P4：仅随获批范围增加音频、评分训练和商业化数据。
 
 ## 与其他文档关系

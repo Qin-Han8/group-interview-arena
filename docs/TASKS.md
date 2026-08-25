@@ -1,17 +1,17 @@
 # 当前任务清单
 
-- Status: P1 in progress; P1-1, P1-2, P1-3, and P1-4 completed; P1-5A/P1-5B/P1-5C/P1-5D/P1-5E/P1-5E-1/P1-5E-2/P1-5E-3 completed; P1-5F not started
-- Managed scope: P1-5E-3 final docs-only closeout; no P1-5F
+- Status: P1 in progress; P1-1, P1-2, P1-3, and P1-4 completed; P1-5A/P1-5B/P1-5C/P1-5D/P1-5E/P1-5E-1/P1-5E-2/P1-5E-3/P1-5F-1 completed; P1-5F in progress; P1-5F-2/P1-5F-3/P1-5F-4 not started
+- Managed scope: P1-5F-1 docs-only Realtime/Public Contract Design Freeze; no backend/Web/REST/WS/schema/test implementation and no P1-5F-2～F4
 - Most recently completed subphase: P1-5E-3 — `DONE`
 - P0-7 final outcome: initial verdict `BLOCKED` with two documentation findings; remediation completed; finding-only independent recheck `PASS`; new blockers none; P1 readiness `READY`
 - Current phase: P1 — `IN_PROGRESS`
 - Most recently completed task: P1-4 — `DONE`
-- Current task gate: P1-5 — `IN_PROGRESS`; P1-5A/P1-5B/P1-5C/P1-5D/P1-5E/P1-5E-1/P1-5E-2/P1-5E-3 `DONE`; P1-5F `NOT_STARTED`
+- Current task gate: P1-5 — `IN_PROGRESS`; P1-5A/P1-5B/P1-5C/P1-5D/P1-5E/P1-5E-1/P1-5E-2/P1-5E-3/P1-5F-1 `DONE`; P1-5F `IN_PROGRESS`; P1-5F-2/P1-5F-3/P1-5F-4 `NOT_STARTED`
 - P0 status: `DONE`; P0-1 through P0-7 completed
 - Allowed status values: `TODO` / `IN_PROGRESS` / `BLOCKED` / `DONE`
 - Related roadmap: [`ROADMAP.md`](ROADMAP.md)
 
-用户已明确批准正式进入 P1，并已完成 P1-1～P1-4。P1-5A～P1-5D 已完成；P1-5E-1 actual-source review 为 `PASS`、findings none；P1-5E-2 的 3 个 findings 已全部 remediation，re-review 为 `PASS`、findings none；P1-5E-3 implementation actual-source review 与 user-run sanitized real-provider composition smoke 均为 `PASS`。P1-5E automatic AI runtime orchestration 现已关闭为 `DONE`；P1-5F 保持 `NOT_STARTED` 并需要单独明确批准。Codex 不得开始 transport、记忆、报告、语音、Redis/queue、P1-5F 或 P2～P6。
+用户已明确批准正式进入 P1，并已完成 P1-1～P1-4。P1-5A～P1-5D 已完成；P1-5E-1 actual-source review 为 `PASS`、findings none；P1-5E-2 的 3 个 findings 已全部 remediation，re-review 为 `PASS`、findings none；P1-5E-3 implementation actual-source review 与 user-run sanitized real-provider composition smoke 均为 `PASS`。P1-5E automatic AI runtime orchestration 已关闭为 `DONE`。P1-5F-1 initial actual-source review was blocked by one floor-event v1 `action_id` compatibility finding；the remediation preserved historical v1 and froze additive floor-event v2，and finding-only re-review returned `PASS` with findings none for reviewed bundle SHA-256 `6603b1f0377aa449d3a209e475fb3afbb74f9f83c9be38f84df97918eeb1ac0c`。P1-5F-1 is `DONE`；P1-5F remains `IN_PROGRESS`；P1-5F-2～F4 remain `NOT_STARTED` and unapproved。Codex 不得实现 P1-5F-2～F4、记忆、报告、语音、Redis/queue 或 P2～P6。
 
 ## P0-1 — 仓库与文档治理
 
@@ -586,10 +586,10 @@
 - ID: `P1-5`
 - 名称：AI Runtime Foundation
 - Status: `IN_PROGRESS`
-- Approval state：P1-5A architecture freeze、P1-5B persistence foundation、P1-5C deterministic runtime vertical slice、P1-5D first-provider integration and P1-5E automatic orchestration completed；P1-5E-1/P1-5E-2/P1-5E-3 are `DONE`；P1-5F not started。
+- Approval state：P1-5A architecture freeze、P1-5B persistence foundation、P1-5C deterministic runtime vertical slice、P1-5D first-provider integration and P1-5E automatic orchestration completed；P1-5E-1/P1-5E-2/P1-5E-3/P1-5F-1 are `DONE`；P1-5F remains `IN_PROGRESS`；P1-5F-2～F4 are not started。
 - 目标：在既有 immutable question/persona、server-authoritative session lifecycle 与 deterministic floor control 之上，建立 provider-neutral、可追踪、可重试且不破坏 session integrity 的 AI utterance generation boundary。
-- In scope：the completed P1-5A～P1-5E-2 foundations plus P1-5E-3's provider-neutral bounded continuous drive、lazy Zhipu composition from required server settings、canonical provenance promotion and network-free unit/PostgreSQL recovery/concurrency/cancellation coverage。
-- Out of scope for this checkpoint：real GLM calls、schema/migration、dependency/lock/config、API/WS/Web、streaming、registry/routing/fallback/automatic retry、memory/RAG、scoring/report、voice、Redis/queue/worker、CI、token/cost/billing/quota/payment/multi-tenant and P1-5F。
+- In scope：docs-only freeze of the public Human WS command、unified Human/AI utterance event、owner-only transcript REST、Human utterance+release and AI completion+public-event atomicity、post-Human scheduler/E3 composition boundary、restart/reconnect/Browser merge/UX/privacy rules and F2～F4 acceptance expectations。
+- Out of scope for this checkpoint：all Python/TypeScript/TSX/test/OpenAPI generated/schema/migration/dependency/lock/config/provider/runtime/floor/lifecycle/REST/WS/Web/CI/Docker/prompt/seed implementation；real provider calls；browser smoke；P1-5F-2～F4；memory/RAG、scoring/report、voice、Redis/queue/worker、billing/quota/payment/multi-tenant。
 - Dependencies：P1-1/P1-2/P1-3/P1-4 `DONE`；Accepted `D-003`、`D-007`、`D-008`、`D-013`、`ADR-006`、`ADR-007`、`ADR-009`、`ADR-011`～`ADR-014`。
 - P1-5D acceptance result：the frozen Zhipu/configured-model/model-independent-configuration/request/timeouts are exact；provider/domain separation、safe error mapping、secret non-disclosure、one-request/no-retry behavior and existing P1-5C lifecycle/provenance invariants passed network-free tests and full PostgreSQL regression；HTTPX remains the single runtime dependency；no schema/API/WS/Web or automatic implementation was added；both actual-source reviews and the sanitized user smoke passed，so P1-5D is `DONE`。P1-5E-1 has separately passed its docs-only actual-source review with findings none and is `DONE`。
 
@@ -603,8 +603,23 @@
 - `P1-5E-1 — Automatic AI Runtime Orchestration Design Freeze`：`DONE`；docs-only actual-source review `PASS`；findings none；
 - `P1-5E-2 — Single AI Turn Orchestration Kernel`：`DONE`；initial actual-source review `BLOCKED` on 3 findings；all 3 findings remediated；remediation actual-source re-review `PASS`，findings none；
 - `P1-5E-3 — Continuous AI Drive + Composition Acceptance`：`DONE`；implementation actual-source review `PASS`，findings none；sanitized real-provider composition smoke `PASS`；
-- `P1-5F — Realtime/Web Integration + Independent Acceptance`：not started；
-- P1-5E、P1-5E-1、P1-5E-2 and P1-5E-3 were separately approved；P1-5F still requires separate explicit approval。
+- `P1-5F — Realtime/Web Integration + Independent Acceptance`：`IN_PROGRESS`；
+- `P1-5F-1 — Realtime/Public Contract Design Freeze`：`DONE`；docs-only contract accepted after finding remediation and finding-only external re-review `PASS`；
+- `P1-5F-2 — Backend Text Discussion Transport`：`NOT_STARTED`；
+- `P1-5F-3 — Web Discussion Experience`：`NOT_STARTED`；
+- `P1-5F-4 — Composition E2E + Independent Acceptance`：`NOT_STARTED`；
+- P1-5F-1 is separately approved；P1-5F-2～F4 still require separate explicit approval。
+
+### P1-5F-1 implementation checkpoint
+
+- Baseline is clean committed `main` / `origin/main` `fa4e8b0123d55044c9c621068311db06524b93c6` with P1-5E `DONE` and unchanged master-plan SHA-256 `2388a9660320406cb35d5354126ad71c6849a98db7c4a356796ca951bf372f26`；
+- Frozen protocol：Human text commands use `participant.utterance.submit` over WebSocket；REST remains authoritative for snapshot/history；`participant.utterance.created` v1 is the only formal Human/AI utterance event；`GET /sessions/{session_id}/utterances` is owner-only sequence-cursor transcript；
+- Frozen floor compatibility：historical P1-4 floor-event v1 semantics stay unchanged；additive floor-event v2 keeps the same names/payload meanings but makes nullable `action_id` public-client causation only，with automatic scheduler/release/intervention projected as null and internal `SessionAction` private。F2/F3 must preserve and parse v1 alongside v2；
+- Frozen authority/atomicity：server derives the exact Human participant/current grant；Human utterance+exact release are one transaction and scheduling is separate；AI `COMPLETED + AiUtterance + public event` are one transaction；all WS delivery is commit-before-send；
+- Frozen recovery：same Human action replays exact content/identity；post-Human schedule identity is deterministic from session/released grant；existing P1-5E drives any resulting AI grant；crash/restart and disconnect recover from durable state without a second provider call or duplicate mutation；
+- Frozen Browser/privacy：pending text is not formal transcript；REST/WS merge uses `utterance_id` plus authoritative sequence；transcript-only sequences need not be contiguous；AI loading derives only from current floor；new v2 projections exclude internal automatic action IDs，and provider/runtime/prompt/private/failure details plus utterance content in ordinary logs remain excluded；
+- Actual-source stop-condition assessment found existing `DiscussionEvent`、Human participant/user identity、aggregate lock、FloorRelease、generation completion transaction and deterministic action/scheduler facts sufficient with no schema or P1-5E authority change；
+- Full contract、F2～F4 acceptance and docs-only validation are in [`exec-plans/P1-5_ai-runtime-foundation.md`](exec-plans/P1-5_ai-runtime-foundation.md)。The initial actual-source review was blocked by one floor-event v1 `action_id` compatibility finding；the remediation preserved historical v1 and froze additive v2。Finding-only re-review is `PASS` with findings none against `group-interview-arena-review-20260825-110115.zip` / SHA-256 `6603b1f0377aa449d3a209e475fb3afbb74f9f83c9be38f84df97918eeb1ac0c`，so P1-5F-1 is `DONE`。No commit/push and no P1-5F-2 start。
 
 ### P1-5E-1 completion note
 
@@ -641,7 +656,7 @@
 - External implementation actual-source review：`PASS`；findings：none；reviewed implementation bundle SHA-256：`a2b453846f1ad1e94fa17b74ca507efe462c176d67471cae87278893bb907dd0`；
 - User-run sanitized real-provider composition smoke：`PASS`；`continuous_outcome = WAITING_FOR_HUMAN`、`automated_ai_turns_advanced = 1`、`generation_request_count = 1`、`provider_identifier = zhipu`、`model_identifier = glm-4.7-flashx`、`configuration_version = ZHIPU_CHAT_DEV_V1`、generation request `COMPLETED`、formal `AiUtterance` persisted、AI `FloorRelease = SPEAKER_FINISHED`、resulting current floor actor `HUMAN`；pytest smoke `1 passed in 5.56s`；
 - No credential、Authorization header、raw provider response、rendered prompt、Private Stance or verbatim model output was recorded。The temporary manual smoke test file was removed and is not part of project source/review scope；
-- No E2 kernel、schema/migration、dependency/lock/config、runtime/service、API/WS/Web implementation change。P1-5E/P1-5E-3 are `DONE`；P1-5F remains `NOT_STARTED` and requires separate explicit approval。
+- No E2 kernel、schema/migration、dependency/lock/config、runtime/service、API/WS/Web implementation change。At the P1-5E-3 closeout checkpoint，P1-5E/P1-5E-3 became `DONE` and P1-5F remained `NOT_STARTED`；the current F1 status is recorded above。
 
 ### P1-5D design and implementation checkpoint note
 
@@ -653,7 +668,7 @@
 - The minimal `GenerationProvider` Protocol and `ZhipuGenerationProvider` implement the frozen one-request non-streaming path without an SDK、registry、routing、fallback or automatic retry；lazy provider settings keep ordinary API startup independent of `GIA_API_ZHIPU_API_KEY` / `GIA_API_ZHIPU_MODEL`。Changing the model requires configuration plus API restart but no Python、adapter or schema change；future DB/admin configuration remains deferred；
 - User-supplied manual access evidence selected FlashX for current development：`glm-4.7-flash` repeatedly encountered rate-limit/availability failures，while the same credential/endpoint returned HTTP `200` for `glm-4.7-flashx`。This does not claim permanent Flash unavailability or permanent Zhipu/FlashX production policy；
 - All automated tests use HTTPX mocked/injected transport and remain network-free；config/provider focused results are `55 passed` / `47 passed`，provider/config/generation targeted is `111 passed`，PostgreSQL orchestration is `8 passed`，and fresh full backend/PostgreSQL is `469 passed` with 1 existing Starlette deprecation warning。Codex made zero real GLM calls；
-- Final user-run sanitized real-provider acceptance smoke：`PASS`；provider `zhipu`、model `glm-4.7-flashx` and configuration version `ZHIPU_CHAT_DEV_V1` returned `RawGenerationSuccess`，and output satisfied the intended Chinese group-interview smoke expectation。No credential、raw provider response、sensitive header、verbatim output or diagnostic payload is recorded。P1-5D and all P1-5E substeps are now `DONE`；P1-5F remains `NOT_STARTED`。
+- Final user-run sanitized real-provider acceptance smoke：`PASS`；provider `zhipu`、model `glm-4.7-flashx` and configuration version `ZHIPU_CHAT_DEV_V1` returned `RawGenerationSuccess`，and output satisfied the intended Chinese group-interview smoke expectation。No credential、raw provider response、sensitive header、verbatim output or diagnostic payload is recorded。P1-5D and all P1-5E substeps are `DONE`；P1-5F was still `NOT_STARTED` at that checkpoint and has since entered the separately approved F1 freeze above。
 
 ### P1-5C completion note
 

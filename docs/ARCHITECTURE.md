@@ -1,6 +1,6 @@
 # P0 技术架构基线
 
-- Status: P0 Architecture Baseline + P1-1/P1-2/P1-3/P1-4 completed + P1-5A/P1-5B/P1-5C/P1-5D/P1-5E/P1-5E-1/P1-5E-2/P1-5E-3 completed
+- Status: P0 Architecture Baseline + P1-1/P1-2/P1-3/P1-4 completed + P1-5A/P1-5B/P1-5C/P1-5D/P1-5E/P1-5E-1/P1-5E-2/P1-5E-3/P1-5F-1 completed + P1-5F in progress
 - Current phase: P1 — IN_PROGRESS
 - Architecture baseline established by: P0-2 — DONE
 - P0-3 foundation status: DONE
@@ -8,9 +8,9 @@
 - P0-5 identity boundary status: DONE
 - Most recently completed subphase: P1-5E-3 Continuous AI Drive + Composition Acceptance
 - P0 status: DONE; P0-1 through P0-7 completed
-- P1 status: IN_PROGRESS; P1-1/P1-2/P1-3/P1-4 DONE; P1-5A/P1-5B/P1-5C/P1-5D/P1-5E/P1-5E-1/P1-5E-2/P1-5E-3 DONE; P1-5F NOT_STARTED
+- P1 status: IN_PROGRESS; P1-1/P1-2/P1-3/P1-4 DONE; P1-5A/P1-5B/P1-5C/P1-5D/P1-5E/P1-5E-1/P1-5E-2/P1-5E-3/P1-5F-1 DONE; P1-5F IN_PROGRESS; P1-5F-2/P1-5F-3/P1-5F-4 NOT_STARTED
 - Target version: V0.1 Internal Validation
-- Business architecture detail: P1-1 runtime completed; P1-2 question/persona boundary implemented; P1-3 lifecycle independently accepted; P1-4 floor control implemented; P1-5A freezes authority; P1-5B persists prompt/request/final utterance; P1-5C adds deterministic internal generation orchestration; P1-5D adds the first thin real-provider adapter; P1-5E-1 freezes state-driven automatic coordination; P1-5E-2 implements its single-turn kernel; P1-5E-3 closes bounded continuous drive and lazy configured composition without public transport
+- Business architecture detail: P1-1 runtime completed; P1-2 question/persona boundary implemented; P1-3 lifecycle independently accepted; P1-4 floor control implemented; P1-5A freezes authority; P1-5B persists prompt/request/final utterance; P1-5C adds deterministic internal generation orchestration; P1-5D adds the first thin real-provider adapter; P1-5E-1 freezes state-driven automatic coordination; P1-5E-2 implements its single-turn kernel; P1-5E-3 closes bounded continuous drive and lazy configured composition; P1-5F-1 freezes the public text-discussion REST/WS/Browser boundary docs-only
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -340,8 +340,22 @@ P1-3 lifecycle authority: phase / deadline
 - Concurrent drives converge through deterministic identities、one request claimant、unique utterance/grant constraints、aggregate lock and exact sequence/current-grant preconditions。Concurrent post-release crash recovery produces exactly one deterministic scheduler action/decision and no duplicate next-speaker winner；a losing conflict reads that durable winner and never changes IDs。
 - P1-5E-2 is the completed one-AI-turn kernel plus one release and one scheduler call。P1-5E-3 implements the provider-neutral continuous loop by repeatedly consuming that closed result，bounded by `MAX_AUTOMATED_AI_TURNS_PER_DRIVE = 8` and stopped by HUMAN/no-current-work/no-grant/not-applicable/intervention/state-change/reconciliation/budget boundaries。Only a proved release advances the budget；scheduler-only crash recovery does not。
 - The thin composition constructs `ZhipuProviderSettings` and `ZhipuGenerationProvider` only when explicitly invoked，then passes canonical `zhipu` / configured model / `ZHIPU_CHAT_DEV_V1` provenance and the existing V0.1 scheduler policy。Missing/invalid settings fail safely before provider or drive execution；ordinary app import/startup remains independent of provider configuration。
-- P1-5E-3 implementation actual-source review is `PASS` with findings none。The sanitized composition smoke proves one completed/persisted AI turn reaches a HUMAN current owner with `WAITING_FOR_HUMAN` and one advanced turn；provider/model/configuration provenance is `zhipu` / `glm-4.7-flashx` / `ZHIPU_CHAT_DEV_V1`。P1-5E is `DONE`；P1-5F remains separately gated。
-- Existing schema is sufficient for orchestration correctness；no orchestration table or migration is planned。API/WebSocket/Web、public utterance projection、human-side transport behavior and independent acceptance remain P1-5F。Full outcome/restart matrices are in [`exec-plans/P1-5_ai-runtime-foundation.md`](exec-plans/P1-5_ai-runtime-foundation.md)。
+- P1-5E-3 implementation actual-source review is `PASS` with findings none。The sanitized composition smoke proves one completed/persisted AI turn reaches a HUMAN current owner with `WAITING_FOR_HUMAN` and one advanced turn；provider/model/configuration provenance is `zhipu` / `glm-4.7-flashx` / `ZHIPU_CHAT_DEV_V1`。P1-5E is `DONE`；P1-5F implementation remains separately gated，while F1 now freezes its contract below。
+- Existing schema is sufficient for orchestration correctness；no orchestration table or migration is planned。At E3 closeout API/WebSocket/Web、public utterance projection、human-side transport behavior and independent acceptance remained P1-5F concerns；F1 now freezes them docs-only and F2～F4 retain implementation/acceptance ownership。Full outcome/restart matrices are in [`exec-plans/P1-5_ai-runtime-foundation.md`](exec-plans/P1-5_ai-runtime-foundation.md)。
+
+### P1-5F-1 realtime/public architecture — contract frozen, implementation deferred
+
+- Public protocol split is now exact：WebSocket owns active discussion commands and the complete ordered incremental formal-event stream；REST owns session snapshot and independent transcript/history reads。Human text uses WS `participant.utterance.submit`，not REST or SSE。
+- This is a public contract，not a deployment-topology promise。V0.1 may invoke progression best-effort in process，while correctness stays in PostgreSQL durable state and reentrant P1-4/P1-5E services。Future Redis/NATS/Kafka、gateway or multi-worker routing can replace delivery/invocation without changing the public contract；none is added in F1。
+- Transport derives Human identity from opaque authenticated user plus the exact current `HUMAN` grant after locked lifecycle reconciliation。Browser cannot supply participant、actor、grant、phase or AI/provider/runtime identity。
+- One unified `participant.utterance.created` v1 event represents formal Human and AI speech。Human action identity is public for pending/reconnect confirmation；AI utterance events use `action_id = null`。
+- Historical P1-4 floor-event v1 remains unchanged：grant/intervention require a non-null UUID4 action identity and release is nullable。P1-5F adds floor-event v2 with the same names/payload meanings but a nullable envelope `action_id` meaning only public client causation；direct Human-command causation may retain that Human ID，while automatic scheduler/release/intervention projects null and keeps its durable `SessionAction` private。F2/F3 must serialize/parse both versions rather than mutate v1 semantics。
+- `GET /sessions/{session_id}/utterances` is an owner-only sequence-cursor transcript projection；the session snapshot does not embed transcript。`DiscussionEvent` is current durable public transcript/event storage，not a permanent physical contract。
+- The Human utterance and exact `SPEAKER_FINISHED` release are one aggregate-locked commit producing consecutive utterance/release events。The scheduler runs only after that commit in a separate deterministic checkpoint and remains the sole who-speaks authority。
+- Successful AI completion atomically commits `LlmGenerationRequest.COMPLETED + AiUtterance + participant.utterance.created`。P1-5E then releases and schedules in its existing separate commits。Failure fabricates no utterance and surfaces only `floor.released / INTERRUPTED` plus safe generic Browser UX。
+- Every WebSocket send follows commit。Disconnect cannot roll back、regenerate、duplicate or replace action identity；snapshot、transcript and full ordered catch-up recover durable truth。
+- Browser transcript merges by `utterance_id` and orders by event sequence。Transcript-only sequences are intentionally non-contiguous，while full WS gap detection remains strict。Pending content stays memory-only and is not a transcript bubble before durable confirmation。
+- Existing source is sufficient without schema or authority change：session aggregate lock、Human participant user link、FloorRelease helper、DiscussionEvent sequence and AI completion transaction cover the frozen atomic/recovery boundaries。Exact command/event/REST fields、crash matrix、privacy and F2～F4 acceptance are authoritative in [`exec-plans/P1-5_ai-runtime-foundation.md`](exec-plans/P1-5_ai-runtime-foundation.md)。
 
 ## Configuration, secrets and error boundaries
 
@@ -420,7 +434,7 @@ Redis 只在多 API workers、横向扩容、跨进程 WebSocket broadcast、dis
 - P0-5D：completed；真实 browser Cookie/CORS/CSRF 闭环已通过 Chromium 验证；
 - P0-5E：completed；final outcome `PASS after findings remediation and independent recheck`；
 - P0：`DONE`；P0-1～P0-7 completed；P0-7 finding-only independent recheck `PASS`，P1 readiness `READY`；其后用户已明确批准进入 P1；
-- P1：`IN_PROGRESS`；P1-1～P1-4 均已完成且 independent verdict `PASS`；P1-5A/P1-5B/P1-5C/P1-5D/P1-5E/P1-5E-1/P1-5E-2/P1-5E-3 已完成；transport、记忆和基础报告继续 Deferred，P1-5F 尚未开始并需要单独明确批准；
+- P1：`IN_PROGRESS`；P1-1～P1-4 均已完成且 independent verdict `PASS`；P1-5A/P1-5B/P1-5C/P1-5D/P1-5E/P1-5E-1/P1-5E-2/P1-5E-3/P1-5F-1 已完成；P1-5F remains `IN_PROGRESS`；P1-5F-2～F4 transport/Web/E2E implementation、记忆和基础报告继续 Deferred；
 - P2 以后：只在对应阶段获批后增加语音、评分训练和商业化能力。
 
 ## 与其他文档关系

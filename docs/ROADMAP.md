@@ -6,7 +6,7 @@
 - P0-7 final outcome: initial `BLOCKED`; two documentation findings remediated; finding-only independent recheck `PASS`; P1 readiness `READY`
 - Current phase: P1 — `IN_PROGRESS`
 - Most recently completed task: P1-4 — `DONE`
-- Current task gate: P1-5 — `IN_PROGRESS`; P1-5A/P1-5B/P1-5C/P1-5D/P1-5E/P1-5E-1/P1-5E-2/P1-5E-3 `DONE`; P1-5F `NOT_STARTED`
+- Current task gate: P1-5 — `IN_PROGRESS`; P1-5A/P1-5B/P1-5C/P1-5D/P1-5E/P1-5E-1/P1-5E-2/P1-5E-3/P1-5F-1 `DONE`; P1-5F `IN_PROGRESS`; P1-5F-2/P1-5F-3/P1-5F-4 `NOT_STARTED`
 - P0 status: `DONE`; P0-1 through P0-7 completed
 - Target product version: V0.1 — Internal Validation
 - Source: [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) §30–31
@@ -18,7 +18,7 @@
 - `P0～P6`：研发推进阶段，描述按什么顺序建立能力；
 - `V0.1 / V0.5 / V1.0`：产品交付版本，描述某个可验证版本包含什么。
 
-阶段不是版本，P0-x/P1-x 也不是新增产品版本。P0 已完成不代表 V0.1 的全部业务能力已经实现；用户已明确批准进入 P1，P1-1～P1-4 均已完成。P1-5A～P1-5D 已完成；P1-5E-1 actual-source review 为 `PASS`、findings none；P1-5E-2 的 3 个 findings 已全部 remediation，re-review 为 `PASS`、findings none；P1-5E-3 implementation actual-source review 与 sanitized real-provider composition smoke 均为 `PASS`。P1-5E automatic AI runtime orchestration 现为 `DONE`；P1-5F 保持 `NOT_STARTED` 并需要单独明确批准。
+阶段不是版本，P0-x/P1-x 也不是新增产品版本。P0 已完成不代表 V0.1 的全部业务能力已经实现；用户已明确批准进入 P1，P1-1～P1-4 均已完成。P1-5A～P1-5D 已完成；P1-5E-1 actual-source review 为 `PASS`、findings none；P1-5E-2 的 3 个 findings 已全部 remediation，re-review 为 `PASS`、findings none；P1-5E-3 implementation actual-source review 与 sanitized real-provider composition smoke 均为 `PASS`。P1-5E automatic AI runtime orchestration 现为 `DONE`。P1-5F-1 initial actual-source review was blocked by one floor-event v1 `action_id` compatibility finding；the docs preserved historical v1 and froze additive floor-event v2，then the finding-only re-review returned `PASS` with findings none against bundle SHA-256 `6603b1f0377aa449d3a209e475fb3afbb74f9f83c9be38f84df97918eeb1ac0c`。P1-5F-1 is `DONE`；P1-5F remains `IN_PROGRESS`；P1-5F-2～F4 remain `NOT_STARTED`。
 
 ## 2. 开发阶段
 
@@ -106,9 +106,13 @@ P1-4A 已冻结 phase lifecycle 与 within-phase floor authority 分离、single
 - `P1-5E-1 — Automatic AI Runtime Orchestration Design Freeze`：completed；docs-only actual-source review `PASS`；findings none；
 - `P1-5E-2 — Single AI Turn Orchestration Kernel`：completed；initial actual-source review `BLOCKED` on 3 findings，all remediated；remediation actual-source re-review `PASS`，findings none；
 - `P1-5E-3 — Continuous AI Drive + Composition Acceptance`：completed；implementation actual-source review `PASS`，findings none；sanitized real-provider composition smoke `PASS`；
-- `P1-5F — Realtime/Web Integration + Independent Acceptance`：not started。
+- `P1-5F — Realtime/Web Integration + Independent Acceptance`：in progress；
+- `P1-5F-1 — Realtime/Public Contract Design Freeze`：`DONE`；docs-only contract freeze accepted after finding remediation and finding-only re-review `PASS`；
+- `P1-5F-2 — Backend Text Discussion Transport`：not started；
+- `P1-5F-3 — Web Discussion Experience`：not started；
+- `P1-5F-4 — Composition E2E + Independent Acceptance`：not started。
 
-P1-5A 冻结 Scheduler 决定 who、AI Runtime 决定 what、provider 只负责 model I/O。P1-5B～P1-5D implement persistence、deterministic runtime and the thin configured Zhipu adapter；P1-5E-1 freezes state-driven automatic coordination；P1-5E-2 implements the reviewed single-turn kernel；P1-5E-3 implements the provider-neutral bounded continuous loop and thin lazy configured composition。Network-free validation is `47` focused、`253` relevant and `516` full backend/PostgreSQL tests；implementation actual-source review is `PASS` with findings none，and the user-run sanitized composition smoke is `PASS`。P1-5E/P1-5E-3 are `DONE`；P1-5F remains `NOT_STARTED` and requires separate approval。完整边界见 [`exec-plans/P1-5_ai-runtime-foundation.md`](exec-plans/P1-5_ai-runtime-foundation.md)。
+P1-5A 冻结 Scheduler 决定 who、AI Runtime 决定 what、provider 只负责 model I/O。P1-5B～P1-5D implement persistence、deterministic runtime and the thin configured Zhipu adapter；P1-5E-1 freezes state-driven automatic coordination；P1-5E-2 implements the reviewed single-turn kernel；P1-5E-3 implements the provider-neutral bounded continuous loop and thin lazy configured composition。Network-free validation is `47` focused、`253` relevant and `516` full backend/PostgreSQL tests；implementation actual-source review is `PASS` with findings none，and the user-run sanitized composition smoke is `PASS`。P1-5E/P1-5E-3 are `DONE`。P1-5F-1 now freezes the public Human WS command、unified utterance event、historical floor-event v1 plus additive public v2 compatibility、sequence-cursor transcript、atomic Human/AI publication boundaries、commit-before-send、restart/reconnect convergence and F2～F4 acceptance docs-only；it does not implement transport or Web。完整边界见 [`exec-plans/P1-5_ai-runtime-foundation.md`](exec-plans/P1-5_ai-runtime-foundation.md)。
 
 ## 5. 产品版本
 
