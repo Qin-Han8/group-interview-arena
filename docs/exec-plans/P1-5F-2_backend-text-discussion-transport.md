@@ -1204,6 +1204,51 @@ The plan is ready for external review only when all of these are true:
 - Closeout status: P1-5F-2 `DONE`; P1/P1-5/P1-5F remain `IN_PROGRESS`;
   P1-5F-3/P1-5F-4 remain `NOT_STARTED`.
 
+### Post-commit CI compatibility remediation
+
+- Committed baseline `347ad53e6a7f74fab171dcca59354ffb8573b85f` reached
+  GitHub CI run #39 with API quality、PostgreSQL/migration and Web
+  quality/OpenAPI drift green；Chromium alone failed because the existing Web
+  floor parser and scheduler-grant assertion accepted only historical v1 while
+  new P1-5F-2 floor facts correctly emit additive v2 with automatic
+  `action_id = null`.
+- Web TDD reproduced the compatibility gap as four floor-v2 envelopes returning
+  `undefined` (`4 failed`、`60 passed`)；the minimal version-discriminated parser
+  keeps v1 grant/intervention action identity non-null、keeps v1 release
+  nullable、accepts only floor v2 with nullable UUID4 action identity and still
+  rejects unsupported versions。Focused GREEN is `25 passed` and full Web is
+  `64 passed`.
+- The first remediation let Chromium progress beyond the floor assertion and
+  exposed a second F2 regression：pre-F2 realtime had explicitly delivered the
+  exact durable events returned by a command even when their sequence was
+  behind the connection cursor；F2 accidentally replaced that acknowledgement
+  with passive `sequence > sent_sequence` draining。Persistence replay remained
+  correct；only realtime command-result delivery regressed.
+- Two PostgreSQL/WebSocket RED tests independently proved session-start replay
+  behind cursor and Human utterance replay behind cursor both resolved the
+  original durable result but timed out without a public response。The minimal
+  restoration uses a replay-only sender to project exactly the returned
+  `StoredEvent` values through `project_public_events`、send them under the
+  existing lock and update the passive cursor with
+  `max(sent_sequence, event.sequence)`.
+- A follow-up RED regression proved that routing a fresh command through that
+  replay sender emitted command sequence `N+2` before an immediately preceding
+  reconciliation fact at `N+1`。The final two-way branch is explicit：an
+  old/partial result whose first sequence is at or behind `sent_sequence` uses
+  exact replay without cursor rewind；every fresh result uses the normal
+  `drain_committed_events()` durable stream。The three-case delivery matrix and
+  full WebSocket suite pass at `3/3` and `19/19` respectively.
+- Backend GREEN proves the original old sequences/action identities and Human
+  `utterance_id` replay exactly，with unchanged action/event/release/utterance
+  counts and unchanged aggregate watermark。Focused results are WebSocket `18`、
+  utterance `16`、backend transport `1` and affected API `39` passed.
+- Final local validation is API unit `438`、PostgreSQL integration `142`、full
+  API `580`、Web `64` and real Chromium `2 passed, 0 failed`；Ruff lint/format、
+  Pyright、Web lint/format/typecheck/build and OpenAPI drift passed。No real
+  provider call occurred；no schema、migration、dependency、CI、provider、AI
+  runtime、scheduler、Master Plan or ADR change was made。P1-5F-2 remains
+  `DONE`；P1-5F-3/P1-5F-4 remain `NOT_STARTED`.
+
 ## Progress
 
 - Completed: baseline verification, amended TDD plan gate, Tasks 1～13,

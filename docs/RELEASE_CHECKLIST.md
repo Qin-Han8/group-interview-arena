@@ -248,9 +248,13 @@ P0-2 已 Accepted PostgreSQL、SQLAlchemy 2.x 和 Alembic，P0-4 实施基线为
 - [x] Deterministic post-Human scheduler recovery reuses P1-5E configured drive without a new durable table；
 - [x] Owner-only sequence-cursor transcript and one ordered commit-before-send WebSocket drain are implemented；
 - [x] Provider behavior in automated validation is injected/network-free；real provider calls are zero；
-- [x] Generated Web diff is mechanical REST OpenAPI only；handwritten Web/F3 and Browser E2E/F4 remain untouched；
+- [x] Original F2 implementation generated only the mechanical REST OpenAPI Web delta；the later post-commit CI compatibility remediation changes only the existing floor parser/unit contract and the existing scheduler-grant Chromium assertion，without adding F3 UI；
 - [x] Final validation recorded：pre-review focused `145`、finding-remediation focused `77`、final affected `45`、unit `438`、integration `140`、full `578` tests passed；frozen sync/lock、Ruff lint/format、Pyright、Alembic head/current/check and generated REST OpenAPI drift check passed；
 - [x] Initial implementation actual-source review `BLOCKED` on three findings；all remediated；finding-only external re-review `PASS` with findings none against `group-interview-arena-review-20260825-150754.zip` / SHA-256 `b9553cbe488707d5fd87598b70e48e1fabdf55a0ae6d3dab367b830267d61edd`；P1-5F-2 is `DONE`；
+- [x] Post-commit GitHub CI run #39 failed Chromium because the existing Web floor parser/assertion accepted only v1 while new F2 floor facts correctly emit v2；dual strict v1/v2 parsing was restored with RED `4 failed` → focused GREEN `25 passed`；
+- [x] The first compatibility remediation exposed a second F2 regression：explicit OLD command-result replay behind a newer cursor had been replaced by passive `> sent_sequence` draining；a replay-only exact sender was restored for old session and Human utterance results without rewinding the passive cursor；both backend RED cases timed out before the fix and passed afterward；
+- [x] Surgical follow-up proved RED `expected sequence 3, received 4` when a fresh command committed reconciliation `N+1` immediately before command fact `N+2`；the final branch is exactly OLD/partial → exact replay and fresh → normal committed drain；delivery matrix `3/3`、WebSocket `19/19`、affected API `19/19`、Web realtime `36/36` and real Chromium `2/2` passed；
+- [x] Post-commit remediation validation：utterance `16`、backend transport `1`、affected API `39`、API unit `438`、PostgreSQL integration `142`、full API `580`、Web `64` and real Chromium `2/2` passed；Ruff lint/format、Pyright、Web lint/format/typecheck/build、OpenAPI drift and cleanup passed；provider calls remain zero；P1-5F-2 remains `DONE` and P1-5F-3/F4 remain `NOT_STARTED`；
 - [x] Commit/push remains separately authorized and has not occurred。
 
 ## V0.1 internal validation

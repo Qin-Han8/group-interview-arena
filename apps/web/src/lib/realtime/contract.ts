@@ -70,7 +70,7 @@ export type FloorPolicyReason =
 export type FloorReleaseReason =
   "SPEAKER_FINISHED" | "INTERRUPTED" | "PHASE_CHANGED" | "SESSION_TERMINATED";
 
-export type FloorGrantedEvent = {
+export type FloorGrantedV1Event = {
   schema_version: 1;
   type: "floor.granted";
   session_id: string;
@@ -88,7 +88,17 @@ export type FloorGrantedEvent = {
   };
 };
 
-export type FloorReleasedEvent = {
+export type FloorGrantedV2Event = Omit<
+  FloorGrantedV1Event,
+  "schema_version" | "action_id"
+> & {
+  schema_version: 2;
+  action_id: string | null;
+};
+
+export type FloorGrantedEvent = FloorGrantedV1Event | FloorGrantedV2Event;
+
+export type FloorReleasedV1Event = {
   schema_version: 1;
   type: "floor.released";
   session_id: string;
@@ -103,7 +113,17 @@ export type FloorReleasedEvent = {
   };
 };
 
-export type FloorInterventionRequestedEvent = {
+export type FloorReleasedV2Event = Omit<
+  FloorReleasedV1Event,
+  "schema_version" | "action_id"
+> & {
+  schema_version: 2;
+  action_id: string | null;
+};
+
+export type FloorReleasedEvent = FloorReleasedV1Event | FloorReleasedV2Event;
+
+export type FloorInterventionRequestedV1Event = {
   schema_version: 1;
   type: "floor.intervention_requested";
   session_id: string;
@@ -119,6 +139,17 @@ export type FloorInterventionRequestedEvent = {
     policy_version: string;
   };
 };
+
+export type FloorInterventionRequestedV2Event = Omit<
+  FloorInterventionRequestedV1Event,
+  "schema_version" | "action_id"
+> & {
+  schema_version: 2;
+  action_id: string | null;
+};
+
+export type FloorInterventionRequestedEvent =
+  FloorInterventionRequestedV1Event | FloorInterventionRequestedV2Event;
 
 export type FloorEvent =
   FloorGrantedEvent | FloorReleasedEvent | FloorInterventionRequestedEvent;
@@ -295,7 +326,7 @@ function isFloorPolicyReason(value: unknown): value is FloorPolicyReason {
 
 function isFloorEvent(value: Record<string, unknown>): value is FloorEvent {
   if (
-    value.schema_version !== 1 ||
+    (value.schema_version !== 1 && value.schema_version !== 2) ||
     !isRecord(value.payload) ||
     !isFloorPhase(value.payload.phase)
   ) {
@@ -305,7 +336,9 @@ function isFloorEvent(value: Record<string, unknown>): value is FloorEvent {
 
   if (value.type === "floor.granted") {
     return (
-      isUuid4(value.action_id) &&
+      (value.schema_version === 1
+        ? isUuid4(value.action_id)
+        : value.action_id === null || isUuid4(value.action_id)) &&
       hasExactKeys(payload, [
         "grant_id",
         "decision_id",
@@ -344,7 +377,9 @@ function isFloorEvent(value: Record<string, unknown>): value is FloorEvent {
 
   if (value.type !== "floor.intervention_requested") return false;
   return (
-    isUuid4(value.action_id) &&
+    (value.schema_version === 1
+      ? isUuid4(value.action_id)
+      : value.action_id === null || isUuid4(value.action_id)) &&
     hasExactKeys(payload, [
       "intervention_id",
       "decision_id",

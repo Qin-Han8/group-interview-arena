@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+from collections.abc import Sequence
 from contextlib import suppress
 from datetime import UTC, datetime
 from typing import Annotated, cast
@@ -39,6 +40,7 @@ from group_interview_arena_api.modules.discussion_sessions.contracts import (
 from group_interview_arena_api.modules.discussion_sessions.domain import (
     InvalidSessionStateError,
     SessionCommand,
+    StoredEvent,
 )
 from group_interview_arena_api.modules.discussion_sessions.progression import (
     resume_discussion_progression,
@@ -267,6 +269,15 @@ def create_realtime_router(settings: Settings) -> APIRouter:
                     await _send_formal_event(websocket, event)
                     sent_sequence = event.sequence
 
+        async def send_old_command_replay(events: Sequence[StoredEvent]) -> None:
+            nonlocal sent_sequence
+            async with send_lock:
+                async with session_factory() as session:
+                    projected = await project_public_events(session, events)
+                for event in projected:
+                    await _send_formal_event(websocket, event)
+                    sent_sequence = max(sent_sequence, event.sequence)
+
         async def run_progression_best_effort() -> None:
             try:
                 result = await resume_discussion_progression(
@@ -427,7 +438,7 @@ def create_realtime_router(settings: Settings) -> APIRouter:
                                     received_at=datetime.now(UTC),
                                 ),
                             )
-                        last_command_sequence = committed.events[-1].sequence
+                        command_events: Sequence[StoredEvent] = committed.events
                     else:
                         command = SessionCommand(
                             schema_version=parsed.schema_version,
@@ -437,7 +448,7 @@ def create_realtime_router(settings: Settings) -> APIRouter:
                             payload=parsed.payload.model_dump(mode="json"),
                         )
                         async with session_factory() as session:
-                            events = await apply_session_command(
+                            command_events = await apply_session_command(
                                 session,
                                 owner_id=user.user_id,
                                 command=command,
@@ -445,7 +456,9 @@ def create_realtime_router(settings: Settings) -> APIRouter:
                                     settings.session_phase_durations.to_duration_plan()
                                 ),
                             )
-                        last_command_sequence = events[-1].sequence if events else None
+                    last_command_sequence = (
+                        command_events[-1].sequence if command_events else None
+                    )
                 except InvalidSessionStateError:
                     await _send_error(
                         websocket,
@@ -524,7 +537,10 @@ def create_realtime_router(settings: Settings) -> APIRouter:
                     await websocket.close(code=1011)
                     return
 
-                await drain_committed_events()
+                if command_events and command_events[0].sequence <= sent_sequence:
+                    await send_old_command_replay(command_events)
+                else:
+                    await drain_committed_events()
                 log_event(
                     logger,
                     logging.INFO,

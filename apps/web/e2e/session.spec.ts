@@ -132,10 +132,11 @@ test("browser session recovers durable phases across API restart and reload", as
   await expect.poll(() => floorEvent).toBeTruthy();
   const parsedFloorEvent = JSON.parse(floorEvent ?? "{}");
   expect(parsedFloorEvent).toMatchObject({
-    schema_version: 1,
+    schema_version: 2,
     type: "floor.granted",
     session_id: sessionId,
     sequence: 4,
+    action_id: null,
     payload: {
       phase: "OPENING_STATEMENTS",
       reason_code: "FIRST_OPPORTUNITY",

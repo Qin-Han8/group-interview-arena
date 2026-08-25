@@ -1,14 +1,18 @@
 import asyncio
 import re
+import time
 from collections.abc import Callable, Generator
 from contextlib import contextmanager
+from datetime import UTC, datetime, timedelta
+from queue import Empty, Queue
+from threading import Thread
 from typing import Never, Protocol, cast
 from uuid import UUID, uuid4
 
 import pytest
 from fastapi import FastAPI
 from httpx import Cookies, Headers, Response
-from sqlalchemy import URL, select
+from sqlalchemy import URL, func, select
 from starlette.testclient import (
     TestClient,
     WebSocketDenialResponse,
@@ -23,7 +27,12 @@ from group_interview_arena_api.core.config import (
     SessionPhaseDurations,
     Settings,
 )
-from group_interview_arena_api.db.models import SimulationSession
+from group_interview_arena_api.db import (
+    DiscussionEvent,
+    FloorRelease,
+    SessionAction,
+    SimulationSession,
+)
 from group_interview_arena_api.db.runtime import (
     create_database_engine,
     create_database_session_factory,
@@ -192,6 +201,93 @@ def _utterance_command(
             "content": content,
         },
     }
+
+
+def _receive_json_with_timeout(
+    websocket: WebSocketTestSession,
+    *,
+    timeout_seconds: float = 2.0,
+) -> dict[str, object]:
+    result: Queue[tuple[bool, object]] = Queue(maxsize=1)
+
+    def receive() -> None:
+        try:
+            result.put((True, websocket.receive_json()))
+        except BaseException as exc:
+            result.put((False, exc))
+
+    Thread(target=receive, daemon=True).start()
+    try:
+        succeeded, value = result.get(timeout=timeout_seconds)
+    except Empty as exc:
+        websocket.close()
+        raise AssertionError("Timed out waiting for command-result replay.") from exc
+    if not succeeded:
+        assert isinstance(value, BaseException)
+        raise value
+    assert isinstance(value, dict)
+    return cast(dict[str, object], value)
+
+
+async def _durable_counts(
+    temporary_database: TemporaryDatabaseContext,
+    session_id: UUID,
+) -> tuple[int, int, int, int, int]:
+    engine = create_database_engine(temporary_database.database_settings())
+    try:
+        session_factory = create_database_session_factory(engine)
+        async with session_factory() as session:
+            aggregate = await session.get(SimulationSession, session_id)
+            assert aggregate is not None
+            action_count = await session.scalar(
+                select(func.count())
+                .select_from(SessionAction)
+                .where(SessionAction.session_id == session_id)
+            )
+            event_count = await session.scalar(
+                select(func.count())
+                .select_from(DiscussionEvent)
+                .where(DiscussionEvent.session_id == session_id)
+            )
+            utterance_count = await session.scalar(
+                select(func.count())
+                .select_from(DiscussionEvent)
+                .where(
+                    DiscussionEvent.session_id == session_id,
+                    DiscussionEvent.event_type == "participant.utterance.created",
+                )
+            )
+            release_count = await session.scalar(
+                select(func.count())
+                .select_from(FloorRelease)
+                .where(FloorRelease.session_id == session_id)
+            )
+            return (
+                aggregate.last_sequence,
+                int(action_count or 0),
+                int(event_count or 0),
+                int(utterance_count or 0),
+                int(release_count or 0),
+            )
+    finally:
+        await dispose_database_engine(engine)
+
+
+async def _expire_phase_deadline(
+    temporary_database: TemporaryDatabaseContext,
+    session_id: UUID,
+) -> None:
+    engine = create_database_engine(temporary_database.database_settings())
+    try:
+        session_factory = create_database_session_factory(engine)
+        async with session_factory() as session, session.begin():
+            aggregate = await session.get(SimulationSession, session_id)
+            assert aggregate is not None
+            now = datetime.now(UTC)
+            aggregate.phase_started_at = now - timedelta(seconds=31)
+            aggregate.phase_deadline_at = now - timedelta(seconds=1)
+    finally:
+        await dispose_database_engine(engine)
 
 
 async def _schedule_floor(
@@ -389,6 +485,145 @@ def test_websocket_abort_duplicate_invalid_state_and_ordered_catchup(
         ) as websocket:
             catchup = [websocket.receive_json(), websocket.receive_json()]
             assert [event["sequence"] for event in catchup] == [1, 2]
+
+
+def test_websocket_replays_session_command_result_behind_connection_cursor(
+    migrated_database: TemporaryDatabaseContext,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    application = _application(migrated_database)
+    with _client(application) as client:
+        _register(client, "ws_session_replay_behind_cursor")
+        snapshot = _create_session(client)
+        session_id = str(snapshot["id"])
+        start_action_id = uuid4()
+        abort_action_id = uuid4()
+        start_command = _start_command(session_id, start_action_id)
+
+        with client.websocket_connect(
+            _ws_path(session_id),
+            headers={"Origin": TRUSTED_ORIGIN},
+        ) as websocket:
+            websocket.send_json(start_command)
+            original = websocket.receive_json()
+            assert original["sequence"] == 2
+            assert original["action_id"] == str(start_action_id)
+
+            websocket.send_json(_abort_command(session_id, abort_action_id))
+            assert websocket.receive_json()["sequence"] == 3
+
+        before = asyncio.run(
+            _durable_counts(migrated_database, UUID(session_id)),
+            loop_factory=asyncio.SelectorEventLoop,
+        )
+        assert before[:3] == (3, 2, 3)
+
+        observed_after_sequences: list[int] = []
+        real_load = realtime.load_reconnect_events
+
+        async def observe_cursor(*args: object, **kwargs: object) -> list[StoredEvent]:
+            after_sequence = kwargs["after_sequence"]
+            assert isinstance(after_sequence, int)
+            observed_after_sequences.append(after_sequence)
+            return await real_load(*args, **kwargs)  # pyright: ignore[reportArgumentType]
+
+        monkeypatch.setattr(realtime, "load_reconnect_events", observe_cursor)
+        with client.websocket_connect(
+            _ws_path(session_id, after_sequence=before[0]),
+            headers={"Origin": TRUSTED_ORIGIN},
+        ) as websocket:
+            websocket.send_json(start_command)
+            replay = _receive_json_with_timeout(websocket)
+            assert replay == original
+
+            deadline = time.monotonic() + 2
+            while len(observed_after_sequences) < 3 and time.monotonic() < deadline:
+                time.sleep(0.05)
+            assert len(observed_after_sequences) >= 3
+            assert set(observed_after_sequences) == {before[0]}
+
+        after = asyncio.run(
+            _durable_counts(migrated_database, UUID(session_id)),
+            loop_factory=asyncio.SelectorEventLoop,
+        )
+        assert after == before
+
+
+def test_websocket_fresh_command_drains_reconciliation_before_command_result(
+    migrated_database: TemporaryDatabaseContext,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    real_load = realtime.load_reconnect_events
+
+    async def skip_periodic_reconciliation(*_args: object, **_kwargs: object) -> None:
+        return None
+
+    async def suppress_periodic_drain(
+        *args: object,
+        **kwargs: object,
+    ) -> list[StoredEvent]:
+        task = asyncio.current_task()
+        coroutine_name = task.get_coro().__qualname__ if task is not None else ""
+        if coroutine_name.endswith("catchup_committed_events"):
+            return []
+        return await real_load(*args, **kwargs)  # pyright: ignore[reportArgumentType]
+
+    monkeypatch.setattr(
+        realtime,
+        "reconcile_session_deadline",
+        skip_periodic_reconciliation,
+    )
+    monkeypatch.setattr(realtime, "load_reconnect_events", suppress_periodic_drain)
+
+    application = _application(
+        migrated_database,
+        settings=Settings(
+            environment=Environment.TEST,
+            cors_origins=(TRUSTED_ORIGIN,),
+            session_phase_durations=SessionPhaseDurations(
+                preparation_seconds=30,
+                opening_statements_seconds=30,
+                exploration_seconds=30,
+                conflict_and_evaluation_seconds=30,
+                convergence_seconds=30,
+                final_summary_seconds=30,
+            ),
+        ),
+    )
+    with _client(application) as client:
+        _register(client, "ws_fresh_reconciliation_order")
+        snapshot = _create_session(client)
+        session_id = str(snapshot["id"])
+
+        with client.websocket_connect(
+            _ws_path(session_id),
+            headers={"Origin": TRUSTED_ORIGIN},
+        ) as websocket:
+            websocket.send_json(_start_command(session_id, uuid4()))
+            assert websocket.receive_json()["sequence"] == 2
+
+            asyncio.run(
+                _expire_phase_deadline(migrated_database, UUID(session_id)),
+                loop_factory=asyncio.SelectorEventLoop,
+            )
+            abort_action_id = uuid4()
+            websocket.send_json(_abort_command(session_id, abort_action_id))
+
+            reconciled = websocket.receive_json()
+            assert reconciled["sequence"] == 3
+            assert reconciled["action_id"] is None
+            assert reconciled["payload"]["trigger"] == "PHASE_DEADLINE"
+            assert reconciled["payload"]["previous_status"] == "PREPARATION"
+            assert reconciled["payload"]["status"] == "OPENING_STATEMENTS"
+
+            command_result = websocket.receive_json()
+            assert command_result["sequence"] == 4
+            assert command_result["action_id"] == str(abort_action_id)
+            assert command_result["payload"]["trigger"] == "USER_ABORT"
+            assert command_result["payload"]["previous_status"] == (
+                "OPENING_STATEMENTS"
+            )
+            assert command_result["payload"]["status"] == "ABORTED_USER"
 
 
 ProtocolPayloadFactory = Callable[[str], str | dict[str, object]]
@@ -917,3 +1152,100 @@ def test_websocket_human_submit_is_ordered_recoverable_and_preserves_content(
     combined = captured.out + captured.err
     assert "progression-private-sentinel" not in combined
     assert "Task exception was never retrieved" not in combined
+
+
+def test_websocket_replays_human_utterance_result_behind_connection_cursor(
+    migrated_database: TemporaryDatabaseContext,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def progression_failure(*_args: object, **_kwargs: object) -> Never:
+        raise RuntimeError("expected-test-progression-stop")
+
+    monkeypatch.setattr(
+        realtime,
+        "resume_discussion_progression",
+        progression_failure,
+        raising=False,
+    )
+    application = _application(
+        migrated_database,
+        settings=Settings(
+            environment=Environment.TEST,
+            cors_origins=(TRUSTED_ORIGIN,),
+            session_phase_durations=SessionPhaseDurations(
+                preparation_seconds=1,
+                opening_statements_seconds=30,
+                exploration_seconds=30,
+                conflict_and_evaluation_seconds=30,
+                convergence_seconds=30,
+                final_summary_seconds=30,
+            ),
+        ),
+    )
+    with _client(application) as client:
+        _register(client, "ws_human_replay_behind_cursor")
+        created = _create_session(client)
+        session_id = str(created["id"])
+        action_id = uuid4()
+        content = "Exact Human replay behind cursor."
+
+        with client.websocket_connect(
+            _ws_path(session_id),
+            headers={"Origin": TRUSTED_ORIGIN},
+        ) as websocket:
+            websocket.send_json(_start_command(session_id, uuid4()))
+            assert websocket.receive_json()["sequence"] == 2
+            assert websocket.receive_json()["sequence"] == 3
+
+            scheduled = asyncio.run(
+                _schedule_floor(migrated_database, UUID(session_id)),
+                loop_factory=asyncio.SelectorEventLoop,
+            )
+            human_grant = websocket.receive_json()
+            assert human_grant["sequence"] == 4
+            assert human_grant["payload"]["participant_id"] == str(
+                scheduled[0].payload["participant_id"]
+            )
+
+            command = _utterance_command(
+                session_id,
+                action_id,
+                human_grant["payload"]["grant_id"],
+                content,
+            )
+            websocket.send_json(command)
+            original = [websocket.receive_json(), websocket.receive_json()]
+            assert [event["sequence"] for event in original] == [5, 6]
+            assert [event["action_id"] for event in original] == [
+                str(action_id),
+                str(action_id),
+            ]
+
+        before = asyncio.run(
+            _durable_counts(migrated_database, UUID(session_id)),
+            loop_factory=asyncio.SelectorEventLoop,
+        )
+        assert before[0] == 6
+        assert before[3:] == (1, 1)
+
+        with client.websocket_connect(
+            _ws_path(session_id, after_sequence=before[0]),
+            headers={"Origin": TRUSTED_ORIGIN},
+        ) as websocket:
+            websocket.send_json(command)
+            replay = [
+                _receive_json_with_timeout(websocket),
+                _receive_json_with_timeout(websocket),
+            ]
+            assert replay == original
+            replay_payload = replay[0]["payload"]
+            original_payload = original[0]["payload"]
+            assert isinstance(replay_payload, dict)
+            assert isinstance(original_payload, dict)
+            assert replay_payload["utterance_id"] == original_payload["utterance_id"]
+
+        after = asyncio.run(
+            _durable_counts(migrated_database, UUID(session_id)),
+            loop_factory=asyncio.SelectorEventLoop,
+        )
+        assert after == before

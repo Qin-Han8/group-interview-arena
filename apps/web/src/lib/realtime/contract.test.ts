@@ -127,6 +127,124 @@ describe("WebSocket derivative contract", () => {
   });
 
   it.each([
+    {
+      schema_version: 2,
+      type: "floor.granted",
+      session_id: SESSION_ID,
+      sequence: 7,
+      occurred_at: "2026-08-25T01:04:04Z",
+      action_id: null,
+      payload: {
+        grant_id: GRANT_ID,
+        decision_id: DECISION_ID,
+        participant_id: PARTICIPANT_ID,
+        phase: "OPENING_STATEMENTS",
+        opportunity_id: null,
+        reason_code: "FIRST_OPPORTUNITY",
+        policy_version: "v0.1-floor-1",
+      },
+    },
+    {
+      schema_version: 2,
+      type: "floor.released",
+      session_id: SESSION_ID,
+      sequence: 8,
+      occurred_at: "2026-08-25T01:04:05Z",
+      action_id: null,
+      payload: {
+        grant_id: GRANT_ID,
+        participant_id: PARTICIPANT_ID,
+        phase: "OPENING_STATEMENTS",
+        reason_code: "PHASE_CHANGED",
+      },
+    },
+    {
+      schema_version: 2,
+      type: "floor.released",
+      session_id: SESSION_ID,
+      sequence: 9,
+      occurred_at: "2026-08-25T01:04:06Z",
+      action_id: ACTION_ID,
+      payload: {
+        grant_id: GRANT_ID,
+        participant_id: PARTICIPANT_ID,
+        phase: "OPENING_STATEMENTS",
+        reason_code: "SPEAKER_FINISHED",
+      },
+    },
+    {
+      schema_version: 2,
+      type: "floor.intervention_requested",
+      session_id: SESSION_ID,
+      sequence: 10,
+      occurred_at: "2026-08-25T01:04:07Z",
+      action_id: null,
+      payload: {
+        intervention_id: INTERVENTION_ID,
+        decision_id: DECISION_ID,
+        phase: "EXPLORATION",
+        intervention_kind: "SILENCE",
+        reason_code: "SILENCE_RECOVERY",
+        policy_version: "v0.1-floor-1",
+      },
+    },
+  ])("accepts additive floor v2 envelopes", (message) => {
+    expect(parseRealtimeMessage(JSON.stringify(message))).toEqual(message);
+  });
+
+  it.each([
+    {
+      schema_version: 1,
+      type: "floor.granted",
+      session_id: SESSION_ID,
+      sequence: 11,
+      occurred_at: "2026-08-25T01:04:08Z",
+      action_id: null,
+      payload: {
+        grant_id: GRANT_ID,
+        decision_id: DECISION_ID,
+        participant_id: PARTICIPANT_ID,
+        phase: "OPENING_STATEMENTS",
+        opportunity_id: null,
+        reason_code: "FIRST_OPPORTUNITY",
+        policy_version: "v0.1-floor-1",
+      },
+    },
+    {
+      schema_version: 1,
+      type: "floor.intervention_requested",
+      session_id: SESSION_ID,
+      sequence: 12,
+      occurred_at: "2026-08-25T01:04:09Z",
+      action_id: null,
+      payload: {
+        intervention_id: INTERVENTION_ID,
+        decision_id: DECISION_ID,
+        phase: "EXPLORATION",
+        intervention_kind: "SILENCE",
+        reason_code: "SILENCE_RECOVERY",
+        policy_version: "v0.1-floor-1",
+      },
+    },
+    {
+      schema_version: 3,
+      type: "floor.released",
+      session_id: SESSION_ID,
+      sequence: 13,
+      occurred_at: "2026-08-25T01:04:10Z",
+      action_id: null,
+      payload: {
+        grant_id: GRANT_ID,
+        participant_id: PARTICIPANT_ID,
+        phase: "OPENING_STATEMENTS",
+        reason_code: "PHASE_CHANGED",
+      },
+    },
+  ])("rejects invalid floor versions and v1 action nullability", (message) => {
+    expect(parseRealtimeMessage(JSON.stringify(message))).toBeUndefined();
+  });
+
+  it.each([
     "{not-json",
     JSON.stringify({ schema_version: 2 }),
     JSON.stringify({
