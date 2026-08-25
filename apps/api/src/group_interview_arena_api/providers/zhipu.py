@@ -12,8 +12,8 @@ from group_interview_arena_api.modules.ai_runtime.generation import (
 )
 
 _ENDPOINT = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
-_PROVIDER_IDENTIFIER = "zhipu"
-_CONFIGURATION_VERSION = "ZHIPU_CHAT_DEV_V1"
+ZHIPU_PROVIDER_IDENTIFIER = "zhipu"
+ZHIPU_CONFIGURATION_VERSION = "ZHIPU_CHAT_DEV_V1"
 _TIMEOUT = httpx.Timeout(connect=5.0, read=60.0, write=10.0, pool=5.0)
 
 
@@ -81,9 +81,9 @@ class ZhipuGenerationProvider:
         generation_input: RuntimeGenerationInput,
     ) -> RawGenerationResult:
         if (
-            generation_input.provider_identifier != _PROVIDER_IDENTIFIER
+            generation_input.provider_identifier != ZHIPU_PROVIDER_IDENTIFIER
             or generation_input.model_identifier != self._settings.model
-            or generation_input.configuration_version != _CONFIGURATION_VERSION
+            or generation_input.configuration_version != ZHIPU_CONFIGURATION_VERSION
         ):
             return _failure(GenerationFailureCode.INTERNAL_ERROR)
 

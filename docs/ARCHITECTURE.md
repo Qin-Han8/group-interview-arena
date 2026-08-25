@@ -1,16 +1,16 @@
 # P0 技术架构基线
 
-- Status: P0 Architecture Baseline + P1-1/P1-2/P1-3/P1-4 completed + P1-5A/P1-5B/P1-5C/P1-5D/P1-5E-1/P1-5E-2 completed
+- Status: P0 Architecture Baseline + P1-1/P1-2/P1-3/P1-4 completed + P1-5A/P1-5B/P1-5C/P1-5D/P1-5E/P1-5E-1/P1-5E-2/P1-5E-3 completed
 - Current phase: P1 — IN_PROGRESS
 - Architecture baseline established by: P0-2 — DONE
 - P0-3 foundation status: DONE
 - P0-4 database foundation status: DONE
 - P0-5 identity boundary status: DONE
-- Most recently completed subphase: P1-5E-2 Single AI Turn Orchestration Kernel
+- Most recently completed subphase: P1-5E-3 Continuous AI Drive + Composition Acceptance
 - P0 status: DONE; P0-1 through P0-7 completed
-- P1 status: IN_PROGRESS; P1-1/P1-2/P1-3/P1-4 DONE; P1-5A/P1-5B/P1-5C/P1-5D/P1-5E-1/P1-5E-2 DONE; P1-5E IN_PROGRESS; P1-5E-3/P1-5F NOT_STARTED
+- P1 status: IN_PROGRESS; P1-1/P1-2/P1-3/P1-4 DONE; P1-5A/P1-5B/P1-5C/P1-5D/P1-5E/P1-5E-1/P1-5E-2/P1-5E-3 DONE; P1-5F NOT_STARTED
 - Target version: V0.1 Internal Validation
-- Business architecture detail: P1-1 runtime completed; P1-2 question/persona boundary implemented; P1-3 lifecycle independently accepted; P1-4 floor control implemented; P1-5A freezes authority; P1-5B persists prompt/request/final utterance; P1-5C adds deterministic internal generation orchestration; P1-5D adds the first thin real-provider adapter; P1-5E-1 freezes state-driven automatic coordination; P1-5E-2 implements its internal single-turn kernel without public transport
+- Business architecture detail: P1-1 runtime completed; P1-2 question/persona boundary implemented; P1-3 lifecycle independently accepted; P1-4 floor control implemented; P1-5A freezes authority; P1-5B persists prompt/request/final utterance; P1-5C adds deterministic internal generation orchestration; P1-5D adds the first thin real-provider adapter; P1-5E-1 freezes state-driven automatic coordination; P1-5E-2 implements its single-turn kernel; P1-5E-3 closes bounded continuous drive and lazy configured composition without public transport
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -281,7 +281,7 @@ WebSocket 使用独立版本化事件契约，至少表达 event type、schema v
 
 ### P1-5 AI Runtime architecture — frozen authority and current implementation
 
-P1-5A 冻结 authority boundary；P1-5B 已增加 generation request/final utterance persistence，P1-5C 已增加 deterministic internal prompt/runtime orchestration，P1-5D 已增加首个 project-owned provider Protocol 与 thin Zhipu HTTP adapter，current development model is server-configured `glm-4.7-flashx`。它仍是显式 internal caller，不是 automatic orchestration 或 public transport。
+P1-5A 冻结 authority boundary；P1-5B 已增加 generation request/final utterance persistence，P1-5C 已增加 deterministic internal prompt/runtime orchestration，P1-5D 已增加首个 project-owned provider Protocol 与 thin Zhipu HTTP adapter，current development model is server-configured `glm-4.7-flashx`。P1-5E-2/E3 now provide internal single-turn and bounded continuous coordination；there is still no public transport or background/startup trigger。
 
 ```text
 P1-3 lifecycle authority: phase / deadline
@@ -324,9 +324,9 @@ P1-3 lifecycle authority: phase / deadline
 - `ZhipuGenerationProvider` uses one `httpx.AsyncClient` request with required lazy `ZhipuProviderSettings.model` (currently `glm-4.7-flashx`)。It requires configured/input/outbound/response/durable model alignment and model-independent `ZHIPU_CHAT_DEV_V1` provenance，rejects mismatch before or after HTTP as appropriate，disables redirects/retries/streaming/thinking，applies bounded timeouts and normalizes only safe typed outcomes。
 - `ZhipuProviderSettings` is a separate lazy server-only boundary with required `GIA_API_ZHIPU_API_KEY: SecretStr` and required bounded non-secret `GIA_API_ZHIPU_MODEL: str`。Ordinary API startup requires neither；changing the model requires configuration plus API restart but no Python、adapter or schema change。Both identifiers remain internal provenance，and the key、rendered prompt、request/response body、provider exception and reasoning content are not logged or persisted。
 - Provider execution still uses the existing P1-5C explicit runtime callable outside database transactions。Durable `RUNNING` remains reconciliation-required/no automatic re-call；late results、overdue reconciliation、concurrent claims and at-most-one utterance retain the P1-3/P1-5C authority rules。
-- Automated provider/runtime tests use injected `httpx.MockTransport` and make zero real GLM calls。Implementation and config-driven patch actual-source reviews passed。Final user-run sanitized real-provider acceptance smoke：`PASS`；`zhipu` / `glm-4.7-flashx` / `ZHIPU_CHAT_DEV_V1` returned `RawGenerationSuccess` and satisfied the intended Chinese group-interview smoke expectation，without recording credentials or raw provider data。P1-5D is `DONE`；P1-5E-1 now freezes the next automatic-orchestration design without implementing it。
+- Automated provider/runtime tests use injected `httpx.MockTransport` and make zero real GLM calls。Implementation and config-driven patch actual-source reviews passed。Final user-run sanitized real-provider acceptance smoke：`PASS`；`zhipu` / `glm-4.7-flashx` / `ZHIPU_CHAT_DEV_V1` returned `RawGenerationSuccess` and satisfied the intended Chinese group-interview smoke expectation，without recording credentials or raw provider data。P1-5D is `DONE`；P1-5E automatic orchestration is separately closed below。
 
-### P1-5E-1 automatic orchestration architecture — design frozen, not implemented
+### P1-5E automatic orchestration architecture — completed through E3
 
 - P1-5E is an application-level、state-driven coordination layer。P1-3 remains lifecycle authority；P1-4 Floor Scheduler decides who；P1-5 AI Runtime decides what。The coordinator never directly writes current-grant/phase/deadline/floor facts or selects a participant。
 - Correctness is recovered from durable session/current-grant、FloorGrant/Release、GenerationRequest/AiUtterance、SessionAction/scheduler children and ordered discussion-event state。`floor.granted` may wake the drive，but no exactly-once event listener、Redis、queue、distributed lock or in-memory mutex is authoritative。
@@ -338,7 +338,9 @@ P1-3 lifecycle authority: phase / deadline
 - P1-3 overdue reconciliation wins before generation/release/schedule mutation。If it releases or changes phase，the orchestrator consumes those committed facts and never overwrites lifecycle reason、deadline or sequence。
 - Release commits before scheduling。For release/scheduler persistence uncertainty，an exact expected durable result is recovered，another proved authoritative change is `STATE_CHANGED`，and an unchanged applicable checkpoint without the expected durable result is `RECONCILIATION_REQUIRED`。Scheduler `GRANT` is classified by the newly durable actor kind；`NO_GRANT` and `REQUEST_INTERVENTION` stop the drive。
 - Concurrent drives converge through deterministic identities、one request claimant、unique utterance/grant constraints、aggregate lock and exact sequence/current-grant preconditions。Concurrent post-release crash recovery produces exactly one deterministic scheduler action/decision and no duplicate next-speaker winner；a losing conflict reads that durable winner and never changes IDs。
-- P1-5E-2 is the completed one-AI-turn kernel plus one release and one scheduler call。P1-5E-3 is the future continuous loop，bounded by `MAX_AUTOMATED_AI_TURNS_PER_DRIVE = 8` and stopped by HUMAN/no-grant/intervention/lifecycle/reconciliation/budget boundaries。
+- P1-5E-2 is the completed one-AI-turn kernel plus one release and one scheduler call。P1-5E-3 implements the provider-neutral continuous loop by repeatedly consuming that closed result，bounded by `MAX_AUTOMATED_AI_TURNS_PER_DRIVE = 8` and stopped by HUMAN/no-current-work/no-grant/not-applicable/intervention/state-change/reconciliation/budget boundaries。Only a proved release advances the budget；scheduler-only crash recovery does not。
+- The thin composition constructs `ZhipuProviderSettings` and `ZhipuGenerationProvider` only when explicitly invoked，then passes canonical `zhipu` / configured model / `ZHIPU_CHAT_DEV_V1` provenance and the existing V0.1 scheduler policy。Missing/invalid settings fail safely before provider or drive execution；ordinary app import/startup remains independent of provider configuration。
+- P1-5E-3 implementation actual-source review is `PASS` with findings none。The sanitized composition smoke proves one completed/persisted AI turn reaches a HUMAN current owner with `WAITING_FOR_HUMAN` and one advanced turn；provider/model/configuration provenance is `zhipu` / `glm-4.7-flashx` / `ZHIPU_CHAT_DEV_V1`。P1-5E is `DONE`；P1-5F remains separately gated。
 - Existing schema is sufficient for orchestration correctness；no orchestration table or migration is planned。API/WebSocket/Web、public utterance projection、human-side transport behavior and independent acceptance remain P1-5F。Full outcome/restart matrices are in [`exec-plans/P1-5_ai-runtime-foundation.md`](exec-plans/P1-5_ai-runtime-foundation.md)。
 
 ## Configuration, secrets and error boundaries
@@ -418,7 +420,7 @@ Redis 只在多 API workers、横向扩容、跨进程 WebSocket broadcast、dis
 - P0-5D：completed；真实 browser Cookie/CORS/CSRF 闭环已通过 Chromium 验证；
 - P0-5E：completed；final outcome `PASS after findings remediation and independent recheck`；
 - P0：`DONE`；P0-1～P0-7 completed；P0-7 finding-only independent recheck `PASS`，P1 readiness `READY`；其后用户已明确批准进入 P1；
-- P1：`IN_PROGRESS`；P1-1～P1-4 均已完成且 independent verdict `PASS`；P1-5A/P1-5B/P1-5C/P1-5D/P1-5E-1/P1-5E-2 已完成；P1-5E 保持 `IN_PROGRESS`；P1-5E-3、transport、记忆和基础报告继续 Deferred，P1-5F 尚未开始；
+- P1：`IN_PROGRESS`；P1-1～P1-4 均已完成且 independent verdict `PASS`；P1-5A/P1-5B/P1-5C/P1-5D/P1-5E/P1-5E-1/P1-5E-2/P1-5E-3 已完成；transport、记忆和基础报告继续 Deferred，P1-5F 尚未开始并需要单独明确批准；
 - P2 以后：只在对应阶段获批后增加语音、评分训练和商业化能力。
 
 ## 与其他文档关系

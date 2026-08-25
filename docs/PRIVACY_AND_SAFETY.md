@@ -1,9 +1,9 @@
 # 隐私、安全、合规与反作弊基线
 
-- Status: Active baseline through completed P1-5D first-provider integration + completed P1-5E-1 design freeze + completed P1-5E-2 single-turn kernel
+- Status: Active baseline through completed P1-5D first-provider integration + completed P1-5E automatic orchestration (P1-5E-1/P1-5E-2/P1-5E-3)
 - Current phase: P1 — IN_PROGRESS
 - Target version: V0.1 Internal Validation
-- Detailed design: P1-5E-1 automatic orchestration privacy/safety boundary frozen；P1-5E-2 internal single-turn implementation remains provider-neutral and network-free in automated tests；full production/privacy design remains incomplete
+- Detailed design: P1-5E-1 automatic orchestration privacy/safety boundary frozen；P1-5E-2 single-turn and P1-5E-3 continuous/configured composition remain provider-neutral；automated tests are network-free and the separately user-run sanitized composition smoke is `PASS`；full production/privacy design remains incomplete
 - Security boundaries: Active from project start
 - P0-5A identity security boundary: completed / approved
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
@@ -129,7 +129,7 @@ P0-5B 已实现显式参数的 Argon2id hash/verify/verify-and-update、username
 - `RUNNING`、request conflict、internal uncertainty and stale/unproved state stop automatic progression。After release/scheduler persistence uncertainty，only an exact proved durable result may be recovered；another proved authority change returns `STATE_CHANGED`，and otherwise the drive returns `RECONCILIATION_REQUIRED`。Safety favors uncertain durable truth over retry/progress；no second provider call、synthetic result、stale release or unproved next scheduling is allowed。
 - HUMAN ownership is a hard safety boundary：no automatic generation、fabrication、release or scheduling over the human。P1-5F must preserve that boundary when transport is later introduced。
 - Future internal diagnostics may allowlist `session_id`、`floor_grant_id`、`generation_request_id`、orchestration outcome code、provider/model provenance and aggregate latency/counters only。P1-5E-1 adds no log field、trace span、metric、table、dependency or telemetry exporter。
-- P1-5E-2 automatic tests remain network-free and include privacy sentinels；P1-5E-3 tests must preserve that boundary。Any sanitized real-provider composition smoke remains user-run/separately approved and must record no credential、raw response/header、verbatim prompt/output or diagnostic payload。
+- P1-5E-2/P1-5E-3 automatic tests remain network-free and include privacy sentinels。The configured composition reads secrets only through lazy `SecretStr` settings at explicit invocation；missing configuration raises one generic safe error before provider/drive work，and no secret enters result serialization。Codex made zero real-provider calls。The separately user-run sanitized composition smoke is `PASS`；no credential、Authorization header、raw provider response、rendered prompt、Private Stance or verbatim model output was recorded，and its temporary test file was removed from project source。
 
 ## Implementation guidance
 
@@ -157,7 +157,7 @@ P0-5B 已实现显式参数的 Argon2id hash/verify/verify-and-update、username
 
 - P0-2：在架构决策中记录基础信任边界；完整威胁建模随实际接口、数据和 Provider 逐步细化。
 - P0-5C～P0-5E：backend/browser authentication、Cookie/CORS/CSRF 与最小日志边界已实现；P0-5E final outcome 为 `PASS after findings remediation and independent recheck`，P0-5 已转为 `DONE`。
-- P0：`DONE`；P1 is `IN_PROGRESS`，P1-1～P1-4 and P1-5A/B/C/D/P1-5E-1/P1-5E-2 are completed；P1-5E remains `IN_PROGRESS`；Codex made no real-model call and recorded no provider secret/raw response；P1-5E-3 continuous drive and P1-5F transport are not started。
+- P0：`DONE`；P1 is `IN_PROGRESS`，P1-1～P1-4 and P1-5A/B/C/D/P1-5E/P1-5E-1/P1-5E-2/P1-5E-3 are completed；Codex made no real-model call and recorded no provider secret/raw response；P1-5F transport is `NOT_STARTED` and requires separate explicit approval。
 - P2：完成语音同意、上传、保存和删除设计。
 - P4/P5：完成支付审计、公开隐私设置、投诉和发布合规检查。
 

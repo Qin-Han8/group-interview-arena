@@ -1,6 +1,6 @@
 # 数据库技术基线
 
-- Status: P0 Data Architecture Baseline + P1-1～P1-4 schema implemented + P1-5A/P1-5B/P1-5C/P1-5D/P1-5E-1/P1-5E-2 completed; P1-5C/P1-5D/P1-5E-1/P1-5E-2 add no schema
+- Status: P0 Data Architecture Baseline + P1-1～P1-4 schema implemented + P1-5A/P1-5B/P1-5C/P1-5D/P1-5E/P1-5E-1/P1-5E-2/P1-5E-3 completed; P1-5C/P1-5D/P1-5E-1/P1-5E-2/P1-5E-3 add no schema
 - Current phase: P1 — IN_PROGRESS
 - Data architecture baseline established by: P0-2 — DONE
 - Local PostgreSQL infrastructure: P0-4B — completed
@@ -15,7 +15,7 @@
 - Target version: V0.1 Internal Validation
 - Business schema: identity, session, question/persona, durable phase timing, participant/floor audit, and AI Runtime persistence foundation (nineteen product tables)
 - P1-1 status: P1-1A～E completed; independent final verdict PASS; P1-1 DONE
-- P1-2/P1-3/P1-4 status: DONE; P1-5A～P1-5D and P1-5E-1/P1-5E-2 completed; P1-5E-2 has zero schema delta; P1-5B adds the latest three product tables through linear revision `f1a15b15c005`
+- P1-2/P1-3/P1-4 status: DONE; P1-5A～P1-5E/P1-5E-1/P1-5E-2/P1-5E-3 completed; P1-5E-3 has zero schema delta; P1-5B adds the latest three product tables through linear revision `f1a15b15c005`
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -394,6 +394,8 @@ This sufficiency conclusion covers internal automatic-orchestration correctness 
 
 P1-5E-2 implementation confirms the frozen sufficiency conclusion：the coordinator reads these existing facts and mutates only through the existing AI Runtime、floor and scheduler services。Alembic remains at single head `f1a15b15c005` with no new upgrade operations，and the product schema remains exactly nineteen tables。
 
+P1-5E-3 continuous drive and configured composition add no durable cursor、budget、lease、provider-configuration or orchestration fact。The loop reconstructs progress from E2's exact release/next-grant result and authoritative existing rows；its per-invocation budget is an in-memory safety guard rather than persisted product state。PostgreSQL progression、crash-E recovery、concurrency and cancellation/re-entry tests confirm the same nineteen-table recovery model without a migration。
+
 ## Future business schema
 
 总纲提到 `users`、题目版本、角色模板、会话、参与者、阶段、发言、讨论事件、结构化记忆、报告、证据、训练、反馈、模型调用和审计等未来领域概念。
@@ -423,7 +425,7 @@ P1-5E-2 implementation confirms the frozen sufficiency conclusion：the coordina
 
 - P0-5C：FastAPI lifespan/request dependency 已成为现有 async DB runtime 的第一个 application caller；真实 PostgreSQL auth integration 只使用迁移到 head 的隔离临时数据库，development DB 保持 head `4fe43b42641b` 且两张表均为 0 rows；
 - P0-5D：completed；browser closure 已实现，existing Cookie/CORS/CSRF/shared trusted-origin boundary 已生效；P1 不得创建第二套 trusted-origin config；
-- P1：`IN_PROGRESS`；P1-1～P1-4 and P1-5A～P1-5D/P1-5E-1/P1-5E-2 `DONE`；P1-5E `IN_PROGRESS`；current migration head `f1a15b15c005`、精确十九张 product tables；P1-5C/P1-5D/P1-5E-1/P1-5E-2 schema delta 为零；P1-5E-3、记忆和报告继续 Deferred；
+- P1：`IN_PROGRESS`；P1-1～P1-4 and P1-5A～P1-5E/P1-5E-1/P1-5E-2/P1-5E-3 `DONE`；current migration head `f1a15b15c005`、精确十九张 product tables；P1-5C/P1-5D/P1-5E-1/P1-5E-2/P1-5E-3 schema delta 为零；P1-5F、记忆和报告继续 Deferred；
 - P2～P4：仅随获批范围增加音频、评分训练和商业化数据。
 
 ## 与其他文档关系

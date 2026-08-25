@@ -1,6 +1,6 @@
 # P1-5 AI Runtime Foundation Execution Plan
 
-Status: `P1 IN_PROGRESS`; `P1-5 IN_PROGRESS`; `P1-5A completed`; `P1-5B completed`; `P1-5C completed`; `P1-5D DONE`; `P1-5E IN_PROGRESS`; `P1-5E-1 DONE`; `P1-5E-2 DONE`; `P1-5E-3/P1-5F NOT_STARTED`
+Status: `P1 IN_PROGRESS`; `P1-5 IN_PROGRESS`; `P1-5A completed`; `P1-5B completed`; `P1-5C completed`; `P1-5D DONE`; `P1-5E DONE`; `P1-5E-1 DONE`; `P1-5E-2 DONE`; `P1-5E-3 DONE`; `P1-5F NOT_STARTED`
 
 Target version: `V0.1 Internal Validation`
 
@@ -13,6 +13,8 @@ P1-5A baseline: clean committed `main` at `5397cd2b25f36c6a9fbd666b759261091c36a
 P1-5D design-freeze baseline: clean committed `main` at `371d5a57ffb952a7ccb664170819e07b606b5688`, equal to `origin/main`; P1-5C is committed；[`PROJECT_MASTER_PLAN.md`](../PROJECT_MASTER_PLAN.md) SHA-256 remains `2388A9660320406CB35D5354126AD71C6849A98DB7C4A356796CA951BF372F26`
 
 P1-5E-1 design-freeze baseline: clean committed `main` at `a416d955920ec407c011c32602ac720a6d8080fd`, equal to `origin/main`; P1-5D is committed and `DONE`；P1-5E was `NOT_STARTED` before this approved checkpoint；[`PROJECT_MASTER_PLAN.md`](../PROJECT_MASTER_PLAN.md) SHA-256 remains `2388A9660320406CB35D5354126AD71C6849A98DB7C4A356796CA951BF372F26`
+
+P1-5E-3 implementation baseline: clean committed `main` at `de6ffdc5f98b2ec4549037f7fa3f96eeb83c7d31`, equal to `origin/main`; P1-5E-1/P1-5E-2 are committed and `DONE`；[`PROJECT_MASTER_PLAN.md`](../PROJECT_MASTER_PLAN.md) SHA-256 remains `2388A9660320406CB35D5354126AD71C6849A98DB7C4A356796CA951BF372F26`
 
 ## Goal
 
@@ -30,13 +32,13 @@ P1-5C 是 separately approved deterministic runtime vertical slice。它在不�
 - `P1-5B — AI Runtime Persistence Foundation`：`DONE`；
 - `P1-5C — Runtime Contract & Deterministic Generation Vertical Slice`：`DONE`；
 - `P1-5D — First Real Provider Integration`：`DONE`；implementation and config-driven model patch actual-source reviews `PASS`，final user-run sanitized real-provider acceptance smoke `PASS`；
-- `P1-5E — Automatic AI Runtime Orchestration`：`IN_PROGRESS`；
+- `P1-5E — Automatic AI Runtime Orchestration`：`DONE`；
   - `P1-5E-1 — Automatic AI Runtime Orchestration Design Freeze`：`DONE`；docs-only actual-source review `PASS`；findings none；
   - `P1-5E-2 — Single AI Turn Orchestration Kernel`：`DONE`；initial actual-source review `BLOCKED` on 3 findings；all remediated；remediation actual-source re-review `PASS`，findings none；
-  - `P1-5E-3 — Continuous AI Drive + Composition Acceptance`：`NOT_STARTED`；
+  - `P1-5E-3 — Continuous AI Drive + Composition Acceptance`：`DONE`；implementation actual-source review `PASS`，findings none；sanitized real-provider composition smoke `PASS`；
 - `P1-5F — Realtime/Web Integration + Independent Acceptance`：`NOT_STARTED`。
 
-P1-5D design freeze、implementation and config-driven model patch were separately approved；both actual-source reviews and the final user-run sanitized real-provider acceptance smoke passed，so P1-5D is closed as `DONE`。The user separately approved P1-5E and P1-5E-1，then approved P1-5E-2 implementation；P1-5E-2 is now `DONE` after findings remediation and actual-source re-review `PASS`。Codex makes no real-model call and records no credential、raw provider response or sensitive header。P1-5E-3 and P1-5F remain outside this checkpoint and require their own later approval。
+P1-5D design freeze、implementation and config-driven model patch were separately approved；both actual-source reviews and its final user-run sanitized real-provider acceptance smoke passed，so P1-5D is `DONE`。P1-5E-1、P1-5E-2 and P1-5E-3 are also `DONE` after their required reviews；P1-5E-3's user-run sanitized real-provider composition smoke passed，closing P1-5E automatic orchestration as `DONE`。Codex made no real-model call and records no credential、raw provider response or sensitive header。P1-5F remains outside this checkpoint and requires later approval。
 
 ## Context and authority
 
@@ -411,7 +413,7 @@ P1-5E-2/3 may implement provider-neutral structured result categories for：wait
 
 `P1-5E-2 — Single AI Turn Orchestration Kernel` now implements `drive_single_ai_turn(...)` with `owner_id + session_id + orchestration configuration + injected GenerationProvider`，inspects one authoritative current grant，drives at most that one AI grant through generation、safe terminal release and one scheduler invocation，then returns the structured result/new current state。Its network-free PostgreSQL tests cover crash A～F、fresh and post-release same-session concurrency、typed failure、release/scheduler persistence uncertainty、SUPERSEDED winner proof、prompt/privacy isolation and lifecycle precedence；Codex makes no real-provider call。
 
-`P1-5E-3 — Continuous AI Drive + Composition Acceptance` repeatedly invokes the single-turn kernel across consecutive AI grants and composes the existing Zhipu provider only from lazy server settings。The kernel remains provider-neutral and automated tests remain network-free。A sanitized user-run real-provider composition smoke may be requested separately if needed。
+`P1-5E-3 — Continuous AI Drive + Composition Acceptance` repeatedly invokes the single-turn kernel across consecutive AI grants and composes the existing Zhipu provider only from lazy server settings。The kernel remains provider-neutral and automated tests remain network-free。The separately user-run sanitized real-provider composition smoke is `PASS` with only the allowlisted facts recorded below。
 
 Continuous drive stops when the current grant belongs to HUMAN、scheduler returns `NO_GRANT`、scheduler requests intervention、session leaves a floor-enabled phase、lifecycle reconciliation changes/terminates applicability、durable truth is uncertain or the per-invocation safety budget is exhausted。The frozen application guard is `MAX_AUTOMATED_AI_TURNS_PER_DRIVE = 8`。Exhaustion does not release/mutate the current grant、fail a request or change phase；it returns safe `drive budget exhausted / resume allowed` and a later invocation resumes from durable state。This is not a user-facing product limit。
 
@@ -476,7 +478,7 @@ Still Deferred after the P1-5E-1 docs-only freeze:
 - provider SDK、multi-provider registry/routing/fallback and automatic retry；
 - production prompt orchestration beyond the closed P1-5C renderer and internal prompt-variable persistence；
 - additional provider-attempt/fallback hierarchy beyond the current one-request/one-attempt identity；
-- continuous automatic orchestration beyond the completed P1-5E-2 single-turn kernel remains deferred to P1-5E-3；transport/API/WebSocket/Web and streaming remain deferred to P1-5F or later approved work；
+- P1-5E-3 now implements only bounded in-process continuous automatic orchestration and configured composition；transport/API/WebSocket/Web、startup/background invocation and streaming remain deferred to P1-5F or later approved work；
 - memory、RAG、embedding/vector store；
 - scoring、evidence extraction、report generation；
 - voice、ASR、TTS、audio interruption；
@@ -486,7 +488,7 @@ Still Deferred after the P1-5E-1 docs-only freeze:
 
 ## Later implementation gates
 
-P1-5D implementation and config-driven patch followed the frozen section above without scope expansion；both actual-source reviews and the final user-run sanitized real-provider acceptance smoke passed，and P1-5D is `DONE`。P1-5E is now decomposed；P1-5E-1 docs-only design freeze is `DONE` after actual-source review `PASS` with findings none，and P1-5E-2 is `DONE` after its initial 3 findings were remediated and remediation actual-source re-review passed with findings none。P1-5E-3 and P1-5F each require their own later approval。Any later implementation/transport subphase must preserve:
+P1-5D implementation and config-driven patch followed the frozen section above without scope expansion；both actual-source reviews and the final user-run sanitized real-provider acceptance smoke passed，and P1-5D is `DONE`。P1-5E-1 is `DONE` after actual-source review `PASS`，P1-5E-2 is `DONE` after its initial 3 findings were remediated and re-review passed，and P1-5E-3 is `DONE` after implementation actual-source review `PASS` with findings none and sanitized real-provider composition smoke `PASS`。P1-5F requires its own later approval。Any later implementation/transport subphase must preserve:
 
 - any additive schema need and historical deletion/retention semantics；
 - provider-neutral request/result/error contract with a real caller；
@@ -540,7 +542,19 @@ P1-5D implementation and config-driven patch followed the frozen section above w
 - Release/scheduler `SessionPersistenceError` now re-reads authority：an exact expected durable result is recovered，another proved authoritative change returns `STATE_CHANGED`，and an otherwise still-applicable checkpoint without the expected durable result returns `RECONCILIATION_REQUIRED`。No success/failure is synthesized and provider execution is never retried。
 - Real PostgreSQL crash-E concurrency prepares one exact automatic release with no schedule fact，then runs two callers：provider calls remain zero，one deterministic `SessionAction` and `FloorDecision` win，at most one next grant/intervention exists and both callers recover the same action identity without duplicate next speaker。
 - Remediation-focused automatic orchestration is `22 passed`；relevant runtime/floor/lifecycle regression is `98 passed`；fresh full backend/PostgreSQL is `491 passed` with one existing Starlette deprecation warning。Ruff、format (`112 files`)、strict Pyright、frozen dependency/lock and Alembic head/current/check pass。
-- No schema/migration、dependency/lock、configuration、provider、`runtime.py`、`service.py`、API/WS/Web or continuous-drive implementation change；real-provider calls are zero。P1-5E-2 is `DONE`；P1-5E remains `IN_PROGRESS`；P1-5E-3/P1-5F remain `NOT_STARTED`。
+- No schema/migration、dependency/lock、configuration、provider、`runtime.py`、`service.py`、API/WS/Web or continuous-drive implementation change；real-provider calls are zero。At the P1-5E-2 closeout checkpoint，P1-5E-2 was `DONE`、P1-5E remained `IN_PROGRESS` and P1-5E-3/P1-5F remained `NOT_STARTED`；the current status is superseded by the P1-5E-3 final closeout below。
+
+## P1-5E-3 actual-source review, composition smoke and final closeout
+
+- Meaningful TDD RED gates were missing `continuous` composition surface and missing canonical public Zhipu provenance constants。The GREEN implementation adds one provider-neutral continuous module、one thin lazy composition module and only promotes the two existing adapter constants；the E2 kernel remains unchanged。
+- `drive_continuous_ai(...)` calls E2 until a frozen stop boundary or exact budget。A proved release action advances the count；post-release scheduler recovery does not；eight advances return `BUDGET_EXHAUSTED` before a ninth kernel/provider call。Distinct next-grant and repeated-progress guards prevent a busy loop or fabricated progress。
+- PostgreSQL tests use real services/state transitions to prove AI → AI → HUMAN consecutive drive、terminal provider failure followed by a distinct AI、post-release crash-E scheduler recovery、concurrent convergence with one call/request/utterance/release per exact grant and cancellation propagation with durable `RUNNING` fail-closed re-entry。
+- `drive_configured_ai_session(...)` lazily loads required server-only Zhipu settings，constructs the existing provider and passes canonical `zhipu` / configured model / `ZHIPU_CHAT_DEV_V1` plus the existing V0.1 scheduler policy。Missing settings produce only a generic safe composition error；ordinary imports/startup require no provider environment。
+- Network-free results are `47 passed` focused E3/E2、`253 passed` relevant runtime/floor/lifecycle and `516 passed` full backend/PostgreSQL with one existing Starlette deprecation warning。Ruff formatting/lint and strict Pyright pass；real-provider calls are zero。
+- External implementation actual-source review verdict is `PASS` with findings none；reviewed implementation bundle SHA-256 is `a2b453846f1ad1e94fa17b74ca507efe462c176d67471cae87278893bb907dd0`。
+- User-run sanitized real-provider composition smoke is `PASS`：`continuous_outcome = WAITING_FOR_HUMAN`、`automated_ai_turns_advanced = 1`、`generation_request_count = 1`、`provider_identifier = zhipu`、`model_identifier = glm-4.7-flashx`、`configuration_version = ZHIPU_CHAT_DEV_V1`、generation request `COMPLETED`、formal `AiUtterance` persisted、AI `FloorRelease = SPEAKER_FINISHED` and resulting current floor actor `HUMAN`；pytest smoke is `1 passed in 5.56s`。
+- No credential、Authorization header、raw provider response、rendered prompt、Private Stance or verbatim model output was recorded。The temporary manual smoke test file was removed and is excluded from project/review scope。
+- No schema/migration、dependency/lock/config、E2 orchestration、runtime/service、API/WS/Web implementation change。P1-5E/P1-5E-3 are `DONE`；P1-5F remains `NOT_STARTED` and requires separate explicit approval。
 
 ## Decisions
 
@@ -577,5 +591,5 @@ P1-5D implementation and config-driven patch followed the frozen section above w
 - P1-5B：completed；provider-neutral persistence foundation；all required gates PASS；no provider/runtime caller。
 - P1-5C：completed；deterministic runtime contract/vertical slice and PostgreSQL orchestration gates PASS；no real provider or transport。
 - P1-5D：`DONE`；design freeze、implementation、findings remediation、config-driven model patch、both actual-source reviews and final user-run sanitized real-provider acceptance smoke completed without a Codex real-model call or sensitive-data recording。
-- P1-5E：`IN_PROGRESS`；P1-5E-1 docs-only automatic-orchestration design freeze is `DONE` after actual-source review `PASS` with findings none；P1-5E-2 is `DONE` after initial actual-source review `BLOCKED` on 3 findings、all findings remediation and remediation actual-source re-review `PASS` with findings none；P1-5E-3 is `NOT_STARTED`。
+- P1-5E：`DONE`；P1-5E-1 design freeze、P1-5E-2 single-turn kernel and P1-5E-3 bounded continuous drive/configured composition are `DONE` after required reviews and the sanitized composition smoke。
 - P1-5F：`NOT_STARTED`；requires separate explicit approval。
