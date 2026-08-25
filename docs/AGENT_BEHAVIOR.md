@@ -1,9 +1,9 @@
 # AI 候选人与讨论编排骨架
 
-- Status: P1-2/P1-3/P1-4 and P1-5A/B/C/D/P1-5E/P1-5E-1/P1-5E-2/P1-5E-3/P1-5F-1 completed; P1-5F in progress; P1-5F-2～F4 not started
+- Status: P1-2/P1-3/P1-4 and P1-5A～P1-5E/P1-5F-1/P1-5F-2 completed; P1-5F in progress; P1-5F-3/F4 not started
 - Current phase: P1 — IN_PROGRESS
 - Target version: V0.1 Internal Validation
-- Detailed orchestrator/agent design: P1-3A～D and P1-4A～E completed; P1-5A/B/C/D completed; P1-5E-1 freezes automatic-drive behavior; P1-5E-2 implements the single-turn kernel; P1-5E-3 closes bounded continuous drive and lazy configured composition; P1-5F-1 freezes Human/AI public utterance progression and Browser UX docs-only
+- Detailed orchestrator/agent design: P1-3A～D and P1-4A～E completed; P1-5A～P1-5E implement the internal runtime; P1-5F-1 freezes Human/AI public utterance progression and Browser UX; P1-5F-2 backend progression/transport is completed after finding remediation and finding-only external re-review `PASS`
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -295,7 +295,7 @@ Generation Request 与 final Utterance 是不同 identity。一个 logical reque
 ### P1-5E automatic-drive behavior — completed through E3
 
 - Automatic drive is state-driven from the exact durable current grant；`floor.granted` may trigger invocation but missed/duplicate delivery cannot change correctness。The orchestrator is an application coordinator，not a participant、speaker selector、lifecycle authority or floor authority。
-- HUMAN current owner is a successful stop boundary。The drive never generates for、releases、schedules over or fabricates an utterance for a human；P1-5F-1 freezes the later Human/UI transport behavior below without implementing it。
+- HUMAN current owner is a successful stop boundary。The drive never generates for、releases、schedules over or fabricates an utterance for a human；P1-5F-2 now enforces the Human transport behavior below in the backend。
 - Eligible AI current owner resolves exact `AI_CANDIDATE_TURN` version `1` plus `zhipu` / server-configured model / `ZHIPU_CHAT_DEV_V1` for a new request。One floor grant deterministically owns one generation request and utterance identity；existing request provenance/timestamp wins on re-entry。
 - Confirmed exact completed utterance ends the still-current AI turn as `SPEAKER_FINISHED`。Confirmed durable failure ends it as `INTERRUPTED` while the Generation Request retains the real typed `failure_code`。`INTERRUPTED` is only the current V0.1 floor vocabulary for an AI turn ending without formal content；it is not the generation failure taxonomy。
 - `RUNNING`/`RECONCILIATION_REQUIRED`、request conflict、internal uncertainty and unproved winner stop automatic progression without provider retry、release or scheduling。`CONTEXT_REJECTED`/`STALE_RESULT` first re-read exact session/current-grant truth：a changed grant/lifecycle is `STATE_CHANGED`，while the same exact current grant is `RECONCILIATION_REQUIRED`；neither path mutates the grant。
@@ -310,17 +310,17 @@ Generation Request 与 final Utterance 是不同 identity。一个 logical reque
 - P1-5E-3 implementation actual-source review is `PASS` with findings none。The user-run sanitized composition smoke is `PASS`：one `COMPLETED` generation request persisted one formal `AiUtterance`，released the AI grant as `SPEAKER_FINISHED` and stopped at a HUMAN owner with `WAITING_FOR_HUMAN` / one automated turn advanced。Only `zhipu` / `glm-4.7-flashx` / `ZHIPU_CHAT_DEV_V1` provenance is recorded；sensitive and verbatim content remains excluded。
 - No prompt/provider body、other participant stance、secret or raw exception becomes orchestration state/logging。P1-5E added no API/WS/Web/public utterance implementation。Full outcome and crash matrices are in [`exec-plans/P1-5_ai-runtime-foundation.md`](exec-plans/P1-5_ai-runtime-foundation.md)。
 
-### P1-5F-1 Human/public discussion behavior — contract frozen, not implemented
+### P1-5F Human/public discussion behavior — F1 frozen; F2 backend implemented
 
-- Human speech enters only through authenticated WS `participant.utterance.submit`。The server resolves the exact current grant and accepts only an owner-bound `HUMAN` participant in a floor-enabled active phase after authoritative lifecycle/deadline reconciliation。The Browser cannot name a participant、grant、phase or actor。
+- Human speech enters only through authenticated WS `participant.utterance.submit` with the exact public `floor_grant_id` and original `content`。After authoritative lifecycle/deadline reconciliation，the server requires that ID to equal the locked current unreleased grant and accepts only its owner-bound `HUMAN` / `CANDIDATE` participant in the exact floor-enabled phase。The Browser cannot name a participant、phase or actor，and a stale grant ID never binds to a newer turn。
 - Accepted content preserves the original `1..4000` Unicode-code-point string，rejecting empty-after-strip and U+0000 without trimming or normalization。A late、ineligible or content-invalid syntactically valid command produces safe recoverable `UTTERANCE_REJECTED` and no old-turn utterance。
 - Human and AI formal speech are the same `participant.utterance.created` v1 fact。Human carries its original client action identity；AI carries null。Provider/generation/runtime identity never becomes public discussion behavior。
 - Historical P1-4 floor-event v1 behavior is preserved exactly。The additive floor-event v2 keeps the same grant/release/intervention meanings but treats nullable `action_id` only as public client causation：direct Human-command causation may expose the original Human ID，while automatic scheduler/release/intervention uses null and keeps internal `SessionAction` causation private。F2/F3 must support both versions。
-- A successful Human command and release of that exact grant are one atomic control/content operation：`participant.utterance.created` v1 at sequence N，then `floor.released / SPEAKER_FINISHED` v2 at sequence N+1，both carrying the original Human action ID。Replay of the same action/content returns the same deterministic utterance identity and never repeats release、scheduling or AI drive。
+- A successful Human command and release of that exact grant are one atomic control/content operation：`participant.utterance.created` v1 at sequence N，then `floor.released / SPEAKER_FINISHED` v2 at sequence N+1，both carrying the original Human action ID。Replay requires the same action/floor/exact content；changing floor or content conflicts，and exact replay returns the same deterministic utterance identity without repeating release、scheduling or AI drive。
 - WHO remains exclusively P1-4。After the Human transaction commits，a separately committed deterministic scheduler checkpoint resumes from stable session/released-grant identity。Only if it grants AI does transport invoke existing `drive_configured_ai_session(...)`；transport does not copy the scheduler、runtime、release or provider loop。
 - Successful AI content becomes public in the same completion commit as `COMPLETED + AiUtterance`，then P1-5E performs its existing separate release and scheduling commits。AI failure creates no speech and progresses through `floor.released / INTERRUPTED`。
 - V0.1 may wake progression with bounded best-effort in-process work，but no correctness depends on that task。Reconnect/resume re-enters from durable Human action/event/release、scheduler facts、current AI grant、Generation Request and AiUtterance truth。`RUNNING` never causes a second automatic provider call。
-- Browser input is enabled only for the authenticated Human's authoritative current grant；AI、other、no-floor and terminal states disable it。Pending text stays in memory and is not a formal transcript bubble before WS or REST action-ID confirmation。
+- Browser input is enabled only for the authenticated Human's authoritative current grant；AI、other、no-floor and terminal states disable it。Pending `action_id + floor_grant_id + content` stays in memory and is not a formal transcript bubble before WS or REST action-ID confirmation。
 - Browser derives AI processing only from an AI current grant and may show `AI 候选人正在组织发言…` without ETA/provider status。On `INTERRUPTED` it may show the non-durable generic notice `该 AI 候选人本轮未能完成发言，讨论已继续。`，never an internal failure taxonomy。
 - Transcript merge uses stable `utterance_id` and authoritative event sequence。Transcript sequence is filtered/non-contiguous；full WS events alone use gap detection。Conflicting fields for one ID stop local inference and reload authoritative session+transcript without deliberately clearing confirmed content first。
 - Crash boundaries before Human commit、after Human release、after AI grant、during `RUNNING`、after AI public completion、after AI release and after any commit/before WS send all converge without duplicate content or control mutation。The exact matrix and F2～F4 acceptance live in [`exec-plans/P1-5_ai-runtime-foundation.md`](exec-plans/P1-5_ai-runtime-foundation.md)。
@@ -340,7 +340,7 @@ Generation Request 与 final Utterance 是不同 identity。一个 logical reque
 - Confirmed for P1-3：V0.1 状态转换条件、abort 来源、deadline concurrency/recovery 语义；
 - Confirmed and implemented through P1-4D：V0.1 deterministic lexicographic floor policy、single-owner/participant/event/explanation/persistence boundary、pure ranking、locked transactional orchestration and display-only authoritative Web recovery；
 - TBD after real discussion evidence：policy parameter calibration values and conflict-loop content semantics；P1-4 does not use semantic conflict ranking；
-- Implemented through P1-5E-3：Prompt Version、Generation Request lifecycle、final AI Utterance relation、closed prompt/context assembly、typed deterministic harness、one thin Zhipu provider adapter、the provider-neutral single-turn coordinator、bounded continuous drive and lazy configured composition；P1-5F-1 public transport/behavior contract is frozen docs-only，while F2～F4 implementation and provider routing/fallback remain Deferred；
+- Implemented through P1-5F-2 backend：Prompt/request/AI runtime plus Human submit、unified utterance publication、post-Human durable progression、ordered WS delivery and transcript read model；P1-5F-3/F4 and provider routing/fallback remain Deferred；
 - TBD：结构化记忆和模型输出 validation 的正式 Schema；
 - TBD：角色盲测样本及通过标准的执行细节。
 
@@ -348,7 +348,7 @@ Generation Request 与 final Utterance 是不同 identity。一个 logical reque
 
 ## Future work
 
-- P1：`IN_PROGRESS`；P1-1～P1-4 and P1-5A/P1-5B/P1-5C/P1-5D/P1-5E/P1-5E-1/P1-5E-2/P1-5E-3/P1-5F-1 `DONE`；P1-5F remains `IN_PROGRESS`；P1-5F-2～F4 public transport/Web/E2E implementation and memory remain Deferred。
+- P1：`IN_PROGRESS`；P1-1～P1-4 and P1-5A/P1-5B/P1-5C/P1-5D/P1-5E/P1-5E-1/P1-5E-2/P1-5E-3/P1-5F-1/P1-5F-2 `DONE`；P1-5F remains `IN_PROGRESS`；P1-5F-3/F4 Web/E2E implementation and memory remain Deferred。
 - P2：加入语音、打断、播放停止和恢复语义。
 - P3：建立角色行为与评分证据之间的校准边界。
 - P6/V1.0：扩展到 6～8 种角色和压力模式。

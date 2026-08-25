@@ -2,9 +2,9 @@
 
 - Status: Skeleton / Baseline
 - Most recently completed phase: P0 — DONE
-- Next phase: P1 — NOT_STARTED / awaiting explicit user approval
+- Current phase: P1 — IN_PROGRESS
 - Target version: V0.1 Internal Validation
-- Detailed design: Not started
+- Detailed design: Completed through P1-5F-2 backend closeout; P1-5F remains in progress
 - Detailed operational checklist: Not started
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
@@ -18,7 +18,7 @@
 
 ## 当前版本范围
 
-P0-1～P0-7 均已完成，P0 整体已转为 `DONE`。P0-4 已通过独立最终验收；P0-5E final outcome 为 `PASS after findings remediation and independent recheck`；P0-6B remote CI run #1、P0-6C run #4、P0-6D run #6 与 P0-6E cross-layer/actual-source review 均 `PASS`。P0-7 independent final acceptance initial verdict 为 `BLOCKED`，两个 documentation current-state findings 已 remediation，finding-only independent recheck `PASS`，new blockers none，P1 readiness `READY`。P1 仍为 `NOT_STARTED`，等待用户明确批准。
+P0-1～P0-7 均已完成，P0 整体已转为 `DONE`。P0-7 finding-only independent recheck `PASS` 后用户已批准进入 P1。P1-1～P1-4 and P1-5A～P1-5E/P1-5F-1/P1-5F-2 are complete；P1-5F remains `IN_PROGRESS`；P1-5F-3/F4 remain `NOT_STARTED`。
 
 ## Implementation guidance
 
@@ -241,6 +241,18 @@ P0-5D actual-source final review 已 PASS 并转为 completed；P0-5E initial in
 
 P0-2 已 Accepted PostgreSQL、SQLAlchemy 2.x 和 Alembic，P0-4 实施基线为 PostgreSQL 18.x，并要求真实 PostgreSQL integration/migration checks。`ADR-015` 已确认 P0/V0.1 initial identity boundary；email/phone/WeChat/OAuth、verified recovery 与完整公开账号产品继续 Deferred，不是 P0-5B 的前置实现范围。
 
+## P1-5F-2 backend text discussion closeout
+
+- [x] Historical floor-event v1 semantics remain unchanged and additive v2 public projection is covered；
+- [x] Human utterance + exact release and AI completion + utterance + public event atomicity are covered；
+- [x] Deterministic post-Human scheduler recovery reuses P1-5E configured drive without a new durable table；
+- [x] Owner-only sequence-cursor transcript and one ordered commit-before-send WebSocket drain are implemented；
+- [x] Provider behavior in automated validation is injected/network-free；real provider calls are zero；
+- [x] Generated Web diff is mechanical REST OpenAPI only；handwritten Web/F3 and Browser E2E/F4 remain untouched；
+- [x] Final validation recorded：pre-review focused `145`、finding-remediation focused `77`、final affected `45`、unit `438`、integration `140`、full `578` tests passed；frozen sync/lock、Ruff lint/format、Pyright、Alembic head/current/check and generated REST OpenAPI drift check passed；
+- [x] Initial implementation actual-source review `BLOCKED` on three findings；all remediated；finding-only external re-review `PASS` with findings none against `group-interview-arena-review-20260825-150754.zip` / SHA-256 `b9553cbe488707d5fd87598b70e48e1fabdf55a0ae6d3dab367b830267d61edd`；P1-5F-2 is `DONE`；
+- [x] Commit/push remains separately authorized and has not occurred。
+
 ## V0.1 internal validation
 
 目标：验证多角色讨论和状态机，不公开收费。
@@ -347,7 +359,7 @@ P0-2 已 Accepted PostgreSQL、SQLAlchemy 2.x 和 Alembic，P0-4 实施基线为
 - P0-5D：completed；P0-5E completed；final outcome `PASS after findings remediation and independent recheck`。
 - P0-6：`DONE`；P0-6A～P0-6E completed，cross-layer validation/closeout `PASS`。
 - P0-7：completed；initial verdict `BLOCKED`，2 documentation findings remediated，finding-only independent recheck `PASS`，P1 readiness `READY`。
-- P1：`NOT_STARTED`；awaiting explicit user approval。
+- P1：`IN_PROGRESS`；P1-5F remains `IN_PROGRESS`，P1-5F-2 is `DONE`；P1-5F-3/F4 are `NOT_STARTED`。
 - 各版本发布任务：补充负责人、环境、命令、证据和发布/回滚步骤。
 
 ## 与其他文档关系

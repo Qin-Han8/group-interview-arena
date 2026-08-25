@@ -23,8 +23,12 @@ from group_interview_arena_api.identity.service import (
     CurrentUser,
     get_current_user,
 )
+from group_interview_arena_api.modules.ai_runtime.composition import (
+    AiDriveCompositionError,
+)
 from group_interview_arena_api.modules.discussion_sessions.contracts import (
     FormalEventEnvelope,
+    ParticipantUtteranceSubmitCommand,
     RealtimeErrorCode,
     RealtimeSessionCommand,
     SessionAbortCommand,
@@ -35,7 +39,12 @@ from group_interview_arena_api.modules.discussion_sessions.contracts import (
 from group_interview_arena_api.modules.discussion_sessions.domain import (
     InvalidSessionStateError,
     SessionCommand,
-    StoredEvent,
+)
+from group_interview_arena_api.modules.discussion_sessions.progression import (
+    resume_discussion_progression,
+)
+from group_interview_arena_api.modules.discussion_sessions.public_events import (
+    project_public_events,
 )
 from group_interview_arena_api.modules.discussion_sessions.service import (
     ActionIdConflictError,
@@ -47,12 +56,18 @@ from group_interview_arena_api.modules.discussion_sessions.service import (
     load_reconnect_events,
     reconcile_session_deadline,
 )
+from group_interview_arena_api.modules.discussion_sessions.utterances import (
+    SubmitHumanUtterance,
+    UtteranceRejectedError,
+    submit_human_utterance,
+)
 
 logger = logging.getLogger(__name__)
 
 _ERROR_MESSAGES: dict[RealtimeErrorCode, str] = {
     "INVALID_SESSION_STATE": "Session command could not be applied.",
     "ACTION_ID_CONFLICT": "Action identity conflicts with an earlier command.",
+    "UTTERANCE_REJECTED": "You cannot submit an utterance right now.",
     "PROTOCOL_ERROR": "Realtime command could not be processed.",
     "SEQUENCE_AHEAD": "Session history must be reloaded.",
     "INTERNAL_ERROR": "An internal error occurred.",
@@ -69,21 +84,9 @@ def _parse_command(text: str) -> RealtimeSessionCommand:
         return SessionAbortCommand.model_validate(payload)
     if command_type == "session.start":
         return SessionStartCommand.model_validate(payload)
+    if command_type == "participant.utterance.submit":
+        return ParticipantUtteranceSubmitCommand.model_validate(payload)
     raise ValueError("Unsupported realtime command.")
-
-
-def _formal_event(event: StoredEvent) -> FormalEventEnvelope:
-    return FormalEventEnvelope.model_validate(
-        {
-            "schema_version": event.event_version,
-            "type": event.event_type,
-            "session_id": event.session_id,
-            "sequence": event.sequence,
-            "occurred_at": event.occurred_at,
-            "action_id": event.action_id,
-            "payload": event.payload,
-        }
-    )
 
 
 def _error_event(
@@ -133,8 +136,11 @@ async def _deny(websocket: WebSocket) -> None:
     await websocket.close(code=1008)
 
 
-async def _send_formal_event(websocket: WebSocket, event: StoredEvent) -> None:
-    await websocket.send_json(_formal_event(event).model_dump(mode="json"))
+async def _send_formal_event(
+    websocket: WebSocket,
+    event: FormalEventEnvelope,
+) -> None:
+    await websocket.send_json(event.model_dump(mode="json"))
 
 
 async def _authorized_user(
@@ -195,14 +201,13 @@ def create_realtime_router(settings: Settings) -> APIRouter:
                     session_id=session_id,
                 )
             async with session_factory() as session:
-                catchup = await load_reconnect_events(
+                await load_reconnect_events(
                     session,
                     owner_id=user.user_id,
                     session_id=session_id,
                     after_sequence=after_sequence,
                 )
         except SequenceAheadError:
-            catchup = []
             sequence_ahead = True
         except SessionNotFoundError, SessionPersistenceError:
             await _deny(websocket)
@@ -242,24 +247,79 @@ def create_realtime_router(settings: Settings) -> APIRouter:
         sent_sequence = after_sequence
         send_lock = asyncio.Lock()
         catchup_task: asyncio.Task[None] | None = None
+        progression_task: asyncio.Task[None] | None = None
+        progression_lock = asyncio.Lock()
 
-        async def send_new_events(events: list[StoredEvent]) -> None:
+        async def drain_committed_events() -> None:
             nonlocal sent_sequence
-            for event in events:
-                if event.sequence <= sent_sequence:
-                    continue
-                async with send_lock:
-                    if event.sequence <= sent_sequence:
-                        continue
+            async with send_lock:
+                async with session_factory() as session:
+                    events = await load_reconnect_events(
+                        session,
+                        owner_id=user.user_id,
+                        session_id=session_id,
+                        after_sequence=sent_sequence,
+                    )
+                    projected = (
+                        await project_public_events(session, events) if events else []
+                    )
+                for event in projected:
                     await _send_formal_event(websocket, event)
                     sent_sequence = event.sequence
 
-        async def send_command_events(events: list[StoredEvent]) -> None:
-            nonlocal sent_sequence
-            for event in events:
-                async with send_lock:
-                    await _send_formal_event(websocket, event)
-                    sent_sequence = max(sent_sequence, event.sequence)
+        async def run_progression_best_effort() -> None:
+            try:
+                result = await resume_discussion_progression(
+                    session_factory,
+                    owner_id=user.user_id,
+                    session_id=session_id,
+                )
+            except asyncio.CancelledError:
+                log_event(
+                    logger,
+                    logging.INFO,
+                    "realtime.progression.stopped",
+                    session_id=str(session_id),
+                    connection_id=str(connection_id),
+                    exception_category="progression_cancelled",
+                )
+                raise
+            except AiDriveCompositionError:
+                log_event(
+                    logger,
+                    logging.INFO,
+                    "realtime.progression.stopped",
+                    session_id=str(session_id),
+                    connection_id=str(connection_id),
+                    exception_category="provider_configuration_unavailable",
+                )
+            except Exception:
+                log_event(
+                    logger,
+                    logging.ERROR,
+                    "realtime.progression.failed",
+                    session_id=str(session_id),
+                    connection_id=str(connection_id),
+                    exception_category="internal_error",
+                )
+            else:
+                log_event(
+                    logger,
+                    logging.INFO,
+                    "realtime.progression.stopped",
+                    session_id=str(session_id),
+                    connection_id=str(connection_id),
+                    exception_category=f"progression_{result.outcome.value}",
+                )
+
+        async def kick_progression_best_effort() -> None:
+            nonlocal progression_task
+            async with progression_lock:
+                if progression_task is not None:
+                    if not progression_task.done():
+                        return
+                    await progression_task
+                progression_task = asyncio.create_task(run_progression_best_effort())
 
         async def catchup_committed_events() -> None:
             try:
@@ -271,18 +331,20 @@ def create_realtime_router(settings: Settings) -> APIRouter:
                             owner_id=user.user_id,
                             session_id=session_id,
                         )
-                    async with session_factory() as session:
-                        events = await load_reconnect_events(
-                            session,
-                            owner_id=user.user_id,
-                            session_id=session_id,
-                            after_sequence=sent_sequence,
-                        )
-                    await send_new_events(events)
+                    await drain_committed_events()
             except asyncio.CancelledError:
                 raise
-            except SequenceAheadError, SessionNotFoundError, SessionPersistenceError:
+            except Exception:
                 request_id = create_request_id()
+                log_event(
+                    logger,
+                    logging.ERROR,
+                    "realtime.catchup.failed",
+                    request_id=request_id,
+                    session_id=str(session_id),
+                    connection_id=str(connection_id),
+                    exception_category="internal_error",
+                )
                 async with send_lock:
                     await _send_error(
                         websocket,
@@ -291,10 +353,12 @@ def create_realtime_router(settings: Settings) -> APIRouter:
                         action_id=None,
                         request_id=request_id,
                     )
-                    await websocket.close(code=1011)
+                    with suppress(Exception):
+                        await websocket.close(code=1011)
 
         try:
-            await send_new_events(catchup)
+            await drain_committed_events()
+            await kick_progression_best_effort()
             catchup_task = asyncio.create_task(catchup_committed_events())
 
             while True:
@@ -349,23 +413,39 @@ def create_realtime_router(settings: Settings) -> APIRouter:
                     return
 
                 active_action_id = parsed.action_id
-                command = SessionCommand(
-                    schema_version=parsed.schema_version,
-                    command_type=parsed.type,
-                    session_id=parsed.session_id,
-                    action_id=parsed.action_id,
-                    payload=parsed.payload.model_dump(mode="json"),
-                )
                 try:
-                    async with session_factory() as session:
-                        events = await apply_session_command(
-                            session,
-                            owner_id=user.user_id,
-                            command=command,
-                            duration_plan=(
-                                settings.session_phase_durations.to_duration_plan()
-                            ),
+                    if isinstance(parsed, ParticipantUtteranceSubmitCommand):
+                        async with session_factory() as session:
+                            committed = await submit_human_utterance(
+                                session,
+                                owner_id=user.user_id,
+                                command=SubmitHumanUtterance(
+                                    session_id=parsed.session_id,
+                                    action_id=parsed.action_id,
+                                    floor_grant_id=parsed.payload.floor_grant_id,
+                                    content=parsed.payload.content,
+                                    received_at=datetime.now(UTC),
+                                ),
+                            )
+                        last_command_sequence = committed.events[-1].sequence
+                    else:
+                        command = SessionCommand(
+                            schema_version=parsed.schema_version,
+                            command_type=parsed.type,
+                            session_id=parsed.session_id,
+                            action_id=parsed.action_id,
+                            payload=parsed.payload.model_dump(mode="json"),
                         )
+                        async with session_factory() as session:
+                            events = await apply_session_command(
+                                session,
+                                owner_id=user.user_id,
+                                command=command,
+                                duration_plan=(
+                                    settings.session_phase_durations.to_duration_plan()
+                                ),
+                            )
+                        last_command_sequence = events[-1].sequence if events else None
                 except InvalidSessionStateError:
                     await _send_error(
                         websocket,
@@ -383,6 +463,25 @@ def create_realtime_router(settings: Settings) -> APIRouter:
                         connection_id=str(connection_id),
                         action_id=str(parsed.action_id),
                         exception_category="invalid_session_state",
+                    )
+                    continue
+                except UtteranceRejectedError:
+                    await _send_error(
+                        websocket,
+                        code="UTTERANCE_REJECTED",
+                        session_id=session_id,
+                        action_id=parsed.action_id,
+                        request_id=request_id,
+                    )
+                    log_event(
+                        logger,
+                        logging.WARNING,
+                        "realtime.command.rejected",
+                        request_id=request_id,
+                        session_id=str(session_id),
+                        connection_id=str(connection_id),
+                        action_id=str(parsed.action_id),
+                        exception_category="utterance_rejected",
                     )
                     continue
                 except ActionIdConflictError:
@@ -425,7 +524,7 @@ def create_realtime_router(settings: Settings) -> APIRouter:
                     await websocket.close(code=1011)
                     return
 
-                await send_command_events(events)
+                await drain_committed_events()
                 log_event(
                     logger,
                     logging.INFO,
@@ -434,9 +533,11 @@ def create_realtime_router(settings: Settings) -> APIRouter:
                     session_id=str(session_id),
                     connection_id=str(connection_id),
                     action_id=str(parsed.action_id),
-                    sequence=events[-1].sequence if events else None,
+                    sequence=last_command_sequence,
                 )
                 active_action_id = None
+                if isinstance(parsed, ParticipantUtteranceSubmitCommand):
+                    await kick_progression_best_effort()
         except WebSocketDisconnect:
             return
         except Exception:
@@ -469,5 +570,9 @@ def create_realtime_router(settings: Settings) -> APIRouter:
                 catchup_task.cancel()
                 with suppress(asyncio.CancelledError):
                     await catchup_task
+            if progression_task is not None:
+                progression_task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await progression_task
 
     return router

@@ -254,7 +254,7 @@ def floor_granted_event(
     if decision.selected_participant_id is None:
         raise ValueError("Grant event requires a selected participant.")
     return PendingEvent(
-        event_version=1,
+        event_version=2,
         event_type="floor.granted",
         payload={
             "grant_id": str(grant_id),
@@ -280,7 +280,7 @@ def floor_released_event(
     reason: FloorReleaseReason,
 ) -> PendingEvent:
     return PendingEvent(
-        event_version=1,
+        event_version=2,
         event_type="floor.released",
         payload={
             "grant_id": str(grant_id),
@@ -299,7 +299,7 @@ def floor_intervention_requested_event(
     if decision.intervention_kind is None:
         raise ValueError("Intervention event requires an intervention kind.")
     return PendingEvent(
-        event_version=1,
+        event_version=2,
         event_type="floor.intervention_requested",
         payload={
             "intervention_id": str(intervention_id),

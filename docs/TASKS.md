@@ -1,17 +1,17 @@
 # 当前任务清单
 
-- Status: P1 in progress; P1-1, P1-2, P1-3, and P1-4 completed; P1-5A/P1-5B/P1-5C/P1-5D/P1-5E/P1-5E-1/P1-5E-2/P1-5E-3/P1-5F-1 completed; P1-5F in progress; P1-5F-2/P1-5F-3/P1-5F-4 not started
-- Managed scope: P1-5F-1 docs-only Realtime/Public Contract Design Freeze; no backend/Web/REST/WS/schema/test implementation and no P1-5F-2～F4
-- Most recently completed subphase: P1-5E-3 — `DONE`
+- Status: P1 in progress; P1-1, P1-2, P1-3, and P1-4 completed; P1-5A/P1-5B/P1-5C/P1-5D/P1-5E/P1-5E-1/P1-5E-2/P1-5E-3/P1-5F-1/P1-5F-2 completed; P1-5F in progress; P1-5F-3/P1-5F-4 not started
+- Managed scope: completed P1-5F-2 backend-only text discussion transport closeout; no handwritten Web/F3, Browser E2E/F4, schema/migration/dependency/CI/provider change, or real provider call
+- Most recently completed subphase: P1-5F-2 Backend Text Discussion Transport — `DONE`
 - P0-7 final outcome: initial verdict `BLOCKED` with two documentation findings; remediation completed; finding-only independent recheck `PASS`; new blockers none; P1 readiness `READY`
 - Current phase: P1 — `IN_PROGRESS`
-- Most recently completed task: P1-4 — `DONE`
-- Current task gate: P1-5 — `IN_PROGRESS`; P1-5A/P1-5B/P1-5C/P1-5D/P1-5E/P1-5E-1/P1-5E-2/P1-5E-3/P1-5F-1 `DONE`; P1-5F `IN_PROGRESS`; P1-5F-2/P1-5F-3/P1-5F-4 `NOT_STARTED`
+- Most recently completed task: P1-5F-2 — `DONE`
+- Current task gate: P1-5 — `IN_PROGRESS`; P1-5A/P1-5B/P1-5C/P1-5D/P1-5E/P1-5E-1/P1-5E-2/P1-5E-3/P1-5F-1/P1-5F-2 `DONE`; P1-5F `IN_PROGRESS`; P1-5F-3/P1-5F-4 `NOT_STARTED`
 - P0 status: `DONE`; P0-1 through P0-7 completed
 - Allowed status values: `TODO` / `IN_PROGRESS` / `BLOCKED` / `DONE`
 - Related roadmap: [`ROADMAP.md`](ROADMAP.md)
 
-用户已明确批准正式进入 P1，并已完成 P1-1～P1-4。P1-5A～P1-5D 已完成；P1-5E-1 actual-source review 为 `PASS`、findings none；P1-5E-2 的 3 个 findings 已全部 remediation，re-review 为 `PASS`、findings none；P1-5E-3 implementation actual-source review 与 user-run sanitized real-provider composition smoke 均为 `PASS`。P1-5E automatic AI runtime orchestration 已关闭为 `DONE`。P1-5F-1 initial actual-source review was blocked by one floor-event v1 `action_id` compatibility finding；the remediation preserved historical v1 and froze additive floor-event v2，and finding-only re-review returned `PASS` with findings none for reviewed bundle SHA-256 `6603b1f0377aa449d3a209e475fb3afbb74f9f83c9be38f84df97918eeb1ac0c`。P1-5F-1 is `DONE`；P1-5F remains `IN_PROGRESS`；P1-5F-2～F4 remain `NOT_STARTED` and unapproved。Codex 不得实现 P1-5F-2～F4、记忆、报告、语音、Redis/queue 或 P2～P6。
+用户已明确批准正式进入 P1，并已完成 P1-1～P1-4。P1-5A～P1-5E/P1-5E-1～E-3 均已完成。P1-5F-1 initial actual-source review was blocked by one floor-event v1 `action_id` compatibility finding；the remediation preserved historical v1 and froze additive floor-event v2，and finding-only re-review returned `PASS` with findings none for reviewed bundle SHA-256 `6603b1f0377aa449d3a209e475fb3afbb74f9f83c9be38f84df97918eeb1ac0c`。P1-5F-1 is `DONE`。P1-5F-2 initial implementation actual-source review was `BLOCKED` by exactly three findings；the remediation restored exact Human floor binding/stale G1→G2 rejection，tightened transcript public actor/phase enums，and normalized `PublicEventProjectionError` plus periodic catch-up failure handling。Finding-only external re-review returned `PASS` with findings none against `group-interview-arena-review-20260825-150754.zip` / SHA-256 `b9553cbe488707d5fd87598b70e48e1fabdf55a0ae6d3dab367b830267d61edd`，so P1-5F-2 is `DONE`。P1/P1-5/P1-5F remain `IN_PROGRESS` and P1-5F-3/F4 remain `NOT_STARTED`。Codex 不得实现 F3/F4、记忆、报告、语音、Redis/queue 或 P2～P6。
 
 ## P0-1 — 仓库与文档治理
 
@@ -586,10 +586,10 @@
 - ID: `P1-5`
 - 名称：AI Runtime Foundation
 - Status: `IN_PROGRESS`
-- Approval state：P1-5A architecture freeze、P1-5B persistence foundation、P1-5C deterministic runtime vertical slice、P1-5D first-provider integration and P1-5E automatic orchestration completed；P1-5E-1/P1-5E-2/P1-5E-3/P1-5F-1 are `DONE`；P1-5F remains `IN_PROGRESS`；P1-5F-2～F4 are not started。
+- Approval state：P1-5A architecture freeze、P1-5B persistence foundation、P1-5C deterministic runtime vertical slice、P1-5D first-provider integration and P1-5E automatic orchestration completed；P1-5E-1/P1-5E-2/P1-5E-3/P1-5F-1/P1-5F-2 are `DONE`；P1-5F remains `IN_PROGRESS`；P1-5F-3/F4 are not started。
 - 目标：在既有 immutable question/persona、server-authoritative session lifecycle 与 deterministic floor control 之上，建立 provider-neutral、可追踪、可重试且不破坏 session integrity 的 AI utterance generation boundary。
-- In scope：docs-only freeze of the public Human WS command、unified Human/AI utterance event、owner-only transcript REST、Human utterance+release and AI completion+public-event atomicity、post-Human scheduler/E3 composition boundary、restart/reconnect/Browser merge/UX/privacy rules and F2～F4 acceptance expectations。
-- Out of scope for this checkpoint：all Python/TypeScript/TSX/test/OpenAPI generated/schema/migration/dependency/lock/config/provider/runtime/floor/lifecycle/REST/WS/Web/CI/Docker/prompt/seed implementation；real provider calls；browser smoke；P1-5F-2～F4；memory/RAG、scoring/report、voice、Redis/queue/worker、billing/quota/payment/multi-tenant。
+- In scope：P1-5F-2 backend command/event contracts、Human/AI atomic publication、deterministic post-Human scheduler recovery、owner-only transcript REST、ordered WebSocket delivery/public projection、network-free tests and mechanically generated REST schema。
+- Out of scope for this checkpoint：handwritten TypeScript/TSX/Web behavior、Browser E2E、schema/migration/dependency/lock/config/CI/Docker/prompt/seed change；real provider calls；P1-5F-3/F4；memory/RAG、scoring/report、voice、Redis/queue/worker、billing/quota/payment/multi-tenant。
 - Dependencies：P1-1/P1-2/P1-3/P1-4 `DONE`；Accepted `D-003`、`D-007`、`D-008`、`D-013`、`ADR-006`、`ADR-007`、`ADR-009`、`ADR-011`～`ADR-014`。
 - P1-5D acceptance result：the frozen Zhipu/configured-model/model-independent-configuration/request/timeouts are exact；provider/domain separation、safe error mapping、secret non-disclosure、one-request/no-retry behavior and existing P1-5C lifecycle/provenance invariants passed network-free tests and full PostgreSQL regression；HTTPX remains the single runtime dependency；no schema/API/WS/Web or automatic implementation was added；both actual-source reviews and the sanitized user smoke passed，so P1-5D is `DONE`。P1-5E-1 has separately passed its docs-only actual-source review with findings none and is `DONE`。
 
@@ -605,10 +605,10 @@
 - `P1-5E-3 — Continuous AI Drive + Composition Acceptance`：`DONE`；implementation actual-source review `PASS`，findings none；sanitized real-provider composition smoke `PASS`；
 - `P1-5F — Realtime/Web Integration + Independent Acceptance`：`IN_PROGRESS`；
 - `P1-5F-1 — Realtime/Public Contract Design Freeze`：`DONE`；docs-only contract accepted after finding remediation and finding-only external re-review `PASS`；
-- `P1-5F-2 — Backend Text Discussion Transport`：`NOT_STARTED`；
+- `P1-5F-2 — Backend Text Discussion Transport`：`DONE`；initial implementation actual-source review `BLOCKED` on three findings，all remediated；finding-only external re-review `PASS`，findings none；reviewed remediation bundle SHA-256 `b9553cbe488707d5fd87598b70e48e1fabdf55a0ae6d3dab367b830267d61edd`；
 - `P1-5F-3 — Web Discussion Experience`：`NOT_STARTED`；
 - `P1-5F-4 — Composition E2E + Independent Acceptance`：`NOT_STARTED`；
-- P1-5F-1 is separately approved；P1-5F-2～F4 still require separate explicit approval。
+- P1-5F-2 is closed as `DONE` after finding-only external re-review；P1-5F-3/F4 still require separate explicit approval。
 
 ### P1-5F-1 implementation checkpoint
 
@@ -619,7 +619,8 @@
 - Frozen recovery：same Human action replays exact content/identity；post-Human schedule identity is deterministic from session/released grant；existing P1-5E drives any resulting AI grant；crash/restart and disconnect recover from durable state without a second provider call or duplicate mutation；
 - Frozen Browser/privacy：pending text is not formal transcript；REST/WS merge uses `utterance_id` plus authoritative sequence；transcript-only sequences need not be contiguous；AI loading derives only from current floor；new v2 projections exclude internal automatic action IDs，and provider/runtime/prompt/private/failure details plus utterance content in ordinary logs remain excluded；
 - Actual-source stop-condition assessment found existing `DiscussionEvent`、Human participant/user identity、aggregate lock、FloorRelease、generation completion transaction and deterministic action/scheduler facts sufficient with no schema or P1-5E authority change；
-- Full contract、F2～F4 acceptance and docs-only validation are in [`exec-plans/P1-5_ai-runtime-foundation.md`](exec-plans/P1-5_ai-runtime-foundation.md)。The initial actual-source review was blocked by one floor-event v1 `action_id` compatibility finding；the remediation preserved historical v1 and froze additive v2。Finding-only re-review is `PASS` with findings none against `group-interview-arena-review-20260825-110115.zip` / SHA-256 `6603b1f0377aa449d3a209e475fb3afbb74f9f83c9be38f84df97918eeb1ac0c`，so P1-5F-1 is `DONE`。No commit/push and no P1-5F-2 start。
+- Full contract、F2～F4 acceptance and docs-only validation are in [`exec-plans/P1-5_ai-runtime-foundation.md`](exec-plans/P1-5_ai-runtime-foundation.md)。The initial actual-source review was blocked by one floor-event v1 `action_id` compatibility finding；the remediation preserved historical v1 and froze additive v2。Finding-only re-review is `PASS` with findings none against `group-interview-arena-review-20260825-110115.zip` / SHA-256 `6603b1f0377aa449d3a209e475fb3afbb74f9f83c9be38f84df97918eeb1ac0c`，so P1-5F-1 is `DONE`。At that F1 checkpoint there was no commit/push and F2 had not started；the current separately approved F2 status is recorded above。
+- F2 external actual-source finding remediation restored the narrow F1 exact-floor command binding (`floor_grant_id + content`)，tightened transcript OpenAPI to exact Human/AI and five floor phases，and normalized projection/background catch-up failure handling。No unrelated F1 design was reopened；finding-only re-review is `PASS` with findings none against `group-interview-arena-review-20260825-150754.zip` / SHA-256 `b9553cbe488707d5fd87598b70e48e1fabdf55a0ae6d3dab367b830267d61edd`，so F2 is `DONE`。
 
 ### P1-5E-1 completion note
 

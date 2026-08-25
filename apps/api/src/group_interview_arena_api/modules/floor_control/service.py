@@ -79,7 +79,7 @@ def _stored_event(row: DiscussionEvent) -> StoredEvent:
         session_id=row.session_id,
         sequence=row.sequence,
         occurred_at=row.occurred_at,
-        action_id=row.causation_action_id,
+        causation_action_id=row.causation_action_id,
         payload=row.payload,
     )
 

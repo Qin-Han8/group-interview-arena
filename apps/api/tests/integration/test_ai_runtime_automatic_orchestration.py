@@ -52,6 +52,7 @@ from group_interview_arena_api.modules.ai_runtime.orchestration import (
     SingleAiTurnResult,
     derive_automatic_turn_identities,
     drive_single_ai_turn,
+    has_resumable_ai_work,
 )
 from group_interview_arena_api.modules.ai_runtime.runtime import (
     GenerateAiUtteranceCommand,
@@ -74,6 +75,9 @@ from group_interview_arena_api.modules.discussion_sessions.service import (
     create_session,
     get_session_snapshot,
     reconcile_session_deadline,
+)
+from group_interview_arena_api.modules.floor_control import (
+    progression as floor_progression_module,
 )
 from group_interview_arena_api.modules.floor_control.domain import (
     FloorDecisionOutcome,
@@ -117,6 +121,23 @@ PLAN = PhaseDurationPlan.from_seconds(
         SessionStatus.FINAL_SUMMARY: 300,
     }
 )
+
+
+def test_automatic_turn_identity_bytes_remain_frozen() -> None:
+    identities = derive_automatic_turn_identities(
+        session_id=UUID("10000000-0000-4000-8000-000000000001"),
+        floor_grant_id=UUID("30000000-0000-4000-8000-000000000003"),
+    )
+
+    assert identities.model_dump(mode="json") == {
+        "generation_request_id": "c1ba2871-1469-4c67-8b30-082fb9af6ee8",
+        "utterance_id": "b5b42d93-053d-4165-92fc-eca968e2e6fb",
+        "release_action_id": "5b6ffd0d-6e33-416c-a9e1-fc7551ebcbab",
+        "schedule_action_id": "640c57e0-dcb2-442c-a75f-a3892603a14e",
+        "decision_id": "1090ad6e-48d2-4ab7-acd0-185fbd5d2cf3",
+        "next_floor_grant_id": "f6ca0e88-9f5c-4e15-9e15-9bb506306fe5",
+        "intervention_id": "ed991e77-7543-4437-80c8-5a1092f0ddc4",
+    }
 
 
 class TemporaryDatabaseContext(Protocol):
@@ -588,6 +609,60 @@ async def _complete_and_release_without_scheduling(
         )
 
 
+def test_generic_scheduler_checkpoint_recovers_committed_ai_release(
+    migrated_database: TemporaryDatabaseContext,
+) -> None:
+    async def exercise() -> None:
+        async with _automatic_runtime_context(
+            migrated_database,
+            grant_seat_index=1,
+        ) as context:
+            assert context.grant_id is not None
+            identities = derive_automatic_turn_identities(
+                session_id=context.session_id,
+                floor_grant_id=context.grant_id,
+            )
+            await _complete_and_release_without_scheduling(context)
+            assert await has_resumable_ai_work(
+                context.session_factory,
+                owner_id=context.owner_id,
+                session_id=context.session_id,
+            )
+
+            result = await floor_progression_module.drive_scheduler_checkpoint(
+                context.session_factory,
+                owner_id=context.owner_id,
+                session_id=context.session_id,
+                released_floor=floor_progression_module.ReleasedFloorProof(
+                    floor_grant_id=context.grant_id,
+                    release_action_id=identities.release_action_id,
+                    release_command_type="floor.release",
+                    allowed_reasons=frozenset(
+                        {
+                            FloorReleaseReason.SPEAKER_FINISHED,
+                            FloorReleaseReason.INTERRUPTED,
+                        }
+                    ),
+                ),
+                identities=floor_progression_module.SchedulerCheckpointIdentities(
+                    schedule_action_id=identities.schedule_action_id,
+                    decision_id=identities.decision_id,
+                    next_floor_grant_id=identities.next_floor_grant_id,
+                    intervention_id=identities.intervention_id,
+                ),
+                scheduling_policy=V0_1_SCHEDULER_POLICY,
+            )
+
+            assert result.processed_floor_grant_id == context.grant_id
+            assert result.identities.schedule_action_id == identities.schedule_action_id
+            assert result.outcome.value in {
+                "next_ai_granted",
+                "next_human_granted",
+            }
+
+    run_async(exercise)
+
+
 def test_release_commit_precedes_exactly_one_scheduler_checkpoint_and_crash_f_replays(
     migrated_database: TemporaryDatabaseContext,
 ) -> None:
@@ -934,7 +1009,7 @@ def test_scheduler_persistence_uncertainty_before_durable_action_requires_reconc
             )
             await _complete_and_release_without_scheduling(context)
             monkeypatch.setattr(
-                orchestration_module,
+                floor_progression_module,
                 "apply_scheduler_command",
                 uncertain_schedule,
             )

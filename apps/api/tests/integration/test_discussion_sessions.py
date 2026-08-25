@@ -210,7 +210,7 @@ async def _verify_idempotency_conflict_and_invalid_state(
 
         assert accepted == duplicate
         assert [event.sequence for event in accepted] == [2]
-        assert accepted[0].action_id == action_id
+        assert accepted[0].causation_action_id == action_id
 
         conflict = SessionCommand(
             schema_version=1,
@@ -375,7 +375,7 @@ async def _verify_multi_event_reservation_and_rollback(
                 command=_abort(multi_snapshot.session_id),
             )
         assert [event.sequence for event in events] == [2, 3]
-        assert len({event.action_id for event in events}) == 1
+        assert len({event.causation_action_id for event in events}) == 1
 
         async with session_factory() as session:
             rollback_snapshot = await create_session(

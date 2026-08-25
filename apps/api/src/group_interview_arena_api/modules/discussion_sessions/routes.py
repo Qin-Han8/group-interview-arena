@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from pydantic import UUID4
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -20,6 +20,8 @@ from group_interview_arena_api.modules.discussion_sessions.contracts import (
     SessionCreateRequest,
     SessionSnapshotResponse,
     SessionStartRequest,
+    TranscriptResponse,
+    TranscriptUtteranceResponse,
 )
 from group_interview_arena_api.modules.discussion_sessions.domain import (
     InvalidSessionStateError,
@@ -33,6 +35,10 @@ from group_interview_arena_api.modules.discussion_sessions.service import (
     apply_session_command,
     create_session,
     get_session_snapshot,
+)
+from group_interview_arena_api.modules.discussion_sessions.utterances import (
+    TranscriptPage,
+    load_transcript_page,
 )
 from group_interview_arena_api.modules.question_personas.service import (
     QuestionNotFoundError,
@@ -98,6 +104,28 @@ def _response(snapshot: SessionSnapshot) -> SessionSnapshotResponse:
                 else None
             ),
         ),
+    )
+
+
+def _transcript_response(page: TranscriptPage) -> TranscriptResponse:
+    return TranscriptResponse(
+        items=[
+            TranscriptUtteranceResponse.model_validate(
+                {
+                    "utterance_id": item.utterance_id,
+                    "sequence": item.sequence,
+                    "occurred_at": item.occurred_at,
+                    "action_id": item.action_id,
+                    "participant_id": item.participant_id,
+                    "actor_kind": item.actor_kind,
+                    "floor_grant_id": item.floor_grant_id,
+                    "phase": item.phase,
+                    "content": item.content,
+                }
+            )
+            for item in page.items
+        ],
+        next_after_sequence=page.next_after_sequence,
     )
 
 
@@ -204,6 +232,38 @@ def create_discussion_session_router(settings: Settings) -> APIRouter:
         except SessionPersistenceError:
             raise _internal_error() from None
         return _response(result)
+
+    @router.get(
+        "/{session_id}/utterances",
+        response_model=TranscriptResponse,
+        responses={
+            401: {"model": ErrorResponse},
+            404: {"model": ErrorResponse},
+            422: {"model": ErrorResponse},
+            500: {"model": ErrorResponse},
+        },
+    )
+    async def transcript(  # pyright: ignore[reportUnusedFunction]
+        session_id: UUID4,
+        user: CurrentUserDependency,
+        session_factory: DatabaseSessionFactory,
+        after_sequence: Annotated[int, Query(ge=0)] = 0,
+        limit: Annotated[int, Query(ge=1, le=200)] = 100,
+    ) -> TranscriptResponse:
+        try:
+            async with session_factory() as session:
+                page = await load_transcript_page(
+                    session,
+                    owner_id=user.user_id,
+                    session_id=session_id,
+                    after_sequence=after_sequence,
+                    limit=limit,
+                )
+        except SessionNotFoundError:
+            raise _not_found() from None
+        except SessionPersistenceError:
+            raise _internal_error() from None
+        return _transcript_response(page)
 
     @router.post(
         "/{session_id}/start",

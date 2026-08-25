@@ -11,6 +11,7 @@ from group_interview_arena_api.modules.discussion_sessions.contracts import (
     FloorParticipantResponse,
     FloorSnapshotResponse,
     FormalEventEnvelope,
+    ParticipantUtteranceSubmitCommand,
     SessionAbortCommand,
     SessionSnapshotResponse,
     SessionStartCommand,
@@ -322,3 +323,182 @@ def test_floor_snapshot_projection_is_closed_safe_and_human_compatible() -> None
                 "hidden_ranking": [0.99],
             }
         )
+
+
+def test_participant_utterance_submit_accepts_only_the_closed_v1_shape() -> None:
+    session_id = uuid4()
+    action_id = uuid4()
+    floor_grant_id = uuid4()
+    original = "  保留首尾空白的意见。  "
+
+    command = ParticipantUtteranceSubmitCommand.model_validate(
+        {
+            "schema_version": 1,
+            "type": "participant.utterance.submit",
+            "session_id": str(session_id),
+            "action_id": str(action_id),
+            "payload": {
+                "floor_grant_id": str(floor_grant_id),
+                "content": original,
+            },
+        }
+    )
+
+    assert command.payload.content == original
+    assert command.payload.floor_grant_id == floor_grant_id
+    assert command.semantic_payload() == {
+        "schema_version": 1,
+        "type": "participant.utterance.submit",
+        "payload": {
+            "floor_grant_id": str(floor_grant_id),
+            "content": original,
+        },
+    }
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        {"schema_version": 2},
+        {"type": "participant.utterance.create"},
+        {"participant_id": str(uuid4())},
+        {"payload": {"content": "valid"}},
+        {
+            "payload": {
+                "floor_grant_id": str(uuid4()),
+                "content": "valid",
+                "participant_id": str(uuid4()),
+            }
+        },
+        {"payload": {"floor_grant_id": str(uuid4()), "content": 42}},
+    ],
+)
+def test_participant_utterance_submit_rejects_authority_and_shape_drift(
+    mutation: dict[str, object],
+) -> None:
+    data: dict[str, object] = {
+        "schema_version": 1,
+        "type": "participant.utterance.submit",
+        "session_id": str(uuid4()),
+        "action_id": str(uuid4()),
+        "payload": {"floor_grant_id": str(uuid4()), "content": "valid"},
+    }
+    data.update(mutation)
+
+    with pytest.raises(ValidationError):
+        ParticipantUtteranceSubmitCommand.model_validate(data)
+
+
+def test_semantically_invalid_string_content_remains_a_parseable_command() -> None:
+    for content in ("   ", "contains\x00nul", "x" * 4001):
+        parsed = ParticipantUtteranceSubmitCommand.model_validate(
+            {
+                "schema_version": 1,
+                "type": "participant.utterance.submit",
+                "session_id": str(uuid4()),
+                "action_id": str(uuid4()),
+                "payload": {
+                    "floor_grant_id": str(uuid4()),
+                    "content": content,
+                },
+            }
+        )
+        assert parsed.payload.content == content
+
+
+def test_participant_utterance_created_v1_is_exact_for_human_and_ai() -> None:
+    occurred_at = datetime(2026, 8, 25, 4, 5, 6, tzinfo=UTC)
+    payload: dict[str, object] = {
+        "utterance_id": str(uuid4()),
+        "participant_id": str(uuid4()),
+        "actor_kind": "HUMAN",
+        "floor_grant_id": str(uuid4()),
+        "phase": "EXPLORATION",
+        "content": "A durable public contribution.",
+    }
+    common: dict[str, object] = {
+        "schema_version": 1,
+        "type": "participant.utterance.created",
+        "session_id": str(uuid4()),
+        "sequence": 8,
+        "occurred_at": occurred_at,
+        "payload": payload,
+    }
+    action_id = uuid4()
+
+    human = FormalEventEnvelope.model_validate({**common, "action_id": str(action_id)})
+    ai = FormalEventEnvelope.model_validate(
+        {
+            **common,
+            "action_id": None,
+            "payload": {**payload, "actor_kind": "AI"},
+        }
+    )
+
+    assert human.action_id == action_id
+    assert ai.action_id is None
+    assert set(human.payload) == {
+        "utterance_id",
+        "participant_id",
+        "actor_kind",
+        "floor_grant_id",
+        "phase",
+        "content",
+    }
+
+
+@pytest.mark.parametrize(
+    ("schema_version", "actor_kind", "action_id", "extra"),
+    [
+        (1, "HUMAN", None, {}),
+        (1, "AI", "uuid", {}),
+        (2, "HUMAN", "uuid", {}),
+        (1, "SYSTEM", "uuid", {}),
+        (1, "HUMAN", "uuid", {"provider_identifier": "private"}),
+    ],
+)
+def test_participant_utterance_created_rejects_version_action_and_payload_drift(
+    schema_version: int,
+    actor_kind: str,
+    action_id: str | None,
+    extra: dict[str, object],
+) -> None:
+    resolved_action_id = None if action_id is None else str(uuid4())
+    with pytest.raises(ValidationError):
+        FormalEventEnvelope.model_validate(
+            {
+                "schema_version": schema_version,
+                "type": "participant.utterance.created",
+                "session_id": str(uuid4()),
+                "sequence": 9,
+                "occurred_at": datetime.now(UTC),
+                "action_id": resolved_action_id,
+                "payload": {
+                    "utterance_id": str(uuid4()),
+                    "participant_id": str(uuid4()),
+                    "actor_kind": actor_kind,
+                    "floor_grant_id": str(uuid4()),
+                    "phase": "OPENING_STATEMENTS",
+                    "content": "Public only.",
+                    **extra,
+                },
+            }
+        )
+
+
+def test_utterance_rejected_error_contract_is_safe_and_recoverable() -> None:
+    error = WsErrorEnvelope(
+        schema_version=1,
+        type="error",
+        session_id=uuid4(),
+        action_id=uuid4(),
+        occurred_at=datetime.now(UTC),
+        error=WsErrorDetail(
+            code="UTTERANCE_REJECTED",
+            message="You cannot submit an utterance right now.",
+            request_id=uuid4(),
+        ),
+    ).model_dump(mode="json")
+
+    assert error["error"]["code"] == "UTTERANCE_REJECTED"
+    assert error["error"]["message"] == "You cannot submit an utterance right now."

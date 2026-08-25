@@ -15,6 +15,7 @@ def test_session_rest_contract_is_cookie_secured_and_version_bound_in_openapi() 
     create_operation = paths["/sessions"]["post"]
     snapshot_operation = paths["/sessions/{session_id}"]["get"]
     start_operation = paths["/sessions/{session_id}/start"]["post"]
+    transcript_operation = paths["/sessions/{session_id}/utterances"]["get"]
 
     assert create_operation["requestBody"]["required"] is True
     assert create_operation["requestBody"]["content"]["application/json"]["schema"] == {
@@ -32,6 +33,27 @@ def test_session_rest_contract_is_cookie_secured_and_version_bound_in_openapi() 
     }
     assert start_operation["security"] == [{"SessionCookie": []}]
     assert "X-GIA-CSRF" in str(start_operation)
+    assert transcript_operation["security"] == [{"SessionCookie": []}]
+    assert "X-GIA-CSRF" not in str(transcript_operation)
+    assert transcript_operation["responses"]["200"]["content"]["application/json"][
+        "schema"
+    ] == {"$ref": "#/components/schemas/TranscriptResponse"}
+    transcript_parameters = {
+        parameter["name"]: parameter for parameter in transcript_operation["parameters"]
+    }
+    assert transcript_parameters["after_sequence"]["schema"] == {
+        "type": "integer",
+        "minimum": 0,
+        "default": 0,
+        "title": "After Sequence",
+    }
+    assert transcript_parameters["limit"]["schema"] == {
+        "type": "integer",
+        "maximum": 200,
+        "minimum": 1,
+        "default": 100,
+        "title": "Limit",
+    }
     assert schema["components"]["securitySchemes"]["SessionCookie"] == {
         "type": "apiKey",
         "description": (
@@ -95,3 +117,40 @@ def test_session_rest_contract_is_cookie_secured_and_version_bound_in_openapi() 
         "score",
     ):
         assert forbidden not in serialized_schema.lower()
+    transcript_schema = schema["components"]["schemas"]["TranscriptResponse"]
+    assert set(transcript_schema["properties"]) == {
+        "items",
+        "next_after_sequence",
+    }
+    assert transcript_schema["required"] == ["items", "next_after_sequence"]
+    transcript_item_schema = schema["components"]["schemas"][
+        "TranscriptUtteranceResponse"
+    ]
+    assert set(transcript_item_schema["properties"]) == {
+        "utterance_id",
+        "sequence",
+        "occurred_at",
+        "action_id",
+        "participant_id",
+        "actor_kind",
+        "floor_grant_id",
+        "phase",
+        "content",
+    }
+    assert transcript_item_schema["properties"]["actor_kind"] == {
+        "$ref": "#/components/schemas/TranscriptActorKind"
+    }
+    assert schema["components"]["schemas"]["TranscriptActorKind"]["enum"] == [
+        "HUMAN",
+        "AI",
+    ]
+    assert transcript_item_schema["properties"]["phase"] == {
+        "$ref": "#/components/schemas/TranscriptPhase"
+    }
+    assert schema["components"]["schemas"]["TranscriptPhase"]["enum"] == [
+        "OPENING_STATEMENTS",
+        "EXPLORATION",
+        "CONFLICT_AND_EVALUATION",
+        "CONVERGENCE",
+        "FINAL_SUMMARY",
+    ]

@@ -71,7 +71,38 @@ class SessionStartCommand(_ClosedModel):
         }
 
 
-type RealtimeSessionCommand = SessionAbortCommand | SessionStartCommand
+class ParticipantUtteranceSubmitPayload(_ClosedModel):
+    floor_grant_id: UUID4
+    content: str
+
+
+class ParticipantUtteranceSubmitCommand(_ClosedModel):
+    schema_version: Literal[1]
+    type: Literal["participant.utterance.submit"]
+    session_id: UUID4
+    action_id: UUID4
+    payload: ParticipantUtteranceSubmitPayload
+
+    def semantic_payload(self) -> dict[str, object]:
+        return {
+            "schema_version": self.schema_version,
+            "type": self.type,
+            "payload": self.payload.model_dump(mode="json"),
+        }
+
+
+type RealtimeSessionCommand = (
+    SessionAbortCommand | SessionStartCommand | ParticipantUtteranceSubmitCommand
+)
+
+type TranscriptActorKind = Literal["HUMAN", "AI"]
+type TranscriptPhase = Literal[
+    "OPENING_STATEMENTS",
+    "EXPLORATION",
+    "CONFLICT_AND_EVALUATION",
+    "CONVERGENCE",
+    "FINAL_SUMMARY",
+]
 
 
 class SessionStartRequest(_ClosedModel):
@@ -177,6 +208,25 @@ class SessionSnapshotResponse(_ClosedModel):
     )(_require_aware)
 
 
+class TranscriptUtteranceResponse(_ClosedModel):
+    utterance_id: UUID4
+    sequence: int = Field(gt=0)
+    occurred_at: datetime
+    action_id: UUID4 | None
+    participant_id: UUID4
+    actor_kind: TranscriptActorKind
+    floor_grant_id: UUID4
+    phase: TranscriptPhase
+    content: str
+
+    _validate_timestamp = field_validator("occurred_at")(_require_aware)
+
+
+class TranscriptResponse(_ClosedModel):
+    items: list[TranscriptUtteranceResponse]
+    next_after_sequence: int | None = Field(ge=0)
+
+
 class FormalEventEnvelope(_ClosedModel):
     schema_version: Literal[1, 2]
     type: Literal[
@@ -185,6 +235,7 @@ class FormalEventEnvelope(_ClosedModel):
         "floor.granted",
         "floor.released",
         "floor.intervention_requested",
+        "participant.utterance.created",
     ]
     session_id: UUID4
     sequence: int = Field(gt=0)
@@ -196,6 +247,8 @@ class FormalEventEnvelope(_ClosedModel):
     def validate_event_shape(self) -> Self:
         if self.type.startswith("floor."):
             self._validate_floor_event()
+        elif self.type == "participant.utterance.created":
+            self._validate_utterance_event()
         elif self.type == "session.created":
             if (
                 self.schema_version != 1
@@ -242,10 +295,12 @@ class FormalEventEnvelope(_ClosedModel):
         return self
 
     def _validate_floor_event(self) -> None:
-        if self.schema_version != 1:
-            raise ValueError("Floor events require schema version 1.")
+        if self.schema_version not in {1, 2}:
+            raise ValueError("Unsupported floor event version.")
         if self.type == "floor.granted":
-            if self.action_id is None or set(self.payload) != {
+            if (self.schema_version == 1 and self.action_id is None) or set(
+                self.payload
+            ) != {
                 "grant_id",
                 "decision_id",
                 "participant_id",
@@ -275,7 +330,9 @@ class FormalEventEnvelope(_ClosedModel):
             _require_uuid4(self.payload["participant_id"])
             FloorReleaseReason(str(self.payload["reason_code"]))
         else:
-            if self.action_id is None or set(self.payload) != {
+            if (self.schema_version == 1 and self.action_id is None) or set(
+                self.payload
+            ) != {
                 "intervention_id",
                 "decision_id",
                 "phase",
@@ -291,6 +348,34 @@ class FormalEventEnvelope(_ClosedModel):
             _require_policy_version(self.payload["policy_version"])
         if SessionStatus(str(self.payload["phase"])) not in FLOOR_ENABLED_PHASES:
             raise ValueError("Floor event phase is not floor-enabled.")
+
+    def _validate_utterance_event(self) -> None:
+        if self.schema_version != 1 or set(self.payload) != {
+            "utterance_id",
+            "participant_id",
+            "actor_kind",
+            "floor_grant_id",
+            "phase",
+            "content",
+        }:
+            raise ValueError("Invalid participant.utterance.created event.")
+        _require_uuid4(self.payload["utterance_id"])
+        _require_uuid4(self.payload["participant_id"])
+        _require_uuid4(self.payload["floor_grant_id"])
+        actor_kind = ParticipantActorKind(str(self.payload["actor_kind"]))
+        if actor_kind not in {
+            ParticipantActorKind.HUMAN,
+            ParticipantActorKind.AI,
+        }:
+            raise ValueError("Invalid public utterance actor.")
+        if actor_kind is ParticipantActorKind.HUMAN and self.action_id is None:
+            raise ValueError("Human utterance events require a public action id.")
+        if actor_kind is ParticipantActorKind.AI and self.action_id is not None:
+            raise ValueError("AI utterance events must not expose an action id.")
+        if SessionStatus(str(self.payload["phase"])) not in FLOOR_ENABLED_PHASES:
+            raise ValueError("Utterance event phase is not floor-enabled.")
+        if not isinstance(self.payload["content"], str):
+            raise ValueError("Utterance event content must be a string.")
 
     _validate_timestamp = field_validator("occurred_at")(_require_aware)
 
@@ -312,6 +397,7 @@ def _require_policy_version(value: object) -> str:
 RealtimeErrorCode = Literal[
     "INVALID_SESSION_STATE",
     "ACTION_ID_CONFLICT",
+    "UTTERANCE_REJECTED",
     "PROTOCOL_ERROR",
     "SEQUENCE_AHEAD",
     "INTERNAL_ERROR",

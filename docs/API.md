@@ -1,17 +1,17 @@
 # API 与事件技术基线
 
-- Status: P0 API Architecture Baseline + P1-1/P1-2/P1-3/P1-4 completed + P1-5A/P1-5B/P1-5C/P1-5D internal boundaries implemented + P1-5E/P1-5E-1/P1-5E-2/P1-5E-3/P1-5F-1 completed + P1-5F in progress
+- Status: P0 API Architecture Baseline + P1-1～P1-4 completed + P1-5A～P1-5E/P1-5F-1/P1-5F-2 completed + P1-5F in progress
 - Current phase: P1 — IN_PROGRESS
 - API architecture baseline established by: P0-2 — DONE
 - Target version: V0.1 Internal Validation
-- Implemented REST contracts: `GET /health`, `POST /auth/register`, `POST /auth/login`, `POST /auth/logout`, `GET /auth/me`, `GET /questions`, `GET /questions/{question_version_id}`, `POST /sessions`, `GET /sessions/{session_id}`, `POST /sessions/{session_id}/start`
+- Implemented REST contracts: `GET /health`, `POST /auth/register`, `POST /auth/login`, `POST /auth/logout`, `GET /auth/me`, `GET /questions`, `GET /questions/{question_version_id}`, `POST /sessions`, `GET /sessions/{session_id}`, `GET /sessions/{session_id}/utterances`, `POST /sessions/{session_id}/start`
 - Implemented realtime contract: `/ws/sessions/{session_id}?after_sequence=` scoped session channel with historical v1 and current v2 formal events
 - P0-5 browser CORS/CSRF/Web closure: P0-5D completed
 - P1-1 contract: scoped/frozen by P1-1A; P1-1B persistence, P1-1C REST/WebSocket runtime, P1-1D Web realtime caller and P1-1E independent final review completed
 - P1-2 contract: P1-2A/B/C completed; safe question reads and immutable version-bound session creation implemented
 - P1-3 contract: P1-3A～D completed; independent verdict `PASS`; P1-3 `DONE`
 - P1-4 contract: P1-4A～E completed; final independent verdict `PASS`; deterministic scheduler remains server-owned and safe floor snapshot/WS/Web projection is implemented
-- P1-5 contract: P1-5A freeze, P1-5B persistence, P1-5C deterministic internal runtime and P1-5D first provider adapter implemented; P1-5E-1 freezes automatic internal coordination, P1-5E-2 implements its single-turn kernel, and P1-5E-3 closes Python-internal continuous drive/configured composition; P1-5F-1 now freezes the generation/utterance REST/WS/Browser contract docs-only, with implementation deferred to F2～F4
+- P1-5 contract: P1-5A～P1-5E implement the internal runtime; P1-5F-1 freezes the generation/utterance REST/WS/Browser contract; P1-5F-2 backend transport is `DONE` after finding remediation and finding-only re-review `PASS`, while F3/F4 remain unstarted
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -293,7 +293,7 @@ P1-5A froze the rules below。P1-5B implements internal persistence/domain comma
 - A future contract must preserve the order `floor.granted -> generation -> persisted utterance -> floor release` without allowing the LLM/provider to emit state-transition、speaker-selection、scoring or database-mutation commands。
 - P1-5D performs exactly one provider request with application retry `0` and no fallback；stable project-owned request identity records the actual provider/model/config used。Late output after phase/grant change is rejected and must not be projected。
 - Timeout、unavailable、rate-limit、partial/invalid-output errors are typed internal generation outcomes, not session state changes。Public errors/events expose only safe allowlisted status/reason；provider exception body、credential、rendered prompt、other participants' Private Stance and chain-of-thought remain private。
-- Through P1-5E-3，streaming chunks、request/attempt events、utterance event naming、REST transcript reads and Browser rendering had no public contract。P1-5F-1 now freezes only the unified event and transcript read described below；streaming、request lifecycle events、REST utterance write fallback and all implementation remain Deferred。
+- Through P1-5E-3，streaming chunks、request/attempt events、utterance event naming、REST transcript reads and Browser rendering had no public contract。P1-5F-1 froze the unified event and transcript read described below；P1-5F-2 now implements the backend command/event/transcript transport。Streaming、request lifecycle events、REST utterance write fallback and Browser implementation remain Deferred。
 
 P1-5C's callable contract is Python-internal only。It assembles the exact authorized context, renders the exact Prompt Version, invokes a typed local executor outside database transactions and commits/replays the P1-5B durable result。It neither consumes nor emits transport messages, and it never auto-triggers from `floor.granted` or auto-releases floor。
 
@@ -317,17 +317,17 @@ The internal orchestrator may return provider-neutral safe categories such as wa
 
 The full authority, provenance and failure boundary is in [`exec-plans/P1-5_ai-runtime-foundation.md`](exec-plans/P1-5_ai-runtime-foundation.md)。
 
-## P1-5F-1 public text-discussion contract — frozen, not implemented
+## P1-5F public text-discussion contract — F1 frozen; F2 backend implemented
 
-P1-5F-1 is docs-only。The following contract is approved but no route、schema、parser、generated artifact or Browser code has been changed yet。
+P1-5F-1 was docs-only and froze the contract below。P1-5F-2 now implements its backend parser、durable publication、public projection、ordered WebSocket delivery、owner-only transcript route and mechanically generated REST artifact；handwritten Browser code remains unchanged for P1-5F-3。
 
 ### Human WS command and safe rejection
 
-Human text submission is the v1 WS command `participant.utterance.submit` with the existing envelope fields `schema_version`、`type`、`session_id`、UUID4 `action_id` and the closed payload `{ "content": string }`。The client cannot send participant/grant/phase/actor/provider/runtime identity；the server resolves the authenticated Human and exact current grant after locked lifecycle reconciliation。
+Human text submission is the v1 WS command `participant.utterance.submit` with the existing envelope fields `schema_version`、`type`、`session_id`、UUID4 `action_id` and the closed payload `{ "floor_grant_id": UUID4, "content": string }`。The client cannot send participant/phase/actor/provider/runtime identity；after locked lifecycle reconciliation the server requires the named grant to equal the authoritative current grant and verifies its authenticated `HUMAN` / `CANDIDATE` owner。This exact-floor requirement is a narrow F1 erratum restored during F2 actual-source review；delayed commands never bind implicitly to a later grant。
 
 Accepted content is the unchanged original string with `1..4000` Unicode code points、non-empty `strip()` result and no U+0000。No normalization or automatic trim occurs。A syntactically valid command rejected by authority/content rules receives recoverable `UTTERANCE_REJECTED` / `You cannot submit an utterance right now.` and the socket stays open；malformed messages remain `PROTOCOL_ERROR`。The error never discloses AI floor、stale grant、phase/deadline advance or other internal reason。
 
-`(session_id, action_id)` remains the command identity。Same action plus identical semantic content replays the same two causal events；same action plus different content returns `ACTION_ID_CONFLICT`。Human `utterance_id` is a deterministic server-owned UUID4-compatible identity derived from session/action identity and cannot be chosen by the client。
+`(session_id, action_id)` remains the command identity。Same action plus identical `floor_grant_id` and exact content replays the same two causal events；changing either floor or content returns `ACTION_ID_CONFLICT`。Human `utterance_id` is a deterministic server-owned UUID4-compatible identity derived from session/action identity and cannot be chosen by the client。
 
 ### Unified formal utterance event
 
@@ -366,7 +366,7 @@ The cursor is the full discussion sequence，not transcript offset。Transcript 
 
 Initial restore loads snapshot/watermark S，then the transcript，then connects WS with `after_sequence=S`。REST/WS duplicates merge by `utterance_id` and authoritative sequence。Identical replay is ignored；same identity with conflicting authoritative fields triggers a full session+transcript reload。Confirmed transcript is merged in place rather than deliberately cleared during reload。
 
-Pending Human content is memory-only and is not a formal transcript bubble。It is confirmed by matching the WS utterance action ID or transcript item action ID after reconnect；retry reuses the same action ID and does not use localStorage/sessionStorage。
+Pending Human `action_id + floor_grant_id + content` is memory-only and is not a formal transcript bubble。It is confirmed by matching the WS utterance action ID or transcript item action ID after reconnect；retry reuses the same exact binding and does not use localStorage/sessionStorage。
 
 The complete WS stream retains strict exact-next sequence/gap recovery。Every event is sent only after commit；send failure changes no business fact and catch-up recovers it。Full Browser and backend acceptance rules are in [`exec-plans/P1-5_ai-runtime-foundation.md`](exec-plans/P1-5_ai-runtime-foundation.md)。
 
@@ -440,7 +440,7 @@ P0-3D 已完成最小 API、OpenAPI authority、typed config、request correlati
 - P1-2B persistence/domain/seed、P1-2C safe API/session/Web vertical slice 与 P1-2D independent acceptance 均已完成；P1-2 `DONE`。
 - P1-3A～D 已完成；state/timing/command/event/snapshot、backend durable foundation 与 realtime/Web complete phase flow 已独立验收 `PASS`；P1-3 `DONE`，P1 保持 `IN_PROGRESS`。
 - P1-4A～E 已完成；P1-4 `DONE`，final independent verdict `PASS`。Safe snapshot/WS/Web floor projection 已实现且无 public floor command。
-- P1-5A AI Runtime Architecture Freeze、P1-5B internal persistence、P1-5C deterministic internal runtime、P1-5D first provider adapter and P1-5E automatic orchestration 已完成；P1-5E/P1-5E-1/P1-5E-2/P1-5E-3/P1-5F-1 are `DONE`。P1-5F remains `IN_PROGRESS`；F2 backend、F3 Web and F4 E2E implementation remain `NOT_STARTED`。
+- P1-5A～P1-5E/P1-5F-1/P1-5F-2 are `DONE`。P1-5F remains `IN_PROGRESS`；F3 Web and F4 E2E remain `NOT_STARTED`。P1-5F-2 finding-only external re-review is `PASS` with findings none。
 
 ### P2 and later
 
@@ -455,8 +455,8 @@ P0-3D 已完成最小 API、OpenAPI authority、typed config、request correlati
 - Implemented：P1-3B `session.start` REST/WS command parsing、generalized state event v2、phase timing snapshot 和 backend durable state-machine foundation；
 - Implemented：P1-3C in-process deadline recovery、connected realtime catch-up/push、Browser authoritative phase/deadline projection 和 complete Chromium phase flow；
 - Implemented：P1-4 minimum formal floor facts、deterministic schedule → fact orchestration、owner-only safe snapshot projection and display-only Realtime/Web recovery；public floor commands remain absent；
-- Frozen but not implemented：P1-5F-1 Human utterance WS command、unified public utterance event、recoverable rejection and owner-only transcript REST；
-- Implemented internal persistence / frozen pending F2 transport：Generation Request、final AI Utterance and typed failure are durable；their public projection is frozen above but not yet implemented；
+- Implemented in P1-5F-2：Human utterance WS command、unified Human/AI public utterance events、recoverable rejection、v1/v2 floor projection、owner-only transcript REST and ordered reconnect/live delivery；
+- Implemented atomic AI publication：Generation Request、final AI Utterance and matching public event share the locked completion transaction and completed replay proof；
 - Deferred：event retention/compaction、large replay pagination、multi-tab/cross-process delivery 和长期 compatibility policy；
 - TBD：V0.1 之后的 identity expansion、verified recovery flow 与 authorization；
 - TBD：音频上传和短期签名协议；

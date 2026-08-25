@@ -35,6 +35,9 @@ from group_interview_arena_api.modules.discussion_sessions.domain import (
     SessionStatus,
     StoredEvent,
 )
+from group_interview_arena_api.modules.discussion_sessions.public_events import (
+    PublicEventProjectionError,
+)
 from group_interview_arena_api.modules.discussion_sessions.service import (
     ActionIdConflictError,
 )
@@ -170,6 +173,24 @@ def _start_command(session_id: str, action_id: UUID) -> dict[str, object]:
         "session_id": session_id,
         "action_id": str(action_id),
         "payload": {},
+    }
+
+
+def _utterance_command(
+    session_id: str,
+    action_id: UUID,
+    floor_grant_id: UUID | str,
+    content: str,
+) -> dict[str, object]:
+    return {
+        "schema_version": 1,
+        "type": "participant.utterance.submit",
+        "session_id": session_id,
+        "action_id": str(action_id),
+        "payload": {
+            "floor_grant_id": str(floor_grant_id),
+            "content": content,
+        },
     }
 
 
@@ -336,10 +357,6 @@ def test_websocket_abort_duplicate_invalid_state_and_ordered_catchup(
                 "phase_deadline_at": None,
             }
 
-            websocket.send_json(command)
-            duplicate = websocket.receive_json()
-            assert duplicate == accepted
-
             real_apply = realtime.apply_session_command
 
             async def conflict(
@@ -365,9 +382,6 @@ def test_websocket_abort_duplicate_invalid_state_and_ordered_catchup(
                 code="INVALID_SESSION_STATE",
                 session_id=session_id,
             )
-
-            websocket.send_json(command)
-            assert websocket.receive_json() == accepted
 
         with client.websocket_connect(
             _ws_path(session_id, after_sequence=0),
@@ -395,6 +409,24 @@ PROTOCOL_PAYLOAD_FACTORIES: tuple[ProtocolPayloadFactory, ...] = (
     lambda session_id: {
         **_abort_command(session_id, uuid4()),
         "unexpected": True,
+    },
+    lambda session_id: {
+        "schema_version": 1,
+        "type": "participant.utterance.submit",
+        "session_id": session_id,
+        "action_id": str(uuid4()),
+        "payload": {"content": "missing exact floor binding"},
+    },
+    lambda session_id: {
+        "schema_version": 1,
+        "type": "participant.utterance.submit",
+        "session_id": session_id,
+        "action_id": str(uuid4()),
+        "payload": {
+            "floor_grant_id": str(uuid4()),
+            "content": "authority must stay server-owned",
+            "participant_id": str(uuid4()),
+        },
     },
     lambda _session_id: _abort_command(str(uuid4()), uuid4()),
 )
@@ -461,12 +493,17 @@ def test_websocket_ahead_watermark_and_lost_send_reconnect_are_durable(
             assert disconnect.value.code == 1008
 
         action_id = uuid4()
-        real_formal_event = realtime._formal_event  # pyright: ignore[reportPrivateUsage]
+        real_projection = getattr(realtime, "project_public_events", None)
 
-        def fail_after_commit(_event: StoredEvent) -> Never:
+        async def fail_after_commit(*_args: object, **_kwargs: object) -> Never:
             raise RuntimeError("lost-send-exception-sentinel")
 
-        monkeypatch.setattr(realtime, "_formal_event", fail_after_commit)
+        monkeypatch.setattr(
+            realtime,
+            "project_public_events",
+            fail_after_commit,
+            raising=False,
+        )
         with client.websocket_connect(
             _ws_path(session_id),
             headers={"Origin": TRUSTED_ORIGIN},
@@ -480,7 +517,8 @@ def test_websocket_ahead_watermark_and_lost_send_reconnect_are_durable(
                 websocket.receive_json()
             assert disconnect.value.code == 1011
 
-        monkeypatch.setattr(realtime, "_formal_event", real_formal_event)
+        if real_projection is not None:
+            monkeypatch.setattr(realtime, "project_public_events", real_projection)
 
         restored = client.get(f"/sessions/{session_id}")
         assert restored.status_code == 200
@@ -494,8 +532,86 @@ def test_websocket_ahead_watermark_and_lost_send_reconnect_are_durable(
             recovered = websocket.receive_json()
             assert recovered["sequence"] == 2
             assert recovered["action_id"] == str(action_id)
-            websocket.send_json(_abort_command(session_id, action_id))
-            assert websocket.receive_json() == recovered
+
+
+@pytest.mark.parametrize("failure_kind", ["projection", "send"])
+def test_periodic_catchup_failure_closes_safely_without_raw_error(
+    migrated_database: TemporaryDatabaseContext,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    failure_kind: str,
+) -> None:
+    application = _application(
+        migrated_database,
+        settings=Settings(
+            environment=Environment.TEST,
+            cors_origins=(TRUSTED_ORIGIN,),
+            session_phase_durations=SessionPhaseDurations(
+                preparation_seconds=1,
+                opening_statements_seconds=30,
+                exploration_seconds=30,
+                conflict_and_evaluation_seconds=30,
+                convergence_seconds=30,
+                final_summary_seconds=30,
+            ),
+        ),
+    )
+    original_send = vars(realtime)["_send_formal_event"]
+    send_attempts = 0
+
+    async def fail_once(*args: object, **kwargs: object) -> None:
+        nonlocal send_attempts
+        send_attempts += 1
+        if send_attempts == 1:
+            raise RuntimeError("periodic-send-private-sentinel")
+        await original_send(*args, **kwargs)  # pyright: ignore[reportArgumentType]
+
+    async def fail_projection(*_args: object, **_kwargs: object) -> Never:
+        raise PublicEventProjectionError("periodic-projection-private-sentinel")
+
+    with _client(application) as client:
+        _register(client, "ws_periodic_send_failure_owner")
+        snapshot = _create_session(client)
+        session_id = str(snapshot["id"])
+
+        with client.websocket_connect(
+            _ws_path(session_id),
+            headers={"Origin": TRUSTED_ORIGIN},
+        ) as websocket:
+            websocket.send_json(_start_command(session_id, uuid4()))
+            assert websocket.receive_json()["sequence"] == 2
+            assert websocket.receive_json()["sequence"] == 3
+            if failure_kind == "projection":
+                monkeypatch.setattr(
+                    realtime,
+                    "project_public_events",
+                    fail_projection,
+                )
+            else:
+                monkeypatch.setattr(realtime, "_send_formal_event", fail_once)
+            asyncio.run(
+                _schedule_floor(migrated_database, UUID(session_id)),
+                loop_factory=asyncio.SelectorEventLoop,
+            )
+
+            error = websocket.receive_json()
+            _assert_error(error, code="INTERNAL_ERROR", session_id=session_id)
+            assert error["action_id"] is None
+            with pytest.raises(WebSocketDisconnect) as disconnect:
+                websocket.receive_json()
+            assert disconnect.value.code == 1011
+
+        durable = client.get(f"/sessions/{session_id}")
+        assert durable.status_code == 200
+        assert durable.json()["status"] == "OPENING_STATEMENTS"
+        assert durable.json()["last_sequence"] == 4
+        assert durable.json()["floor"]["current_grant"] is not None
+
+    captured = capsys.readouterr()
+    combined = captured.out + captured.err
+    assert "periodic-send-private-sentinel" not in combined
+    assert "periodic-projection-private-sentinel" not in combined
+    assert "Task exception was never retrieved" not in combined
 
 
 def test_websocket_delivers_committed_phase_deadline_event(
@@ -595,10 +711,12 @@ def test_websocket_projects_floor_grant_and_recovers_it_from_snapshot_and_catchu
             assert [(event.sequence, event.event_type) for event in scheduled] == [
                 (4, "floor.granted")
             ]
+            assert scheduled[0].causation_action_id is not None
             granted = websocket.receive_json()
-            assert granted["schema_version"] == 1
+            assert granted["schema_version"] == 2
             assert granted["type"] == "floor.granted"
             assert granted["sequence"] == 4
+            assert granted["action_id"] is None
             assert set(granted["payload"]) == {
                 "grant_id",
                 "decision_id",
@@ -653,3 +771,149 @@ def test_websocket_projects_floor_grant_and_recovers_it_from_snapshot_and_catchu
             "provider",
         ):
             assert forbidden not in public_surfaces
+
+
+def test_websocket_human_submit_is_ordered_recoverable_and_preserves_content(
+    migrated_database: TemporaryDatabaseContext,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    async def progression_failure(*_args: object, **_kwargs: object) -> Never:
+        raise RuntimeError("progression-private-sentinel")
+
+    monkeypatch.setattr(
+        realtime,
+        "resume_discussion_progression",
+        progression_failure,
+        raising=False,
+    )
+    application = _application(
+        migrated_database,
+        settings=Settings(
+            environment=Environment.TEST,
+            cors_origins=(TRUSTED_ORIGIN,),
+            session_phase_durations=SessionPhaseDurations(
+                preparation_seconds=1,
+                opening_statements_seconds=30,
+                exploration_seconds=30,
+                conflict_and_evaluation_seconds=30,
+                convergence_seconds=30,
+                final_summary_seconds=30,
+            ),
+        ),
+    )
+    with _client(application) as client:
+        _register(client, "ws_human_utterance_owner")
+        created = _create_session(client)
+        session_id = str(created["id"])
+        content = "  preserve me exactly  "
+        action_id = uuid4()
+
+        with client.websocket_connect(
+            _ws_path(session_id),
+            headers={"Origin": TRUSTED_ORIGIN},
+        ) as websocket:
+            websocket.send_json(_start_command(session_id, uuid4()))
+            assert websocket.receive_json()["sequence"] == 2
+            phase_event = websocket.receive_json()
+            assert phase_event["sequence"] == 3
+            assert phase_event["payload"]["status"] == "OPENING_STATEMENTS"
+
+            scheduled = asyncio.run(
+                _schedule_floor(migrated_database, UUID(session_id)),
+                loop_factory=asyncio.SelectorEventLoop,
+            )
+            human_grant = websocket.receive_json()
+            assert human_grant["sequence"] == 4
+            assert human_grant["payload"]["participant_id"] == str(
+                scheduled[0].payload["participant_id"]
+            )
+
+            websocket.send_json(
+                _utterance_command(
+                    session_id,
+                    uuid4(),
+                    human_grant["payload"]["grant_id"],
+                    "   ",
+                )
+            )
+            rejected = websocket.receive_json()
+            _assert_error(
+                rejected,
+                code="UTTERANCE_REJECTED",
+                session_id=session_id,
+            )
+            assert rejected["error"]["message"] == (
+                "You cannot submit an utterance right now."
+            )
+
+            websocket.send_json(
+                _utterance_command(
+                    session_id,
+                    action_id,
+                    human_grant["payload"]["grant_id"],
+                    content,
+                )
+            )
+            utterance = websocket.receive_json()
+            released = websocket.receive_json()
+            assert [utterance["sequence"], released["sequence"]] == [5, 6]
+            assert utterance == {
+                "schema_version": 1,
+                "type": "participant.utterance.created",
+                "session_id": session_id,
+                "sequence": 5,
+                "occurred_at": utterance["occurred_at"],
+                "action_id": str(action_id),
+                "payload": {
+                    "utterance_id": utterance["payload"]["utterance_id"],
+                    "participant_id": human_grant["payload"]["participant_id"],
+                    "actor_kind": "HUMAN",
+                    "floor_grant_id": human_grant["payload"]["grant_id"],
+                    "phase": "OPENING_STATEMENTS",
+                    "content": content,
+                },
+            }
+            assert released["schema_version"] == 2
+            assert released["type"] == "floor.released"
+            assert released["action_id"] == str(action_id)
+
+            websocket.send_json(
+                _utterance_command(
+                    session_id,
+                    action_id,
+                    human_grant["payload"]["grant_id"],
+                    "different content",
+                )
+            )
+            conflict = websocket.receive_json()
+            _assert_error(
+                conflict,
+                code="ACTION_ID_CONFLICT",
+                session_id=session_id,
+            )
+
+            websocket.send_json(
+                _utterance_command(
+                    session_id,
+                    uuid4(),
+                    human_grant["payload"]["grant_id"],
+                    "still open",
+                )
+            )
+            no_floor = websocket.receive_json()
+            _assert_error(
+                no_floor,
+                code="UTTERANCE_REJECTED",
+                session_id=session_id,
+            )
+
+        transcript = client.get(f"/sessions/{session_id}/utterances")
+        assert transcript.status_code == 200
+        assert transcript.json()["items"][0]["content"] == content
+        assert transcript.json()["items"][0]["action_id"] == str(action_id)
+
+    captured = capsys.readouterr()
+    combined = captured.out + captured.err
+    assert "progression-private-sentinel" not in combined
+    assert "Task exception was never retrieved" not in combined

@@ -157,6 +157,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sessions/{session_id}/utterances": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Transcript */
+        get: operations["transcript_sessions__session_id__utterances_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sessions/{session_id}/start": {
         parameters: {
             query?: never;
@@ -457,6 +474,48 @@ export interface components {
          * @enum {string}
          */
         SessionStatus: "CREATED" | "PREPARATION" | "OPENING_STATEMENTS" | "EXPLORATION" | "CONFLICT_AND_EVALUATION" | "CONVERGENCE" | "FINAL_SUMMARY" | "COMPLETED" | "ABORTED_USER";
+        /** @enum {string} */
+        TranscriptActorKind: "HUMAN" | "AI";
+        /** @enum {string} */
+        TranscriptPhase: "OPENING_STATEMENTS" | "EXPLORATION" | "CONFLICT_AND_EVALUATION" | "CONVERGENCE" | "FINAL_SUMMARY";
+        /** TranscriptResponse */
+        TranscriptResponse: {
+            /** Items */
+            items: components["schemas"]["TranscriptUtteranceResponse"][];
+            /** Next After Sequence */
+            next_after_sequence: number | null;
+        };
+        /** TranscriptUtteranceResponse */
+        TranscriptUtteranceResponse: {
+            /**
+             * Utterance Id
+             * Format: uuid4
+             */
+            utterance_id: string;
+            /** Sequence */
+            sequence: number;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+            /** Action Id */
+            action_id: string | null;
+            /**
+             * Participant Id
+             * Format: uuid4
+             */
+            participant_id: string;
+            actor_kind: components["schemas"]["TranscriptActorKind"];
+            /**
+             * Floor Grant Id
+             * Format: uuid4
+             */
+            floor_grant_id: string;
+            phase: components["schemas"]["TranscriptPhase"];
+            /** Content */
+            content: string;
+        };
     };
     responses: never;
     parameters: never;
@@ -848,6 +907,67 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SessionSnapshotResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    transcript_sessions__session_id__utterances_get: {
+        parameters: {
+            query?: {
+                after_sequence?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TranscriptResponse"];
                 };
             };
             /** @description Unauthorized */

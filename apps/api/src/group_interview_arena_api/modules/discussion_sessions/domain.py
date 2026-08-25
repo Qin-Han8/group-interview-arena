@@ -191,7 +191,7 @@ class StoredEvent:
     session_id: UUID
     sequence: int
     occurred_at: datetime
-    action_id: UUID | None
+    causation_action_id: UUID | None
     payload: dict[str, object]
 
 

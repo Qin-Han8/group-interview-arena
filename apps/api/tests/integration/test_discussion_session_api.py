@@ -2,6 +2,7 @@ import asyncio
 import re
 from collections.abc import Callable, Coroutine
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 from typing import Any, Protocol, cast
 from uuid import UUID, uuid4
 
@@ -20,7 +21,11 @@ from group_interview_arena_api.core.config import (
 from group_interview_arena_api.db.dependencies import (
     DATABASE_SESSION_FACTORY_STATE_KEY,
 )
-from group_interview_arena_api.db.models import DiscussionEvent, SimulationSession
+from group_interview_arena_api.db.models import (
+    DiscussionEvent,
+    SessionAction,
+    SimulationSession,
+)
 from group_interview_arena_api.modules.question_personas.seed import (
     INTERNAL_VALIDATION_BUNDLE,
     seed_question_persona_foundation,
@@ -101,6 +106,14 @@ async def _verify_rest_contract(
                 },
             )
             _assert_safe_error(missing_auth, 401, "AUTHENTICATION_REQUIRED")
+            missing_transcript_auth = await unauthenticated.get(
+                f"/sessions/{uuid4()}/utterances"
+            )
+            _assert_safe_error(
+                missing_transcript_auth,
+                401,
+                "AUTHENTICATION_REQUIRED",
+            )
 
         async with AsyncClient(
             transport=transport,
@@ -200,6 +213,110 @@ async def _verify_rest_contract(
             )
             _assert_safe_error(stale_start, 409, "INVALID_SESSION_STATE")
 
+            human_action_id = uuid4()
+            human_utterance_id = uuid4()
+            ai_utterance_id = uuid4()
+            human_participant_id = UUID(
+                started_snapshot["floor"]["participants"][0]["participant_id"]
+            )
+            ai_participant_id = UUID(
+                started_snapshot["floor"]["participants"][1]["participant_id"]
+            )
+            human_grant_id = uuid4()
+            ai_grant_id = uuid4()
+            occurred_at = datetime(2026, 8, 25, 4, 0, tzinfo=UTC)
+            async with _factory(application)() as session:
+                async with session.begin():
+                    aggregate = await session.get(SimulationSession, session_id)
+                    assert aggregate is not None
+                    session.add(
+                        SessionAction(
+                            session_id=session_id,
+                            action_id=human_action_id,
+                            command_version=1,
+                            command_type="participant.utterance.submit",
+                            payload_digest=b"h" * 32,
+                            created_at=occurred_at,
+                        )
+                    )
+                    await session.flush()
+                    session.add_all(
+                        [
+                            DiscussionEvent(
+                                session_id=session_id,
+                                sequence=4,
+                                event_version=1,
+                                event_type="participant.utterance.created",
+                                causation_action_id=human_action_id,
+                                payload={
+                                    "utterance_id": str(human_utterance_id),
+                                    "participant_id": str(human_participant_id),
+                                    "actor_kind": "HUMAN",
+                                    "floor_grant_id": str(human_grant_id),
+                                    "phase": "OPENING_STATEMENTS",
+                                    "content": "Human transcript item.",
+                                },
+                                occurred_at=occurred_at,
+                            ),
+                            DiscussionEvent(
+                                session_id=session_id,
+                                sequence=7,
+                                event_version=1,
+                                event_type="participant.utterance.created",
+                                causation_action_id=None,
+                                payload={
+                                    "utterance_id": str(ai_utterance_id),
+                                    "participant_id": str(ai_participant_id),
+                                    "actor_kind": "AI",
+                                    "floor_grant_id": str(ai_grant_id),
+                                    "phase": "OPENING_STATEMENTS",
+                                    "content": "AI transcript item.",
+                                },
+                                occurred_at=occurred_at,
+                            ),
+                        ]
+                    )
+                    aggregate.last_sequence = 7
+
+            transcript = await owner.get(
+                f"/sessions/{session_id}/utterances",
+                params={"limit": 1},
+            )
+            assert transcript.status_code == 200
+            first_page = transcript.json()
+            assert first_page["next_after_sequence"] == 4
+            assert first_page["items"] == [
+                {
+                    "utterance_id": str(human_utterance_id),
+                    "sequence": 4,
+                    "occurred_at": "2026-08-25T04:00:00Z",
+                    "action_id": str(human_action_id),
+                    "participant_id": str(human_participant_id),
+                    "actor_kind": "HUMAN",
+                    "floor_grant_id": str(human_grant_id),
+                    "phase": "OPENING_STATEMENTS",
+                    "content": "Human transcript item.",
+                }
+            ]
+            second_page = await owner.get(
+                f"/sessions/{session_id}/utterances",
+                params={"after_sequence": 4},
+            )
+            assert second_page.status_code == 200
+            assert second_page.json()["next_after_sequence"] is None
+            assert [item["sequence"] for item in second_page.json()["items"]] == [7]
+            assert second_page.json()["items"][0]["action_id"] is None
+            for invalid_params in (
+                {"after_sequence": -1},
+                {"limit": 0},
+                {"limit": 201},
+            ):
+                invalid = await owner.get(
+                    f"/sessions/{session_id}/utterances",
+                    params=invalid_params,
+                )
+                assert invalid.status_code == 422
+
             missing = await owner.get(f"/sessions/{uuid4()}")
             _assert_safe_error(missing, 404, "SESSION_NOT_FOUND")
 
@@ -213,6 +330,16 @@ async def _verify_rest_contract(
                 assert (
                     hidden.json()["error"]["message"]
                     == missing.json()["error"]["message"]
+                )
+                hidden_transcript = await non_owner.get(
+                    f"/sessions/{session_id}/utterances"
+                )
+                _assert_safe_error(hidden_transcript, 404, "SESSION_NOT_FOUND")
+                missing_transcript = await owner.get(f"/sessions/{uuid4()}/utterances")
+                _assert_safe_error(missing_transcript, 404, "SESSION_NOT_FOUND")
+                assert (
+                    hidden_transcript.json()["error"]["message"]
+                    == missing_transcript.json()["error"]["message"]
                 )
 
         async with _factory(application)() as session:
@@ -232,14 +359,14 @@ async def _verify_rest_contract(
                 "CONVERGENCE",
                 "FINAL_SUMMARY",
             }
-            assert stored.last_sequence == 2
+            assert stored.last_sequence == 7
             assert (
                 await session.scalar(
                     select(func.count())
                     .select_from(DiscussionEvent)
                     .where(DiscussionEvent.session_id == session_id)
                 )
-                == 2
+                == 4
             )
 
 

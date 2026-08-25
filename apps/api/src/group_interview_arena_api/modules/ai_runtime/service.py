@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from group_interview_arena_api.db import (
     AiUtterance,
+    DiscussionEvent,
     FloorGrant,
     LlmGenerationRequest,
     PromptVersion,
@@ -32,10 +33,17 @@ from group_interview_arena_api.modules.ai_runtime.domain import (
     RequestGenerationCommand,
     StartGenerationCommand,
 )
-from group_interview_arena_api.modules.discussion_sessions.domain import ACTIVE_PHASES
+from group_interview_arena_api.modules.discussion_sessions.domain import (
+    ACTIVE_PHASES,
+    SessionStatus,
+)
 from group_interview_arena_api.modules.discussion_sessions.service import (
     reconcile_due_for_locked_aggregate,
 )
+from group_interview_arena_api.modules.discussion_sessions.utterances import (
+    participant_utterance_created_event,
+)
+from group_interview_arena_api.modules.floor_control.domain import ParticipantActorKind
 
 
 def _utc_now() -> datetime:
@@ -248,6 +256,79 @@ async def _locked_request(
     return request
 
 
+async def _prove_completed_request(
+    session: AsyncSession,
+    *,
+    aggregate: SimulationSession,
+    request: LlmGenerationRequest,
+) -> AiUtterance:
+    utterances = tuple(
+        (
+            await session.scalars(
+                select(AiUtterance).where(
+                    AiUtterance.generation_request_id == request.id
+                )
+            )
+        ).all()
+    )
+    if len(utterances) != 1:
+        raise GenerationRequestConflictError(
+            "Completed generation is missing its exact public event proof."
+        )
+    utterance = utterances[0]
+    grant = await session.get(FloorGrant, request.floor_grant_id)
+    events = tuple(
+        event
+        for event in (
+            await session.scalars(
+                select(DiscussionEvent).where(
+                    DiscussionEvent.session_id == request.session_id,
+                    DiscussionEvent.event_type == "participant.utterance.created",
+                )
+            )
+        ).all()
+        if event.payload.get("utterance_id") == str(utterance.id)
+    )
+    if grant is None or len(events) != 1:
+        raise GenerationRequestConflictError(
+            "Completed generation is missing its exact public event proof."
+        )
+    event = events[0]
+    expected_event = participant_utterance_created_event(
+        utterance_id=utterance.id,
+        participant_id=request.participant_id,
+        actor_kind=ParticipantActorKind.AI,
+        floor_grant_id=request.floor_grant_id,
+        phase=SessionStatus(grant.phase),
+        content=utterance.content,
+    )
+    if not (
+        request.status == GenerationRequestStatus.COMPLETED.value
+        and request.completed_at is not None
+        and request.failed_at is None
+        and request.failure_code is None
+        and utterance.session_id == request.session_id
+        and utterance.participant_id == request.participant_id
+        and utterance.floor_grant_id == request.floor_grant_id
+        and utterance.generation_request_status
+        == GenerationRequestStatus.COMPLETED.value
+        and utterance.content_digest == _sha256_text(utterance.content)
+        and utterance.persisted_at == request.completed_at
+        and grant.session_id == request.session_id
+        and grant.participant_id == request.participant_id
+        and event.event_version == expected_event.event_version
+        and event.event_type == expected_event.event_type
+        and event.causation_action_id is None
+        and event.payload == expected_event.payload
+        and event.occurred_at == utterance.persisted_at
+        and 0 < event.sequence <= aggregate.last_sequence
+    ):
+        raise GenerationRequestConflictError(
+            "Completed generation conflicts with its exact public event proof."
+        )
+    return utterance
+
+
 async def create_generation_request(
     session: AsyncSession,
     *,
@@ -268,14 +349,14 @@ async def create_generation_request(
                     raise GenerationRequestConflictError(
                         "Generation request identity conflicts with its original payload."
                     )
-                utterance_id = None
                 if existing.status == GenerationRequestStatus.COMPLETED.value:
-                    utterance_id = await session.scalar(
-                        select(AiUtterance.id).where(
-                            AiUtterance.generation_request_id == existing.id
-                        )
+                    utterance = await _prove_completed_request(
+                        session,
+                        aggregate=aggregate,
+                        request=existing,
                     )
-                return _to_snapshot(existing, utterance_id=utterance_id)
+                    return _to_snapshot(existing, utterance_id=utterance.id)
+                return _to_snapshot(existing)
 
             if await _reconcile_due_before_generation_mutation(session, aggregate):
                 pending_context_error = GenerationContextError(
@@ -348,18 +429,18 @@ async def claim_generation_request(
                 request_id=command.generation_request_id,
             )
             if request.status != GenerationRequestStatus.REQUESTED.value:
+                utterance_id = None
+                if request.status == GenerationRequestStatus.COMPLETED.value:
+                    utterance = await _prove_completed_request(
+                        session,
+                        aggregate=aggregate,
+                        request=request,
+                    )
+                    utterance_id = utterance.id
                 return GenerationStartClaim(
                     snapshot=_to_snapshot(
                         request,
-                        utterance_id=(
-                            await session.scalar(
-                                select(AiUtterance.id).where(
-                                    AiUtterance.generation_request_id == request.id
-                                )
-                            )
-                            if request.status == GenerationRequestStatus.COMPLETED.value
-                            else None
-                        ),
+                        utterance_id=utterance_id,
                     ),
                     claimed=False,
                 )
@@ -432,14 +513,13 @@ async def complete_generation_request(
                 request_id=command.generation_request_id,
             )
             if request.status == GenerationRequestStatus.COMPLETED.value:
-                utterance = await session.scalar(
-                    select(AiUtterance).where(
-                        AiUtterance.generation_request_id == request.id
-                    )
+                utterance = await _prove_completed_request(
+                    session,
+                    aggregate=aggregate,
+                    request=request,
                 )
                 if (
-                    utterance is not None
-                    and utterance.id == command.utterance_id
+                    utterance.id == command.utterance_id
                     and utterance.content == command.content
                     and utterance.content_digest == content_digest
                     and utterance.persisted_at == command.persisted_at
@@ -479,6 +559,36 @@ async def complete_generation_request(
                 )
                 session.add(utterance)
                 await session.flush()
+                grant = await session.get(FloorGrant, request.floor_grant_id)
+                if grant is None:
+                    raise ValueError("Completed generation floor grant is missing.")
+                pending_event = participant_utterance_created_event(
+                    utterance_id=utterance.id,
+                    participant_id=request.participant_id,
+                    actor_kind=ParticipantActorKind.AI,
+                    floor_grant_id=request.floor_grant_id,
+                    phase=SessionStatus(grant.phase),
+                    content=utterance.content,
+                )
+                aggregate.last_sequence += 1
+                aggregate.updated_at = command.persisted_at
+                session.add(
+                    DiscussionEvent(
+                        session_id=request.session_id,
+                        sequence=aggregate.last_sequence,
+                        event_version=pending_event.event_version,
+                        event_type=pending_event.event_type,
+                        causation_action_id=None,
+                        payload=pending_event.payload,
+                        occurred_at=command.persisted_at,
+                    )
+                )
+                await session.flush()
+                await _prove_completed_request(
+                    session,
+                    aggregate=aggregate,
+                    request=request,
+                )
                 snapshot = _to_snapshot(request, utterance_id=utterance.id)
     except (SQLAlchemyError, ValueError) as error:
         raise AiRuntimePersistenceError(

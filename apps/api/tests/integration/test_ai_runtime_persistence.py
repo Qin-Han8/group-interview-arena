@@ -12,6 +12,7 @@ from sqlalchemy.exc import IntegrityError
 from group_interview_arena_api.core.config import DatabaseSettings
 from group_interview_arena_api.db import (
     AiUtterance,
+    DiscussionEvent,
     LlmGenerationRequest,
     PromptVersion,
     SessionParticipant,
@@ -23,6 +24,7 @@ from group_interview_arena_api.db.runtime import (
     create_database_session_factory,
     dispose_database_engine,
 )
+from group_interview_arena_api.modules.ai_runtime import service as ai_runtime_service
 from group_interview_arena_api.modules.ai_runtime.domain import (
     AiRuntimePersistenceError,
     FailGenerationCommand,
@@ -39,6 +41,7 @@ from group_interview_arena_api.modules.ai_runtime.domain import (
     StartGenerationCommand,
 )
 from group_interview_arena_api.modules.ai_runtime.service import (
+    claim_generation_request,
     complete_generation_request,
     create_generation_request,
     fail_generation_request,
@@ -309,6 +312,37 @@ async def _verify_ai_runtime_persistence(
         assert completed == completed_duplicate
         assert completed.status is GenerationRequestStatus.COMPLETED
         assert completed.utterance_id == utterance_id
+        async with session_factory() as session:
+            aggregate_after_completion = await session.get(
+                SimulationSession, session_id
+            )
+            utterance_events = tuple(
+                (
+                    await session.scalars(
+                        select(DiscussionEvent)
+                        .where(
+                            DiscussionEvent.session_id == session_id,
+                            DiscussionEvent.event_type
+                            == "participant.utterance.created",
+                        )
+                        .order_by(DiscussionEvent.sequence)
+                    )
+                ).all()
+            )
+        assert aggregate_after_completion is not None
+        assert len(utterance_events) == 1
+        public_event = utterance_events[0]
+        assert public_event.sequence == aggregate_after_completion.last_sequence
+        assert public_event.event_version == 1
+        assert public_event.causation_action_id is None
+        assert public_event.payload == {
+            "utterance_id": str(utterance_id),
+            "participant_id": str(participants[1].id),
+            "actor_kind": "AI",
+            "floor_grant_id": str(grant_id),
+            "phase": "OPENING_STATEMENTS",
+            "content": complete_command.content,
+        }
 
         rollback_request_id = uuid4()
         rollback_request = _request(
@@ -350,6 +384,17 @@ async def _verify_ai_runtime_persistence(
             assert rolled_back.completed_at is None
             assert (
                 await session.scalar(select(func.count()).select_from(AiUtterance)) == 1
+            )
+            assert (
+                await session.scalar(
+                    select(func.count())
+                    .select_from(DiscussionEvent)
+                    .where(
+                        DiscussionEvent.session_id == session_id,
+                        DiscussionEvent.event_type == "participant.utterance.created",
+                    )
+                )
+                == 1
             )
 
         fail_command = FailGenerationCommand(
@@ -429,3 +474,207 @@ def test_ai_runtime_provenance_lifecycle_failure_and_constraints_are_durable(
     migrated_database: TemporaryDatabaseContext,
 ) -> None:
     run_async(lambda: _verify_ai_runtime_persistence(migrated_database))
+
+
+def test_every_completed_return_path_requires_the_same_public_event_proof(
+    migrated_database: TemporaryDatabaseContext,
+) -> None:
+    async def exercise() -> None:
+        async with _runtime_context(migrated_database) as context:
+            session_factory, owner_id, session_id, participants, grant_id = context
+            request_id = uuid4()
+            request_command = _request(
+                request_id=request_id,
+                session_id=session_id,
+                participant_id=participants[1].id,
+                grant_id=grant_id,
+            )
+            start_command = StartGenerationCommand(
+                session_id=session_id,
+                generation_request_id=request_id,
+                started_at=NOW,
+            )
+            complete_command = PersistUtteranceCommand(
+                utterance_id=uuid4(),
+                session_id=session_id,
+                generation_request_id=request_id,
+                content="Strict completed triple proof.",
+                persisted_at=NOW,
+            )
+            async with session_factory() as session:
+                await create_generation_request(
+                    session, owner_id=owner_id, command=request_command
+                )
+            async with session_factory() as session:
+                await start_generation_request(
+                    session, owner_id=owner_id, command=start_command
+                )
+            async with session_factory() as session:
+                await complete_generation_request(
+                    session, owner_id=owner_id, command=complete_command
+                )
+            async with session_factory() as session:
+                async with session.begin():
+                    event = await session.scalar(
+                        select(DiscussionEvent).where(
+                            DiscussionEvent.session_id == session_id,
+                            DiscussionEvent.event_type
+                            == "participant.utterance.created",
+                        )
+                    )
+                    assert event is not None
+                    event.payload = {**event.payload, "content": "conflicting event"}
+
+            async with session_factory() as session:
+                with pytest.raises(GenerationRequestConflictError):
+                    await create_generation_request(
+                        session, owner_id=owner_id, command=request_command
+                    )
+            async with session_factory() as session:
+                async with session.begin():
+                    event = await session.scalar(
+                        select(DiscussionEvent).where(
+                            DiscussionEvent.session_id == session_id,
+                            DiscussionEvent.event_type
+                            == "participant.utterance.created",
+                        )
+                    )
+                    aggregate = await session.get(SimulationSession, session_id)
+                    assert event is not None
+                    assert aggregate is not None
+                    event.payload = {
+                        **event.payload,
+                        "content": complete_command.content,
+                    }
+                    aggregate.last_sequence += 1
+                    session.add(
+                        DiscussionEvent(
+                            session_id=session_id,
+                            sequence=aggregate.last_sequence,
+                            event_version=event.event_version,
+                            event_type=event.event_type,
+                            causation_action_id=None,
+                            payload=event.payload,
+                            occurred_at=event.occurred_at,
+                        )
+                    )
+
+            async with session_factory() as session:
+                with pytest.raises(GenerationRequestConflictError):
+                    await claim_generation_request(
+                        session, owner_id=owner_id, command=start_command
+                    )
+            async with session_factory() as session:
+                async with session.begin():
+                    events = tuple(
+                        (
+                            await session.scalars(
+                                select(DiscussionEvent).where(
+                                    DiscussionEvent.session_id == session_id,
+                                    DiscussionEvent.event_type
+                                    == "participant.utterance.created",
+                                )
+                            )
+                        ).all()
+                    )
+                    assert len(events) == 2
+                    for event in events:
+                        await session.delete(event)
+
+            async with session_factory() as session:
+                with pytest.raises(GenerationRequestConflictError):
+                    await create_generation_request(
+                        session, owner_id=owner_id, command=request_command
+                    )
+            async with session_factory() as session:
+                with pytest.raises(GenerationRequestConflictError):
+                    await claim_generation_request(
+                        session, owner_id=owner_id, command=start_command
+                    )
+            async with session_factory() as session:
+                with pytest.raises(GenerationRequestConflictError):
+                    await complete_generation_request(
+                        session, owner_id=owner_id, command=complete_command
+                    )
+
+    run_async(exercise)
+
+
+def test_public_event_construction_failure_rolls_back_completed_triple(
+    migrated_database: TemporaryDatabaseContext,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def exercise() -> None:
+        async with _runtime_context(migrated_database) as context:
+            session_factory, owner_id, session_id, participants, grant_id = context
+            request_id = uuid4()
+            request_command = _request(
+                request_id=request_id,
+                session_id=session_id,
+                participant_id=participants[1].id,
+                grant_id=grant_id,
+            )
+            async with session_factory() as session:
+                await create_generation_request(
+                    session, owner_id=owner_id, command=request_command
+                )
+            async with session_factory() as session:
+                await start_generation_request(
+                    session,
+                    owner_id=owner_id,
+                    command=StartGenerationCommand(
+                        session_id=session_id,
+                        generation_request_id=request_id,
+                        started_at=NOW,
+                    ),
+                )
+            async with session_factory() as session:
+                before = await session.get(SimulationSession, session_id)
+                assert before is not None
+                prior_watermark = before.last_sequence
+
+            def event_failure(**_kwargs: object):
+                raise ValueError("test-only public event construction failure")
+
+            monkeypatch.setattr(
+                ai_runtime_service,
+                "participant_utterance_created_event",
+                event_failure,
+            )
+            async with session_factory() as session:
+                with pytest.raises(AiRuntimePersistenceError):
+                    await complete_generation_request(
+                        session,
+                        owner_id=owner_id,
+                        command=PersistUtteranceCommand(
+                            utterance_id=uuid4(),
+                            session_id=session_id,
+                            generation_request_id=request_id,
+                            content="Must roll back with its event.",
+                            persisted_at=NOW,
+                        ),
+                    )
+            async with session_factory() as session:
+                request = await session.get(LlmGenerationRequest, request_id)
+                aggregate = await session.get(SimulationSession, session_id)
+                utterance_count = await session.scalar(
+                    select(func.count())
+                    .select_from(AiUtterance)
+                    .where(AiUtterance.generation_request_id == request_id)
+                )
+                event_count = await session.scalar(
+                    select(func.count())
+                    .select_from(DiscussionEvent)
+                    .where(
+                        DiscussionEvent.session_id == session_id,
+                        DiscussionEvent.event_type == "participant.utterance.created",
+                    )
+                )
+            assert request is not None
+            assert request.status == GenerationRequestStatus.RUNNING
+            assert aggregate is not None
+            assert aggregate.last_sequence == prior_watermark
+            assert utterance_count == 0
+            assert event_count == 0
+
+    run_async(exercise)

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from enum import StrEnum
 from uuid import UUID, uuid5
 
@@ -10,9 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from group_interview_arena_api.db import (
     AiUtterance,
-    FloorDecision,
     FloorGrant,
-    FloorIntervention,
     FloorRelease,
     LlmGenerationRequest,
     PromptVersion,
@@ -40,7 +37,6 @@ from group_interview_arena_api.modules.discussion_sessions.service import (
 )
 from group_interview_arena_api.modules.floor_control.domain import (
     FLOOR_ENABLED_PHASES,
-    FloorDecisionOutcome,
     FloorReleaseReason,
     InvalidFloorStateError,
     ParticipantActorKind,
@@ -49,13 +45,17 @@ from group_interview_arena_api.modules.floor_control.domain import (
     ReleaseFloorCommand,
     StaleFloorDecisionError,
 )
+from group_interview_arena_api.modules.floor_control.progression import (
+    ReleasedFloorProof,
+    SchedulerCheckpointIdentities,
+    SchedulerCheckpointOutcome,
+    drive_scheduler_checkpoint,
+)
 from group_interview_arena_api.modules.floor_control.scheduler import (
-    ScheduleFloorCommand,
     SchedulerPolicy,
 )
 from group_interview_arena_api.modules.floor_control.service import (
     apply_floor_command,
-    apply_scheduler_command,
 )
 
 _AUTOMATIC_TURN_NAMESPACE = UUID("b86d84b9-05fc-5d65-8170-b1158545c91f")
@@ -273,206 +273,6 @@ async def _release_terminal_grant(
     )
 
 
-def _scheduled_result(
-    outcome: SingleAiTurnOutcome,
-    *,
-    processed_floor_grant_id: UUID,
-    identities: AutomaticTurnIdentities,
-    next_floor_grant_id: UUID | None = None,
-    next_participant_id: UUID | None = None,
-    intervention_id: UUID | None = None,
-) -> SingleAiTurnResult:
-    return SingleAiTurnResult(
-        outcome=outcome,
-        processed_floor_grant_id=processed_floor_grant_id,
-        schedule_action_id=identities.schedule_action_id,
-        decision_id=identities.decision_id,
-        next_floor_grant_id=next_floor_grant_id,
-        next_participant_id=next_participant_id,
-        intervention_id=intervention_id,
-    )
-
-
-async def _recover_scheduler_result(
-    session_factory: async_sessionmaker[AsyncSession],
-    *,
-    owner_id: UUID,
-    session_id: UUID,
-    processed_floor_grant_id: UUID,
-    identities: AutomaticTurnIdentities,
-    scheduling_policy: SchedulerPolicy,
-) -> SingleAiTurnResult | None:
-    async with session_factory() as session:
-        simulation_session = await session.scalar(
-            select(SimulationSession).where(
-                SimulationSession.id == session_id,
-                SimulationSession.owner_user_id == owner_id,
-            )
-        )
-        action = await session.get(
-            SessionAction,
-            (session_id, identities.schedule_action_id),
-        )
-        decision = await session.get(FloorDecision, identities.decision_id)
-        next_grant = await session.get(FloorGrant, identities.next_floor_grant_id)
-        intervention = await session.get(FloorIntervention, identities.intervention_id)
-        if action is None:
-            if (
-                decision is not None
-                or next_grant is not None
-                or intervention is not None
-            ):
-                return SingleAiTurnResult(
-                    outcome=SingleAiTurnOutcome.RECONCILIATION_REQUIRED,
-                    processed_floor_grant_id=processed_floor_grant_id,
-                )
-            return None
-        if not (
-            simulation_session is not None
-            and action.command_version == 1
-            and action.command_type == "floor.schedule"
-            and decision is not None
-            and decision.session_id == session_id
-            and decision.policy_version == scheduling_policy.version
-        ):
-            return SingleAiTurnResult(
-                outcome=SingleAiTurnOutcome.RECONCILIATION_REQUIRED,
-                processed_floor_grant_id=processed_floor_grant_id,
-                schedule_action_id=identities.schedule_action_id,
-            )
-
-        if decision.outcome_kind == FloorDecisionOutcome.GRANT:
-            if not (
-                next_grant is not None
-                and next_grant.session_id == session_id
-                and next_grant.decision_id == identities.decision_id
-                and next_grant.participant_id == decision.selected_participant_id
-                and intervention is None
-            ):
-                return _scheduled_result(
-                    SingleAiTurnOutcome.RECONCILIATION_REQUIRED,
-                    processed_floor_grant_id=processed_floor_grant_id,
-                    identities=identities,
-                )
-            participant = await session.scalar(
-                select(SessionParticipant).where(
-                    SessionParticipant.id == next_grant.participant_id,
-                    SessionParticipant.session_id == session_id,
-                )
-            )
-            if simulation_session.current_floor_grant_id != next_grant.id:
-                return _scheduled_result(
-                    SingleAiTurnOutcome.STATE_CHANGED,
-                    processed_floor_grant_id=processed_floor_grant_id,
-                    identities=identities,
-                    next_floor_grant_id=next_grant.id,
-                    next_participant_id=next_grant.participant_id,
-                )
-            if participant is None or not (
-                participant.participation_role == ParticipationRole.CANDIDATE
-                and participant.availability == ParticipantAvailability.AVAILABLE
-            ):
-                return _scheduled_result(
-                    SingleAiTurnOutcome.RECONCILIATION_REQUIRED,
-                    processed_floor_grant_id=processed_floor_grant_id,
-                    identities=identities,
-                )
-            if participant.actor_kind == ParticipantActorKind.HUMAN:
-                outcome = SingleAiTurnOutcome.NEXT_HUMAN_GRANTED
-            elif participant.actor_kind == ParticipantActorKind.AI:
-                outcome = SingleAiTurnOutcome.NEXT_AI_GRANTED
-            else:
-                return _scheduled_result(
-                    SingleAiTurnOutcome.RECONCILIATION_REQUIRED,
-                    processed_floor_grant_id=processed_floor_grant_id,
-                    identities=identities,
-                )
-            return _scheduled_result(
-                outcome,
-                processed_floor_grant_id=processed_floor_grant_id,
-                identities=identities,
-                next_floor_grant_id=next_grant.id,
-                next_participant_id=participant.id,
-            )
-        if decision.outcome_kind == FloorDecisionOutcome.REQUEST_INTERVENTION:
-            if not (
-                intervention is not None
-                and intervention.session_id == session_id
-                and intervention.decision_id == identities.decision_id
-                and next_grant is None
-                and simulation_session.current_floor_grant_id is None
-            ):
-                return _scheduled_result(
-                    SingleAiTurnOutcome.RECONCILIATION_REQUIRED,
-                    processed_floor_grant_id=processed_floor_grant_id,
-                    identities=identities,
-                )
-            return _scheduled_result(
-                SingleAiTurnOutcome.INTERVENTION_REQUESTED,
-                processed_floor_grant_id=processed_floor_grant_id,
-                identities=identities,
-                intervention_id=intervention.id,
-            )
-        if decision.outcome_kind == FloorDecisionOutcome.NO_GRANT:
-            if (
-                next_grant is not None
-                or intervention is not None
-                or simulation_session.current_floor_grant_id is not None
-            ):
-                return _scheduled_result(
-                    SingleAiTurnOutcome.RECONCILIATION_REQUIRED,
-                    processed_floor_grant_id=processed_floor_grant_id,
-                    identities=identities,
-                )
-            return _scheduled_result(
-                SingleAiTurnOutcome.NO_GRANT,
-                processed_floor_grant_id=processed_floor_grant_id,
-                identities=identities,
-            )
-        return _scheduled_result(
-            SingleAiTurnOutcome.RECONCILIATION_REQUIRED,
-            processed_floor_grant_id=processed_floor_grant_id,
-            identities=identities,
-        )
-
-
-async def _classify_unresolved_scheduler_checkpoint(
-    session_factory: async_sessionmaker[AsyncSession],
-    *,
-    owner_id: UUID,
-    session_id: UUID,
-    processed_floor_grant_id: UUID,
-    identities: AutomaticTurnIdentities,
-) -> SingleAiTurnOutcome:
-    async with session_factory() as session:
-        simulation_session = await session.scalar(
-            select(SimulationSession).where(
-                SimulationSession.id == session_id,
-                SimulationSession.owner_user_id == owner_id,
-            )
-        )
-        grant = await session.get(FloorGrant, processed_floor_grant_id)
-        release = await session.get(FloorRelease, processed_floor_grant_id)
-        if (
-            simulation_session is None
-            or grant is None
-            or grant.session_id != session_id
-            or simulation_session.status != grant.phase
-            or SessionStatus(simulation_session.status) not in FLOOR_ENABLED_PHASES
-            or simulation_session.current_floor_grant_id is not None
-            or release is None
-            or release.session_id != session_id
-            or release.causation_action_id != identities.release_action_id
-            or release.reason_code
-            not in {
-                FloorReleaseReason.SPEAKER_FINISHED,
-                FloorReleaseReason.INTERRUPTED,
-            }
-        ):
-            return SingleAiTurnOutcome.STATE_CHANGED
-        return SingleAiTurnOutcome.RECONCILIATION_REQUIRED
-
-
 async def _drive_scheduler_checkpoint(
     session_factory: async_sessionmaker[AsyncSession],
     *,
@@ -482,78 +282,58 @@ async def _drive_scheduler_checkpoint(
     identities: AutomaticTurnIdentities,
     scheduling_policy: SchedulerPolicy,
 ) -> SingleAiTurnResult:
-    recovered = await _recover_scheduler_result(
+    checkpoint = await drive_scheduler_checkpoint(
         session_factory,
         owner_id=owner_id,
         session_id=session_id,
-        processed_floor_grant_id=processed_floor_grant_id,
-        identities=identities,
-        scheduling_policy=scheduling_policy,
-    )
-    if recovered is not None:
-        return recovered
-
-    async with session_factory() as session:
-        simulation_session = await session.scalar(
-            select(SimulationSession).where(
-                SimulationSession.id == session_id,
-                SimulationSession.owner_user_id == owner_id,
-            )
-        )
-        if (
-            simulation_session is None
-            or SessionStatus(simulation_session.status) not in FLOOR_ENABLED_PHASES
-            or simulation_session.current_floor_grant_id is not None
-        ):
-            return SingleAiTurnResult(
-                outcome=SingleAiTurnOutcome.STATE_CHANGED,
-                processed_floor_grant_id=processed_floor_grant_id,
-            )
-        command = ScheduleFloorCommand(
-            session_id=session_id,
-            action_id=identities.schedule_action_id,
+        released_floor=ReleasedFloorProof(
+            floor_grant_id=processed_floor_grant_id,
+            release_action_id=identities.release_action_id,
+            release_command_type="floor.release",
+            allowed_reasons=frozenset(
+                {
+                    FloorReleaseReason.SPEAKER_FINISHED,
+                    FloorReleaseReason.INTERRUPTED,
+                }
+            ),
+        ),
+        identities=SchedulerCheckpointIdentities(
+            schedule_action_id=identities.schedule_action_id,
             decision_id=identities.decision_id,
-            grant_id=identities.next_floor_grant_id,
+            next_floor_grant_id=identities.next_floor_grant_id,
             intervention_id=identities.intervention_id,
-            expected_phase=SessionStatus(simulation_session.status),
-            expected_last_sequence=simulation_session.last_sequence,
-            expected_current_floor_grant_id=None,
-            evaluated_at=datetime.now(UTC),
-            policy=scheduling_policy,
-        )
-
-    try:
-        async with session_factory() as session:
-            await apply_scheduler_command(session, owner_id=owner_id, command=command)
-    except (
-        ActionIdConflictError,
-        InvalidFloorStateError,
-        SessionNotFoundError,
-        SessionPersistenceError,
-        StaleFloorDecisionError,
-    ):
-        pass
-
-    recovered = await _recover_scheduler_result(
-        session_factory,
-        owner_id=owner_id,
-        session_id=session_id,
-        processed_floor_grant_id=processed_floor_grant_id,
-        identities=identities,
+        ),
         scheduling_policy=scheduling_policy,
     )
-    if recovered is not None:
-        return recovered
-    unresolved_outcome = await _classify_unresolved_scheduler_checkpoint(
-        session_factory,
-        owner_id=owner_id,
-        session_id=session_id,
-        processed_floor_grant_id=processed_floor_grant_id,
-        identities=identities,
-    )
+    outcome = SingleAiTurnOutcome(checkpoint.outcome.value)
     return SingleAiTurnResult(
-        outcome=unresolved_outcome,
+        outcome=outcome,
         processed_floor_grant_id=processed_floor_grant_id,
+        schedule_action_id=(
+            identities.schedule_action_id
+            if checkpoint.outcome
+            in {
+                SchedulerCheckpointOutcome.NEXT_AI_GRANTED,
+                SchedulerCheckpointOutcome.NEXT_HUMAN_GRANTED,
+                SchedulerCheckpointOutcome.NO_GRANT,
+                SchedulerCheckpointOutcome.INTERVENTION_REQUESTED,
+            }
+            else None
+        ),
+        decision_id=(
+            identities.decision_id
+            if checkpoint.outcome
+            in {
+                SchedulerCheckpointOutcome.NEXT_AI_GRANTED,
+                SchedulerCheckpointOutcome.NEXT_HUMAN_GRANTED,
+                SchedulerCheckpointOutcome.NO_GRANT,
+                SchedulerCheckpointOutcome.INTERVENTION_REQUESTED,
+            }
+            else None
+        ),
+        next_floor_grant_id=checkpoint.next_floor_grant_id,
+        next_participant_id=checkpoint.next_participant_id,
+        intervention_id=checkpoint.intervention_id,
     )
 
 
@@ -657,6 +437,22 @@ async def _find_resumable_release(
         elif request.status != GenerationRequestStatus.FAILED:
             return None
         return grant.id, identities
+
+
+async def has_resumable_ai_work(
+    session_factory: async_sessionmaker[AsyncSession],
+    *,
+    owner_id: UUID,
+    session_id: UUID,
+) -> bool:
+    return (
+        await _find_resumable_release(
+            session_factory,
+            owner_id=owner_id,
+            session_id=session_id,
+        )
+        is not None
+    )
 
 
 async def drive_single_ai_turn(

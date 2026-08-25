@@ -1,6 +1,6 @@
 # P1-5 AI Runtime Foundation Execution Plan
 
-Status: `P1 IN_PROGRESS`; `P1-5 IN_PROGRESS`; `P1-5A completed`; `P1-5B completed`; `P1-5C completed`; `P1-5D DONE`; `P1-5E DONE`; `P1-5E-1 DONE`; `P1-5E-2 DONE`; `P1-5E-3 DONE`; `P1-5F IN_PROGRESS`; `P1-5F-1 DONE`; `P1-5F-2/P1-5F-3/P1-5F-4 NOT_STARTED`
+Status: `P1 IN_PROGRESS`; `P1-5 IN_PROGRESS`; `P1-5A completed`; `P1-5B completed`; `P1-5C completed`; `P1-5D DONE`; `P1-5E DONE`; `P1-5E-1 DONE`; `P1-5E-2 DONE`; `P1-5E-3 DONE`; `P1-5F IN_PROGRESS`; `P1-5F-1 DONE`; `P1-5F-2 DONE`; `P1-5F-3/P1-5F-4 NOT_STARTED`
 
 Target version: `V0.1 Internal Validation`
 
@@ -40,11 +40,11 @@ P1-5C 是 separately approved deterministic runtime vertical slice。它在不�
   - `P1-5E-3 — Continuous AI Drive + Composition Acceptance`：`DONE`；implementation actual-source review `PASS`，findings none；sanitized real-provider composition smoke `PASS`；
 - `P1-5F — Realtime/Web Integration + Independent Acceptance`：`IN_PROGRESS`；
 - `P1-5F-1 — Realtime/Public Contract Design Freeze`：`DONE`；docs-only；finding-only external re-review `PASS` with findings none；
-  - `P1-5F-2 — Backend Text Discussion Transport`：`NOT_STARTED`；
+  - `P1-5F-2 — Backend Text Discussion Transport`：`DONE`；initial implementation actual-source review `BLOCKED` on three findings；all remediated；finding-only external re-review `PASS`，findings none；
   - `P1-5F-3 — Web Discussion Experience`：`NOT_STARTED`；
   - `P1-5F-4 — Composition E2E + Independent Acceptance`：`NOT_STARTED`。
 
-P1-5D design freeze、implementation and config-driven model patch were separately approved；both actual-source reviews and its final user-run sanitized real-provider acceptance smoke passed，so P1-5D is `DONE`。P1-5E-1、P1-5E-2 and P1-5E-3 are also `DONE` after their required reviews；P1-5E-3's user-run sanitized real-provider composition smoke passed，closing P1-5E automatic orchestration as `DONE`。Codex made no real-model call and records no credential、raw provider response or sensitive header。The separately approved P1-5F-1 checkpoint freezes only the public realtime/transcript contract below；P1-5F-2～F4 remain outside this checkpoint。
+P1-5D design freeze、implementation and config-driven model patch were separately approved；both actual-source reviews and its final user-run sanitized real-provider acceptance smoke passed，so P1-5D is `DONE`。P1-5E-1、P1-5E-2 and P1-5E-3 are also `DONE` after their required reviews，closing P1-5E as `DONE`。Codex made no real-model call and records no credential、raw provider response or sensitive header。P1-5F-1 froze the public realtime/transcript contract below；P1-5F-2 is `DONE` after its three implementation review findings were remediated and finding-only external re-review passed with findings none，while F3/F4 remain outside this checkpoint。
 
 ## Context and authority
 
@@ -494,7 +494,7 @@ Still Deferred after the P1-5E-1 docs-only freeze:
 
 ## Later implementation gates
 
-P1-5D implementation and config-driven patch followed the frozen section above without scope expansion；both actual-source reviews and the final user-run sanitized real-provider acceptance smoke passed，and P1-5D is `DONE`。P1-5E-1 is `DONE` after actual-source review `PASS`，P1-5E-2 is `DONE` after its initial 3 findings were remediated and re-review passed，and P1-5E-3 is `DONE` after implementation actual-source review `PASS` with findings none and sanitized real-provider composition smoke `PASS`。P1-5F-1 is now separately approved docs-only；P1-5F-2～F4 require their own later approvals。Any later implementation/transport subphase must preserve:
+P1-5D implementation and config-driven patch followed the frozen section above without scope expansion；both actual-source reviews and the final user-run sanitized real-provider acceptance smoke passed，and P1-5D is `DONE`。P1-5E-1 is `DONE` after actual-source review `PASS`，P1-5E-2 is `DONE` after its initial 3 findings were remediated and re-review passed，and P1-5E-3 is `DONE` after implementation actual-source review `PASS` with findings none and sanitized real-provider composition smoke `PASS`。P1-5F-1 and the separately approved P1-5F-2 are `DONE`；P1-5F-3/F4 require their own later approvals。Any later implementation/transport subphase must preserve:
 
 - any additive schema need and historical deletion/retention semantics；
 - provider-neutral request/result/error contract with a real caller；
@@ -564,7 +564,7 @@ P1-5D implementation and config-driven patch followed the frozen section above w
 
 ## P1-5F-1 design freeze — Realtime/Public Contract
 
-P1-5F-1 is the separately approved docs-only architectural freeze for exposing the completed P1-5E automatic AI orchestration through a public text-discussion contract。It creates no backend、Web、WebSocket、REST、schema、migration、test、generated contract、dependency、configuration or infrastructure implementation。P1-5F/P1-5/P1 remain `IN_PROGRESS`；P1-5F-1 is `DONE` after external actual-source re-review；P1-5F-2～F4 remain `NOT_STARTED`。
+P1-5F-1 is the separately approved docs-only architectural freeze for exposing the completed P1-5E automatic AI orchestration through a public text-discussion contract。It creates no backend、Web、WebSocket、REST、schema、migration、test、generated contract、dependency、configuration or infrastructure implementation。P1-5F/P1-5/P1 remain `IN_PROGRESS`；P1-5F-1 and the separately approved P1-5F-2 are `DONE` after their required external reviews；P1-5F-3/F4 remain `NOT_STARTED`。
 
 ### Public protocol and deployment boundary
 
@@ -579,10 +579,11 @@ type = "participant.utterance.submit"
 session_id
 action_id
 payload:
+  floor_grant_id
   content
 ```
 
-- The client must not provide `participant_id`、`actor_kind`、`floor_grant_id`、`phase` or any AI/provider/runtime identity。The server derives identity and context from the authenticated user plus the exact authoritative current floor。
+- Narrow F1 contract erratum discovered during P1-5F-2 actual-source review：the client must provide the exact public `floor_grant_id` it is answering；the client still must not provide `participant_id`、`actor_kind`、`phase` or any AI/provider/runtime identity。The server derives participant identity and phase from the authenticated user and locked durable state，and must never silently bind a delayed command to whichever Human grant is current on arrival。
 
 ### Human authorization, reconciliation and text validation
 
@@ -590,9 +591,10 @@ A syntactically valid Human utterance is accepted only when one locked aggregate
 
 - the session belongs to the current authenticated owner；
 - the session remains in a floor-enabled active phase；
-- an exact current、unreleased floor grant exists；
+- `payload.floor_grant_id == aggregate.current_floor_grant_id`；
+- that exact named floor grant is current and unreleased；
 - the grant participant belongs to the session and the grant phase remains exact；
-- the participant has `actor_kind = HUMAN` and belongs to the authenticated user；
+- the participant has `actor_kind = HUMAN`、`participation_role = CANDIDATE` and belongs to the authenticated user；
 - the exact authoritative phase/current grant did not advance during reconciliation。
 
 A late command after authoritative phase/grant advancement is rejected and never becomes an utterance in the old turn。A syntactically valid command rejected by current authority or content rules uses the recoverable WS business error `UTTERANCE_REJECTED` with the exact safe message `You cannot submit an utterance right now.`；the socket remains open。The error does not reveal whether rejection came from an AI floor、stale grant、phase transition、deadline reconciliation、content rule or another internal state reason。Malformed envelopes remain `PROTOCOL_ERROR`。Existing safe concepts remain `ACTION_ID_CONFLICT`、`SEQUENCE_AHEAD` and `INTERNAL_ERROR`。
@@ -676,7 +678,7 @@ Pagination uses `after_sequence >= 0` as an exclusive cursor，`limit = 100` by 
 
 ### Human identity, idempotency and atomic release
 
-The existing `(session_id, action_id)` identity remains the Human command idempotency boundary。Same action ID plus exactly the same semantic content is exact replay：no second utterance、release、scheduling or AI drive。Same action ID plus different content is `ACTION_ID_CONFLICT`。
+The existing `(session_id, action_id)` identity remains the Human command idempotency boundary。Same action ID plus the same `floor_grant_id` and exactly the same content is exact replay：no second utterance、release、scheduling or AI drive。Same action ID plus a different floor grant or different content is `ACTION_ID_CONFLICT`。
 
 Human `utterance_id` is server-owned and deterministic from the accepted session/Human command identity。Replay returns the same ID；the client cannot choose it。P1-5F-2 may finalize the namespace/helper，but the result must follow the existing project convention of deterministic bytes with UUID4-compatible public identity。
 
@@ -737,7 +739,7 @@ No public AI Runtime lifecycle event、provider status or ETA/countdown is intro
 
 Human input is enabled only when authoritative state proves an active floor-enabled session whose current grant belongs to the authenticated Human participant。AI floor、another participant、no current floor and terminal session disable input。Client disablement is UX only；the backend always revalidates。
 
-After submit，the Browser may keep an in-memory pending state but must not render pending text as a formal transcript bubble before a durable `participant.utterance.created` fact arrives。Pending is confirmed by matching WS event `action_id` or，after reconnect，matching transcript item `action_id`。Pending action/content is never stored in localStorage/sessionStorage。Disconnect does not justify a new action ID；retry reuses the original ID。
+After submit，the Browser may keep an in-memory pending state but must not render pending text as a formal transcript bubble before a durable `participant.utterance.created` fact arrives。Pending is confirmed by matching WS event `action_id` or，after reconnect，matching transcript item `action_id`。Pending `action_id + floor_grant_id + content` is never stored in localStorage/sessionStorage。Disconnect does not justify a new action ID；retry reuses the original action and floor binding。
 
 ### Browser restore and transcript convergence
 
@@ -812,7 +814,8 @@ If later actual-source implementation disproves any of those facts，requires a 
 - Validation is limited to baseline/changed-file scope、Markdown relative links、final newlines、terminology/status、secret/static leakage、master-plan hash、`git diff --check` and staged count。No backend/Web/provider test、browser smoke or real-model call runs。
 - The initial external actual-source review was `BLOCKED` by one floor-event v1 `action_id` compatibility finding。Remediation preserved historical v1 semantics and froze additive floor-event v2 without changing source、schema or ADR authority。
 - The finding-only external re-review verdict is `PASS` with findings none。Reviewed bundle：`group-interview-arena-review-20260825-110115.zip`；SHA-256：`6603b1f0377aa449d3a209e475fb3afbb74f9f83c9be38f84df97918eeb1ac0c`。
-- P1-5F-1 is `DONE`。P1-5F/P1-5/P1 remain `IN_PROGRESS`；P1-5F-2～F4 remain `NOT_STARTED`。No commit or push is authorized；P1-5F-2 must not start。
+- A narrow F1 command erratum was later discovered during P1-5F-2 actual-source review：the previously approved exact-floor binding is restored by requiring `floor_grant_id` in the v1 submit payload and matching it to the locked authoritative current grant。This does not reopen the unrelated F1 design or alter the independently versioned public-event contract。
+- At the P1-5F-1 closeout checkpoint，P1-5F-2～F4 were `NOT_STARTED` and no commit or push was authorized。After the separately approved P1-5F-2 implementation、remediation and external finding-only re-review，P1-5F-1/P1-5F-2 are `DONE`；P1-5F/P1-5/P1 remain `IN_PROGRESS`；P1-5F-3/F4 remain `NOT_STARTED`；no commit or push is authorized。
 
 ## Decisions
 
@@ -859,6 +862,6 @@ If later actual-source implementation disproves any of those facts，requires a 
 - P1-5E：`DONE`；P1-5E-1 design freeze、P1-5E-2 single-turn kernel and P1-5E-3 bounded continuous drive/configured composition are `DONE` after required reviews and the sanitized composition smoke。
 - P1-5F：`IN_PROGRESS`；
 - P1-5F-1：`DONE`；docs-only public REST/WS/Browser contract freeze accepted after finding remediation and finding-only external re-review `PASS`；
-  - P1-5F-2：`NOT_STARTED`；backend text discussion transport requires separate approval；
+  - P1-5F-2：`DONE`；initial implementation review `BLOCKED` on three findings，all remediated；finding-only external re-review `PASS`，findings none；reviewed remediation bundle `group-interview-arena-review-20260825-150754.zip` / SHA-256 `b9553cbe488707d5fd87598b70e48e1fabdf55a0ae6d3dab367b830267d61edd`；
   - P1-5F-3：`NOT_STARTED`；Web discussion experience requires separate approval；
   - P1-5F-4：`NOT_STARTED`；composition E2E and independent acceptance require separate approval。
