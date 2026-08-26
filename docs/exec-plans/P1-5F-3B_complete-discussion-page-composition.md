@@ -1,7 +1,7 @@
 # P1-5F-3B Complete Discussion Page Composition — Design Freeze
 
-Status: `DESIGN_FROZEN / IMPLEMENTATION_NOT_STARTED`; document complete;
-self-review `PASS`
+Status: `DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN /
+IMPLEMENTATION_NOT_STARTED`; document complete; self-review `PASS`
 
 Design actual-source review: `PASS`; findings: `NONE`; reviewed bundle:
 `group-interview-arena-review-20260826-190658.zip`; SHA-256:
@@ -21,6 +21,14 @@ Immutable product baseline:
 
 Parent execution plan:
 [`P1-5_ai-runtime-foundation.md`](P1-5_ai-runtime-foundation.md)
+
+Frozen implementation plan:
+[`P1-5F-3B_complete-discussion-page-composition-implementation.md`](P1-5F-3B_complete-discussion-page-composition-implementation.md), remediated self-review `PASS`, open findings `NONE`
+
+Implementation-plan finding-only remediation: initial actual-source review
+`BLOCKED` on exactly `F3B-IP-001` and `F3B-IP-002`; both findings `CLOSED`;
+remediated self-review `PASS`; open findings `NONE`. This evidence update does
+not change the frozen product-design substance.
 
 Preserved F3A authorities:
 [`P1-5F-3A_web-discussion-functional-closure.md`](P1-5F-3A_web-discussion-functional-closure.md)
@@ -1149,8 +1157,9 @@ Results:
 - no stop condition is triggered.
 
 The design document is complete, self-reviewed and externally reviewed. Its
-status is `DESIGN_FROZEN / IMPLEMENTATION_NOT_STARTED`; this is not
-implementation authorization.
+current-source TDD implementation plan is also frozen. F3B status is
+`DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN /
+IMPLEMENTATION_NOT_STARTED`; this is not implementation authorization.
 
 ## Docs-only validation contract
 
@@ -1176,7 +1185,13 @@ No Web/API/browser/provider test suite or real provider call is required.
 - Requirement coverage audit: `PASS`.
 - Internal contradiction audit: `PASS`.
 - F3B design actual-source review: `PASS`; findings: `NONE`.
-- F3B status: `DESIGN_FROZEN / IMPLEMENTATION_NOT_STARTED`.
+- F3B implementation-plan actual-source review: initial `BLOCKED` on
+  `F3B-IP-001` and `F3B-IP-002`; both findings `CLOSED` by finding-only
+  remediation.
+- F3B remediated implementation-plan self-review: `PASS`; open findings:
+  `NONE`.
+- F3B status: `DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN /
+  IMPLEMENTATION_NOT_STARTED`.
 - F3B implementation: not started / not authorized.
 - F4: `NOT_STARTED`.
 - Stage/commit/push authorization: none.
