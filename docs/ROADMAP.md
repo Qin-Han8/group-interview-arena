@@ -2,11 +2,11 @@
 
 - Status: Active baseline
 - Most recently completed development phase: P0 — `DONE`
-- Most recently completed subphase: P1-5F-2 Backend Text Discussion Transport — `DONE`
+- Most recently completed subphase: P1-5F-3A Web Discussion Functional Closure — `DONE`
 - P0-7 final outcome: initial `BLOCKED`; two documentation findings remediated; finding-only independent recheck `PASS`; P1 readiness `READY`
 - Current phase: P1 — `IN_PROGRESS`
-- Most recently completed task: P1-5F-2 — `DONE`
-- Current task gate: P1-5 — `IN_PROGRESS`; P1-5A/P1-5B/P1-5C/P1-5D/P1-5E/P1-5E-1/P1-5E-2/P1-5E-3/P1-5F-1/P1-5F-2 `DONE`; P1-5F `IN_PROGRESS`; P1-5F-3/P1-5F-4 `NOT_STARTED`
+- Most recently completed task: P1-5F-3A — `DONE`
+- Current task gate: P1-5 — `IN_PROGRESS`; P1-5F — `IN_PROGRESS`; P1-5F-3 — `IN_PROGRESS`; P1-5F-3A — `DONE`; P1-5F-3B — `DESIGN_FROZEN / IMPLEMENTATION_NOT_STARTED`; design actual-source review `PASS`; findings `NONE`; P1-5F-4 — `NOT_STARTED`
 - P0 status: `DONE`; P0-1 through P0-7 completed
 - Target product version: V0.1 — Internal Validation
 - Source: [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) §30–31
@@ -18,7 +18,7 @@
 - `P0～P6`：研发推进阶段，描述按什么顺序建立能力；
 - `V0.1 / V0.5 / V1.0`：产品交付版本，描述某个可验证版本包含什么。
 
-阶段不是版本，P0-x/P1-x 也不是新增产品版本。P0 已完成不代表 V0.1 的全部业务能力已经实现；用户已明确批准进入 P1，P1-1～P1-4 均已完成。P1-5A～P1-5E/P1-5E-1～E-3 均已完成。P1-5F-1 preserved historical floor-event v1 and froze additive v2，then finding-only external re-review returned `PASS` with findings none against bundle SHA-256 `6603b1f0377aa449d3a209e475fb3afbb74f9f83c9be38f84df97918eeb1ac0c`，so F1 is `DONE`。P1-5F-2 initial implementation review was `BLOCKED` on three findings；all were remediated，and finding-only external re-review returned `PASS` with findings none against bundle SHA-256 `b9553cbe488707d5fd87598b70e48e1fabdf55a0ae6d3dab367b830267d61edd`，so F2 is `DONE`。P1/P1-5/P1-5F remain `IN_PROGRESS` and P1-5F-3/F4 remain `NOT_STARTED`。
+阶段不是版本，P0-x/P1-x 也不是新增产品版本。P0 已完成不代表 V0.1 的全部业务能力已经实现；用户已明确批准进入 P1，P1-1～P1-4 均已完成。P1-5A～P1-5E/P1-5E-1～E-3 均已完成。P1-5F-1 preserved historical floor-event v1 and froze additive v2，then finding-only external re-review returned `PASS` with findings none against bundle SHA-256 `6603b1f0377aa449d3a209e475fb3afbb74f9f83c9be38f84df97918eeb1ac0c`，so F1 is `DONE`。P1-5F-2 initial implementation review was `BLOCKED` on three findings；all were remediated，and finding-only external re-review returned `PASS` with findings none against bundle SHA-256 `b9553cbe488707d5fd87598b70e48e1fabdf55a0ae6d3dab367b830267d61edd`，so F2 is `DONE`。P1-5F-3A is `DONE`；P1/P1-5/P1-5F/P1-5F-3 remain `IN_PROGRESS`；P1-5F-3B is `DESIGN_FROZEN / IMPLEMENTATION_NOT_STARTED` after design actual-source review `PASS` with findings `NONE`；P1-5F-4 remains `NOT_STARTED`。
 
 ## 2. 开发阶段
 
@@ -109,10 +109,12 @@ P1-4A 已冻结 phase lifecycle 与 within-phase floor authority 分离、single
 - `P1-5F — Realtime/Web Integration + Independent Acceptance`：in progress；
 - `P1-5F-1 — Realtime/Public Contract Design Freeze`：`DONE`；docs-only contract freeze accepted after finding remediation and finding-only re-review `PASS`；
 - `P1-5F-2 — Backend Text Discussion Transport`：`DONE`；initial implementation review `BLOCKED` on three findings，all remediated；finding-only external re-review `PASS`，findings none；
-- `P1-5F-3 — Web Discussion Experience`：not started；
+- `P1-5F-3 — Web Discussion Experience`：in progress；
+  - `P1-5F-3A — Web Discussion Functional Closure`：`DONE`；
+  - `P1-5F-3B — Complete Discussion Page Composition`：`DESIGN_FROZEN / IMPLEMENTATION_NOT_STARTED`；design actual-source review `PASS`；findings `NONE`；
 - `P1-5F-4 — Composition E2E + Independent Acceptance`：not started。
 
-P1-5A 冻结 Scheduler 决定 who、AI Runtime 决定 what、provider 只负责 model I/O。P1-5B～P1-5E implement persistence、deterministic runtime、thin configured Zhipu adapter and bounded automatic orchestration。P1-5F-1 freezes the public Human WS command、unified utterance event、historical floor-event v1 plus additive public v2 compatibility、sequence-cursor transcript、atomic publication and recovery contract。P1-5F-2 implements that backend-only transport with no schema/dependency/handwritten-Web delta；its three external review findings were remediated and finding-only re-review passed with findings none，so F2 is `DONE`。F3 Web and F4 Browser/E2E have not started。完整边界见 [`exec-plans/P1-5_ai-runtime-foundation.md`](exec-plans/P1-5_ai-runtime-foundation.md)。
+P1-5A 冻结 Scheduler 决定 who、AI Runtime 决定 what、provider 只负责 model I/O。P1-5B～P1-5E implement persistence、deterministic runtime、thin configured Zhipu adapter and bounded automatic orchestration。P1-5F-1 freezes the public Human WS command、unified utterance event、historical floor-event v1 plus additive public v2 compatibility、sequence-cursor transcript、atomic publication and recovery contract。P1-5F-2 implements that backend-only transport with no schema/dependency/handwritten-Web delta；its three external review findings were remediated and finding-only re-review passed with findings none，so F2 is `DONE`。F3A Web functional closure is `DONE`；F3B complete page-composition design is `DESIGN_FROZEN / IMPLEMENTATION_NOT_STARTED` after design actual-source review `PASS` with findings `NONE`；F4 Browser/E2E remains `NOT_STARTED`。完整边界见 [`exec-plans/P1-5_ai-runtime-foundation.md`](exec-plans/P1-5_ai-runtime-foundation.md)。
 
 ## 5. 产品版本
 
