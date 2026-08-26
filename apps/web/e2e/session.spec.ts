@@ -3,6 +3,8 @@ import { access, writeFile } from "node:fs/promises";
 
 const API_BASE_URL = process.env.GIA_E2E_API_ORIGIN ?? "http://localhost:8000";
 const PRIVATE_SENTINEL = "P1_2C_PRIVATE_SENTINEL_DO_NOT_DISCLOSE";
+const HUMAN_CONTRIBUTION =
+  "  Human evidence: preserve this exact contribution.\nSecond line stays exact.  ";
 const API_RESTART_REQUEST = process.env.GIA_E2E_API_RESTART_REQUEST;
 const API_RESTART_READY = process.env.GIA_E2E_API_RESTART_READY;
 const FLOOR_REQUEST = process.env.GIA_E2E_FLOOR_REQUEST;
@@ -15,19 +17,51 @@ test("browser session recovers durable phases across API restart and reload", as
   const password = `P1-1D browser ${crypto.randomUUID()} phrase`;
   let startCommand: string | undefined;
   let floorEvent: string | undefined;
+  let humanSubmitCommand: string | undefined;
+  let humanCreatedEvent: string | undefined;
+  let humanReleaseEvent: string | undefined;
 
   page.on("websocket", (socket) => {
     socket.on("framesent", ({ payload }) => {
       if (typeof payload === "string" && payload.includes("session.start")) {
         startCommand = payload;
       }
+      if (
+        typeof payload === "string" &&
+        payload.includes("participant.utterance.submit")
+      ) {
+        humanSubmitCommand = payload;
+      }
     });
     socket.on("framereceived", ({ payload }) => {
       if (typeof payload === "string" && payload.includes("floor.granted")) {
         floorEvent = payload;
       }
+      if (
+        typeof payload === "string" &&
+        payload.includes("participant.utterance.created") &&
+        payload.includes('\"actor_kind\":\"HUMAN\"')
+      ) {
+        humanCreatedEvent = payload;
+      }
+      if (
+        typeof payload === "string" &&
+        payload.includes("floor.released") &&
+        payload.includes('\"reason_code\":\"SPEAKER_FINISHED\"')
+      ) {
+        humanReleaseEvent = payload;
+      }
     });
   });
+
+  const exactConfirmedContributionCount = () =>
+    page
+      .locator('[data-testid^="utterance-content-"]')
+      .evaluateAll(
+        (items, exactContent) =>
+          items.filter((item) => item.textContent === exactContent).length,
+        HUMAN_CONTRIBUTION,
+      );
 
   await page.goto("/");
   await page.getByRole("button", { name: "注册" }).click();
@@ -155,12 +189,76 @@ test("browser session recovers durable phases across API restart and reload", as
     expect(floorEvent!.toLowerCase()).not.toContain(forbidden);
   }
 
-  await page.reload();
-  await expect(page.getByTestId("session-sequence")).toHaveText("4");
-  await expect(page.getByTestId("floor-owner")).toContainText(
-    "你（真人参与者）",
+  const humanFloorGrantId = parsedFloorEvent.payload.grant_id as string;
+  const humanParticipantId = parsedFloorEvent.payload.participant_id as string;
+  const draft = page.getByLabel("发言草稿");
+  await draft.fill(HUMAN_CONTRIBUTION);
+  await page.getByRole("button", { name: "发送发言" }).click();
+  await expect(page.getByTestId("human-pending")).toBeVisible();
+  await expect(page.getByTestId("human-pending-content")).toHaveText(
+    HUMAN_CONTRIBUTION,
+    { useInnerText: false },
   );
-  await expect(page.getByTestId("floor-lifecycle")).toHaveText("发言权已授予");
+  expect(await exactConfirmedContributionCount()).toBe(0);
+
+  await expect.poll(() => humanSubmitCommand).toBeTruthy();
+  const parsedHumanCommand = JSON.parse(humanSubmitCommand ?? "{}");
+  expect(parsedHumanCommand).toEqual({
+    schema_version: 1,
+    type: "participant.utterance.submit",
+    session_id: sessionId,
+    action_id: expect.stringMatching(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    ),
+    payload: {
+      floor_grant_id: humanFloorGrantId,
+      content: HUMAN_CONTRIBUTION,
+    },
+  });
+
+  await expect.poll(() => humanCreatedEvent).toBeTruthy();
+  const parsedHumanEvent = JSON.parse(humanCreatedEvent ?? "{}");
+  expect(parsedHumanEvent).toMatchObject({
+    schema_version: 1,
+    type: "participant.utterance.created",
+    session_id: sessionId,
+    action_id: parsedHumanCommand.action_id,
+    payload: {
+      participant_id: humanParticipantId,
+      actor_kind: "HUMAN",
+      floor_grant_id: humanFloorGrantId,
+      phase: "OPENING_STATEMENTS",
+      content: HUMAN_CONTRIBUTION,
+    },
+  });
+  await expect.poll(exactConfirmedContributionCount).toBe(1);
+  await expect(page.getByTestId("human-pending")).toHaveCount(0);
+
+  await expect.poll(() => humanReleaseEvent).toBeTruthy();
+  const parsedHumanRelease = JSON.parse(humanReleaseEvent ?? "{}");
+  expect(parsedHumanRelease).toMatchObject({
+    schema_version: 2,
+    type: "floor.released",
+    session_id: sessionId,
+    sequence: parsedHumanEvent.sequence + 1,
+    action_id: parsedHumanCommand.action_id,
+    payload: {
+      grant_id: humanFloorGrantId,
+      participant_id: humanParticipantId,
+      phase: "OPENING_STATEMENTS",
+      reason_code: "SPEAKER_FINISHED",
+    },
+  });
+
+  await page.reload();
+  await expect.poll(exactConfirmedContributionCount).toBe(1);
+  expect(
+    await page
+      .locator('[data-testid^="utterance-content-"]')
+      .filter({ hasText: "Human evidence" })
+      .first()
+      .textContent(),
+  ).toBe(HUMAN_CONTRIBUTION);
   await expect(page.getByText("实时连接已建立")).toBeVisible();
 
   expect(API_RESTART_REQUEST).toBeTruthy();
@@ -182,26 +280,26 @@ test("browser session recovers durable phases across API restart and reload", as
   await expect(page.getByText("实时连接已建立")).toBeVisible({
     timeout: 10_000,
   });
-  await expect(page.getByTestId("session-sequence")).toHaveText("4");
-  await expect(page.getByTestId("floor-owner")).toContainText(
-    "你（真人参与者）",
-  );
+  await expect.poll(exactConfirmedContributionCount).toBe(1);
 
   await expect(
     page.locator("p").filter({ hasText: "会话状态：" }),
   ).toContainText("已完成", { timeout: 25_000 });
   await expect(page.getByTestId("phase-label")).toContainText("已完成");
-  await expect(page.getByTestId("session-sequence")).toHaveText("10");
   await expect(page.getByTestId("floor-owner")).toContainText("暂无");
-  await expect(page.getByTestId("floor-lifecycle")).toHaveText("发言权已释放");
+  await expect.poll(exactConfirmedContributionCount).toBe(1);
+  const finalSequence = Number(
+    await page.getByTestId("session-sequence").textContent(),
+  );
+  expect(finalSequence).toBeGreaterThan(parsedHumanRelease.sequence);
 
   const duplicate = await page.evaluate(
-    ({ apiBaseUrl, command, session }) =>
+    ({ apiBaseUrl, command, session, afterSequence }) =>
       new Promise<Record<string, unknown>>((resolve, reject) => {
         const socketUrl = new URL(apiBaseUrl);
         socketUrl.protocol = socketUrl.protocol === "https:" ? "wss:" : "ws:";
         socketUrl.pathname = `/ws/sessions/${session}`;
-        socketUrl.search = "after_sequence=10";
+        socketUrl.search = `after_sequence=${afterSequence.toString()}`;
         const socket = new WebSocket(socketUrl);
         const timeout = window.setTimeout(() => {
           socket.close();
@@ -218,7 +316,12 @@ test("browser session recovers durable phases across API restart and reload", as
           reject(new Error("Duplicate replay WebSocket failed"));
         });
       }),
-    { apiBaseUrl: API_BASE_URL, command: startCommand!, session: sessionId },
+    {
+      apiBaseUrl: API_BASE_URL,
+      command: startCommand!,
+      session: sessionId,
+      afterSequence: finalSequence,
+    },
   );
   expect(duplicate).toMatchObject({
     type: "session.state_changed",
@@ -250,15 +353,9 @@ test("browser session recovers durable phases across API restart and reload", as
       status: "COMPLETED",
       phase_started_at: null,
       phase_deadline_at: null,
-      last_sequence: 10,
+      last_sequence: finalSequence,
       floor: {
         current_grant: null,
-        latest_event: {
-          type: "floor.released",
-          sequence: 5,
-          phase: "OPENING_STATEMENTS",
-          reason_code: "PHASE_CHANGED",
-        },
       },
     },
   });
@@ -273,6 +370,13 @@ test("browser session recovers durable phases across API restart and reload", as
   }));
   expect(browserStorage).toEqual({ local: [], session: [] });
   expect(JSON.stringify(browserStorage)).not.toContain(parsedCommand.action_id);
+  expect(JSON.stringify(browserStorage)).not.toContain(
+    parsedHumanCommand.action_id,
+  );
+  expect(JSON.stringify(browserStorage)).not.toContain(humanFloorGrantId);
+  expect(JSON.stringify(browserStorage)).not.toContain(HUMAN_CONTRIBUTION);
+  expect(JSON.stringify(browserStorage)).not.toContain("human-pending");
+  expect(JSON.stringify(browserStorage)).not.toContain("confirmed-transcript");
   expect(JSON.stringify(browserStorage)).not.toContain(sessionId);
 
   await page.reload();
@@ -282,9 +386,11 @@ test("browser session recovers durable phases across API restart and reload", as
   await expect(
     page.locator("p").filter({ hasText: "会话状态：" }),
   ).toContainText("已完成");
-  await expect(page.getByTestId("session-sequence")).toHaveText("10");
+  await expect(page.getByTestId("session-sequence")).toHaveText(
+    finalSequence.toString(),
+  );
   await expect(page.getByTestId("floor-owner")).toContainText("暂无");
-  await expect(page.getByTestId("floor-lifecycle")).toHaveText("发言权已释放");
+  await expect.poll(exactConfirmedContributionCount).toBe(1);
   await expect(page.getByTestId("question-version-id")).toContainText(
     questionVersionId,
   );

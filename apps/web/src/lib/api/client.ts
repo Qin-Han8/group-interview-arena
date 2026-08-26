@@ -13,6 +13,9 @@ export type RegisterRequest = components["schemas"]["RegisterRequest"];
 export type QuestionDetail = components["schemas"]["QuestionDetailResponse"];
 export type QuestionSummary = components["schemas"]["QuestionSummaryResponse"];
 export type SessionSnapshot = components["schemas"]["SessionSnapshotResponse"];
+export type TranscriptResponse = components["schemas"]["TranscriptResponse"];
+export type TranscriptUtterance =
+  components["schemas"]["TranscriptUtteranceResponse"];
 
 export function createApiClient(baseUrl: string) {
   return createClient<paths>({ baseUrl, credentials: "include" });
@@ -83,6 +86,40 @@ export function getSessionSnapshot(client: ApiClient, sessionId: string) {
   return client.GET("/sessions/{session_id}", {
     params: { path: { session_id: sessionId } },
   });
+}
+
+export async function loadSessionTranscript(
+  client: ApiClient,
+  sessionId: string,
+): Promise<TranscriptUtterance[]> {
+  let afterSequence = 0;
+  const transcript: TranscriptUtterance[] = [];
+
+  for (;;) {
+    const { data, error } = await client.GET(
+      "/sessions/{session_id}/utterances",
+      {
+        params: {
+          path: { session_id: sessionId },
+          query: { after_sequence: afterSequence, limit: 200 },
+        },
+      },
+    );
+    if (error !== undefined || data === undefined) {
+      throw new Error("Session transcript unavailable");
+    }
+
+    transcript.push(...data.items);
+    const nextAfterSequence = data.next_after_sequence;
+    if (nextAfterSequence === null) return transcript;
+    if (
+      !Number.isSafeInteger(nextAfterSequence) ||
+      nextAfterSequence <= afterSequence
+    ) {
+      throw new Error("Invalid session transcript cursor");
+    }
+    afterSequence = nextAfterSequence;
+  }
 }
 
 function isErrorResponse(value: unknown): value is ErrorResponse {

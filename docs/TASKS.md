@@ -1,17 +1,17 @@
 # 当前任务清单
 
-- Status: P1 in progress; P1-1, P1-2, P1-3, and P1-4 completed; P1-5A/P1-5B/P1-5C/P1-5D/P1-5E/P1-5E-1/P1-5E-2/P1-5E-3/P1-5F-1/P1-5F-2 completed; P1-5F in progress; P1-5F-3/P1-5F-4 not started
-- Managed scope: completed P1-5F-2 backend-only text discussion transport closeout; no handwritten Web/F3, Browser E2E/F4, schema/migration/dependency/CI/provider change, or real provider call
+- Status: P1 in progress; P1-1, P1-2, P1-3, and P1-4 completed; P1-5A/P1-5B/P1-5C/P1-5D/P1-5E/P1-5E-1/P1-5E-2/P1-5E-3/P1-5F-1/P1-5F-2 completed; P1-5F in progress; P1-5F-3A design frozen, implementation complete, actual-source review PASS, and still in progress (not DONE); P1-5F-3B/P1-5F-4 not started
+- Managed scope: P1-5F-3A docs-only implementation closeout；no runtime/test/generated schema/migration/dependency/CI/provider change or real provider call
 - Most recently completed subphase: P1-5F-2 Backend Text Discussion Transport — `DONE`
 - P0-7 final outcome: initial verdict `BLOCKED` with two documentation findings; remediation completed; finding-only independent recheck `PASS`; new blockers none; P1 readiness `READY`
 - Current phase: P1 — `IN_PROGRESS`
-- Most recently completed task: P1-5F-2 — `DONE`
-- Current task gate: P1-5 — `IN_PROGRESS`; P1-5A/P1-5B/P1-5C/P1-5D/P1-5E/P1-5E-1/P1-5E-2/P1-5E-3/P1-5F-1/P1-5F-2 `DONE`; P1-5F `IN_PROGRESS`; P1-5F-3/P1-5F-4 `NOT_STARTED`
+- Most recently completed governance checkpoint: P1-5F-3A external actual-source implementation review — `PASS`; findings none open
+- Current task gate: P1-5 — `IN_PROGRESS`; P1-5A/P1-5B/P1-5C/P1-5D/P1-5E/P1-5E-1/P1-5E-2/P1-5E-3/P1-5F-1/P1-5F-2 `DONE`; P1-5F `IN_PROGRESS`; P1-5F-3A `IN_PROGRESS` (not `DONE`) with `DESIGN_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PASS / FINDINGS_NONE_OPEN`; commit/push、CI and independent final acceptance `PENDING`; P1-5F-3B/P1-5F-4 `NOT_STARTED`
 - P0 status: `DONE`; P0-1 through P0-7 completed
 - Allowed status values: `TODO` / `IN_PROGRESS` / `BLOCKED` / `DONE`
 - Related roadmap: [`ROADMAP.md`](ROADMAP.md)
 
-用户已明确批准正式进入 P1，并已完成 P1-1～P1-4。P1-5A～P1-5E/P1-5E-1～E-3 均已完成。P1-5F-1 initial actual-source review was blocked by one floor-event v1 `action_id` compatibility finding；the remediation preserved historical v1 and froze additive floor-event v2，and finding-only re-review returned `PASS` with findings none for reviewed bundle SHA-256 `6603b1f0377aa449d3a209e475fb3afbb74f9f83c9be38f84df97918eeb1ac0c`。P1-5F-1 is `DONE`。P1-5F-2 initial implementation actual-source review was `BLOCKED` by exactly three findings；the remediation restored exact Human floor binding/stale G1→G2 rejection，tightened transcript public actor/phase enums，and normalized `PublicEventProjectionError` plus periodic catch-up failure handling。Finding-only external re-review returned `PASS` with findings none against `group-interview-arena-review-20260825-150754.zip` / SHA-256 `b9553cbe488707d5fd87598b70e48e1fabdf55a0ae6d3dab367b830267d61edd`，so P1-5F-2 is `DONE`。P1/P1-5/P1-5F remain `IN_PROGRESS` and P1-5F-3/F4 remain `NOT_STARTED`。Codex 不得实现 F3/F4、记忆、报告、语音、Redis/queue 或 P2～P6。
+用户已明确批准正式进入 P1，并已完成 P1-1～P1-4。P1-5A～P1-5E/P1-5E-1～E-3 均已完成。P1-5F-1 initial actual-source review was blocked by one floor-event v1 `action_id` compatibility finding；the remediation preserved historical v1 and froze additive floor-event v2，and finding-only re-review returned `PASS` with findings none for reviewed bundle SHA-256 `6603b1f0377aa449d3a209e475fb3afbb74f9f83c9be38f84df97918eeb1ac0c`。P1-5F-1 is `DONE`。P1-5F-2 initial implementation actual-source review was `BLOCKED` by exactly three findings；the remediation restored exact Human floor binding/stale G1→G2 rejection，tightened transcript public actor/phase enums，and normalized `PublicEventProjectionError` plus periodic catch-up failure handling。Finding-only external re-review returned `PASS` with findings none against `group-interview-arena-review-20260825-150754.zip` / SHA-256 `b9553cbe488707d5fd87598b70e48e1fabdf55a0ae6d3dab367b830267d61edd`，so P1-5F-2 is `DONE`。P1-5F-3A remains `IN_PROGRESS` (not `DONE`) with `DESIGN_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PASS / FINDINGS_NONE_OPEN`；commit/push、CI and independent final acceptance remain `PENDING`；F3B/F4 remain `NOT_STARTED`。Codex 不得 start F3B/F4、记忆、报告、语音、Redis/queue 或 P2～P6 without separate approval。
 
 ## P0-1 — 仓库与文档治理
 
@@ -586,10 +586,10 @@
 - ID: `P1-5`
 - 名称：AI Runtime Foundation
 - Status: `IN_PROGRESS`
-- Approval state：P1-5A architecture freeze、P1-5B persistence foundation、P1-5C deterministic runtime vertical slice、P1-5D first-provider integration and P1-5E automatic orchestration completed；P1-5E-1/P1-5E-2/P1-5E-3/P1-5F-1/P1-5F-2 are `DONE`；P1-5F remains `IN_PROGRESS`；P1-5F-3/F4 are not started。
+- Approval state：P1-5A architecture freeze、P1-5B persistence foundation、P1-5C deterministic runtime vertical slice、P1-5D first-provider integration and P1-5E automatic orchestration completed；P1-5E-1/P1-5E-2/P1-5E-3/P1-5F-1/P1-5F-2 are `DONE`；P1-5F remains `IN_PROGRESS`；P1-5F-3A design is frozen、implementation is complete、external actual-source review is `PASS` with no open findings，but commit/push、CI and independent final acceptance are pending，so F3A is not `DONE`；F3B/F4 are not started。
 - 目标：在既有 immutable question/persona、server-authoritative session lifecycle 与 deterministic floor control 之上，建立 provider-neutral、可追踪、可重试且不破坏 session integrity 的 AI utterance generation boundary。
 - In scope：P1-5F-2 backend command/event contracts、Human/AI atomic publication、deterministic post-Human scheduler recovery、owner-only transcript REST、ordered WebSocket delivery/public projection、network-free tests and mechanically generated REST schema。
-- Out of scope for this checkpoint：handwritten TypeScript/TSX/Web behavior、Browser E2E、schema/migration/dependency/lock/config/CI/Docker/prompt/seed change；real provider calls；P1-5F-3/F4；memory/RAG、scoring/report、voice、Redis/queue/worker、billing/quota/payment/multi-tenant。
+- Out of scope for this checkpoint：all handwritten TypeScript/TSX/Web implementation and tests、generated OpenAPI、Browser E2E、schema/migration/dependency/lock/config/CI/Docker/prompt/seed change；real provider calls；P1-5F-3B/F4；memory/RAG、scoring/report、voice、Redis/queue/worker、billing/quota/payment/multi-tenant。
 - Dependencies：P1-1/P1-2/P1-3/P1-4 `DONE`；Accepted `D-003`、`D-007`、`D-008`、`D-013`、`ADR-006`、`ADR-007`、`ADR-009`、`ADR-011`～`ADR-014`。
 - P1-5D acceptance result：the frozen Zhipu/configured-model/model-independent-configuration/request/timeouts are exact；provider/domain separation、safe error mapping、secret non-disclosure、one-request/no-retry behavior and existing P1-5C lifecycle/provenance invariants passed network-free tests and full PostgreSQL regression；HTTPX remains the single runtime dependency；no schema/API/WS/Web or automatic implementation was added；both actual-source reviews and the sanitized user smoke passed，so P1-5D is `DONE`。P1-5E-1 has separately passed its docs-only actual-source review with findings none and is `DONE`。
 
@@ -606,9 +606,20 @@
 - `P1-5F — Realtime/Web Integration + Independent Acceptance`：`IN_PROGRESS`；
 - `P1-5F-1 — Realtime/Public Contract Design Freeze`：`DONE`；docs-only contract accepted after finding remediation and finding-only external re-review `PASS`；
 - `P1-5F-2 — Backend Text Discussion Transport`：`DONE`；initial implementation actual-source review `BLOCKED` on three findings，all remediated；finding-only external re-review `PASS`，findings none；reviewed remediation bundle SHA-256 `b9553cbe488707d5fd87598b70e48e1fabdf55a0ae6d3dab367b830267d61edd`；
-- `P1-5F-3 — Web Discussion Experience`：`NOT_STARTED`；
+- `P1-5F-3 — Web Discussion Experience`：`IN_PROGRESS`；
+  - `P1-5F-3A — Web Discussion Functional Closure`：`IN_PROGRESS` (not `DONE`)；`DESIGN_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PASS / FINDINGS_NONE_OPEN`；commit/push、CI and independent final acceptance `PENDING`；
+  - `P1-5F-3B — Complete Discussion Page Composition`：`NOT_STARTED`；
 - `P1-5F-4 — Composition E2E + Independent Acceptance`：`NOT_STARTED`；
-- P1-5F-2 is closed as `DONE` after finding-only external re-review；P1-5F-3/F4 still require separate explicit approval。
+- P1-5F-2 is closed as `DONE` after finding-only external re-review；P1-5F-3A external actual-source implementation review is `PASS` after F3A-FINAL-001 remediation，with no findings open。F3A remains `IN_PROGRESS` and is not `DONE` pending commit/push、CI and independent final acceptance；F3B and F4 still require separate explicit approval。
+
+### P1-5F-3A design-freeze checkpoint
+
+- Baseline is clean committed `main` / `origin/main` `9fd31d0` with P1-5F-2 backend transport and realtime replay remediation complete；Master Plan SHA-256 remains `2388a9660320406cb35d5354126ad71c6849a98db7c4a356796ca951bf372f26`。
+- Approved Option B keeps protocol parsing independent from React，puts the maximum-one memory-only pending command in the realtime client，keeps session/phase/floor truth in the authoritative snapshot，adds one pure framework-independent confirmed-transcript merge module，and leaves `SessionPanel` to coordinate draft/recovery presentation without a frontend business state machine。
+- Draft、Pending Human submit、Confirmed transcript and one RejectedDraft are distinct。Textarea remains editable；Send requires a floor-enabled phase、exact Human current grant、connected socket、no pending command and valid exact content。Click time re-reads and binds the authoritative grant，generates one UUID4 action and never trims/normalizes/truncates content。
+- Initial/recovery order is authoritative snapshot + watermark → complete transcript pagination → confirmed render → WS from the snapshot watermark。Transcript merge dedupes by `utterance_id`、orders by authoritative sequence and treats same-identity field drift as a full-reload conflict；transcript-only sequences are never gap-validated and confirmed history is not intentionally cleared during recovery。
+- AI waiting/interruption UI derives only from the safe current floor、matching confirmed AI utterance and generic `INTERRUPTED` release。No provider/model/generation lifecycle、retry、ETA or Browser AI timeout is introduced。
+- F3A implemented functional transcript/composer/pending/rejected/recovery UI in the existing panel and one deterministic Human Chromium vertical slice；final code gates are GREEN，including Vitest `150/150`、live OpenAPI drift and Chromium `2/2` with exact durable Human persistence semantics and zero provider request。External actual-source implementation review is `PASS` after F3A-FINAL-001 remediation，with no findings open；F3A remains `IN_PROGRESS` and is not `DONE` because commit/push、CI and independent final acceptance remain pending。F3B separately owns complete page composition，and F4 owns full composition E2E + independent acceptance；both remain `NOT_STARTED`。
 
 ### P1-5F-1 implementation checkpoint
 

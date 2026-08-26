@@ -62,6 +62,10 @@ API_ROOT = Path(__file__).resolve().parents[2]
 REPOSITORY_ROOT = API_ROOT.parents[1]
 WEB_ROOT = REPOSITORY_ROOT / "apps" / "web"
 PRIVATE_SENTINEL = "P1_2C_PRIVATE_SENTINEL_DO_NOT_DISCLOSE"
+HUMAN_CONTRIBUTION = (
+    "  Human evidence: preserve this exact contribution.\n"
+    "Second line stays exact.  "
+)
 
 
 def _port_is_available(port: int) -> bool:
@@ -379,31 +383,139 @@ def _verify_session_persistence(temporary_database: TemporaryDatabase) -> None:
         password=database_url.password,
     ) as connection:
         session_rows = connection.execute(
-            "SELECT status, last_sequence, question_version_id, "
-            "phase_started_at, phase_deadline_at FROM simulation_sessions"
-        ).fetchall()
-        action_count = connection.execute(
-            "SELECT count(*) FROM session_actions"
-        ).fetchone()
-        event_sequences = connection.execute(
-            "SELECT sequence FROM discussion_events ORDER BY sequence"
-        ).fetchall()
-        floor_rows = connection.execute(
-            "SELECT (SELECT count(*) FROM floor_grants), "
-            "(SELECT count(*) FROM floor_releases), current_floor_grant_id "
+            "SELECT id, status, last_sequence, question_version_id, "
+            "phase_started_at, phase_deadline_at, current_floor_grant_id "
             "FROM simulation_sessions"
         ).fetchall()
+        if len(session_rows) != 1:
+            raise RuntimeError("Browser E2E did not persist exactly one session.")
 
-    if session_rows != [
-        ("COMPLETED", 10, INTERNAL_VALIDATION_BUNDLE.version_id, None, None)
+        (
+            session_id,
+            status,
+            last_sequence,
+            question_version_id,
+            phase_started_at,
+            phase_deadline_at,
+            current_floor_grant_id,
+        ) = session_rows[0]
+        event_sequences = connection.execute(
+            "SELECT sequence FROM discussion_events "
+            "WHERE session_id = %s ORDER BY sequence",
+            (session_id,),
+        ).fetchall()
+        human_event_rows = connection.execute(
+            "SELECT event.causation_action_id, event.sequence, "
+            "event.payload->>'floor_grant_id', "
+            "event.payload->>'participant_id', event.payload->>'phase', "
+            "event.payload->>'content', action.command_type "
+            "FROM discussion_events AS event "
+            "JOIN session_actions AS action "
+            "ON action.session_id = event.session_id "
+            "AND action.action_id = event.causation_action_id "
+            "WHERE event.session_id = %s "
+            "AND event.event_type = 'participant.utterance.created' "
+            "AND event.payload->>'actor_kind' = 'HUMAN' "
+            "AND event.payload->>'content' = %s",
+            (session_id, HUMAN_CONTRIBUTION),
+        ).fetchall()
+        human_submit_action_rows = connection.execute(
+            "SELECT action_id FROM session_actions "
+            "WHERE session_id = %s "
+            "AND command_type = 'participant.utterance.submit'",
+            (session_id,),
+        ).fetchall()
+        provider_request_count = connection.execute(
+            "SELECT count(*) FROM llm_generation_requests WHERE session_id = %s",
+            (session_id,),
+        ).fetchone()
+
+        if human_event_rows:
+            (
+                human_action_id,
+                human_event_sequence,
+                human_grant_id_text,
+                human_participant_id_text,
+                human_phase,
+                human_content,
+                human_command_type,
+            ) = human_event_rows[0]
+            human_grant_id = UUID(human_grant_id_text)
+            human_participant_id = UUID(human_participant_id_text)
+            grant_rows = connection.execute(
+                "SELECT participant_id, phase FROM floor_grants "
+                "WHERE session_id = %s AND id = %s",
+                (session_id, human_grant_id),
+            ).fetchall()
+            participant_rows = connection.execute(
+                "SELECT actor_kind FROM session_participants "
+                "WHERE session_id = %s AND id = %s",
+                (session_id, human_participant_id),
+            ).fetchall()
+            release_rows = connection.execute(
+                "SELECT reason_code FROM floor_releases "
+                "WHERE session_id = %s AND grant_id = %s "
+                "AND causation_action_id = %s",
+                (session_id, human_grant_id, human_action_id),
+            ).fetchall()
+            public_release_rows = connection.execute(
+                "SELECT sequence, payload->>'reason_code', payload->>'grant_id' "
+                "FROM discussion_events WHERE session_id = %s "
+                "AND event_type = 'floor.released' "
+                "AND causation_action_id = %s "
+                "AND payload->>'grant_id' = %s",
+                (session_id, human_action_id, str(human_grant_id)),
+            ).fetchall()
+        else:
+            human_action_id = None
+            human_event_sequence = None
+            human_grant_id_text = None
+            human_participant_id_text = None
+            human_phase = None
+            human_content = None
+            human_command_type = None
+            grant_rows = []
+            participant_rows = []
+            release_rows = []
+            public_release_rows = []
+
+    if (
+        status != "COMPLETED"
+        or question_version_id != INTERNAL_VALIDATION_BUNDLE.version_id
+        or phase_started_at is not None
+        or phase_deadline_at is not None
+        or current_floor_grant_id is not None
+    ):
+        raise RuntimeError("Browser E2E terminal session state was not persisted.")
+    if event_sequences != [
+        (sequence,) for sequence in range(1, last_sequence + 1)
     ]:
-        raise RuntimeError("Browser E2E session state was not persisted exactly.")
-    if action_count is None or action_count[0] != 2:
-        raise RuntimeError("Browser E2E action idempotency row count was not two.")
-    if event_sequences != [(sequence,) for sequence in range(1, 11)]:
-        raise RuntimeError("Browser E2E formal event sequences were not [1..10].")
-    if floor_rows != [(1, 1, None)]:
-        raise RuntimeError("Browser E2E floor lifecycle was not persisted exactly.")
+        raise RuntimeError("Browser E2E formal event sequences were not contiguous.")
+    if len(human_event_rows) != 1:
+        raise RuntimeError("Browser E2E Human utterance was not persisted exactly once.")
+    if (
+        human_action_id is None
+        or human_command_type != "participant.utterance.submit"
+        or human_phase != "OPENING_STATEMENTS"
+        or human_content != HUMAN_CONTRIBUTION
+    ):
+        raise RuntimeError("Browser E2E Human submit action/event did not match.")
+    if human_submit_action_rows != [(human_action_id,)]:
+        raise RuntimeError(
+            "Browser E2E did not persist exactly one matching Human submit action."
+        )
+    if grant_rows != [(UUID(human_participant_id_text), human_phase)]:
+        raise RuntimeError("Browser E2E Human utterance floor binding did not match.")
+    if participant_rows != [("HUMAN",)]:
+        raise RuntimeError("Browser E2E Human participant binding did not match.")
+    if release_rows != [("SPEAKER_FINISHED",)]:
+        raise RuntimeError("Browser E2E Human floor release did not match.")
+    if public_release_rows != [
+        (human_event_sequence + 1, "SPEAKER_FINISHED", human_grant_id_text)
+    ]:
+        raise RuntimeError("Browser E2E Human public release order did not match.")
+    if provider_request_count != (0,):
+        raise RuntimeError("Browser E2E unexpectedly created a provider request.")
 
 
 async def _schedule_browser_floor_async(
@@ -521,10 +633,10 @@ def main() -> int:
         _verify_session_persistence(temporary_database)
 
     print(
-        "P1-4D browser E2E passed with immutable question binding, one durable "
-        "start plus one scheduler action, sequences [1..10], live floor grant, "
-        "reload/API-restart recovery, phase-change release, private isolation; "
-        "temporary database and servers were cleaned."
+        "P1-5F-3A browser E2E passed with exact durable Human submit/restore, "
+        "contiguous event history, matching speaker-finished release, immutable "
+        "question binding, reload/API-restart recovery, private isolation and no "
+        "provider request; temporary database and servers were cleaned."
     )
     return 0
 

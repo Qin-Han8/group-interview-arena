@@ -9,8 +9,172 @@ const PARTICIPANT_ID = "00000000-0000-4000-8000-000000000004";
 const GRANT_ID = "00000000-0000-4000-8000-000000000005";
 const DECISION_ID = "00000000-0000-4000-8000-000000000006";
 const INTERVENTION_ID = "00000000-0000-4000-8000-000000000007";
+const UTTERANCE_ID = "00000000-0000-4000-8000-000000000008";
+
+const HUMAN_UTTERANCE_EVENT = {
+  schema_version: 1,
+  type: "participant.utterance.created",
+  session_id: SESSION_ID,
+  sequence: 14,
+  occurred_at: "2026-08-25T01:04:11Z",
+  action_id: ACTION_ID,
+  payload: {
+    utterance_id: UTTERANCE_ID,
+    participant_id: PARTICIPANT_ID,
+    actor_kind: "HUMAN",
+    floor_grant_id: GRANT_ID,
+    phase: "OPENING_STATEMENTS",
+    content: "  exact Human contribution\nsecond line  ",
+  },
+};
+
+const AI_UTTERANCE_EVENT = {
+  ...HUMAN_UTTERANCE_EVENT,
+  sequence: 15,
+  action_id: null,
+  payload: {
+    ...HUMAN_UTTERANCE_EVENT.payload,
+    actor_kind: "AI",
+    content: "  exact AI contribution\nsecond line  ",
+  },
+};
 
 describe("WebSocket derivative contract", () => {
+  it.each([HUMAN_UTTERANCE_EVENT, AI_UTTERANCE_EVENT])(
+    "accepts canonical Human and AI utterance events with exact content",
+    (message) => {
+      expect(parseRealtimeMessage(JSON.stringify(message))).toEqual(message);
+    },
+  );
+
+  it.each([
+    ["Human/null action", { ...HUMAN_UTTERANCE_EVENT, action_id: null }],
+    ["AI/UUID4 action", { ...AI_UTTERANCE_EVENT, action_id: ACTION_ID }],
+    [
+      "unknown actor",
+      {
+        ...HUMAN_UTTERANCE_EVENT,
+        payload: { ...HUMAN_UTTERANCE_EVENT.payload, actor_kind: "SYSTEM" },
+      },
+    ],
+    ["schema version 0", { ...HUMAN_UTTERANCE_EVENT, schema_version: 0 }],
+    ["schema version 2", { ...HUMAN_UTTERANCE_EVENT, schema_version: 2 }],
+    ["schema version 3", { ...HUMAN_UTTERANCE_EVENT, schema_version: 3 }],
+    [
+      "invalid phase",
+      {
+        ...HUMAN_UTTERANCE_EVENT,
+        payload: { ...HUMAN_UTTERANCE_EVENT.payload, phase: "PREPARATION" },
+      },
+    ],
+    ["zero sequence", { ...HUMAN_UTTERANCE_EVENT, sequence: 0 }],
+    [
+      "unsafe sequence",
+      { ...HUMAN_UTTERANCE_EVENT, sequence: Number.MAX_SAFE_INTEGER + 1 },
+    ],
+    [
+      "malformed session UUID4",
+      { ...HUMAN_UTTERANCE_EVENT, session_id: "not-a-uuid" },
+    ],
+    [
+      "malformed action UUID4",
+      { ...HUMAN_UTTERANCE_EVENT, action_id: "not-a-uuid" },
+    ],
+    [
+      "malformed utterance UUID4",
+      {
+        ...HUMAN_UTTERANCE_EVENT,
+        payload: {
+          ...HUMAN_UTTERANCE_EVENT.payload,
+          utterance_id: "not-a-uuid",
+        },
+      },
+    ],
+    [
+      "malformed participant UUID4",
+      {
+        ...HUMAN_UTTERANCE_EVENT,
+        payload: {
+          ...HUMAN_UTTERANCE_EVENT.payload,
+          participant_id: "not-a-uuid",
+        },
+      },
+    ],
+    [
+      "malformed floor grant UUID4",
+      {
+        ...HUMAN_UTTERANCE_EVENT,
+        payload: {
+          ...HUMAN_UTTERANCE_EVENT.payload,
+          floor_grant_id: "not-a-uuid",
+        },
+      },
+    ],
+    [
+      "naive timestamp",
+      { ...HUMAN_UTTERANCE_EVENT, occurred_at: "2026-08-25T01:04:11" },
+    ],
+    [
+      "invalid timestamp",
+      { ...HUMAN_UTTERANCE_EVENT, occurred_at: "not-a-timestamp" },
+    ],
+    [
+      "non-string content",
+      {
+        ...HUMAN_UTTERANCE_EVENT,
+        payload: { ...HUMAN_UTTERANCE_EVENT.payload, content: 42 },
+      },
+    ],
+  ])("rejects utterance actor/version/identity case: %s", (_, message) => {
+    expect(parseRealtimeMessage(JSON.stringify(message))).toBeUndefined();
+  });
+
+  it.each([
+    ["extra envelope field", { ...HUMAN_UTTERANCE_EVENT, extra: true }],
+    [
+      "extra payload field",
+      {
+        ...HUMAN_UTTERANCE_EVENT,
+        payload: { ...HUMAN_UTTERANCE_EVENT.payload, private_fact: true },
+      },
+    ],
+  ])("rejects utterance exact-key case: %s", (_, message) => {
+    expect(parseRealtimeMessage(JSON.stringify(message))).toBeUndefined();
+  });
+
+  it.each(Object.keys(HUMAN_UTTERANCE_EVENT.payload))(
+    "rejects an utterance payload missing %s",
+    (missingKey) => {
+      const payload = Object.fromEntries(
+        Object.entries(HUMAN_UTTERANCE_EVENT.payload).filter(
+          ([key]) => key !== missingKey,
+        ),
+      );
+      expect(
+        parseRealtimeMessage(
+          JSON.stringify({ ...HUMAN_UTTERANCE_EVENT, payload }),
+        ),
+      ).toBeUndefined();
+    },
+  );
+
+  it("accepts UTTERANCE_REJECTED as a safe realtime error", () => {
+    const message = {
+      schema_version: 1,
+      type: "error",
+      session_id: SESSION_ID,
+      action_id: ACTION_ID,
+      occurred_at: "2026-08-25T01:04:12Z",
+      error: {
+        code: "UTTERANCE_REJECTED",
+        message: "The utterance could not be accepted.",
+        request_id: REQUEST_ID,
+      },
+    };
+
+    expect(parseRealtimeMessage(JSON.stringify(message))).toEqual(message);
+  });
+
   it.each([
     {
       schema_version: 1,

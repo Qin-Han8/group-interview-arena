@@ -31,6 +31,15 @@ export function projectSessionEvent(
     };
   }
 
+  if (event.type === "participant.utterance.created") {
+    return {
+      ...snapshot,
+      server_now: event.occurred_at,
+      updated_at: event.occurred_at,
+      last_sequence: event.sequence,
+    };
+  }
+
   const latestEvent = {
     type: event.type,
     sequence: event.sequence,

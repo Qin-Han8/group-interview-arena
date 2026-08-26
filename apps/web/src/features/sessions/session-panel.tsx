@@ -6,6 +6,7 @@ import {
   createSession,
   getQuestion,
   getSessionSnapshot,
+  loadSessionTranscript,
   listQuestions,
   type ApiClient,
   type QuestionDetail,
@@ -14,10 +15,20 @@ import {
 } from "@/lib/api/client";
 import {
   createSessionRealtimeClient,
+  inspectHumanDraft,
+  type PendingHumanUtterance,
+  type RejectedHumanUtterance,
   type RealtimeConnectionState,
+  type SessionRecoveryBundle,
   type SessionRealtimeClient,
 } from "@/lib/realtime/client";
 import { projectSessionEvent } from "@/lib/realtime/projection";
+
+import {
+  confirmedUtteranceFromEvent,
+  mergeConfirmedTranscript,
+  type ConfirmedUtterance,
+} from "./discussion-transcript";
 
 type SessionPanelProps = {
   apiClient: ApiClient;
@@ -32,6 +43,15 @@ const PHASES = [
   "CONVERGENCE",
   "FINAL_SUMMARY",
 ] as const;
+
+const SPEAKING_PHASES = [
+  "OPENING_STATEMENTS",
+  "EXPLORATION",
+  "CONFLICT_AND_EVALUATION",
+  "CONVERGENCE",
+  "FINAL_SUMMARY",
+] as const;
+const TRANSCRIPT_FOLLOW_THRESHOLD_PX = 48;
 
 const PHASE_LABELS: Record<SessionSnapshot["status"], string> = {
   CREATED: "未开始",
@@ -53,6 +73,23 @@ function putSessionInUrl(sessionId: string) {
 
 function isActivePhase(status: SessionSnapshot["status"]) {
   return PHASES.some((phase) => phase === status);
+}
+
+function isSpeakingPhase(status: SessionSnapshot["status"]) {
+  return SPEAKING_PHASES.some((phase) => phase === status);
+}
+
+function aiCandidateLabel(
+  participants: SessionSnapshot["floor"]["participants"],
+  participantId: string,
+) {
+  const aiParticipants = participants
+    .filter((participant) => participant.actor_kind === "AI")
+    .sort((left, right) => left.seat_order - right.seat_order);
+  const index = aiParticipants.findIndex(
+    (participant) => participant.participant_id === participantId,
+  );
+  return index >= 0 ? `AI 候选人 ${index + 1}` : "AI 候选人";
 }
 
 function participantLabel(
@@ -115,7 +152,7 @@ function connectionLabel(state: RealtimeConnectionState) {
     case "connecting":
       return "正在连接实时会话…";
     case "reconnecting":
-      return "正在重新加载会话…";
+      return "正在同步讨论记录…";
     default:
       return "实时连接未建立";
   }
@@ -133,6 +170,15 @@ export default function SessionPanel({
   const [checkingUrl, setCheckingUrl] = useState(true);
   const [creating, setCreating] = useState(false);
   const [pendingAction, setPendingAction] = useState(false);
+  const [humanPending, setHumanPending] = useState<PendingHumanUtterance>();
+  const [rejectedDraft, setRejectedDraft] = useState<RejectedHumanUtterance>();
+  const [draft, setDraft] = useState("");
+  const [interruptedAiGrantIds, setInterruptedAiGrantIds] = useState<string[]>(
+    [],
+  );
+  const [confirmedTranscript, setConfirmedTranscript] = useState<
+    ConfirmedUtterance[]
+  >([]);
   const [connection, setConnection] =
     useState<RealtimeConnectionState>("disconnected");
   const [errorMessage, setErrorMessage] = useState<string>();
@@ -142,6 +188,10 @@ export default function SessionPanel({
   });
   const [displayNowMs, setDisplayNowMs] = useState(0);
   const snapshotRef = useRef<SessionSnapshot | undefined>(undefined);
+  const confirmedTranscriptRef = useRef<ConfirmedUtterance[]>([]);
+  const transcriptContainerRef = useRef<HTMLDivElement | null>(null);
+  const shouldFollowTranscriptRef = useRef(false);
+  const interruptedAiGrantIdsRef = useRef(new Set<string>());
   const realtimeRef = useRef<SessionRealtimeClient | undefined>(undefined);
 
   const updateClockFromSnapshot = useCallback((next: SessionSnapshot) => {
@@ -162,6 +212,51 @@ export default function SessionPanel({
     },
     [updateClockFromSnapshot],
   );
+
+  const loadAuthoritativeRecoveryBundle = useCallback(
+    async (sessionId: string): Promise<SessionRecoveryBundle> => {
+      const snapshotResult = await getSessionSnapshot(apiClient, sessionId);
+      if (!snapshotResult.data) {
+        throw new Error("Session snapshot unavailable");
+      }
+      const transcript = await loadSessionTranscript(apiClient, sessionId);
+      const canonicalTranscript = mergeConfirmedTranscript([], transcript);
+      if (canonicalTranscript.kind === "conflict") {
+        throw new Error("Authoritative transcript identity conflict");
+      }
+      return {
+        snapshot: snapshotResult.data,
+        transcript: canonicalTranscript.items,
+      };
+    },
+    [apiClient],
+  );
+
+  const applyRecoveryBundle = useCallback(
+    (bundle: SessionRecoveryBundle) => {
+      shouldFollowTranscriptRef.current = false;
+      confirmedTranscriptRef.current = bundle.transcript;
+      setConfirmedTranscript(bundle.transcript);
+      applySnapshot(bundle.snapshot);
+      setErrorMessage(undefined);
+    },
+    [applySnapshot],
+  );
+
+  useEffect(() => {
+    confirmedTranscriptRef.current = confirmedTranscript;
+    if (shouldFollowTranscriptRef.current && transcriptContainerRef.current) {
+      if (typeof transcriptContainerRef.current.scrollTo === "function") {
+        transcriptContainerRef.current.scrollTo({
+          top: transcriptContainerRef.current.scrollHeight,
+        });
+      } else {
+        transcriptContainerRef.current.scrollTop =
+          transcriptContainerRef.current.scrollHeight;
+      }
+    }
+    shouldFollowTranscriptRef.current = false;
+  }, [confirmedTranscript]);
 
   useEffect(() => {
     if (!snapshot?.phase_deadline_at || !isActivePhase(snapshot.status)) return;
@@ -202,18 +297,14 @@ export default function SessionPanel({
 
     async function restore() {
       try {
-        const result = await getSessionSnapshot(apiClient, sessionId!);
+        const bundle = await loadAuthoritativeRecoveryBundle(sessionId!);
         if (!active) return;
-        if (!result.data) {
-          setErrorMessage("无法加载会话，请确认会话仍然可用。");
-          return;
-        }
-        applySnapshot(result.data);
-        setConnectionSeed(result.data);
-        if (result.data.question_version_id) {
+        applyRecoveryBundle(bundle);
+        setConnectionSeed(bundle.snapshot);
+        if (bundle.snapshot.question_version_id) {
           const questionResult = await getQuestion(
             apiClient,
-            result.data.question_version_id,
+            bundle.snapshot.question_version_id,
           );
           if (!active) return;
           if (!questionResult.data) {
@@ -233,7 +324,7 @@ export default function SessionPanel({
     return () => {
       active = false;
     };
-  }, [apiClient, applySnapshot]);
+  }, [apiClient, applyRecoveryBundle, loadAuthoritativeRecoveryBundle]);
 
   useEffect(() => {
     if (!connectionSeed) return;
@@ -241,24 +332,76 @@ export default function SessionPanel({
     const realtime = createSessionRealtimeClient({
       baseUrl,
       snapshot: connectionSeed,
-      async loadSnapshot() {
-        const result = await getSessionSnapshot(apiClient, connectionSeed.id);
-        if (!result.data) throw new Error("Session snapshot unavailable");
-        return result.data;
+      loadRecoveryBundle() {
+        return loadAuthoritativeRecoveryBundle(connectionSeed.id);
       },
       onEvent(event) {
         if (!active) return;
         const current = snapshotRef.current;
-        if (current) applySnapshot(projectSessionEvent(current, event));
+        if (!current) return;
+        if (event.type === "participant.utterance.created") {
+          const container = transcriptContainerRef.current;
+          shouldFollowTranscriptRef.current =
+            container !== null &&
+            container.scrollHeight -
+              container.scrollTop -
+              container.clientHeight <=
+              TRANSCRIPT_FOLLOW_THRESHOLD_PX;
+          const incoming = confirmedUtteranceFromEvent(event);
+          const merged = mergeConfirmedTranscript(
+            confirmedTranscriptRef.current,
+            [incoming],
+          );
+          if (merged.kind === "conflict") {
+            realtimeRef.current?.recoverAuthoritativeState();
+            return;
+          }
+          confirmedTranscriptRef.current = merged.items;
+          setConfirmedTranscript(merged.items);
+        }
+        if (
+          event.type === "floor.released" &&
+          event.payload.reason_code === "INTERRUPTED"
+        ) {
+          const grant = current.floor.current_grant;
+          const participant = current.floor.participants.find(
+            (item) => item.participant_id === grant?.participant_id,
+          );
+          const hasConfirmedUtterance = confirmedTranscriptRef.current.some(
+            (item) =>
+              item.actor_kind === "AI" &&
+              item.floor_grant_id === event.payload.grant_id,
+          );
+          if (
+            grant?.grant_id === event.payload.grant_id &&
+            participant?.actor_kind === "AI" &&
+            !hasConfirmedUtterance &&
+            !interruptedAiGrantIdsRef.current.has(grant.grant_id)
+          ) {
+            interruptedAiGrantIdsRef.current.add(grant.grant_id);
+            setInterruptedAiGrantIds([
+              ...interruptedAiGrantIdsRef.current.values(),
+            ]);
+          }
+        }
+        applySnapshot(projectSessionEvent(current, event));
       },
-      onSnapshot(authoritative) {
-        if (active) applySnapshot(authoritative);
+      onRecoveryBundle(bundle) {
+        if (active) applyRecoveryBundle(bundle);
       },
       onPendingChange(pending) {
         if (active) setPendingAction(pending);
       },
+      onHumanPendingChange(pending) {
+        if (active) setHumanPending(pending);
+      },
+      onRejectedHumanUtterance(rejected) {
+        if (active) setRejectedDraft(rejected);
+      },
       onConnectionChange(state) {
-        if (active) setConnection(state);
+        if (!active) return;
+        setConnection(state);
+        if (state === "connected") setErrorMessage(undefined);
       },
       onError(message) {
         if (active) setErrorMessage(message);
@@ -272,7 +415,13 @@ export default function SessionPanel({
       realtime.stop();
       if (realtimeRef.current === realtime) realtimeRef.current = undefined;
     };
-  }, [apiClient, applySnapshot, baseUrl, connectionSeed]);
+  }, [
+    applyRecoveryBundle,
+    applySnapshot,
+    baseUrl,
+    connectionSeed,
+    loadAuthoritativeRecoveryBundle,
+  ]);
 
   async function create() {
     if (creating || !selectedQuestionId) return;
@@ -285,7 +434,7 @@ export default function SessionPanel({
         return;
       }
       putSessionInUrl(result.data.id);
-      applySnapshot(result.data);
+      applyRecoveryBundle({ snapshot: result.data, transcript: [] });
       setConnectionSeed(result.data);
       const authoritativeQuestionId = result.data.question_version_id;
       if (!authoritativeQuestionId) {
@@ -319,6 +468,79 @@ export default function SessionPanel({
     phaseDeadlineMs === undefined || estimatedServerNowMs === undefined
       ? undefined
       : formatCountdown(phaseDeadlineMs - estimatedServerNowMs);
+  const draftInspection = inspectHumanDraft(draft);
+  const renderGrant = snapshot?.floor.current_grant;
+  const renderGrantParticipant = snapshot?.floor.participants.find(
+    (participant) => participant.participant_id === renderGrant?.participant_id,
+  );
+  const canSend =
+    snapshot !== undefined &&
+    isSpeakingPhase(snapshot.status) &&
+    renderGrant !== null &&
+    renderGrantParticipant?.actor_kind === "HUMAN" &&
+    connection === "connected" &&
+    !pendingAction &&
+    draftInspection.isSubmittable;
+
+  let sendDisabledReason = "可以提交当前发言。";
+  if (!snapshot || !isSpeakingPhase(snapshot.status)) {
+    sendDisabledReason = "当前阶段不能提交发言。";
+  } else if (!renderGrant || renderGrantParticipant?.actor_kind !== "HUMAN") {
+    sendDisabledReason = "等待你的发言机会。";
+  } else if (connection !== "connected") {
+    sendDisabledReason = "实时连接恢复后可以提交。";
+  } else if (pendingAction) {
+    sendDisabledReason = "请等待当前操作确认。";
+  } else if (!draftInspection.isSubmittable) {
+    sendDisabledReason =
+      draftInspection.invalidReason === "TOO_LONG"
+        ? "发言不能超过 4000 个字符。"
+        : draftInspection.invalidReason === "CONTAINS_NULL"
+          ? "发言包含不支持的空字符。"
+          : "请输入可提交的发言内容。";
+  }
+
+  const currentAiParticipant =
+    renderGrantParticipant?.actor_kind === "AI"
+      ? renderGrantParticipant
+      : undefined;
+  const aiWaitingLabel =
+    connection === "connected" &&
+    renderGrant &&
+    currentAiParticipant &&
+    !confirmedTranscript.some(
+      (item) =>
+        item.actor_kind === "AI" &&
+        item.floor_grant_id === renderGrant.grant_id,
+    )
+      ? `${aiCandidateLabel(
+          snapshot?.floor.participants ?? [],
+          currentAiParticipant.participant_id,
+        )} 正在准备发言…`
+      : undefined;
+
+  function submitCurrentDraft() {
+    const current = snapshotRef.current;
+    const realtime = realtimeRef.current;
+    const inspection = inspectHumanDraft(draft);
+    if (
+      !current ||
+      !realtime ||
+      !isSpeakingPhase(current.status) ||
+      connection !== "connected" ||
+      pendingAction ||
+      !inspection.isSubmittable
+    ) {
+      return;
+    }
+    const grant = current.floor.current_grant;
+    const participant = current.floor.participants.find(
+      (item) => item.participant_id === grant?.participant_id,
+    );
+    if (!grant || participant?.actor_kind !== "HUMAN") return;
+    realtime.submitHumanUtterance(grant.grant_id, draft);
+    setDraft("");
+  }
 
   if (checkingUrl) {
     return (
@@ -394,7 +616,13 @@ export default function SessionPanel({
             当前序号：
             <span data-testid="session-sequence">{snapshot.last_sequence}</span>
           </p>
-          <p className="text-neutral-600">{connectionLabel(connection)}</p>
+          <p
+            aria-live="polite"
+            className="text-neutral-600"
+            data-testid="recovery-status"
+          >
+            {connectionLabel(connection)}
+          </p>
           <div className="mt-4 space-y-3 border-t border-neutral-200 pt-4">
             <div>
               <p className="font-medium" data-testid="phase-label">
@@ -501,6 +729,165 @@ export default function SessionPanel({
           ) : null}
         </div>
       )}
+      {snapshot ? (
+        <>
+          <section
+            className="mt-6 border-t border-neutral-200 pt-5 text-sm"
+            data-testid="confirmed-transcript"
+          >
+            <h3 className="font-medium">讨论记录</h3>
+            <div
+              className="mt-3 max-h-80 overflow-y-auto"
+              data-testid="confirmed-transcript-list"
+              ref={transcriptContainerRef}
+            >
+              {confirmedTranscript.length === 0 ? (
+                <p className="text-neutral-600">
+                  服务端确认的发言会显示在这里。
+                </p>
+              ) : (
+                <ol className="space-y-3">
+                  {confirmedTranscript.map((item) => {
+                    const participant = snapshot.floor.participants.find(
+                      (candidate) =>
+                        candidate.participant_id === item.participant_id,
+                    );
+                    const speaker =
+                      item.actor_kind === "HUMAN"
+                        ? "你"
+                        : aiCandidateLabel(
+                            snapshot.floor.participants,
+                            participant?.participant_id ?? item.participant_id,
+                          );
+                    return (
+                      <li
+                        className="border border-neutral-200 p-3"
+                        key={item.utterance_id}
+                      >
+                        <p className="font-medium">{speaker}</p>
+                        <p className="text-xs text-neutral-500">
+                          {PHASE_LABELS[item.phase]}
+                        </p>
+                        <p
+                          className="mt-1 whitespace-pre-wrap text-neutral-800"
+                          data-testid={`utterance-content-${item.utterance_id}`}
+                        >
+                          {item.content}
+                        </p>
+                      </li>
+                    );
+                  })}
+                </ol>
+              )}
+            </div>
+          </section>
+
+          <section className="mt-5 border-t border-neutral-200 pt-5 text-sm">
+            <h3 className="font-medium">你的发言</h3>
+            <label className="mt-3 grid gap-1" htmlFor="human-discussion-draft">
+              发言草稿
+              <textarea
+                aria-describedby="human-draft-count send-disabled-reason"
+                className="min-h-28 border border-neutral-300 p-3"
+                id="human-discussion-draft"
+                onChange={(event) => setDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (
+                    event.key === "Enter" &&
+                    (event.ctrlKey || event.metaKey) &&
+                    canSend
+                  ) {
+                    event.preventDefault();
+                    submitCurrentDraft();
+                  }
+                }}
+                value={draft}
+              />
+            </label>
+            <div className="mt-2 flex items-start justify-between gap-3">
+              <div>
+                <p className="text-neutral-600" id="human-draft-count">
+                  {draftInspection.codePointCount} / 4000
+                </p>
+                <p
+                  className="text-neutral-600"
+                  data-testid="send-disabled-reason"
+                  id="send-disabled-reason"
+                >
+                  {sendDisabledReason}
+                </p>
+              </div>
+              <button
+                className="border border-neutral-900 bg-neutral-900 px-4 py-2 font-medium text-white disabled:opacity-50"
+                disabled={!canSend}
+                onClick={submitCurrentDraft}
+                type="button"
+              >
+                发送发言
+              </button>
+            </div>
+            {humanPending ? (
+              <aside
+                aria-live="polite"
+                className="mt-3 border border-blue-200 bg-blue-50 p-3"
+                data-testid="human-pending"
+              >
+                <p>待服务器确认（尚未进入讨论记录）</p>
+                <p
+                  className="mt-1 whitespace-pre-wrap"
+                  data-testid="human-pending-content"
+                >
+                  {humanPending.content}
+                </p>
+              </aside>
+            ) : null}
+          </section>
+
+          {aiWaitingLabel ? (
+            <p aria-live="polite" className="mt-3 text-sm text-neutral-600">
+              {aiWaitingLabel}
+            </p>
+          ) : null}
+          {interruptedAiGrantIds.map((grantId) => (
+            <p
+              aria-live="polite"
+              className="mt-3 text-sm text-neutral-600"
+              key={grantId}
+            >
+              这次 AI 发言未完成，讨论将继续。
+            </p>
+          ))}
+        </>
+      ) : null}
+      {rejectedDraft ? (
+        <aside
+          aria-live="polite"
+          className="mt-4 border border-amber-300 bg-amber-50 p-3 text-sm"
+          data-testid="rejected-human-draft"
+        >
+          <p>
+            {rejectedDraft.reason === "UTTERANCE_REJECTED"
+              ? "这条发言当前无法提交，请确认发言机会后重试。"
+              : "这条发言需要在同步会话状态后重试。"}
+          </p>
+          <p
+            className="mt-2 whitespace-pre-wrap"
+            data-testid="rejected-human-content"
+          >
+            {rejectedDraft.content}
+          </p>
+          <button
+            className="mt-2 border border-amber-700 px-3 py-1 font-medium"
+            onClick={() => {
+              setDraft(rejectedDraft.content);
+              setRejectedDraft(undefined);
+            }}
+            type="button"
+          >
+            {draft ? "用被拒发言替换当前草稿" : "恢复被拒发言到草稿"}
+          </button>
+        </aside>
+      ) : null}
       {question ? (
         <article className="mt-6 space-y-4 border-t border-neutral-200 pt-5 text-sm">
           <div>

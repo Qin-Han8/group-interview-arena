@@ -154,15 +154,36 @@ export type FloorInterventionRequestedEvent =
 export type FloorEvent =
   FloorGrantedEvent | FloorReleasedEvent | FloorInterventionRequestedEvent;
 
+export type ParticipantUtteranceCreatedEvent = {
+  schema_version: 1;
+  type: "participant.utterance.created";
+  session_id: string;
+  sequence: number;
+  occurred_at: string;
+  action_id: string | null;
+  payload: {
+    utterance_id: string;
+    participant_id: string;
+    actor_kind: "HUMAN" | "AI";
+    floor_grant_id: string;
+    phase: FloorPhase;
+    content: string;
+  };
+};
+
 export type FormalSessionEvent =
-  SessionCreatedEvent | SessionStateChangedEvent | FloorEvent;
+  | SessionCreatedEvent
+  | SessionStateChangedEvent
+  | FloorEvent
+  | ParticipantUtteranceCreatedEvent;
 
 export type RealtimeErrorCode =
   | "INVALID_SESSION_STATE"
   | "ACTION_ID_CONFLICT"
   | "PROTOCOL_ERROR"
   | "SEQUENCE_AHEAD"
-  | "INTERNAL_ERROR";
+  | "INTERNAL_ERROR"
+  | "UTTERANCE_REJECTED";
 
 export type RealtimeErrorEvent = {
   schema_version: 1;
@@ -195,6 +216,17 @@ export type SessionStartCommand = {
   payload: Record<string, never>;
 };
 
+export type ParticipantUtteranceSubmitCommand = {
+  schema_version: 1;
+  type: "participant.utterance.submit";
+  session_id: string;
+  action_id: string;
+  payload: {
+    floor_grant_id: string;
+    content: string;
+  };
+};
+
 const UUID4_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ERROR_CODES = new Set<RealtimeErrorCode>([
@@ -203,6 +235,7 @@ const ERROR_CODES = new Set<RealtimeErrorCode>([
   "PROTOCOL_ERROR",
   "SEQUENCE_AHEAD",
   "INTERNAL_ERROR",
+  "UTTERANCE_REJECTED",
 ]);
 const SESSION_STATUSES = new Set<SessionStatus>([
   "CREATED",
@@ -428,6 +461,28 @@ function isFormalEvent(
       value.action_id === null &&
       hasExactKeys(value.payload, ["status"]) &&
       value.payload.status === "CREATED"
+    );
+  }
+
+  if (value.type === "participant.utterance.created") {
+    const payload = value.payload;
+    return (
+      value.schema_version === 1 &&
+      hasExactKeys(payload, [
+        "utterance_id",
+        "participant_id",
+        "actor_kind",
+        "floor_grant_id",
+        "phase",
+        "content",
+      ]) &&
+      isUuid4(payload.utterance_id) &&
+      isUuid4(payload.participant_id) &&
+      isUuid4(payload.floor_grant_id) &&
+      isFloorPhase(payload.phase) &&
+      typeof payload.content === "string" &&
+      ((payload.actor_kind === "HUMAN" && isUuid4(value.action_id)) ||
+        (payload.actor_kind === "AI" && value.action_id === null))
     );
   }
 

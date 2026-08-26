@@ -69,6 +69,64 @@ function event(
 }
 
 describe("authoritative floor projection", () => {
+  it("advances only public timestamps and watermark for an utterance", () => {
+    const withCurrentFloor: SessionSnapshot = {
+      ...SNAPSHOT,
+      floor: {
+        ...SNAPSHOT.floor,
+        current_grant: {
+          grant_id: GRANT_ID,
+          participant_id: PARTICIPANT_ID,
+          phase: "OPENING_STATEMENTS",
+          reason_code: "FIRST_OPPORTUNITY",
+          granted_at: "2026-08-20T01:00:01Z",
+        },
+        latest_event: {
+          type: "floor.granted",
+          sequence: 4,
+          occurred_at: "2026-08-20T01:00:01Z",
+          phase: "OPENING_STATEMENTS",
+          reason_code: "FIRST_OPPORTUNITY",
+          grant_id: GRANT_ID,
+          participant_id: PARTICIPANT_ID,
+          intervention_id: null,
+          intervention_kind: null,
+        },
+      },
+    };
+    const utterance: FormalSessionEvent = {
+      schema_version: 1,
+      type: "participant.utterance.created",
+      session_id: SESSION_ID,
+      sequence: 5,
+      occurred_at: "2026-08-20T01:00:02Z",
+      action_id: ACTION_ID,
+      payload: {
+        utterance_id: "00000000-0000-4000-8000-000000000008",
+        participant_id: PARTICIPANT_ID,
+        actor_kind: "HUMAN",
+        floor_grant_id: GRANT_ID,
+        phase: "OPENING_STATEMENTS",
+        content: "  exact contribution\nsecond line  ",
+      },
+    };
+
+    const projected = projectSessionEvent(withCurrentFloor, utterance);
+
+    expect(projected).toEqual({
+      ...withCurrentFloor,
+      server_now: utterance.occurred_at,
+      updated_at: utterance.occurred_at,
+      last_sequence: utterance.sequence,
+    });
+    expect(projected.status).toBe(withCurrentFloor.status);
+    expect(projected.phase_started_at).toBe(withCurrentFloor.phase_started_at);
+    expect(projected.phase_deadline_at).toBe(
+      withCurrentFloor.phase_deadline_at,
+    );
+    expect(projected.floor).toEqual(withCurrentFloor.floor);
+  });
+
   it("projects grant then release without exposing scheduler metadata", () => {
     const granted = projectSessionEvent(SNAPSHOT, event("floor.granted", 4));
     expect(granted.floor.current_grant).toMatchObject({
