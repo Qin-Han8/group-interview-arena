@@ -63,8 +63,7 @@ REPOSITORY_ROOT = API_ROOT.parents[1]
 WEB_ROOT = REPOSITORY_ROOT / "apps" / "web"
 PRIVATE_SENTINEL = "P1_2C_PRIVATE_SENTINEL_DO_NOT_DISCLOSE"
 HUMAN_CONTRIBUTION = (
-    "  Human evidence: preserve this exact contribution.\n"
-    "Second line stays exact.  "
+    "  Human evidence: preserve this exact contribution.\nSecond line stays exact.  "
 )
 
 
@@ -487,12 +486,12 @@ def _verify_session_persistence(temporary_database: TemporaryDatabase) -> None:
         or current_floor_grant_id is not None
     ):
         raise RuntimeError("Browser E2E terminal session state was not persisted.")
-    if event_sequences != [
-        (sequence,) for sequence in range(1, last_sequence + 1)
-    ]:
+    if event_sequences != [(sequence,) for sequence in range(1, last_sequence + 1)]:
         raise RuntimeError("Browser E2E formal event sequences were not contiguous.")
     if len(human_event_rows) != 1:
-        raise RuntimeError("Browser E2E Human utterance was not persisted exactly once.")
+        raise RuntimeError(
+            "Browser E2E Human utterance was not persisted exactly once."
+        )
     if (
         human_action_id is None
         or human_command_type != "participant.utterance.submit"

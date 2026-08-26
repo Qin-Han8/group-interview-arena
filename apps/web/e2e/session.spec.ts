@@ -20,37 +20,61 @@ test("browser session recovers durable phases across API restart and reload", as
   let humanSubmitCommand: string | undefined;
   let humanCreatedEvent: string | undefined;
   let humanReleaseEvent: string | undefined;
+  let releaseHumanConfirmation: (() => void) | undefined;
+  let humanConfirmationReleased = false;
 
-  page.on("websocket", (socket) => {
-    socket.on("framesent", ({ payload }) => {
-      if (typeof payload === "string" && payload.includes("session.start")) {
+  await page.routeWebSocket(/\/ws\/sessions\//, (socket) => {
+    const server = socket.connectToServer();
+    const bufferedServerFrames: Array<Parameters<typeof socket.send>[0]> = [];
+    let bufferingHumanConfirmation = false;
+
+    socket.onMessage((message) => {
+      const payload = message.toString();
+      if (payload.includes("session.start")) {
         startCommand = payload;
       }
-      if (
-        typeof payload === "string" &&
-        payload.includes("participant.utterance.submit")
-      ) {
+      if (payload.includes("participant.utterance.submit")) {
         humanSubmitCommand = payload;
       }
+      server.send(message);
     });
-    socket.on("framereceived", ({ payload }) => {
-      if (typeof payload === "string" && payload.includes("floor.granted")) {
+
+    server.onMessage((message) => {
+      const payload = message.toString();
+      if (payload.includes("floor.granted")) {
         floorEvent = payload;
       }
-      if (
-        typeof payload === "string" &&
+      const isHumanConfirmation =
         payload.includes("participant.utterance.created") &&
-        payload.includes('\"actor_kind\":\"HUMAN\"')
-      ) {
+        payload.includes('\"actor_kind\":\"HUMAN\"');
+      if (isHumanConfirmation) {
         humanCreatedEvent = payload;
       }
       if (
-        typeof payload === "string" &&
         payload.includes("floor.released") &&
         payload.includes('\"reason_code\":\"SPEAKER_FINISHED\"')
       ) {
         humanReleaseEvent = payload;
       }
+
+      if (
+        !humanConfirmationReleased &&
+        (bufferingHumanConfirmation || isHumanConfirmation)
+      ) {
+        bufferingHumanConfirmation = true;
+        bufferedServerFrames.push(message);
+        releaseHumanConfirmation ??= () => {
+          humanConfirmationReleased = true;
+          bufferingHumanConfirmation = false;
+          for (const bufferedFrame of bufferedServerFrames.splice(0)) {
+            socket.send(bufferedFrame);
+          }
+          releaseHumanConfirmation = undefined;
+        };
+        return;
+      }
+
+      socket.send(message);
     });
   });
 
@@ -194,6 +218,8 @@ test("browser session recovers durable phases across API restart and reload", as
   const draft = page.getByLabel("发言草稿");
   await draft.fill(HUMAN_CONTRIBUTION);
   await page.getByRole("button", { name: "发送发言" }).click();
+  await expect.poll(() => humanSubmitCommand).toBeTruthy();
+  await expect.poll(() => humanCreatedEvent).toBeTruthy();
   await expect(page.getByTestId("human-pending")).toBeVisible();
   await expect(page.getByTestId("human-pending-content")).toHaveText(
     HUMAN_CONTRIBUTION,
@@ -201,7 +227,6 @@ test("browser session recovers durable phases across API restart and reload", as
   );
   expect(await exactConfirmedContributionCount()).toBe(0);
 
-  await expect.poll(() => humanSubmitCommand).toBeTruthy();
   const parsedHumanCommand = JSON.parse(humanSubmitCommand ?? "{}");
   expect(parsedHumanCommand).toEqual({
     schema_version: 1,
@@ -216,7 +241,6 @@ test("browser session recovers durable phases across API restart and reload", as
     },
   });
 
-  await expect.poll(() => humanCreatedEvent).toBeTruthy();
   const parsedHumanEvent = JSON.parse(humanCreatedEvent ?? "{}");
   expect(parsedHumanEvent).toMatchObject({
     schema_version: 1,
@@ -231,6 +255,8 @@ test("browser session recovers durable phases across API restart and reload", as
       content: HUMAN_CONTRIBUTION,
     },
   });
+  expect(releaseHumanConfirmation).toBeDefined();
+  releaseHumanConfirmation?.();
   await expect.poll(exactConfirmedContributionCount).toBe(1);
   await expect(page.getByTestId("human-pending")).toHaveCount(0);
 
