@@ -1,6 +1,6 @@
 # P1-5 AI Runtime Foundation Execution Plan
 
-Status: `P1 IN_PROGRESS`; `P1-5 IN_PROGRESS`; `P1-5A completed`; `P1-5B completed`; `P1-5C completed`; `P1-5D DONE`; `P1-5E DONE`; `P1-5E-1 DONE`; `P1-5E-2 DONE`; `P1-5E-3 DONE`; `P1-5F IN_PROGRESS`; `P1-5F-1 DONE`; `P1-5F-2 DONE`; `P1-5F-3A IN_PROGRESS` (not `DONE`) with `DESIGN_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PASS / FINDINGS_NONE_OPEN`; `COMMIT_PUSH/CI/INDEPENDENT_FINAL_ACCEPTANCE PENDING`; `P1-5F-3B/P1-5F-4 NOT_STARTED`
+Status: `P1 IN_PROGRESS`; `P1-5 IN_PROGRESS`; `P1-5A completed`; `P1-5B completed`; `P1-5C completed`; `P1-5D DONE`; `P1-5E DONE`; `P1-5E-1 DONE`; `P1-5E-2 DONE`; `P1-5E-3 DONE`; `P1-5F IN_PROGRESS`; `P1-5F-1 DONE`; `P1-5F-2 DONE`; `P1-5F-3A DONE` with `DESIGN_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PASS / COMMIT_PUSH_COMPLETE / CI_PASS / INDEPENDENT_FINAL_ACCEPTANCE_PASS / FINDINGS_NONE_OPEN`; `P1-5F-3B/P1-5F-4 NOT_STARTED`
 
 Target version: `V0.1 Internal Validation`
 
@@ -42,11 +42,11 @@ P1-5C 是 separately approved deterministic runtime vertical slice。它在不�
 - `P1-5F-1 — Realtime/Public Contract Design Freeze`：`DONE`；docs-only；finding-only external re-review `PASS` with findings none；
   - `P1-5F-2 — Backend Text Discussion Transport`：`DONE`；initial implementation actual-source review `BLOCKED` on three findings；all remediated；finding-only external re-review `PASS`，findings none；
   - `P1-5F-3 — Web Discussion Experience`：`IN_PROGRESS`；
-    - `P1-5F-3A — Web Discussion Functional Closure`：`IN_PROGRESS` (not `DONE`) with `DESIGN_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PASS / FINDINGS_NONE_OPEN`；commit/push、CI and independent final acceptance `PENDING`；
+    - `P1-5F-3A — Web Discussion Functional Closure`：`DONE` with `DESIGN_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PASS / COMMIT_PUSH_COMPLETE / CI_PASS / INDEPENDENT_FINAL_ACCEPTANCE_PASS / FINDINGS_NONE_OPEN`；
     - `P1-5F-3B — Complete Discussion Page Composition`：`NOT_STARTED`；
   - `P1-5F-4 — Composition E2E + Independent Acceptance`：`NOT_STARTED`。
 
-P1-5D design freeze、implementation and config-driven model patch were separately approved；both actual-source reviews and its final user-run sanitized real-provider acceptance smoke passed，so P1-5D is `DONE`。P1-5E-1、P1-5E-2 and P1-5E-3 are also `DONE` after their required reviews，closing P1-5E as `DONE`。Codex made no real-model call and records no credential、raw provider response or sensitive header。P1-5F-1 froze the public realtime/transcript contract below；P1-5F-2 is `DONE` after its three implementation review findings were remediated and finding-only external re-review passed with findings none。P1-5F-3A design is frozen、implementation and final code gates are complete，and external actual-source implementation review is `PASS` after F3A-FINAL-001 remediation with no findings open；F3A remains `IN_PROGRESS` and is not `DONE` pending commit/push、CI and independent final acceptance；F3B/F4 remain not started。
+P1-5D design freeze、implementation and config-driven model patch were separately approved；both actual-source reviews and its final user-run sanitized real-provider acceptance smoke passed，so P1-5D is `DONE`。P1-5E-1、P1-5E-2 and P1-5E-3 are also `DONE` after their required reviews，closing P1-5E as `DONE`。Codex made no real-model call and records no credential、raw provider response or sensitive header。P1-5F-1 froze the public realtime/transcript contract below；P1-5F-2 is `DONE` after its three implementation review findings were remediated and finding-only external re-review passed with findings none。P1-5F-3A design is frozen、implementation and final code gates are complete，external actual-source implementation review is `PASS` after F3A-FINAL-001 remediation，commit/push is complete at accepted target `30446af520e55977a7c7a4839e00ab1a0a94d44e`，GitHub Actions run `32945590023` passed all four required jobs，and independent final acceptance is `PASS` with no findings；F3A is `DONE` while F3B/F4 remain not started。
 
 ## Context and authority
 
@@ -496,7 +496,7 @@ Still Deferred after the P1-5E-1 docs-only freeze:
 
 ## Later implementation gates
 
-P1-5D implementation and config-driven patch followed the frozen section above without scope expansion；both actual-source reviews and the final user-run sanitized real-provider acceptance smoke passed，and P1-5D is `DONE`。P1-5E-1 is `DONE` after actual-source review `PASS`，P1-5E-2 is `DONE` after its initial 3 findings were remediated and re-review passed，and P1-5E-3 is `DONE` after implementation actual-source review `PASS` with findings none and sanitized real-provider composition smoke `PASS`。P1-5F-1 and the separately approved P1-5F-2 are `DONE`；P1-5F-3A design is frozen、implementation is complete and actual-source review is `PASS` with no findings open，but it remains `IN_PROGRESS` and is not `DONE` pending commit/push、CI and independent final acceptance；F3B/F4 require their own later approvals。Any later implementation/transport subphase must preserve:
+P1-5D implementation and config-driven patch followed the frozen section above without scope expansion；both actual-source reviews and the final user-run sanitized real-provider acceptance smoke passed，and P1-5D is `DONE`。P1-5E-1 is `DONE` after actual-source review `PASS`，P1-5E-2 is `DONE` after its initial 3 findings were remediated and re-review passed，and P1-5E-3 is `DONE` after implementation actual-source review `PASS` with findings none and sanitized real-provider composition smoke `PASS`。P1-5F-1、P1-5F-2 and P1-5F-3A are `DONE`；F3A design is frozen、implementation is complete、actual-source review/commit-push/CI/independent final acceptance passed and no findings remain open；F3B/F4 require their own later approvals。Any later implementation/transport subphase must preserve:
 
 - any additive schema need and historical deletion/retention semantics；
 - provider-neutral request/result/error contract with a real caller；
@@ -566,7 +566,7 @@ P1-5D implementation and config-driven patch followed the frozen section above w
 
 ## P1-5F-1 design freeze — Realtime/Public Contract
 
-P1-5F-1 is the separately approved docs-only architectural freeze for exposing the completed P1-5E automatic AI orchestration through a public text-discussion contract。It creates no backend、Web、WebSocket、REST、schema、migration、test、generated contract、dependency、configuration or infrastructure implementation。P1-5F/P1-5/P1 remain `IN_PROGRESS`；P1-5F-1 and the separately approved P1-5F-2 are `DONE` after their required external reviews；P1-5F-3A remains `IN_PROGRESS` (not `DONE`) with `DESIGN_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PASS / FINDINGS_NONE_OPEN`，and commit/push、CI and independent final acceptance pending，while F3B/F4 remain `NOT_STARTED`。
+P1-5F-1 is the separately approved docs-only architectural freeze for exposing the completed P1-5E automatic AI orchestration through a public text-discussion contract。It creates no backend、Web、WebSocket、REST、schema、migration、test、generated contract、dependency、configuration or infrastructure implementation。P1-5F/P1-5/P1 remain `IN_PROGRESS`；P1-5F-1、P1-5F-2 and P1-5F-3A are `DONE` after their required reviews and gates；F3A has `DESIGN_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PASS / COMMIT_PUSH_COMPLETE / CI_PASS / INDEPENDENT_FINAL_ACCEPTANCE_PASS / FINDINGS_NONE_OPEN`，while F3B/F4 remain `NOT_STARTED`。
 
 ### Public protocol and deployment boundary
 
@@ -819,7 +819,7 @@ If later actual-source implementation disproves any of those facts，requires a 
 - The initial external actual-source review was `BLOCKED` by one floor-event v1 `action_id` compatibility finding。Remediation preserved historical v1 semantics and froze additive floor-event v2 without changing source、schema or ADR authority。
 - The finding-only external re-review verdict is `PASS` with findings none。Reviewed bundle：`group-interview-arena-review-20260825-110115.zip`；SHA-256：`6603b1f0377aa449d3a209e475fb3afbb74f9f83c9be38f84df97918eeb1ac0c`。
 - A narrow F1 command erratum was later discovered during P1-5F-2 actual-source review：the previously approved exact-floor binding is restored by requiring `floor_grant_id` in the v1 submit payload and matching it to the locked authoritative current grant。This does not reopen the unrelated F1 design or alter the independently versioned public-event contract。
-- At the P1-5F-1 closeout checkpoint，P1-5F-2～F4 were `NOT_STARTED` and no commit or push was authorized。After the separately approved P1-5F-2 implementation、remediation and external finding-only re-review，P1-5F-1/P1-5F-2 are `DONE`。P1-5F-3A remains `IN_PROGRESS` (not `DONE`) with `DESIGN_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PASS / FINDINGS_NONE_OPEN`；commit/push、CI and independent final acceptance remain pending；P1-5F-3B/F4 remain `NOT_STARTED`；P1-5F/P1-5/P1 remain `IN_PROGRESS`；no commit or push is authorized。
+- At the P1-5F-1 closeout checkpoint，P1-5F-2～F4 were `NOT_STARTED` and no commit or push was authorized。After the separately approved F2/F3A implementation and governance gates，P1-5F-1/P1-5F-2/P1-5F-3A are `DONE`。F3A has `DESIGN_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PASS / COMMIT_PUSH_COMPLETE / CI_PASS / INDEPENDENT_FINAL_ACCEPTANCE_PASS / FINDINGS_NONE_OPEN` at accepted target `30446af520e55977a7c7a4839e00ab1a0a94d44e`；P1-5F-3B/F4 remain `NOT_STARTED` and require separate approval；P1-5F/P1-5/P1 remain `IN_PROGRESS`。
 
 ## Decisions
 
@@ -867,6 +867,6 @@ If later actual-source implementation disproves any of those facts，requires a 
 - P1-5F：`IN_PROGRESS`；
 - P1-5F-1：`DONE`；docs-only public REST/WS/Browser contract freeze accepted after finding remediation and finding-only external re-review `PASS`；
   - P1-5F-2：`DONE`；initial implementation review `BLOCKED` on three findings，all remediated；finding-only external re-review `PASS`，findings none；reviewed remediation bundle `group-interview-arena-review-20260825-150754.zip` / SHA-256 `b9553cbe488707d5fd87598b70e48e1fabdf55a0ae6d3dab367b830267d61edd`；
-  - P1-5F-3A：`IN_PROGRESS` (not `DONE`) with `DESIGN_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PASS / FINDINGS_NONE_OPEN`；Tasks 1–7 and final code gates are GREEN；commit/push、CI and independent final acceptance are pending；
+  - P1-5F-3A：`DONE` with `DESIGN_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PASS / COMMIT_PUSH_COMPLETE / CI_PASS / INDEPENDENT_FINAL_ACCEPTANCE_PASS / FINDINGS_NONE_OPEN`；accepted target `30446af520e55977a7c7a4839e00ab1a0a94d44e`；GitHub Actions run `32945590023` all four jobs `PASS`；
   - P1-5F-3B：`NOT_STARTED`；complete discussion page composition requires separate approval；
   - P1-5F-4：`NOT_STARTED`；composition E2E and independent acceptance require separate approval。

@@ -6,10 +6,12 @@
 > push unless separately authorized.
 
 Status: `IMPLEMENTATION_PLAN_FROZEN`; `IMPLEMENTATION_COMPLETE`;
-`ACTUAL_SOURCE_REVIEW_PASS`; `FINDINGS_NONE_OPEN`; F3A `IN_PROGRESS`
-(not `DONE`)
+`ACTUAL_SOURCE_REVIEW_PASS`; `COMMIT_PUSH_COMPLETE`; `CI_PASS`;
+`INDEPENDENT_FINAL_ACCEPTANCE_PASS`; `FINDINGS_NONE_OPEN`; F3A `DONE`
 
-Governance pending: `COMMIT_PUSH`; `CI`; `INDEPENDENT_FINAL_ACCEPTANCE`;
+Accepted committed target: `30446af520e55977a7c7a4839e00ab1a0a94d44e`
+
+GitHub Actions: run `32945590023`; all four required jobs `PASS`;
 `P1-5F-3B/P1-5F-4 NOT_STARTED`
 
 **Goal:** Close the V0.1 browser text-discussion functional loop on the
@@ -1394,11 +1396,14 @@ Record the exact finding and stop; do not solve it by broadening this plan.
 - Exact production/test boundary: frozen.
 - Seven-task TDD order and interfaces: frozen.
 - Implementation: Tasks 1–7 complete；external actual-source implementation
-  review `PASS` after F3A-FINAL-001 remediation；findings none open；F3A remains
-  `IN_PROGRESS` and is not `DONE` pending commit/push、CI and independent final acceptance；F3B/F4
-  remain `NOT_STARTED`.
+  review `PASS` after F3A-FINAL-001 remediation；findings none open.
 - Final validation: frozen install/manifests unchanged；Web
   format/lint/typecheck/build PASS；Vitest `150/150`；live OpenAPI derivative
   drift PASS；real Chromium `2/2` PASS with exact durable Human persistence
   semantics and zero provider request.
+- Commit/push: `COMPLETE` at accepted target
+  `30446af520e55977a7c7a4839e00ab1a0a94d44e`.
+- CI: `PASS`；GitHub Actions run `32945590023` passed all four required jobs.
+- Independent final acceptance: `PASS`；findings none；F3A is `DONE`；F3B/F4
+  remain `NOT_STARTED`.
 - Stage/commit/push authorization: none.

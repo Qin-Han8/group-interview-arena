@@ -1,10 +1,12 @@
 # P1-5F-3A Web Discussion Functional Closure — Design Freeze
 
 Status: `DESIGN_FROZEN`; `IMPLEMENTATION_COMPLETE`;
-`ACTUAL_SOURCE_REVIEW_PASS`; `FINDINGS_NONE_OPEN`; F3A `IN_PROGRESS`
-(not `DONE`)
+`ACTUAL_SOURCE_REVIEW_PASS`; `COMMIT_PUSH_COMPLETE`; `CI_PASS`;
+`INDEPENDENT_FINAL_ACCEPTANCE_PASS`; `FINDINGS_NONE_OPEN`; F3A `DONE`
 
-Governance pending: `COMMIT_PUSH`; `CI`; `INDEPENDENT_FINAL_ACCEPTANCE`
+Accepted committed target: `30446af520e55977a7c7a4839e00ab1a0a94d44e`
+
+GitHub Actions: run `32945590023`; all four required jobs `PASS`
 
 Parent status: `P1 IN_PROGRESS`; `P1-5 IN_PROGRESS`; `P1-5F IN_PROGRESS`;
 `P1-5F-1 DONE`; `P1-5F-2 DONE`;
@@ -910,9 +912,11 @@ freeze.
 - E2E harness/persistence-verifier boundary amendment: `DESIGN_FROZEN`.
 - F3A Web implementation: `IMPLEMENTATION_COMPLETE`；external actual-source
   implementation review `PASS` after F3A-FINAL-001 remediation；findings none
-  open；Tasks 1–7 and final code gates GREEN；F3A remains `IN_PROGRESS` and is
-  not `DONE`.
-- Commit/push、CI and independent final acceptance: `PENDING`.
+  open；Tasks 1–7 and final code gates GREEN.
+- Commit/push: `COMPLETE` at accepted target
+  `30446af520e55977a7c7a4839e00ab1a0a94d44e`.
+- CI: `PASS`；GitHub Actions run `32945590023` passed all four required jobs.
+- Independent final acceptance: `PASS`；findings none；F3A is `DONE`.
 - F3B complete discussion page composition: `NOT_STARTED`.
 - F4 composition E2E + independent acceptance: `NOT_STARTED`.
 - New decisions or unresolved F3A design questions: none.
