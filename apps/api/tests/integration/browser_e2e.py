@@ -494,6 +494,7 @@ def _verify_session_persistence(temporary_database: TemporaryDatabase) -> None:
         )
     if (
         human_action_id is None
+        or human_event_sequence is None
         or human_command_type != "participant.utterance.submit"
         or human_phase != "OPENING_STATEMENTS"
         or human_content != HUMAN_CONTRIBUTION
