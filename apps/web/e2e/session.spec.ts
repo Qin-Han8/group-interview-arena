@@ -5,11 +5,16 @@ const API_BASE_URL = process.env.GIA_E2E_API_ORIGIN ?? "http://localhost:8000";
 const PRIVATE_SENTINEL = "P1_2C_PRIVATE_SENTINEL_DO_NOT_DISCLOSE";
 const HUMAN_CONTRIBUTION =
   "  Human evidence: preserve this exact contribution.\nSecond line stays exact.  ";
+const AI_CONTRIBUTION =
+  process.env.GIA_E2E_AI_CONTENT ??
+  "F4 Browser deterministic fake AI contribution.";
 const PRIVATE_NOTES = "仅在当前页面内存中保留的私人思路";
 const API_RESTART_REQUEST = process.env.GIA_E2E_API_RESTART_REQUEST;
 const API_RESTART_READY = process.env.GIA_E2E_API_RESTART_READY;
 const FLOOR_REQUEST = process.env.GIA_E2E_FLOOR_REQUEST;
 const FLOOR_READY = process.env.GIA_E2E_FLOOR_READY;
+
+test.setTimeout(45_000);
 
 test("browser session recovers durable phases across API restart and reload", async ({
   page,
@@ -21,6 +26,7 @@ test("browser session recovers durable phases across API restart and reload", as
   let humanSubmitCommand: string | undefined;
   let humanCreatedEvent: string | undefined;
   let humanReleaseEvent: string | undefined;
+  let aiCreatedEvent: string | undefined;
   let releaseHumanConfirmation: (() => void) | undefined;
   let humanConfirmationReleased = false;
   let authoritativeReadCount = 0;
@@ -67,6 +73,12 @@ test("browser session recovers durable phases across API restart and reload", as
         humanCreatedEvent = payload;
       }
       if (
+        payload.includes("participant.utterance.created") &&
+        payload.includes('\"actor_kind\":\"AI\"')
+      ) {
+        aiCreatedEvent ??= payload;
+      }
+      if (
         payload.includes("floor.released") &&
         payload.includes('\"reason_code\":\"SPEAKER_FINISHED\"')
       ) {
@@ -101,6 +113,15 @@ test("browser session recovers durable phases across API restart and reload", as
         (items, exactContent) =>
           items.filter((item) => item.textContent === exactContent).length,
         HUMAN_CONTRIBUTION,
+      );
+
+  const exactConfirmedAiContributionCount = () =>
+    page
+      .locator('[data-testid^="utterance-content-"]')
+      .evaluateAll(
+        (items, exactContent) =>
+          items.filter((item) => item.textContent === exactContent).length,
+        AI_CONTRIBUTION,
       );
 
   const captureResponsiveEvidence = async (name: string) => {
@@ -425,8 +446,46 @@ test("browser session recovers durable phases across API restart and reload", as
     },
   });
 
+  await expect.poll(() => aiCreatedEvent, { timeout: 10_000 }).toBeTruthy();
+  const parsedAiEvent = JSON.parse(aiCreatedEvent ?? "{}");
+  expect(parsedAiEvent).toMatchObject({
+    schema_version: 1,
+    type: "participant.utterance.created",
+    session_id: sessionId,
+    action_id: null,
+    payload: {
+      utterance_id: expect.stringMatching(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+      ),
+      participant_id: expect.stringMatching(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+      ),
+      actor_kind: "AI",
+      floor_grant_id: expect.stringMatching(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+      ),
+      phase: "OPENING_STATEMENTS",
+      content: AI_CONTRIBUTION,
+    },
+  });
+  expect(aiCreatedEvent).not.toContain(PRIVATE_SENTINEL);
+  await expect
+    .poll(exactConfirmedAiContributionCount)
+    .toBeGreaterThanOrEqual(1);
+  const confirmedAiUtterance = page
+    .getByTestId("confirmed-transcript")
+    .getByTestId(
+      `utterance-content-${parsedAiEvent.payload.utterance_id as string}`,
+    );
+  await expect(confirmedAiUtterance).toHaveText(AI_CONTRIBUTION, {
+    useInnerText: false,
+  });
+
   await page.reload();
   await expect.poll(exactConfirmedContributionCount).toBe(1);
+  await expect(confirmedAiUtterance).toHaveText(AI_CONTRIBUTION, {
+    useInnerText: false,
+  });
   expect(
     await page
       .locator('[data-testid^="utterance-content-"]')
@@ -456,6 +515,9 @@ test("browser session recovers durable phases across API restart and reload", as
     timeout: 10_000,
   });
   await expect.poll(exactConfirmedContributionCount).toBe(1);
+  await expect(confirmedAiUtterance).toHaveText(AI_CONTRIBUTION, {
+    useInnerText: false,
+  });
 
   await expect(page.getByText("已完成", { exact: true }).first()).toBeVisible({
     timeout: 25_000,
@@ -493,6 +555,7 @@ test("browser session recovers durable phases across API restart and reload", as
   });
   const finalSequence = Number(authoritative.body.last_sequence);
   expect(finalSequence).toBeGreaterThan(parsedHumanRelease.sequence);
+  expect(finalSequence).toBeGreaterThan(parsedAiEvent.sequence);
   expect(JSON.stringify(authoritative)).not.toContain(PRIVATE_SENTINEL);
 
   const duplicate = await page.evaluate(
@@ -570,6 +633,9 @@ test("browser session recovers durable phases across API restart and reload", as
     page.getByText("正在安排下一位发言者", { exact: true }),
   ).toHaveCount(0);
   await expect.poll(exactConfirmedContributionCount).toBe(1);
+  await expect(confirmedAiUtterance).toHaveText(AI_CONTRIBUTION, {
+    useInnerText: false,
+  });
   await expect(
     page.getByText("内部工程验证题：团队需要在有限资源下安排三类社区活动。"),
   ).toBeVisible();

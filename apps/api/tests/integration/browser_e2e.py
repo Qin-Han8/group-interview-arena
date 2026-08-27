@@ -37,6 +37,8 @@ from group_interview_arena_api.db.runtime import (
     create_database_session_factory,
     dispose_database_engine,
 )
+from group_interview_arena_api.modules.ai_runtime.domain import PromptVersionDefinition
+from group_interview_arena_api.modules.ai_runtime.service import publish_prompt_version
 from group_interview_arena_api.modules.discussion_sessions.domain import SessionStatus
 from group_interview_arena_api.modules.floor_control.scheduler import (
     V0_1_SCHEDULER_POLICY,
@@ -65,6 +67,17 @@ PRIVATE_SENTINEL = "P1_2C_PRIVATE_SENTINEL_DO_NOT_DISCLOSE"
 HUMAN_CONTRIBUTION = (
     "  Human evidence: preserve this exact contribution.\nSecond line stays exact.  "
 )
+AI_CONTRIBUTION = "F4 Browser deterministic fake AI contribution."
+PROMPT_VERSION_ID = UUID("55000000-0000-4000-8000-000000000001")
+PROMPT_TEMPLATE = """Session: $session_id
+Participant: $participant_id
+Grant: $floor_grant_id
+Phase: $phase
+Question: $question_context
+Persona: $persona_context
+Private stance: $private_stance
+Phase instruction: $phase_instruction
+"""
 
 
 def _port_is_available(port: int) -> bool:
@@ -243,12 +256,37 @@ def _run_browser_flow(temporary_database: TemporaryDatabase) -> None:
         restart_ready = temporary_path / "restart-api.ready"
         floor_request = temporary_path / "schedule-floor.request"
         floor_ready = temporary_path / "schedule-floor.ready"
+        fake_app_module = temporary_path / "gia_e2e_fake_provider_app.py"
+        fake_app_module.write_text(
+            "import os\n"
+            "\n"
+            "from group_interview_arena_api.modules.ai_runtime import composition\n"
+            "from group_interview_arena_api.modules.ai_runtime.generation "
+            "import RawGenerationSuccess\n"
+            "\n"
+            "\n"
+            "async def _network_free_provider(_generation_input):\n"
+            "    return RawGenerationSuccess(\n"
+            "        content=os.environ['GIA_E2E_AI_CONTENT']\n"
+            "    )\n"
+            "\n"
+            "\n"
+            "def _network_free_provider_factory(_settings):\n"
+            "    return _network_free_provider\n"
+            "\n"
+            "\n"
+            "composition.ZhipuGenerationProvider = "
+            "_network_free_provider_factory\n"
+            "\n"
+            "from group_interview_arena_api.app import app\n",
+            encoding="utf-8",
+        )
 
         api_command = [
             sys.executable,
             "-m",
             "uvicorn",
-            "group_interview_arena_api.app:app",
+            "gia_e2e_fake_provider_app:app",
             "--host",
             "localhost",
             "--port",
@@ -261,13 +299,22 @@ def _run_browser_flow(temporary_database: TemporaryDatabase) -> None:
             "GIA_API_DATABASE_URL": database_url.get_secret_value(),
             "GIA_API_ENVIRONMENT": "test",
             "GIA_API_SESSION_COOKIE_SECURE": "false",
+            "GIA_API_ZHIPU_API_KEY": "network-free-e2e-placeholder",
+            "GIA_API_ZHIPU_MODEL": "network-free-e2e-model",
             "GIA_API_SESSION_PHASE_DURATIONS": (
                 '{"preparation_seconds":2,'
-                '"opening_statements_seconds":12,'
+                '"opening_statements_seconds":20,'
                 '"exploration_seconds":2,'
                 '"conflict_and_evaluation_seconds":2,'
                 '"convergence_seconds":2,'
                 '"final_summary_seconds":2}'
+            ),
+            "GIA_E2E_AI_CONTENT": AI_CONTRIBUTION,
+            "PYTHONPATH": os.pathsep.join(
+                filter(
+                    None,
+                    (str(temporary_path), os.environ.get("PYTHONPATH")),
+                )
             ),
             "PYTHONUNBUFFERED": "1",
         }
@@ -346,6 +393,7 @@ def _run_browser_flow(temporary_database: TemporaryDatabase) -> None:
                             "GIA_E2E_API_RESTART_READY": str(restart_ready),
                             "GIA_E2E_FLOOR_REQUEST": str(floor_request),
                             "GIA_E2E_FLOOR_READY": str(floor_ready),
+                            "GIA_E2E_AI_CONTENT": AI_CONTRIBUTION,
                         }
                     )
                 finally:
@@ -428,6 +476,25 @@ def _verify_session_persistence(temporary_database: TemporaryDatabase) -> None:
             "SELECT count(*) FROM llm_generation_requests WHERE session_id = %s",
             (session_id,),
         ).fetchone()
+        ai_event_rows = connection.execute(
+            "SELECT event.sequence, event.payload->>'utterance_id', "
+            "event.payload->>'participant_id', event.payload->>'floor_grant_id', "
+            "event.payload->>'phase', event.payload->>'content', "
+            "utterance.content, request.status "
+            "FROM discussion_events AS event "
+            "JOIN ai_utterances AS utterance "
+            "ON utterance.session_id = event.session_id "
+            "AND utterance.id::text = event.payload->>'utterance_id' "
+            "JOIN llm_generation_requests AS request "
+            "ON request.session_id = utterance.session_id "
+            "AND request.id = utterance.generation_request_id "
+            "WHERE event.session_id = %s "
+            "AND event.event_type = 'participant.utterance.created' "
+            "AND event.payload->>'actor_kind' = 'AI' "
+            "AND event.payload->>'content' = %s "
+            "ORDER BY event.sequence",
+            (session_id, AI_CONTRIBUTION),
+        ).fetchall()
 
         if human_event_rows:
             (
@@ -514,8 +581,34 @@ def _verify_session_persistence(temporary_database: TemporaryDatabase) -> None:
         (human_event_sequence + 1, "SPEAKER_FINISHED", human_grant_id_text)
     ]:
         raise RuntimeError("Browser E2E Human public release order did not match.")
-    if provider_request_count != (0,):
-        raise RuntimeError("Browser E2E unexpectedly created a provider request.")
+    if provider_request_count is None or provider_request_count[0] < 1:
+        raise RuntimeError("Browser E2E did not persist an AI generation request.")
+    if not ai_event_rows:
+        raise RuntimeError(
+            "Browser E2E did not persist the fake-provider AI public utterance."
+        )
+    for (
+        _ai_sequence,
+        ai_utterance_id,
+        ai_participant_id,
+        ai_floor_grant_id,
+        ai_phase,
+        ai_event_content,
+        ai_utterance_content,
+        ai_request_status,
+    ) in ai_event_rows:
+        if (
+            ai_utterance_id is None
+            or ai_participant_id is None
+            or ai_floor_grant_id is None
+            or ai_phase is None
+            or ai_event_content != AI_CONTRIBUTION
+            or ai_utterance_content != AI_CONTRIBUTION
+            or ai_request_status != "COMPLETED"
+        ):
+            raise RuntimeError(
+                "Browser E2E fake-provider AI persistence evidence did not match."
+            )
 
 
 async def _schedule_browser_floor_async(
@@ -581,6 +674,19 @@ async def _seed_browser_question_async(
     try:
         await seed_question_persona_foundation(session_factory)
         async with session_factory() as session:
+            await publish_prompt_version(
+                session,
+                PromptVersionDefinition(
+                    id=PROMPT_VERSION_ID,
+                    prompt_key="AI_CANDIDATE_TURN",
+                    version_number=1,
+                    purpose_code="CANDIDATE_UTTERANCE",
+                    template_text=PROMPT_TEMPLATE,
+                    created_at=datetime(2026, 8, 26, tzinfo=UTC),
+                    published_at=datetime(2026, 8, 26, tzinfo=UTC),
+                ),
+            )
+        async with session_factory() as session:
             async with session.begin():
                 await session.execute(
                     update(QuestionVersion)
@@ -633,10 +739,11 @@ def main() -> int:
         _verify_session_persistence(temporary_database)
 
     print(
-        "P1-5F-3A browser E2E passed with exact durable Human submit/restore, "
-        "contiguous event history, matching speaker-finished release, immutable "
-        "question binding, reload/API-restart recovery, private isolation and no "
-        "provider request; temporary database and servers were cleaned."
+        "P1-5F-4 browser E2E passed with exact durable Human submit/restore, "
+        "real scheduler/runtime composition through the network-free fake provider, "
+        "durable public AI transcript recovery, contiguous event history, matching "
+        "speaker-finished release, immutable question binding, reload/API-restart "
+        "recovery and private isolation; temporary database and servers were cleaned."
     )
     return 0
 
