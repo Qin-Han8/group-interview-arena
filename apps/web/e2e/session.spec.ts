@@ -120,31 +120,46 @@ test("browser session recovers durable phases across API restart and reload", as
   expect(createResponse.request().postDataJSON()).toEqual({
     question_version_id: questionVersionId,
   });
+  const createdSession = (await createResponse.json()) as {
+    id: string;
+    question_version_id: string | null;
+    status: string;
+    last_sequence: number;
+  };
+  expect(createdSession).toMatchObject({
+    id: expect.stringMatching(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    ),
+    question_version_id: questionVersionId,
+    status: "CREATED",
+    last_sequence: 1,
+  });
+  const sessionId = createdSession.id;
+  expect(new URL(page.url()).searchParams.get("session_id")).toBe(sessionId);
 
-  await expect(page.getByText("实时连接已建立")).toBeVisible();
-  await expect(page.getByText("已创建")).toBeVisible();
-  await expect(page.getByTestId("session-sequence")).toHaveText("1");
-  await expect(page.getByTestId("question-version-id")).toContainText(
-    questionVersionId,
-  );
+  await expect(page.getByText("连接正常").first()).toBeVisible();
+  await expect(page.getByText("未开始", { exact: true }).first()).toBeVisible();
   await expect(
     page.getByText("内部工程验证题：团队需要在有限资源下安排三类社区活动。"),
   ).toBeVisible();
   await expect(
     page.getByText("形成满足硬约束、说明取舍且可执行的资源安排。"),
   ).toBeVisible();
-  const sessionId = (
-    (await page.getByTestId("session-id").textContent()) ?? ""
-  ).replace("会话 ID：", "");
-  expect(sessionId).toMatch(
-    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+  for (const diagnosticTestId of [
+    "session-id",
+    "session-sequence",
+    "question-version-id",
+    "phase-deadline",
+  ]) {
+    await expect(page.getByTestId(diagnosticTestId)).toHaveCount(0);
+  }
+  expect(await page.locator("body").textContent()).not.toContain(sessionId);
+  expect(await page.locator("body").textContent()).not.toContain(
+    questionVersionId,
   );
-  expect(new URL(page.url()).searchParams.get("session_id")).toBe(sessionId);
 
   await page.getByRole("button", { name: "开始讨论" }).click();
-  await expect(page.getByText("进行中")).toBeVisible();
-  await expect(page.getByTestId("phase-label")).toContainText("准备");
-  await expect(page.getByTestId("session-sequence")).toHaveText("2");
+  await expect(page.getByText("准备", { exact: true }).first()).toBeVisible();
   await expect.poll(() => startCommand).toBeTruthy();
   const parsedCommand = JSON.parse(startCommand ?? "{}");
   expect(parsedCommand).toEqual({
@@ -159,10 +174,11 @@ test("browser session recovers durable phases across API restart and reload", as
   expect(startCommand).not.toContain("next_status");
   expect(startCommand).not.toContain("phase_deadline_at");
 
-  await expect(page.getByTestId("phase-label")).toContainText("个人陈述", {
-    timeout: 10_000,
-  });
-  await expect(page.getByTestId("session-sequence")).toHaveText("3");
+  await expect(
+    page.locator('[aria-current="step"]').getByText("个人陈述", {
+      exact: true,
+    }),
+  ).toBeVisible({ timeout: 10_000 });
   expect(FLOOR_REQUEST).toBeTruthy();
   expect(FLOOR_READY).toBeTruthy();
   await writeFile(FLOOR_REQUEST!, sessionId, "utf8");
@@ -179,14 +195,6 @@ test("browser session recovers durable phases across API restart and reload", as
       { timeout: 10_000 },
     )
     .toBe(true);
-  await expect(page.getByTestId("session-sequence")).toHaveText("4");
-  await expect(page.getByTestId("floor-owner")).toContainText(
-    "你（真人参与者）",
-  );
-  await expect(page.getByTestId("floor-lifecycle")).toHaveText("发言权已授予");
-  await expect(page.getByTestId("floor-reason")).toContainText(
-    "优先安排尚未发言的参与者",
-  );
   await expect.poll(() => floorEvent).toBeTruthy();
   const parsedFloorEvent = JSON.parse(floorEvent ?? "{}");
   expect(parsedFloorEvent).toMatchObject({
@@ -200,6 +208,16 @@ test("browser session recovers durable phases across API restart and reload", as
       reason_code: "FIRST_OPPORTUNITY",
     },
   });
+  expect(parsedFloorEvent.sequence).toBeGreaterThan(
+    createdSession.last_sequence,
+  );
+  await expect(
+    page.getByText("当前发言：你（真人参与者）", { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText("发言权已授予", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("优先安排尚未发言的参与者", { exact: true }),
+  ).toBeVisible();
   for (const forbidden of [
     "private_stance",
     "persona_calibration",
@@ -285,7 +303,7 @@ test("browser session recovers durable phases across API restart and reload", as
       .first()
       .textContent(),
   ).toBe(HUMAN_CONTRIBUTION);
-  await expect(page.getByText("实时连接已建立")).toBeVisible();
+  await expect(page.getByText("连接正常").first()).toBeVisible();
 
   expect(API_RESTART_REQUEST).toBeTruthy();
   expect(API_RESTART_READY).toBeTruthy();
@@ -303,21 +321,45 @@ test("browser session recovers durable phases across API restart and reload", as
       { timeout: 10_000 },
     )
     .toBe(true);
-  await expect(page.getByText("实时连接已建立")).toBeVisible({
+  await expect(page.getByText("连接正常").first()).toBeVisible({
     timeout: 10_000,
   });
   await expect.poll(exactConfirmedContributionCount).toBe(1);
 
+  await expect(page.getByText("已完成", { exact: true }).first()).toBeVisible({
+    timeout: 25_000,
+  });
   await expect(
-    page.locator("p").filter({ hasText: "会话状态：" }),
-  ).toContainText("已完成", { timeout: 25_000 });
-  await expect(page.getByTestId("phase-label")).toContainText("已完成");
-  await expect(page.getByTestId("floor-owner")).toContainText("暂无");
+    page.getByText("正在安排下一位发言者", { exact: true }).first(),
+  ).toBeVisible();
   await expect.poll(exactConfirmedContributionCount).toBe(1);
-  const finalSequence = Number(
-    await page.getByTestId("session-sequence").textContent(),
+
+  const authoritative = await page.evaluate(
+    async ({ apiBaseUrl, session }) => {
+      const response = await fetch(`${apiBaseUrl}/sessions/${session}`, {
+        credentials: "include",
+      });
+      return { status: response.status, body: await response.json() };
+    },
+    { apiBaseUrl: API_BASE_URL, session: sessionId },
   );
+  expect(authoritative).toMatchObject({
+    status: 200,
+    body: {
+      id: sessionId,
+      question_version_id: questionVersionId,
+      status: "COMPLETED",
+      phase_started_at: null,
+      phase_deadline_at: null,
+      last_sequence: expect.any(Number),
+      floor: {
+        current_grant: null,
+      },
+    },
+  });
+  const finalSequence = Number(authoritative.body.last_sequence);
   expect(finalSequence).toBeGreaterThan(parsedHumanRelease.sequence);
+  expect(JSON.stringify(authoritative)).not.toContain(PRIVATE_SENTINEL);
 
   const duplicate = await page.evaluate(
     ({ apiBaseUrl, command, session, afterSequence }) =>
@@ -362,30 +404,6 @@ test("browser session recovers durable phases across API restart and reload", as
   });
   expect(JSON.stringify(duplicate)).not.toContain(PRIVATE_SENTINEL);
 
-  const authoritative = await page.evaluate(
-    async ({ apiBaseUrl, session }) => {
-      const response = await fetch(`${apiBaseUrl}/sessions/${session}`, {
-        credentials: "include",
-      });
-      return { status: response.status, body: await response.json() };
-    },
-    { apiBaseUrl: API_BASE_URL, session: sessionId },
-  );
-  expect(authoritative).toMatchObject({
-    status: 200,
-    body: {
-      id: sessionId,
-      question_version_id: questionVersionId,
-      status: "COMPLETED",
-      phase_started_at: null,
-      phase_deadline_at: null,
-      last_sequence: finalSequence,
-      floor: {
-        current_grant: null,
-      },
-    },
-  });
-  expect(JSON.stringify(authoritative)).not.toContain(PRIVATE_SENTINEL);
   expect(await page.locator("body").textContent()).not.toContain(
     PRIVATE_SENTINEL,
   );
@@ -409,19 +427,21 @@ test("browser session recovers durable phases across API restart and reload", as
   await expect(page.getByTestId("current-username")).toHaveText(
     username.toLowerCase(),
   );
+  await expect(page.getByText("已完成", { exact: true }).first()).toBeVisible();
   await expect(
-    page.locator("p").filter({ hasText: "会话状态：" }),
-  ).toContainText("已完成");
-  await expect(page.getByTestId("session-sequence")).toHaveText(
-    finalSequence.toString(),
-  );
-  await expect(page.getByTestId("floor-owner")).toContainText("暂无");
+    page.getByText("正在安排下一位发言者", { exact: true }).first(),
+  ).toBeVisible();
   await expect.poll(exactConfirmedContributionCount).toBe(1);
-  await expect(page.getByTestId("question-version-id")).toContainText(
-    questionVersionId,
-  );
   await expect(
     page.getByText("内部工程验证题：团队需要在有限资源下安排三类社区活动。"),
   ).toBeVisible();
-  await expect(page.getByText("实时连接已建立")).toBeVisible();
+  await expect(page.getByText("连接正常").first()).toBeVisible();
+  for (const diagnosticTestId of [
+    "session-id",
+    "session-sequence",
+    "question-version-id",
+    "phase-deadline",
+  ]) {
+    await expect(page.getByTestId(diagnosticTestId)).toHaveCount(0);
+  }
 });

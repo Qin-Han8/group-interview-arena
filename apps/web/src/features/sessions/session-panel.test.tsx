@@ -343,7 +343,7 @@ describe("SessionPanel", () => {
     expect(mockedCreateRealtime).not.toHaveBeenCalled();
 
     transcriptLoad.resolve([HUMAN_TRANSCRIPT]);
-    expect(await screen.findByText("已创建")).toBeInTheDocument();
+    expect((await screen.findAllByText("未开始")).length).toBeGreaterThan(0);
     await waitFor(() => expect(realtime.start).toHaveBeenCalledOnce());
     expect(realtime.options().snapshot).toBe(CREATED);
   });
@@ -379,9 +379,9 @@ describe("SessionPanel", () => {
     render(
       <SessionPanel apiClient={API_CLIENT} baseUrl="http://localhost:8000" />,
     );
-    expect(await screen.findByTestId("floor-owner")).toHaveTextContent(
-      "AI 候选人 1",
-    );
+    expect(
+      await screen.findByText("当前发言：AI 候选人 1"),
+    ).toBeInTheDocument();
     await waitFor(() => expect(realtime.start).toHaveBeenCalledOnce());
 
     act(() => {
@@ -394,8 +394,10 @@ describe("SessionPanel", () => {
       } satisfies RejectedHumanUtterance);
       realtime.options().onConnectionChange("reconnecting");
     });
-    expect(await screen.findByText("正在同步讨论记录…")).toBeInTheDocument();
-    expect(screen.getByTestId("floor-owner")).toHaveTextContent("AI 候选人 1");
+    expect(
+      (await screen.findAllByText("正在同步最新讨论记录…")).length,
+    ).toBeGreaterThan(0);
+    expect(screen.getByText("当前发言：AI 候选人 1")).toBeInTheDocument();
     expect(screen.getByTestId("rejected-human-content").textContent).toBe(
       HUMAN_TRANSCRIPT.content,
     );
@@ -404,7 +406,7 @@ describe("SessionPanel", () => {
       new Error("recovery failed"),
     );
     await expect(realtime.options().loadRecoveryBundle()).rejects.toThrow();
-    expect(screen.getByTestId("floor-owner")).toHaveTextContent("AI 候选人 1");
+    expect(screen.getByText("当前发言：AI 候选人 1")).toBeInTheDocument();
 
     mockedGetSessionSnapshot.mockResolvedValueOnce({
       data: ABORTED,
@@ -417,11 +419,10 @@ describe("SessionPanel", () => {
       realtime.options().onConnectionChange("connected");
     });
 
-    expect(await screen.findByText("已由用户结束")).toBeInTheDocument();
+    expect((await screen.findAllByText("已结束")).length).toBeGreaterThan(0);
     expect(screen.queryByText("旧连接错误")).not.toBeInTheDocument();
-    expect(screen.getByTestId("rejected-human-content").textContent).toBe(
-      HUMAN_TRANSCRIPT.content,
-    );
+    expect(screen.getByText("训练已结束")).toBeInTheDocument();
+    expect(screen.queryByTestId("rejected-human-content")).toBeNull();
   });
 
   it("rejects conflicting transcript identities before an authoritative bundle resolves", async () => {
@@ -429,9 +430,7 @@ describe("SessionPanel", () => {
     const { realtime } = await renderRestoredSession(CREATED, [
       HUMAN_TRANSCRIPT,
     ]);
-    expect(await screen.findByTestId("session-sequence")).toHaveTextContent(
-      "1",
-    );
+    expect(realtime.options().snapshot).toBe(CREATED);
     expect(
       screen.getByTestId(`utterance-content-${HUMAN_TRANSCRIPT.utterance_id}`)
         .textContent,
@@ -452,8 +451,10 @@ describe("SessionPanel", () => {
     );
 
     expect(mergeSpy).toHaveBeenLastCalledWith([], conflictingTranscript);
-    expect(screen.getByTestId("session-sequence")).toHaveTextContent("1");
-    expect(screen.getByText("已创建")).toBeInTheDocument();
+    expect(realtime.options().snapshot).toBe(CREATED);
+    expect(
+      screen.getByRole("button", { name: "开始讨论" }),
+    ).toBeInTheDocument();
     expect(
       screen.getByTestId(`utterance-content-${HUMAN_TRANSCRIPT.utterance_id}`)
         .textContent,
@@ -496,7 +497,7 @@ describe("SessionPanel", () => {
 
     act(() => realtime.options().onRecoveryBundle(correctedBundle));
 
-    expect(await screen.findByText("已由用户结束")).toBeInTheDocument();
+    expect((await screen.findAllByText("已结束")).length).toBeGreaterThan(0);
   });
 
   it("merges live utterances and requests recovery on identity conflict", async () => {
@@ -533,9 +534,9 @@ describe("SessionPanel", () => {
     await waitFor(() => expect(realtime.start).toHaveBeenCalledOnce());
 
     act(() => realtime.options().onEvent(utteranceEvent(aiItem)));
-    await waitFor(() =>
-      expect(screen.getByTestId("session-sequence")).toHaveTextContent("6"),
-    );
+    expect(
+      await screen.findByTestId(`utterance-content-${aiItem.utterance_id}`),
+    ).toHaveTextContent(aiItem.content);
     expect(mergeSpy).toHaveBeenLastCalledWith([HUMAN_TRANSCRIPT], [aiItem]);
 
     act(() => realtime.options().onEvent(utteranceEvent(aiItem)));
@@ -550,7 +551,9 @@ describe("SessionPanel", () => {
         .onEvent(utteranceEvent({ ...aiItem, content: "conflicting content" })),
     );
     expect(realtime.recoverAuthoritativeState).toHaveBeenCalledOnce();
-    expect(screen.getByTestId("session-sequence")).toHaveTextContent("6");
+    expect(
+      screen.getByTestId(`utterance-content-${aiItem.utterance_id}`),
+    ).toHaveTextContent(aiItem.content);
   });
 
   it("keeps the textarea editable while enforcing all six send gates", async () => {
@@ -569,8 +572,6 @@ describe("SessionPanel", () => {
       discussionSnapshot(AI_PARTICIPANT_ID),
       discussionSnapshot(null),
       discussionSnapshot(HUMAN_PARTICIPANT_ID, GRANT_ID, "PREPARATION"),
-      discussionSnapshot(HUMAN_PARTICIPANT_ID, GRANT_ID, "COMPLETED"),
-      discussionSnapshot(HUMAN_PARTICIPANT_ID, GRANT_ID, "ABORTED_USER"),
     ]) {
       act(() =>
         realtime.options().onRecoveryBundle({
@@ -585,26 +586,42 @@ describe("SessionPanel", () => {
       ).not.toBeEmptyDOMElement();
     }
 
+    for (const terminal of ["COMPLETED", "ABORTED_USER"] as const) {
+      act(() =>
+        realtime.options().onRecoveryBundle({
+          snapshot: discussionSnapshot(
+            HUMAN_PARTICIPANT_ID,
+            GRANT_ID,
+            terminal,
+          ),
+          transcript: [],
+        }),
+      );
+      expect(screen.queryByLabelText("发言草稿")).not.toBeInTheDocument();
+    }
+
     act(() =>
       realtime.options().onRecoveryBundle({ snapshot: human, transcript: [] }),
     );
+    const restoredTextarea = screen.getByLabelText("发言草稿");
+    const restoredSend = screen.getByRole("button", { name: "发送发言" });
     for (const state of [
       "connecting",
       "reconnecting",
       "disconnected",
     ] satisfies RealtimeConnectionState[]) {
       act(() => realtime.options().onConnectionChange(state));
-      expect(send).toBeDisabled();
+      expect(restoredSend).toBeDisabled();
     }
 
     act(() => realtime.options().onConnectionChange("connected"));
-    fireEvent.change(textarea, { target: { value: "\u0085" } });
-    expect(send).toBeDisabled();
-    fireEvent.change(textarea, { target: { value: "😀" } });
+    fireEvent.change(restoredTextarea, { target: { value: "\u0085" } });
+    expect(restoredSend).toBeDisabled();
+    fireEvent.change(restoredTextarea, { target: { value: "😀" } });
     expect(screen.getByText("1 / 4000")).toBeInTheDocument();
-    expect(send).toBeEnabled();
+    expect(restoredSend).toBeEnabled();
     act(() => realtime.options().onPendingChange(true));
-    expect(send).toBeDisabled();
+    expect(restoredSend).toBeDisabled();
   });
 
   it("submits keyboard and click actions against the latest exact Human floor", async () => {
@@ -688,14 +705,18 @@ describe("SessionPanel", () => {
     });
     expect(textarea).toHaveValue("newer draft D");
     expect(
-      screen.getByText("这条发言当前无法提交，请确认发言机会后重试。"),
+      within(screen.getByTestId("rejected-human-draft")).getByText(
+        "这条发言当前无法提交，请确认发言机会后重试。",
+      ),
     ).toBeInTheDocument();
     expect(screen.getByTestId("rejected-human-content").textContent).toBe(
       pendingContent,
     );
 
     act(() => realtime.options().onConnectionChange("reconnecting"));
-    expect(screen.getByText("正在同步讨论记录…")).toBeInTheDocument();
+    expect(screen.getAllByText("正在同步最新讨论记录…").length).toBeGreaterThan(
+      0,
+    );
     expect(screen.getByTestId("rejected-human-content")).toBeInTheDocument();
     act(() => realtime.options().onConnectionChange("connected"));
     expect(screen.getByTestId("rejected-human-content")).toBeInTheDocument();
@@ -874,7 +895,7 @@ describe("SessionPanel", () => {
     await screen.findByRole("button", { name: "创建文字会话" });
     fireEvent.click(screen.getByRole("button", { name: "创建文字会话" }));
 
-    expect(await screen.findByText("已创建")).toBeInTheDocument();
+    expect((await screen.findAllByText("未开始")).length).toBeGreaterThan(0);
     expect(mockedCreateSession).toHaveBeenCalledWith(
       API_CLIENT,
       QUESTION_VERSION_ID,
@@ -886,9 +907,7 @@ describe("SessionPanel", () => {
     expect(
       await screen.findByText(QUESTION_DETAIL.scenario),
     ).toBeInTheDocument();
-    expect(screen.getByTestId("question-version-id")).toHaveTextContent(
-      QUESTION_VERSION_ID,
-    );
+    expect(screen.queryByTestId("question-version-id")).toBeNull();
     expect(new URL(window.location.href).searchParams.get("session_id")).toBe(
       SESSION_ID,
     );
@@ -912,8 +931,7 @@ describe("SessionPanel", () => {
       action_id: ACTION_ID,
       payload: { previous_status: "CREATED", status: "ABORTED_USER" },
     } satisfies FormalSessionEvent);
-    expect(await screen.findByText("已由用户结束")).toBeInTheDocument();
-    expect(screen.getByTestId("session-sequence")).toHaveTextContent("2");
+    expect((await screen.findAllByText("已结束")).length).toBeGreaterThan(0);
   });
 
   it("starts a session and projects authoritative phase timing from v2 events", async () => {
@@ -930,7 +948,7 @@ describe("SessionPanel", () => {
     fireEvent.click(
       await screen.findByRole("button", { name: "创建文字会话" }),
     );
-    await screen.findByText("已创建");
+    await screen.findAllByText("未开始");
 
     realtime
       .options()
@@ -957,12 +975,8 @@ describe("SessionPanel", () => {
       },
     } satisfies FormalSessionEvent);
 
-    expect(await screen.findByText("进行中")).toBeInTheDocument();
-    expect(screen.getByTestId("phase-label")).toHaveTextContent("准备");
-    expect(screen.getByTestId("phase-deadline")).toHaveTextContent(
-      PREPARATION.phase_deadline_at!,
-    );
-    expect(screen.getByTestId("session-sequence")).toHaveTextContent("2");
+    expect((await screen.findAllByText("准备")).length).toBeGreaterThan(0);
+    expect(screen.queryByTestId("phase-deadline")).toBeNull();
     expect(screen.getByRole("button", { name: "结束会话" })).toBeEnabled();
   });
 
@@ -982,7 +996,7 @@ describe("SessionPanel", () => {
       <SessionPanel apiClient={API_CLIENT} baseUrl="http://localhost:8000" />,
     );
 
-    expect(await screen.findByText("已由用户结束")).toBeInTheDocument();
+    expect((await screen.findAllByText("已结束")).length).toBeGreaterThan(0);
     expect(mockedGetSessionSnapshot).toHaveBeenCalledWith(
       API_CLIENT,
       SESSION_ID,
@@ -1020,7 +1034,7 @@ describe("SessionPanel", () => {
     render(
       <SessionPanel apiClient={API_CLIENT} baseUrl="http://localhost:8000" />,
     );
-    expect(await screen.findByTestId("floor-owner")).toHaveTextContent("暂无");
+    expect(await screen.findByText("正在安排下一位发言者")).toBeInTheDocument();
 
     realtime.options().onEvent({
       schema_version: 1,
@@ -1040,16 +1054,11 @@ describe("SessionPanel", () => {
       },
     } satisfies FormalSessionEvent);
 
-    expect(await screen.findByTestId("floor-owner")).toHaveTextContent(
-      "AI 候选人 1",
-    );
-    expect(screen.getByTestId("floor-lifecycle")).toHaveTextContent(
-      "发言权已授予",
-    );
-    expect(screen.getByTestId("floor-reason")).toHaveTextContent(
-      "优先安排尚未发言的参与者",
-    );
-    expect(screen.getByTestId("session-sequence")).toHaveTextContent("4");
+    expect(
+      await screen.findByText("当前发言：AI 候选人 1"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("发言权已授予")).toBeInTheDocument();
+    expect(screen.getByText("优先安排尚未发言的参与者")).toBeInTheDocument();
 
     realtime.options().onRecoveryBundle({
       snapshot: {
@@ -1079,9 +1088,9 @@ describe("SessionPanel", () => {
       },
       transcript: [],
     });
-    expect(await screen.findByTestId("floor-owner")).toHaveTextContent(
-      "AI 候选人 1",
-    );
+    expect(
+      await screen.findByText("当前发言：AI 候选人 1"),
+    ).toBeInTheDocument();
   });
 
   it("shows safe realtime errors and closes the connection on unmount", async () => {
@@ -1176,10 +1185,235 @@ describe("SessionPanel", () => {
       await screen.findByRole("button", { name: "创建文字会话" }),
     );
 
-    expect(await screen.findByText("情境")).toBeInTheDocument();
+    expect(await screen.findByText("讨论情境")).toBeInTheDocument();
     expect(screen.getByText("可选方案")).toBeInTheDocument();
     expect(rendered.container.textContent).not.toContain(
       "P1_2C_PRIVATE_SENTINEL_DO_NOT_DISCLOSE",
     );
+  });
+
+  it("composes one workspace and preserves presentation state across same-session recovery", async () => {
+    const snapshot = discussionSnapshot(HUMAN_PARTICIPANT_ID);
+    const { realtime, rendered } = await renderRestoredSession(snapshot);
+    act(() => realtime.options().onConnectionChange("connected"));
+
+    const notes = await screen.findByRole("textbox", {
+      name: "我的思路 / 私人笔记",
+    });
+    const draft = screen.getByLabelText("发言草稿");
+    fireEvent.change(notes, { target: { value: "same-session notes" } });
+    fireEvent.change(draft, { target: { value: "same-session draft" } });
+    fireEvent.click(screen.getByRole("tab", { name: "题目" }));
+    expect(screen.getByRole("tab", { name: "题目" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+
+    const authorityCounts = {
+      question: mockedGetQuestion.mock.calls.length,
+      realtime: mockedCreateRealtime.mock.calls.length,
+      snapshot: mockedGetSessionSnapshot.mock.calls.length,
+      transcript: mockedLoadSessionTranscript.mock.calls.length,
+    };
+    fireEvent.click(screen.getByRole("tab", { name: "进程" }));
+    fireEvent.click(screen.getByRole("tab", { name: "讨论" }));
+    fireEvent.click(screen.getByRole("tab", { name: "题目" }));
+    expect({
+      question: mockedGetQuestion.mock.calls.length,
+      realtime: mockedCreateRealtime.mock.calls.length,
+      snapshot: mockedGetSessionSnapshot.mock.calls.length,
+      transcript: mockedLoadSessionTranscript.mock.calls.length,
+    }).toEqual(authorityCounts);
+
+    act(() => {
+      realtime.options().onHumanPendingChange({
+        action_id: ACTION_ID,
+        floor_grant_id: GRANT_ID,
+        content: "pending remains",
+      });
+      realtime.options().onRejectedHumanUtterance({
+        action_id: ACTION_ID,
+        floor_grant_id: GRANT_ID,
+        content: "rejected remains",
+        reason: "ACTION_ID_CONFLICT",
+      });
+      realtime.options().onRecoveryBundle({ snapshot, transcript: [] });
+    });
+
+    expect(notes).toHaveValue("same-session notes");
+    expect(draft).toHaveValue("same-session draft");
+    expect(screen.getByRole("tab", { name: "题目" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.getByTestId("human-pending-content")).toHaveTextContent(
+      "pending remains",
+    );
+    expect(screen.getByTestId("rejected-human-content")).toHaveTextContent(
+      "rejected remains",
+    );
+
+    const replacement = {
+      ...snapshot,
+      id: "00000000-0000-4000-8000-000000000099",
+      question_version_id: "21000000-0000-4000-8000-000000000099",
+    };
+    act(() =>
+      realtime
+        .options()
+        .onRecoveryBundle({ snapshot: replacement, transcript: [] }),
+    );
+    expect(notes).toHaveValue("");
+    expect(screen.getByRole("tab", { name: "讨论" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.getByText("正在加载题目内容…")).toBeInTheDocument();
+    expect(rendered.container.textContent).not.toContain(QUESTION_DETAIL.title);
+  });
+
+  it("keeps bound Question load failure stable after the generic error clears", async () => {
+    window.history.replaceState({}, "", `/?session_id=${SESSION_ID}`);
+    mockedGetSessionSnapshot.mockResolvedValue({
+      data: CREATED,
+      response: new Response(null, { status: 200 }),
+    });
+    mockedLoadSessionTranscript.mockResolvedValue([]);
+    mockedGetQuestion.mockResolvedValue({
+      error: {
+        error: {
+          code: "INTERNAL_ERROR",
+          message: "Question unavailable",
+          request_id: "00000000-0000-4000-8000-000000000097",
+        },
+      },
+      response: new Response(null, { status: 503 }),
+    });
+    const realtime = installRealtimeDouble();
+
+    render(
+      <SessionPanel apiClient={API_CLIENT} baseUrl="http://localhost:8000" />,
+    );
+    expect(
+      await screen.findByText("题目内容暂时无法加载，讨论记录仍可继续查看"),
+    ).toBeInTheDocument();
+    expect(mockedGetQuestion).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      realtime.options().onError("temporary generic error");
+      realtime.options().onConnectionChange("connected");
+    });
+    expect(screen.queryByText("temporary generic error")).toBeNull();
+    expect(
+      screen.getByText("题目内容暂时无法加载，讨论记录仍可继续查看"),
+    ).toBeInTheDocument();
+  });
+
+  it("derives historical missing binding without a Question detail call", async () => {
+    await renderRestoredSession({ ...CREATED, question_version_id: null });
+
+    expect(
+      await screen.findByText("此历史会话没有可展示的题目内容"),
+    ).toBeInTheDocument();
+    expect(mockedGetQuestion).not.toHaveBeenCalled();
+    expect(
+      screen.queryByText("题目内容暂时无法加载，讨论记录仍可继续查看"),
+    ).toBeNull();
+  });
+
+  it("replaces stale unavailable Question state after a later workspace load succeeds", async () => {
+    const nextSessionId = "00000000-0000-4000-8000-000000000098";
+    const nextQuestionId = "21000000-0000-4000-8000-000000000098";
+    const nextQuestion = {
+      ...QUESTION_DETAIL,
+      id: nextQuestionId,
+      title: "新的工作区题目",
+    };
+    const nextQuestionLoad = deferred<{
+      data: QuestionDetail;
+      response: Response;
+    }>();
+    mockedGetSessionSnapshot
+      .mockResolvedValueOnce({
+        data: CREATED,
+        response: new Response(null, { status: 200 }),
+      })
+      .mockResolvedValueOnce({
+        data: {
+          ...CREATED,
+          id: nextSessionId,
+          question_version_id: nextQuestionId,
+        },
+        response: new Response(null, { status: 200 }),
+      });
+    mockedLoadSessionTranscript.mockResolvedValue([]);
+    mockedGetQuestion
+      .mockResolvedValueOnce({
+        error: {
+          error: {
+            code: "INTERNAL_ERROR",
+            message: "Question unavailable",
+            request_id: "00000000-0000-4000-8000-000000000099",
+          },
+        },
+        response: new Response(null, { status: 503 }),
+      })
+      .mockReturnValueOnce(nextQuestionLoad.promise);
+    const realtime = installRealtimeDouble();
+    window.history.replaceState({}, "", `/?session_id=${SESSION_ID}`);
+
+    const rendered = render(
+      <SessionPanel apiClient={API_CLIENT} baseUrl="http://localhost:8000" />,
+    );
+    expect(
+      await screen.findByText("题目内容暂时无法加载，讨论记录仍可继续查看"),
+    ).toBeInTheDocument();
+
+    window.history.replaceState({}, "", `/?session_id=${nextSessionId}`);
+    const nextApiClient = { unit: "next" } as unknown as ApiClient;
+    rendered.rerender(
+      <SessionPanel
+        apiClient={nextApiClient}
+        baseUrl="http://localhost:8000"
+      />,
+    );
+    await waitFor(() =>
+      expect(mockedGetQuestion).toHaveBeenLastCalledWith(
+        nextApiClient,
+        nextQuestionId,
+      ),
+    );
+    expect(screen.getByText("正在加载题目内容…")).toBeInTheDocument();
+
+    nextQuestionLoad.resolve({
+      data: nextQuestion,
+      response: new Response(null, { status: 200 }),
+    });
+    expect(
+      (await screen.findAllByText(nextQuestion.title)).length,
+    ).toBeGreaterThan(0);
+    expect(
+      screen.queryByText("题目内容暂时无法加载，讨论记录仍可继续查看"),
+    ).toBeNull();
+    expect(realtime.stop).toHaveBeenCalled();
+  });
+
+  it("removes raw engineering diagnostics from rendered product content", async () => {
+    const { rendered } = await renderRestoredSession(PREPARATION);
+
+    for (const testId of [
+      "session-id",
+      "question-version-id",
+      "session-sequence",
+      "phase-deadline",
+    ]) {
+      expect(screen.queryByTestId(testId)).toBeNull();
+    }
+    expect(rendered.container.textContent).not.toContain(SESSION_ID);
+    expect(rendered.container.textContent).not.toContain(QUESTION_VERSION_ID);
+    expect(rendered.container.textContent).not.toContain(
+      PREPARATION.phase_deadline_at,
+    );
+    expect(rendered.container.textContent).not.toContain(GRANT_ID);
   });
 });
