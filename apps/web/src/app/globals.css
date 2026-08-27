@@ -9,11 +9,39 @@
 }
 
 html {
+  min-height: 100%;
   background: #f7f7f5;
 }
 
 body {
-  min-height: 100vh;
+  min-height: 100dvh;
   margin: 0;
   font-family: Arial, Helvetica, sans-serif;
+}
+
+.studio-surface {
+  min-height: 100dvh;
+}
+
+.studio-scroll-region {
+  min-height: 0;
+}
+
+:focus-visible {
+  outline: 2px solid #404040;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html:focus-within {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

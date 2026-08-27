@@ -19,12 +19,16 @@ import {
 import AuthPanel from "./auth-panel";
 
 vi.mock("@/lib/api/client", () => ({
+  checkApiHealth: vi.fn(async () => true),
   createApiClient: vi.fn(() => ({ client: "unit-only" })),
   getCurrentUser: vi.fn(),
   getSafeAuthErrorMessage: vi.fn(() => "安全错误提示"),
   loginUser: vi.fn(),
   logoutUser: vi.fn(),
   registerUser: vi.fn(),
+}));
+vi.mock("@/features/sessions/session-panel", () => ({
+  default: () => <div data-testid="session-panel-boundary">讨论会话</div>,
 }));
 
 const mockedCreateApiClient = vi.mocked(createApiClient);
@@ -64,10 +68,16 @@ describe("AuthPanel", () => {
 
     render(<AuthPanel />);
 
+    expect(screen.getByTestId("entry-shell")).toHaveClass("max-w-3xl");
     expect(screen.getByText("正在检查登录状态…")).toBeInTheDocument();
     expect(
       await screen.findByRole("heading", { name: "登录或注册" }),
     ).toBeInTheDocument();
+    expect(screen.getByTestId("entry-shell")).toHaveClass("max-w-3xl");
+    expect(
+      screen.getByRole("heading", { level: 1, name: "AI 群面训练场" }),
+    ).toBeInTheDocument();
+    expect(await screen.findByText("API 状态：已连接")).toBeInTheDocument();
     expect(screen.queryByText("安全错误提示")).not.toBeInTheDocument();
     expect(mockedCreateApiClient).toHaveBeenCalledWith("http://localhost:8000");
   });
@@ -94,9 +104,15 @@ describe("AuthPanel", () => {
     expect(await screen.findByTestId("current-username")).toHaveTextContent(
       "web_user",
     );
+    expect(screen.getByTestId("studio-shell")).toHaveClass("w-full");
+    expect(screen.getByTestId("session-panel-boundary")).toBeInTheDocument();
     expect(
-      await screen.findByRole("heading", { name: "讨论会话" }),
+      screen.getByRole("button", { name: "退出登录" }),
     ).toBeInTheDocument();
+    expect(screen.queryByTestId("entry-shell")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Internal validation foundation"),
+    ).not.toBeInTheDocument();
     expect(mockedRegisterUser).toHaveBeenCalledWith(expect.anything(), {
       username: "Web_User",
       password: "web unit-only password phrase",
@@ -151,6 +167,8 @@ describe("AuthPanel", () => {
     expect(await screen.findByTestId("current-username")).toHaveTextContent(
       "web_user",
     );
+    expect(screen.getByTestId("studio-shell")).toHaveClass("w-full");
+    expect(screen.getByTestId("session-panel-boundary")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "退出登录" }));
 
     await waitFor(() => {

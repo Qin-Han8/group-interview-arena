@@ -1,30 +1,22 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import Home from "./page";
 
-describe("Home", () => {
-  it("renders the P1 internal validation foundation copy", () => {
-    render(<Home />);
+vi.mock("./auth-panel", () => ({
+  default: () => <div data-testid="auth-panel-boundary" />,
+}));
 
+describe("Home", () => {
+  it("is a neutral full-width root that delegates shell ownership", () => {
+    const { container } = render(<Home />);
+
+    expect(screen.getByRole("main")).toHaveClass("min-h-dvh", "w-full");
+    expect(screen.getByTestId("auth-panel-boundary")).toBeInTheDocument();
+    expect(container.querySelector(".max-w-3xl")).not.toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { level: 1, name: "AI 群面训练场" }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Group Interview Arena")).toBeInTheDocument();
-    expect(
-      screen.getByText("Internal validation foundation"),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Current phase: P1")).toBeInTheDocument();
-    expect(
-      screen.getByText("Target: V0.1 Internal Validation"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText("AI candidates are virtual characters."),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        "Question-bound text sessions are available for internal validation.",
-      ),
-    ).toBeInTheDocument();
+      screen.queryByText("Internal validation foundation"),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("Current phase: P1")).not.toBeInTheDocument();
   });
 });
