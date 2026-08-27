@@ -5,6 +5,7 @@ const API_BASE_URL = process.env.GIA_E2E_API_ORIGIN ?? "http://localhost:8000";
 const PRIVATE_SENTINEL = "P1_2C_PRIVATE_SENTINEL_DO_NOT_DISCLOSE";
 const HUMAN_CONTRIBUTION =
   "  Human evidence: preserve this exact contribution.\nSecond line stays exact.  ";
+const PRIVATE_NOTES = "仅在当前页面内存中保留的私人思路";
 const API_RESTART_REQUEST = process.env.GIA_E2E_API_RESTART_REQUEST;
 const API_RESTART_READY = process.env.GIA_E2E_API_RESTART_READY;
 const FLOOR_REQUEST = process.env.GIA_E2E_FLOOR_REQUEST;
@@ -12,7 +13,7 @@ const FLOOR_READY = process.env.GIA_E2E_FLOOR_READY;
 
 test("browser session recovers durable phases across API restart and reload", async ({
   page,
-}) => {
+}, testInfo) => {
   const username = `P11D_${Date.now().toString(36)}`;
   const password = `P1-1D browser ${crypto.randomUUID()} phrase`;
   let startCommand: string | undefined;
@@ -22,8 +23,23 @@ test("browser session recovers durable phases across API restart and reload", as
   let humanReleaseEvent: string | undefined;
   let releaseHumanConfirmation: (() => void) | undefined;
   let humanConfirmationReleased = false;
+  let authoritativeReadCount = 0;
+  let workspaceWebSocketCount = 0;
+
+  page.on("request", (request) => {
+    const pathname = new URL(request.url()).pathname;
+    if (
+      request.method() === "GET" &&
+      (/\/questions\/[^/]+$/.test(pathname) ||
+        /\/sessions\/[^/]+$/.test(pathname) ||
+        /\/sessions\/[^/]+\/utterances$/.test(pathname))
+    ) {
+      authoritativeReadCount += 1;
+    }
+  });
 
   await page.routeWebSocket(/\/ws\/sessions\//, (socket) => {
+    workspaceWebSocketCount += 1;
     const server = socket.connectToServer();
     const bufferedServerFrames: Array<Parameters<typeof socket.send>[0]> = [];
     let bufferingHumanConfirmation = false;
@@ -87,6 +103,13 @@ test("browser session recovers durable phases across API restart and reload", as
         HUMAN_CONTRIBUTION,
       );
 
+  const captureResponsiveEvidence = async (name: string) => {
+    const path = testInfo.outputPath(name + ".png");
+    await page.screenshot({ fullPage: true, path });
+    await testInfo.attach(name, { contentType: "image/png", path });
+  };
+
+  await page.setViewportSize({ height: 900, width: 1440 });
   await page.goto("/");
   await page.getByRole("button", { name: "注册" }).click();
   await page.getByLabel("用户名").fill(username);
@@ -157,6 +180,114 @@ test("browser session recovers durable phases across API restart and reload", as
   expect(await page.locator("body").textContent()).not.toContain(
     questionVersionId,
   );
+
+  const taskSurface = page.locator("#task-surface");
+  const discussionSurface = page.locator("#discussion-surface");
+  const progressSurface = page.locator("#progress-surface");
+  await expect(taskSurface).toBeVisible();
+  await expect(discussionSurface).toBeVisible();
+  await expect(progressSurface).toBeVisible();
+  const [taskBox, discussionBox, progressBox] = await Promise.all([
+    taskSurface.boundingBox(),
+    discussionSurface.boundingBox(),
+    progressSurface.boundingBox(),
+  ]);
+  expect(taskBox).not.toBeNull();
+  expect(discussionBox).not.toBeNull();
+  expect(progressBox).not.toBeNull();
+  expect(discussionBox!.width).toBeGreaterThan(taskBox!.width);
+  expect(discussionBox!.width).toBeGreaterThan(progressBox!.width);
+  await page.getByLabel("发言草稿").scrollIntoViewIfNeeded();
+  await expect(page.getByLabel("发言草稿")).toBeVisible();
+  await captureResponsiveEvidence("f3b-wide-1440x900");
+
+  const authorityReadsBeforeSwitching = authoritativeReadCount;
+  const webSocketsBeforeSwitching = workspaceWebSocketCount;
+  await page.setViewportSize({ height: 900, width: 900 });
+  await expect(discussionSurface).toBeVisible();
+  await expect(taskSurface).toBeHidden();
+  await expect(progressSurface).toBeHidden();
+  await page.getByRole("button", { name: "打开题目与思考" }).click();
+  await expect(taskSurface).toBeVisible();
+  await expect(progressSurface).toBeHidden();
+  await page
+    .getByRole("textbox", { name: "我的思路 / 私人笔记" })
+    .fill(PRIVATE_NOTES);
+  await page.getByRole("button", { name: "打开训练进程" }).click();
+  await expect(taskSurface).toBeHidden();
+  await expect(progressSurface).toBeVisible();
+  await page.getByRole("button", { name: "关闭训练进程" }).click();
+  await expect(taskSurface).toBeHidden();
+  await expect(progressSurface).toBeHidden();
+  await expect(discussionSurface).toBeVisible();
+  await page.getByLabel("发言草稿").scrollIntoViewIfNeeded();
+  await expect(page.getByLabel("发言草稿")).toBeVisible();
+  await captureResponsiveEvidence("f3b-tablet-900x900");
+
+  await page.setViewportSize({ height: 844, width: 390 });
+  const tabs = page.getByRole("tab");
+  await expect(tabs).toHaveText(["讨论", "题目", "进程"]);
+  const discussionTab = page.getByRole("tab", { name: "讨论" });
+  const taskTab = page.getByRole("tab", { name: "题目" });
+  const progressTab = page.getByRole("tab", { name: "进程" });
+  await expect(discussionTab).toHaveAttribute(
+    "aria-controls",
+    "discussion-surface",
+  );
+  await expect(taskTab).toHaveAttribute("aria-controls", "task-surface");
+  await expect(progressTab).toHaveAttribute(
+    "aria-controls",
+    "progress-surface",
+  );
+  await expect(discussionSurface).toHaveAttribute(
+    "aria-labelledby",
+    "discussion-tab",
+  );
+  await expect(taskSurface).toHaveAttribute("aria-labelledby", "task-tab");
+  await expect(progressSurface).toHaveAttribute(
+    "aria-labelledby",
+    "progress-tab",
+  );
+  await discussionTab.focus();
+  await discussionTab.press("ArrowRight");
+  await expect(taskTab).toBeFocused();
+  await expect(taskTab).toHaveAttribute("aria-selected", "true");
+  await expect(taskSurface).toBeVisible();
+  await expect(discussionSurface).toBeHidden();
+  await expect(
+    page.getByRole("textbox", { name: "我的思路 / 私人笔记" }),
+  ).toHaveValue(PRIVATE_NOTES);
+  await taskTab.press("End");
+  await expect(progressTab).toBeFocused();
+  await expect(progressSurface).toBeVisible();
+  await progressTab.press("Home");
+  await expect(discussionTab).toBeFocused();
+  await expect(discussionSurface).toBeVisible();
+  await discussionTab.press("ArrowLeft");
+  await expect(progressTab).toBeFocused();
+  await progressTab.press("ArrowRight");
+  await expect(discussionTab).toBeFocused();
+  await expect(discussionSurface).toBeVisible();
+  await page.getByLabel("发言草稿").scrollIntoViewIfNeeded();
+  await expect(page.getByLabel("发言草稿")).toBeVisible();
+  expect(authoritativeReadCount).toBe(authorityReadsBeforeSwitching);
+  expect(workspaceWebSocketCount).toBe(webSocketsBeforeSwitching);
+  await captureResponsiveEvidence("f3b-mobile-390x844");
+
+  const transientStorage = await page.evaluate(() => ({
+    local: Object.entries(localStorage),
+    session: Object.entries(sessionStorage),
+  }));
+  expect(transientStorage).toEqual({ local: [], session: [] });
+  expect(JSON.stringify(transientStorage)).not.toContain(PRIVATE_NOTES);
+  expect(JSON.stringify(transientStorage)).not.toContain(sessionId);
+
+  await page.setViewportSize({ height: 900, width: 1440 });
+  await page.reload();
+  await expect(
+    page.getByRole("textbox", { name: "我的思路 / 私人笔记" }),
+  ).toHaveValue("");
+  await expect(page.getByText("连接正常").first()).toBeVisible();
 
   await page.getByRole("button", { name: "开始讨论" }).click();
   await expect(page.getByText("准备", { exact: true }).first()).toBeVisible();
@@ -330,8 +461,11 @@ test("browser session recovers durable phases across API restart and reload", as
     timeout: 25_000,
   });
   await expect(
-    page.getByText("正在安排下一位发言者", { exact: true }).first(),
+    page.getByText("讨论已完成", { exact: true }).first(),
   ).toBeVisible();
+  await expect(
+    page.getByText("正在安排下一位发言者", { exact: true }),
+  ).toHaveCount(0);
   await expect.poll(exactConfirmedContributionCount).toBe(1);
 
   const authoritative = await page.evaluate(
@@ -422,6 +556,7 @@ test("browser session recovers durable phases across API restart and reload", as
   expect(JSON.stringify(browserStorage)).not.toContain("human-pending");
   expect(JSON.stringify(browserStorage)).not.toContain("confirmed-transcript");
   expect(JSON.stringify(browserStorage)).not.toContain(sessionId);
+  expect(JSON.stringify(browserStorage)).not.toContain(PRIVATE_NOTES);
 
   await page.reload();
   await expect(page.getByTestId("current-username")).toHaveText(
@@ -429,8 +564,11 @@ test("browser session recovers durable phases across API restart and reload", as
   );
   await expect(page.getByText("已完成", { exact: true }).first()).toBeVisible();
   await expect(
-    page.getByText("正在安排下一位发言者", { exact: true }).first(),
+    page.getByText("讨论已完成", { exact: true }).first(),
   ).toBeVisible();
+  await expect(
+    page.getByText("正在安排下一位发言者", { exact: true }),
+  ).toHaveCount(0);
   await expect.poll(exactConfirmedContributionCount).toBe(1);
   await expect(
     page.getByText("内部工程验证题：团队需要在有限资源下安排三类社区活动。"),

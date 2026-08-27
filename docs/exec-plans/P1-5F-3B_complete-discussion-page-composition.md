@@ -1,7 +1,8 @@
 # P1-5F-3B Complete Discussion Page Composition — Design Freeze
 
 Status: `DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN /
-IMPLEMENTATION_NOT_STARTED`; document complete; self-review `PASS`
+IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_IMPLEMENTATION_REVIEW_PENDING`;
+document complete; self-review `PASS`
 
 Design actual-source review: `PASS`; findings: `NONE`; reviewed bundle:
 `group-interview-arena-review-20260826-190658.zip`; SHA-256:
@@ -1157,13 +1158,15 @@ Results:
 - no stop condition is triggered.
 
 The design document is complete, self-reviewed and externally reviewed. Its
-current-source TDD implementation plan is also frozen. F3B status is
-`DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN /
-IMPLEMENTATION_NOT_STARTED`; this is not implementation authorization.
+current-source TDD implementation plan is also frozen. A later separately
+approved implementation turn completed all three batches and final code gates
+without changing this frozen design. F3B status is `DESIGN_FROZEN /
+IMPLEMENTATION_PLAN_FROZEN / IMPLEMENTATION_COMPLETE /
+ACTUAL_SOURCE_IMPLEMENTATION_REVIEW_PENDING`; F3B is not `DONE`.
 
-## Docs-only validation contract
+## Historical docs-only validation contract
 
-This turn requires only:
+The design-freeze turn required only:
 
 - exact four-file changed scope;
 - relative Markdown links and final newlines;
@@ -1175,7 +1178,8 @@ This turn requires only:
 - staged count zero;
 - review bundle generation after self-review PASS.
 
-No Web/API/browser/provider test suite or real provider call is required.
+No Web/API/browser/provider test suite or real provider call was required for
+that historical design-freeze turn.
 
 ## Progress
 
@@ -1191,7 +1195,15 @@ No Web/API/browser/provider test suite or real provider call is required.
 - F3B remediated implementation-plan self-review: `PASS`; open findings:
   `NONE`.
 - F3B status: `DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN /
-  IMPLEMENTATION_NOT_STARTED`.
-- F3B implementation: not started / not authorized.
+  IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_IMPLEMENTATION_REVIEW_PENDING`.
+- F3B implementation: complete; external actual-source implementation review
+  pending; F3B is not `DONE`.
+- Batch 3 final implementation gates: focused Vitest `48/48` and full Vitest
+  `178/178`,
+  typecheck, lint, format, production build, live OpenAPI drift and Chromium
+  `2/2` all `PASS`; Master Plan SHA-256 unchanged; staged count `0`.
+- Responsive Browser evidence uses one created session at `1440x900`,
+  `900x900` and `390x844`; notes survive responsive switching, clear on reload
+  and never enter browser storage; authority reads/WebSocket do not multiply.
 - F4: `NOT_STARTED`.
 - Stage/commit/push authorization: none.

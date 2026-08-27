@@ -421,7 +421,11 @@ describe("SessionPanel", () => {
 
     expect((await screen.findAllByText("已结束")).length).toBeGreaterThan(0);
     expect(screen.queryByText("旧连接错误")).not.toBeInTheDocument();
-    expect(screen.getByText("训练已结束")).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("tabpanel", { name: "讨论" })).getByText(
+        "训练已结束",
+      ),
+    ).toBeInTheDocument();
     expect(screen.queryByTestId("rejected-human-content")).toBeNull();
   });
 

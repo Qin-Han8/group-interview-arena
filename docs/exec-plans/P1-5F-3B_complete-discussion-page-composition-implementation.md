@@ -1,6 +1,6 @@
 # P1-5F-3B Complete Discussion Page Composition — Implementation Plan
 
-Status: `DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN / IMPLEMENTATION_NOT_STARTED`
+Status: `DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_IMPLEMENTATION_REVIEW_PENDING`
 
 Parent status: `P1 IN_PROGRESS`; `P1-5 IN_PROGRESS`; `P1-5F IN_PROGRESS`;
 `P1-5F-3 IN_PROGRESS`; `P1-5F-3A DONE`; `P1-5F-4 NOT_STARTED`
@@ -25,6 +25,15 @@ was `BLOCKED` by exactly `F3B-IP-001` and `F3B-IP-002`. This finding-only
 remediation closes both findings without changing frozen product-design
 substance or authorizing implementation. The remediated implementation-plan
 self-review is `PASS`; open findings are `NONE`.
+
+Implementation baseline: clean committed `main` at
+`ee2701e9e66baec16c6095e706770f5490f3df67`, equal to `origin/main`, with
+baseline GitHub Actions run `33035085603` completed `SUCCESS`.
+
+Implementation result: Batches 1-3 and all final gates are complete. External
+actual-source implementation review is pending; F3B is not `DONE`. No F4,
+backend, schema, generated contract, dependency, provider/config or realtime
+authority change was made.
 
 Preserved F3A authorities:
 [`P1-5F-3A_web-discussion-functional-closure.md`](P1-5F-3A_web-discussion-functional-closure.md)
@@ -1068,7 +1077,7 @@ Hidden architecture expansion: none. `F3B-IP-001`: `CLOSED`.
 `F3B-IP-002`: `CLOSED`. Open findings: `NONE`. Planning stop conditions
 triggered: none.
 
-## Planning progress
+## Planning and implementation progress
 
 - Baseline and exact CI evidence: verified.
 - Authority and actual-source inspection: completed.
@@ -1078,8 +1087,21 @@ triggered: none.
 - Interface consistency review: `PASS`.
 - Finding-only remediation: `F3B-IP-001 CLOSED`; `F3B-IP-002 CLOSED`.
 - Remediated implementation-plan self-review: `PASS`.
+- Batch 3 TDD RED: terminal `COMPLETED` and `ABORTED_USER` progress both
+  incorrectly rendered `正在安排下一位发言者`; wide Chromium at `1440x900` then
+  proved the ≥1200 support panels still won as fixed-width overlays.
+- Batch 3 GREEN: truthful distinct terminal copy, deterministic ≥1200
+  three-column composition, tablet support sheet, mobile tab semantics,
+  memory-only notes, no extra responsive authority reads/WebSocket, no raw
+  engineering diagnostics and all durable F3A Human evidence preserved.
+- Final gates: focused Vitest `48/48` and full Vitest `178/178`; typecheck,
+  lint, format,
+  production build, live OpenAPI drift and Chromium `2/2` `PASS`; Master Plan
+  SHA-256 `2388a9660320406cb35d5354126ad71c6849a98db7c4a356796ca951bf372f26`;
+  `git diff --check` clean; staged count `0`.
 - F3B state: `DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN /
-  IMPLEMENTATION_NOT_STARTED`.
+  IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_IMPLEMENTATION_REVIEW_PENDING`; not
+  `DONE`.
 - Open findings: `NONE`.
 - F4: `NOT_STARTED`.
 - Stage/commit/push authorization: none.

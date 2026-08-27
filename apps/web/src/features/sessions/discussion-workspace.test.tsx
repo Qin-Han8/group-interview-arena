@@ -120,14 +120,14 @@ describe("DiscussionWorkspace", () => {
       "min-[1200px]:grid-cols-[minmax(15rem,1fr)_minmax(32rem,2.2fr)_minmax(15rem,1fr)]",
     );
     expect(screen.getByRole("tabpanel", { name: "题目" })).toHaveClass(
-      "min-[1200px]:block",
+      "min-[1200px]:!block",
     );
     expect(screen.getByRole("tabpanel", { name: "讨论" })).toHaveAttribute(
       "data-region-priority",
       "primary",
     );
     expect(screen.getByRole("tabpanel", { name: "进程" })).toHaveClass(
-      "min-[1200px]:block",
+      "min-[1200px]:!block",
     );
   });
 
@@ -145,14 +145,14 @@ describe("DiscussionWorkspace", () => {
       "md:inset-y-4",
       "md:right-4",
       "md:z-20",
-      "min-[1200px]:static",
+      "min-[1200px]:!static",
     );
     expect(progressPanel).toHaveClass(
       "md:absolute",
       "md:inset-y-4",
       "md:right-4",
       "md:z-20",
-      "min-[1200px]:static",
+      "min-[1200px]:!static",
     );
     expect(grid).toHaveAttribute("data-support-surface", "discussion");
 
@@ -350,4 +350,33 @@ describe("SessionProgressPanel", () => {
     expect(screen.queryByText(/投票|结论|报告|共识率/)).not.toBeInTheDocument();
     expect(screen.queryByText(/每阶段|分钟\/阶段/)).not.toBeInTheDocument();
   });
+
+  it.each([
+    ["COMPLETED", "讨论已完成"],
+    ["ABORTED_USER", "训练已结束"],
+  ] as const)(
+    "renders truthful terminal floor copy for %s without implying another speaker",
+    (status, expectedCopy) => {
+      render(
+        <SessionProgressPanel
+          connection="connected"
+          countdown={null}
+          currentGrant={null}
+          latestFloorEvent={null}
+          participants={PARTICIPANTS}
+          status={status}
+        />,
+      );
+
+      expect(
+        screen.queryByText("正在安排下一位发言者", { exact: true }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByText("等待服务端分配发言权", { exact: true }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.getByText(expectedCopy, { exact: true }),
+      ).toBeInTheDocument();
+    },
+  );
 });

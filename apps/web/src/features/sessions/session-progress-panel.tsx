@@ -39,6 +39,12 @@ export default function SessionProgressPanel({
     : latestFloorEvent
       ? floorReasonLabel(latestFloorEvent.reason_code)
       : null;
+  const terminalFloorCopy =
+    status === "COMPLETED"
+      ? "讨论已完成"
+      : status === "ABORTED_USER"
+        ? "训练已结束"
+        : null;
 
   return (
     <div className="flex min-h-0 flex-col gap-6">
@@ -90,16 +96,22 @@ export default function SessionProgressPanel({
           发言进程
         </h2>
         <p className="mt-3 text-sm font-medium text-neutral-900">
-          {floorOwner ? `当前发言：${floorOwner}` : "正在安排下一位发言者"}
+          {floorOwner
+            ? "当前发言：" + floorOwner
+            : (terminalFloorCopy ?? "正在安排下一位发言者")}
         </p>
-        <p className="mt-1 text-sm text-neutral-600">
-          {floorLifecycleLabel(latestFloorEvent)}
-        </p>
-        {floorReason ? (
-          <p className="mt-1 text-xs leading-5 text-neutral-500">
-            {floorReason}
-          </p>
-        ) : null}
+        {terminalFloorCopy ? null : (
+          <>
+            <p className="mt-1 text-sm text-neutral-600">
+              {floorLifecycleLabel(latestFloorEvent)}
+            </p>
+            {floorReason ? (
+              <p className="mt-1 text-xs leading-5 text-neutral-500">
+                {floorReason}
+              </p>
+            ) : null}
+          </>
+        )}
       </section>
 
       <section

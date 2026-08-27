@@ -332,15 +332,22 @@ describe("DiscussionStage", () => {
     expect(notice()).toHaveTextContent("AI 候选人 1 正在准备发言…");
   });
 
-  it("keeps confirmed history but removes terminal submission and fake modules", () => {
-    const { container } = render(
-      <DiscussionStage
-        {...stageProps({ status: "COMPLETED", showComposer: false })}
-      />,
-    );
-    expect(screen.getByTestId("confirmed-transcript")).toBeInTheDocument();
-    expect(screen.queryByLabelText("发言草稿")).toBeNull();
-    expect(screen.queryByRole("button", { name: "发送发言" })).toBeNull();
-    expect(container.textContent).not.toMatch(/报告|投票|结论|共识率|评分/);
-  });
+  it.each([
+    ["COMPLETED", "讨论已完成"],
+    ["ABORTED_USER", "训练已结束"],
+  ] as const)(
+    "keeps confirmed history but removes terminal submission and fake modules for %s",
+    (status, expectedCopy) => {
+      const { container } = render(
+        <DiscussionStage {...stageProps({ status, showComposer: false })} />,
+      );
+      expect(screen.getByTestId("confirmed-transcript")).toBeInTheDocument();
+      expect(
+        screen.getByText(expectedCopy, { exact: true }),
+      ).toBeInTheDocument();
+      expect(screen.queryByLabelText("发言草稿")).toBeNull();
+      expect(screen.queryByRole("button", { name: "发送发言" })).toBeNull();
+      expect(container.textContent).not.toMatch(/报告|投票|结论|共识率|评分/);
+    },
+  );
 });

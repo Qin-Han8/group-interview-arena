@@ -192,7 +192,7 @@ export default function DiscussionWorkspace({
           aria-labelledby="task-tab"
           className={`${
             activeSurface === "task" ? "block" : "hidden"
-          } studio-scroll-region min-h-0 overflow-y-auto rounded-xl border border-neutral-200 bg-white p-4 md:absolute md:inset-y-4 md:right-4 md:z-20 md:w-96 md:max-w-[calc(100%_-_2rem)] md:shadow-xl min-[1200px]:static min-[1200px]:block min-[1200px]:w-auto min-[1200px]:max-w-none min-[1200px]:shadow-none`}
+          } studio-scroll-region min-h-0 overflow-y-auto rounded-xl border border-neutral-200 bg-white p-4 md:absolute md:inset-y-4 md:right-4 md:z-20 md:w-96 md:max-w-[calc(100%_-_2rem)] md:shadow-xl min-[1200px]:!static min-[1200px]:!block min-[1200px]:!w-auto min-[1200px]:!max-w-none min-[1200px]:!shadow-none`}
           id="task-surface"
           role="tabpanel"
           tabIndex={0}
@@ -217,7 +217,7 @@ export default function DiscussionWorkspace({
           aria-labelledby="progress-tab"
           className={`${
             activeSurface === "progress" ? "block" : "hidden"
-          } studio-scroll-region min-h-0 overflow-y-auto rounded-xl border border-neutral-200 bg-white p-4 md:absolute md:inset-y-4 md:right-4 md:z-20 md:w-96 md:max-w-[calc(100%_-_2rem)] md:shadow-xl min-[1200px]:static min-[1200px]:block min-[1200px]:w-auto min-[1200px]:max-w-none min-[1200px]:shadow-none`}
+          } studio-scroll-region min-h-0 overflow-y-auto rounded-xl border border-neutral-200 bg-white p-4 md:absolute md:inset-y-4 md:right-4 md:z-20 md:w-96 md:max-w-[calc(100%_-_2rem)] md:shadow-xl min-[1200px]:!static min-[1200px]:!block min-[1200px]:!w-auto min-[1200px]:!max-w-none min-[1200px]:!shadow-none`}
           id="progress-surface"
           role="tabpanel"
           tabIndex={0}
