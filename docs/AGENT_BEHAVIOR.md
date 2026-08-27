@@ -1,14 +1,14 @@
 # AI 候选人与讨论编排骨架
 
-- Status: P1-2/P1-3/P1-4 and P1-5A～P1-5E/P1-5F-1/P1-5F-2 completed; P1-5F in progress; P1-5F-3/F4 not started
+- Status: P1-2/P1-3/P1-4 and P1-5A～P1-5F historically completed; P1-5R is `IN_PROGRESS / DESIGN_FROZEN`; R1/R2-A/R2-B/R3 are `NOT_STARTED`
 - Current phase: P1 — IN_PROGRESS
 - Target version: V0.1 Internal Validation
-- Detailed orchestrator/agent design: P1-3A～D and P1-4A～E completed; P1-5A～P1-5E implement the internal runtime; P1-5F-1 freezes Human/AI public utterance progression and Browser UX; P1-5F-2 backend progression/transport is completed after finding remediation and finding-only external re-review `PASS`
+- Detailed orchestrator/agent design: P1-3A～D and P1-4A～E completed; P1-5A～P1-5F historical implementation/acceptance remains complete; P1-5R now freezes progression、long-session UX、visual fidelity and AI-conversation remediation without implementing it
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
 
-本文件记录已确认的 AI 候选人/私有立场基础、P1-3 已实现的讨论状态机、P1-4 floor-control、P1-5A authority freeze、P1-5B provider-neutral persistence、P1-5C deterministic internal runtime、P1-5D first-provider adapter、P1-5E-2 single-turn coordination，以及 P1-5E-3 bounded continuous drive/configured composition。当前仍不包含 public transport、streaming 或结构化记忆。
+本文件记录已确认的 AI 候选人/私有立场基础、P1-3 已实现的讨论状态机、P1-4 floor-control，以及 P1-5A～P1-5F 已完成能力。P1-5R 只冻结 R1/R2/R3 remediation；streaming、结构化记忆及 remediation implementation 仍未开始。
 
 ## Confirmed by PROJECT_MASTER_PLAN
 
@@ -348,7 +348,7 @@ Generation Request 与 final Utterance 是不同 identity。一个 logical reque
 
 ## Future work
 
-- P1：`IN_PROGRESS`；P1-1～P1-4 and P1-5A/P1-5B/P1-5C/P1-5D/P1-5E/P1-5E-1/P1-5E-2/P1-5E-3/P1-5F-1/P1-5F-2 `DONE`；P1-5F remains `IN_PROGRESS`；P1-5F-3/F4 Web/E2E implementation and memory remain Deferred。
+- P1：`IN_PROGRESS`；P1-1～P1-4 and P1-5A～P1-5F retain historical `DONE`；P1-5 is `IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN` only for `P1-5R IN_PROGRESS / DESIGN_FROZEN`；R1/R2-A/R2-B/R3 are `NOT_STARTED`，and memory remains Deferred。
 - P2：加入语音、打断、播放停止和恢复语义。
 - P3：建立角色行为与评分证据之间的校准边界。
 - P6/V1.0：扩展到 6～8 种角色和压力模式。

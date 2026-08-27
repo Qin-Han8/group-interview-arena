@@ -9,8 +9,10 @@ Design actual-source review: `PASS`; findings: `NONE`; reviewed bundle:
 `group-interview-arena-review-20260826-190658.zip`; SHA-256:
 `5867365d06fa6e0f1eb6d8f9dc5ec9dd9d806ed0ec444a909ef8266346ceba42`
 
-Parent status: `P1 IN_PROGRESS`; `P1-5 DONE`; `P1-5F DONE`;
-`P1-5F-3 DONE`; `P1-5F-3A DONE`; `P1-5F-4 DONE`
+Current parent status: `P1 IN_PROGRESS`;
+`P1-5 IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN`;
+P1-5F/F3/F3A/F3B/F4 retain historical `DONE`;
+`P1-5R IN_PROGRESS / DESIGN_FROZEN`; R1/R2-A/R2-B/R3 `NOT_STARTED`
 
 Target version: `V0.1 Internal Validation`
 

@@ -1,6 +1,6 @@
 # API 与事件技术基线
 
-- Status: P0 API Architecture Baseline + P1-1～P1-4 completed + P1-5A～P1-5E/P1-5F-1/P1-5F-2 completed + P1-5F in progress
+- Status: P0 API Architecture Baseline + P1-1～P1-4 and P1-5A～P1-5F historically completed + P1-5R `IN_PROGRESS / DESIGN_FROZEN`
 - Current phase: P1 — IN_PROGRESS
 - API architecture baseline established by: P0-2 — DONE
 - Target version: V0.1 Internal Validation
@@ -11,7 +11,7 @@
 - P1-2 contract: P1-2A/B/C completed; safe question reads and immutable version-bound session creation implemented
 - P1-3 contract: P1-3A～D completed; independent verdict `PASS`; P1-3 `DONE`
 - P1-4 contract: P1-4A～E completed; final independent verdict `PASS`; deterministic scheduler remains server-owned and safe floor snapshot/WS/Web projection is implemented
-- P1-5 contract: P1-5A～P1-5E implement the internal runtime; P1-5F-1 freezes the generation/utterance REST/WS/Browser contract; P1-5F-2 backend transport is `DONE` after finding remediation and finding-only re-review `PASS`, while F3/F4 remain unstarted
+- P1-5 contract: P1-5A～P1-5F historical runtime、transport、Web and acceptance remain `DONE`; P1-5R freezes R1/R2/R3 remediation only，with no API、event、schema or implementation change in this checkpoint
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -440,7 +440,7 @@ P0-3D 已完成最小 API、OpenAPI authority、typed config、request correlati
 - P1-2B persistence/domain/seed、P1-2C safe API/session/Web vertical slice 与 P1-2D independent acceptance 均已完成；P1-2 `DONE`。
 - P1-3A～D 已完成；state/timing/command/event/snapshot、backend durable foundation 与 realtime/Web complete phase flow 已独立验收 `PASS`；P1-3 `DONE`，P1 保持 `IN_PROGRESS`。
 - P1-4A～E 已完成；P1-4 `DONE`，final independent verdict `PASS`。Safe snapshot/WS/Web floor projection 已实现且无 public floor command。
-- P1-5A～P1-5E/P1-5F-1/P1-5F-2 are `DONE`。P1-5F remains `IN_PROGRESS`；F3 Web and F4 E2E remain `NOT_STARTED`。P1-5F-2 finding-only external re-review is `PASS` with findings none。
+- P1-5A～P1-5F retain historical `DONE` and their evidence。Parent P1-5 is `IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN` only for `P1-5R IN_PROGRESS / DESIGN_FROZEN`；R1/R2-A/R2-B/R3 and the implementation plan are `NOT_STARTED`。
 
 ### P2 and later
 

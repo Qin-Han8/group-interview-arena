@@ -8,10 +8,10 @@ Accepted committed target: `30446af520e55977a7c7a4839e00ab1a0a94d44e`
 
 GitHub Actions: run `32945590023`; all four required jobs `PASS`
 
-Parent status: `P1 IN_PROGRESS`; `P1-5 IN_PROGRESS`; `P1-5F IN_PROGRESS`;
-`P1-5F-1 DONE`; `P1-5F-2 DONE`;
-`P1-5F-3 IN_PROGRESS`;
-`P1-5F-3B NOT_STARTED`; `P1-5F-4 NOT_STARTED`
+Current parent status: `P1 IN_PROGRESS`;
+`P1-5 IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN`;
+P1-5F/F3/F3A/F3B/F4 retain historical `DONE`;
+`P1-5R IN_PROGRESS / DESIGN_FROZEN`; R1/R2-A/R2-B/R3 `NOT_STARTED`
 
 Target version: `V0.1 Internal Validation`
 
@@ -917,7 +917,7 @@ freeze.
   `30446af520e55977a7c7a4839e00ab1a0a94d44e`.
 - CI: `PASS`；GitHub Actions run `32945590023` passed all four required jobs.
 - Independent final acceptance: `PASS`；findings none；F3A is `DONE`.
-- F3B complete discussion page composition: `NOT_STARTED`.
-- F4 composition E2E + independent acceptance: `NOT_STARTED`.
+- F3B complete discussion page composition: historical `DONE`.
+- F4 composition E2E + independent acceptance: historical `DONE`.
 - New decisions or unresolved F3A design questions: none.
 - Stage/commit/push authorization: none.

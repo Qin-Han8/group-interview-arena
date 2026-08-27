@@ -4,7 +4,7 @@
 - Most recently completed phase: P0 — DONE
 - Current phase: P1 — IN_PROGRESS
 - Target version: V0.1 Internal Validation
-- Detailed design: Completed through P1-5F-2 backend closeout; P1-5F remains in progress
+- Detailed design: P1-5A～P1-5F historically completed; P1-5R remediation is `IN_PROGRESS / DESIGN_FROZEN`
 - Detailed operational checklist: Not started
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
@@ -18,7 +18,7 @@
 
 ## 当前版本范围
 
-P0-1～P0-7 均已完成，P0 整体已转为 `DONE`。P0-7 finding-only independent recheck `PASS` 后用户已批准进入 P1。P1-1～P1-4 and P1-5A～P1-5E/P1-5F-1/P1-5F-2 are complete；P1-5F remains `IN_PROGRESS`；P1-5F-3/F4 remain `NOT_STARTED`。
+P0-1～P0-7 均已完成，P0 整体已转为 `DONE`。P0-7 finding-only independent recheck `PASS` 后用户已批准进入 P1。P1-1～P1-4 and P1-5A～P1-5F retain historical `DONE`；P1-5 is `IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN` only for `P1-5R IN_PROGRESS / DESIGN_FROZEN`；R1/R2-A/R2-B/R3 and the implementation plan are `NOT_STARTED`。
 
 ## Implementation guidance
 
@@ -363,7 +363,7 @@ P0-2 已 Accepted PostgreSQL、SQLAlchemy 2.x 和 Alembic，P0-4 实施基线为
 - P0-5D：completed；P0-5E completed；final outcome `PASS after findings remediation and independent recheck`。
 - P0-6：`DONE`；P0-6A～P0-6E completed，cross-layer validation/closeout `PASS`。
 - P0-7：completed；initial verdict `BLOCKED`，2 documentation findings remediated，finding-only independent recheck `PASS`，P1 readiness `READY`。
-- P1：`IN_PROGRESS`；P1-5F remains `IN_PROGRESS`，P1-5F-2 is `DONE`；P1-5F-3/F4 are `NOT_STARTED`。
+- P1：`IN_PROGRESS`；P1-5A～P1-5F retain historical `DONE`；P1-5 is `IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN` for `P1-5R IN_PROGRESS / DESIGN_FROZEN`；R1/R2-A/R2-B/R3 are `NOT_STARTED`。
 - 各版本发布任务：补充负责人、环境、命令、证据和发布/回滚步骤。
 
 ## 与其他文档关系

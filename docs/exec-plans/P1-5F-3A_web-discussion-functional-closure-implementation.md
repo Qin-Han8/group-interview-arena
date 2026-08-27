@@ -12,7 +12,9 @@ Status: `IMPLEMENTATION_PLAN_FROZEN`; `IMPLEMENTATION_COMPLETE`;
 Accepted committed target: `30446af520e55977a7c7a4839e00ab1a0a94d44e`
 
 GitHub Actions: run `32945590023`; all four required jobs `PASS`;
-`P1-5F-3B/P1-5F-4 NOT_STARTED`
+F3B/F4 retain historical `DONE`; current parent is
+`P1-5 IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN` for
+`P1-5R IN_PROGRESS / DESIGN_FROZEN`; R1/R2-A/R2-B/R3 `NOT_STARTED`
 
 **Goal:** Close the V0.1 browser text-discussion functional loop on the
 completed F2 backend transport: durable transcript restore, exact-floor Human

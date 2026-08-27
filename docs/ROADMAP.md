@@ -2,11 +2,11 @@
 
 - Status: Active baseline
 - Most recently completed development phase: P0 — `DONE`
-- Most recently completed subphase: P1-5F-4 Composition E2E + Independent Acceptance — `DONE`
+- Most recently completed historical subphase: P1-5F-4 Composition E2E + Independent Acceptance — `DONE`
 - P0-7 final outcome: initial `BLOCKED`; two documentation findings remediated; finding-only independent recheck `PASS`; P1 readiness `READY`
 - Current phase: P1 — `IN_PROGRESS`
-- Most recently completed task: P1-5F-4 — `DONE`
-- Current task gate: P1-5 — `DONE`; P1-5F — `DONE`; P1-5F-3 — `DONE`; P1-5F-3A — `DONE`; P1-5F-3B — `DONE`; P1-5F-4 — `DONE`; P1 remains `IN_PROGRESS`
+- Most recently completed historical task: P1-5F-4 — `DONE`
+- Current task gate: P1-5 — `IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN`; P1-5F and P1-5F-3/P1-5F-3A/P1-5F-3B/P1-5F-4 retain historical `DONE`; P1-5R — `IN_PROGRESS / DESIGN_FROZEN`; R1/R2-A/R2-B/R3 — `NOT_STARTED`; P1 remains `IN_PROGRESS`
 - P0 status: `DONE`; P0-1 through P0-7 completed
 - Target product version: V0.1 — Internal Validation
 - Source: [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) §30–31
@@ -18,7 +18,7 @@
 - `P0～P6`：研发推进阶段，描述按什么顺序建立能力；
 - `V0.1 / V0.5 / V1.0`：产品交付版本，描述某个可验证版本包含什么。
 
-阶段不是版本，P0-x/P1-x 也不是新增产品版本。P0 已完成不代表 V0.1 的全部业务能力已经实现；用户已明确批准进入 P1，P1-1～P1-5 均已完成，P1 保持 `IN_PROGRESS`。P1-5F-1/P1-5F-2/P1-5F-3A remain `DONE` with their recorded review evidence。P1-5F-3B actual-source implementation review、commit/push、CI run `33044682226` and network-free F4 composition acceptance passed with findings none，so F3B and P1-5F-3 are `DONE`。P1-5F-4 initially `BLOCKED` on `F4-ACC-001`；finding-only remediation added the missing network-free Human→AI Browser composition proof，remediation actual-source review passed，commit `af33d89baa0355ae1ee5174a2ef8cfb5e7b14554` and CI run `33050532295` succeeded，fresh independent final acceptance passed with findings `NONE`，and `F4-ACC-001` is `CLOSED`。No real provider/model call was made in the accepted F4 path。P1-5F and P1-5 are `DONE`；no later P1 task has started。
+阶段不是版本，P0-x/P1-x 也不是新增产品版本。P0 已完成不代表 V0.1 的全部业务能力已经实现；用户已明确批准进入 P1，P1 保持 `IN_PROGRESS`。P1-5A～P1-5F historically completed with their recorded review、commit/push、CI and acceptance evidence；P1-5F-4 retains `F4-ACC-001 CLOSED` and made no real provider/model call in its accepted path。Later real local acceptance exposed bounded correctness、long-session UX、visual-fidelity and AI-conversation-quality findings，so parent P1-5 is now `IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN` only for `P1-5R IN_PROGRESS / DESIGN_FROZEN`；all earlier child statuses remain historical `DONE`，and R1/R2-A/R2-B/R3 plus the implementation plan remain unstarted。
 
 ## 2. 开发阶段
 
@@ -96,7 +96,7 @@ P1-3A 已冻结 V0.1 单向 path、合法 abort、server-authoritative transitio
 
 P1-4A 已冻结 phase lifecycle 与 within-phase floor authority 分离、single current owner、AI/human/system participant compatibility、deterministic policy、最小 floor facts 与 non-disclosure。P1-4B 已实现 generalized persistence、single-current-grant invariant、immutable audit history、idempotency/concurrency 与 lifecycle protection。P1-4C 已实现 pure deterministic scheduler、fairness/monopoly/phase-aware ordering、stable tie-break、explainable intervention 和 locked decision → fact orchestration。P1-4D 已在既有 REST snapshot + single ordered WS channel 上实现 allowlisted floor projection、strict Web parser/current-owner lifecycle UI、duplicate/gap/stale-generation recovery，以及真实 PostgreSQL Chromium reload/API-restart flow；没有 Browser scheduler authority 或新 realtime protocol。P1-4E 在唯一 documentation finding 修复后完成 full independent recheck，final verdict `PASS`。Scheduler 只决定谁说，未来 LLM/provider 只决定获准 AI 说什么。P1-4 已为 `DONE`；其后 P1-5A 已按下述边界完成。完整 P1-4 scope/gates 见 [`exec-plans/P1-4_floor-control.md`](exec-plans/P1-4_floor-control.md)。
 
-`P1-5 — AI Runtime Foundation` 已完成；其已批准分解为：
+`P1-5 — AI Runtime Foundation` historically completed through P1-5F and is currently reopened only for P1-5R post-closeout remediation；its approved decomposition is：
 
 - `P1-5A — AI Runtime Architecture Freeze`：completed；docs-only；
 - `P1-5B — AI Runtime Persistence Foundation`：completed；provider-neutral persistence only；
@@ -113,8 +113,9 @@ P1-4A 已冻结 phase lifecycle 与 within-phase floor authority 分离、single
   - `P1-5F-3A — Web Discussion Functional Closure`：`DONE`；
   - `P1-5F-3B — Complete Discussion Page Composition`：`DONE`；`DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_IMPLEMENTATION_REVIEW_PASS / COMMIT_PUSH_COMPLETE / CI_PASS / F4_COMPOSITION_ACCEPTANCE_PASS / FINDINGS_NONE_OPEN`；
 - `P1-5F-4 — Composition E2E + Independent Acceptance`：`DONE`；initial acceptance `BLOCKED` on `F4-ACC-001`；finding-only remediation actual-source review `PASS`；accepted commit `af33d89baa0355ae1ee5174a2ef8cfb5e7b14554`；CI `33050532295` `SUCCESS`；independent final acceptance `PASS`；findings `NONE`；`F4-ACC-001 CLOSED`；network-free fake-provider composition only。
+- `P1-5R — Local Acceptance Remediation`：`IN_PROGRESS / DESIGN_FROZEN`；R1/R2-A/R2-B/R3 `NOT_STARTED`；future sequence R1 → R2-A → R2-B → R3 → final composition acceptance / independent acceptance；no implementation plan or remediation implementation exists in this checkpoint。
 
-P1-5A 冻结 Scheduler 决定 who、AI Runtime 决定 what、provider 只负责 model I/O。P1-5B～P1-5E implement persistence、deterministic runtime、thin configured Zhipu adapter and bounded automatic orchestration。P1-5F-1 freezes the public Human WS command、unified utterance event、historical floor-event v1 plus additive public v2 compatibility、sequence-cursor transcript、atomic publication and recovery contract。P1-5F-2 implements that backend-only transport with no schema/dependency/handwritten-Web delta and is `DONE` after finding remediation/re-review。F3A remains `DONE`。F3B implementation baseline `5efe1346532b95b7fabdd521015fd9f8199a457f` and CI run `33044682226` passed implementation review and later F4 composition acceptance，so F3B is `DONE`。F4 preserved the real scheduler/runtime/persistence/WS/Browser path while replacing only external model I/O with a network-free fake；after `F4-ACC-001` remediation、review、commit/CI and independent acceptance all passed，F4 is `DONE`。Therefore P1-5F-3、P1-5F and P1-5 are `DONE`；P1 remains `IN_PROGRESS`。完整边界见 [`exec-plans/P1-5_ai-runtime-foundation.md`](exec-plans/P1-5_ai-runtime-foundation.md)。
+P1-5A 冻结 Scheduler 决定 who、AI Runtime 决定 what、provider 只负责 model I/O。P1-5B～P1-5F 的 historical implementation and acceptance evidence remains unchanged，including F3A/F3B/F4 `DONE` and `F4-ACC-001 CLOSED`。P1-5R now freezes R1 deterministic progression recovery、R2-A viewport/transcript ownership、R2-B responsive composition fidelity and R3 prompt/context/persona quality without implementing them。Parent P1-5 stays `IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN` until R1 → R2-A → R2-B → R3 and final acceptance complete；P1 remains `IN_PROGRESS`。完整边界见 [`exec-plans/P1-5_ai-runtime-foundation.md`](exec-plans/P1-5_ai-runtime-foundation.md) and [`exec-plans/P1-5R_local-acceptance-remediation.md`](exec-plans/P1-5R_local-acceptance-remediation.md)。
 
 ## 5. 产品版本
 
