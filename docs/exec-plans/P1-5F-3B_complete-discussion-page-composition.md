@@ -1,15 +1,16 @@
 # P1-5F-3B Complete Discussion Page Composition — Design Freeze
 
-Status: `DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN /
-IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_IMPLEMENTATION_REVIEW_PENDING`;
-document complete; self-review `PASS`
+Status: `DONE`; `DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN /
+IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_IMPLEMENTATION_REVIEW_PASS /
+COMMIT_PUSH_COMPLETE / CI_PASS / F4_COMPOSITION_ACCEPTANCE_PASS /
+FINDINGS_NONE_OPEN`; document complete; self-review `PASS`
 
 Design actual-source review: `PASS`; findings: `NONE`; reviewed bundle:
 `group-interview-arena-review-20260826-190658.zip`; SHA-256:
 `5867365d06fa6e0f1eb6d8f9dc5ec9dd9d806ed0ec444a909ef8266346ceba42`
 
-Parent status: `P1 IN_PROGRESS`; `P1-5 IN_PROGRESS`; `P1-5F IN_PROGRESS`;
-`P1-5F-3 IN_PROGRESS`; `P1-5F-3A DONE`; `P1-5F-4 NOT_STARTED`
+Parent status: `P1 IN_PROGRESS`; `P1-5 DONE`; `P1-5F DONE`;
+`P1-5F-3 DONE`; `P1-5F-3A DONE`; `P1-5F-4 DONE`
 
 Target version: `V0.1 Internal Validation`
 
@@ -25,6 +26,18 @@ Parent execution plan:
 
 Frozen implementation plan:
 [`P1-5F-3B_complete-discussion-page-composition-implementation.md`](P1-5F-3B_complete-discussion-page-composition-implementation.md), remediated self-review `PASS`, open findings `NONE`
+
+Implementation closeout: committed implementation baseline
+`5efe1346532b95b7fabdd521015fd9f8199a457f`; actual-source implementation
+review `PASS`; findings `NONE`; GitHub Actions run `33044682226` `SUCCESS`;
+commit/push complete.
+
+F4 composition acceptance: initial acceptance `BLOCKED` on `F4-ACC-001`;
+finding-only remediation added network-free Human→AI Browser composition proof;
+remediation actual-source review `PASS`; accepted final commit
+`af33d89baa0355ae1ee5174a2ef8cfb5e7b14554`; GitHub Actions run
+`33050532295` `SUCCESS`; fresh independent final acceptance `PASS`; findings
+`NONE`; `F4-ACC-001 CLOSED`; no real provider/model call.
 
 Implementation-plan finding-only remediation: initial actual-source review
 `BLOCKED` on exactly `F3B-IP-001` and `F3B-IP-002`; both findings `CLOSED`;
@@ -1160,9 +1173,9 @@ Results:
 The design document is complete, self-reviewed and externally reviewed. Its
 current-source TDD implementation plan is also frozen. A later separately
 approved implementation turn completed all three batches and final code gates
-without changing this frozen design. F3B status is `DESIGN_FROZEN /
-IMPLEMENTATION_PLAN_FROZEN / IMPLEMENTATION_COMPLETE /
-ACTUAL_SOURCE_IMPLEMENTATION_REVIEW_PENDING`; F3B is not `DONE`.
+without changing this frozen design. Actual-source implementation review,
+commit/push, CI and F4 composition acceptance subsequently passed with no open
+findings, so F3B is `DONE` with all frozen evidence tokens satisfied.
 
 ## Historical docs-only validation contract
 
@@ -1194,10 +1207,13 @@ that historical design-freeze turn.
   remediation.
 - F3B remediated implementation-plan self-review: `PASS`; open findings:
   `NONE`.
-- F3B status: `DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN /
-  IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_IMPLEMENTATION_REVIEW_PENDING`.
-- F3B implementation: complete; external actual-source implementation review
-  pending; F3B is not `DONE`.
+- F3B status: `DONE`; `DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN /
+  IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_IMPLEMENTATION_REVIEW_PASS /
+  COMMIT_PUSH_COMPLETE / CI_PASS / F4_COMPOSITION_ACCEPTANCE_PASS /
+  FINDINGS_NONE_OPEN`.
+- F3B implementation baseline: `5efe1346532b95b7fabdd521015fd9f8199a457f`;
+  actual-source implementation review `PASS`; GitHub Actions run `33044682226`
+  `SUCCESS`.
 - Batch 3 final implementation gates: focused Vitest `48/48` and full Vitest
   `178/178`,
   typecheck, lint, format, production build, live OpenAPI drift and Chromium
@@ -1205,5 +1221,9 @@ that historical design-freeze turn.
 - Responsive Browser evidence uses one created session at `1440x900`,
   `900x900` and `390x844`; notes survive responsive switching, clear on reload
   and never enter browser storage; authority reads/WebSocket do not multiply.
-- F4: `NOT_STARTED`.
+- F4: `DONE`; initial acceptance `BLOCKED` on `F4-ACC-001`; finding-only
+  remediation actual-source review `PASS`; accepted commit
+  `af33d89baa0355ae1ee5174a2ef8cfb5e7b14554`; CI run `33050532295` `SUCCESS`;
+  independent final acceptance `PASS`; findings `NONE`; `F4-ACC-001 CLOSED`;
+  network-free fake-provider composition only; no real provider/model call.
 - Stage/commit/push authorization: none.

@@ -1,9 +1,9 @@
 # P1-5F-3B Complete Discussion Page Composition — Implementation Plan
 
-Status: `DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_IMPLEMENTATION_REVIEW_PENDING`
+Status: `DONE`; `DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_IMPLEMENTATION_REVIEW_PASS / COMMIT_PUSH_COMPLETE / CI_PASS / F4_COMPOSITION_ACCEPTANCE_PASS / FINDINGS_NONE_OPEN`
 
-Parent status: `P1 IN_PROGRESS`; `P1-5 IN_PROGRESS`; `P1-5F IN_PROGRESS`;
-`P1-5F-3 IN_PROGRESS`; `P1-5F-3A DONE`; `P1-5F-4 NOT_STARTED`
+Parent status: `P1 IN_PROGRESS`; `P1-5 DONE`; `P1-5F DONE`;
+`P1-5F-3 DONE`; `P1-5F-3A DONE`; `P1-5F-4 DONE`
 
 Target version: `V0.1 Internal Validation`
 
@@ -30,10 +30,19 @@ Implementation baseline: clean committed `main` at
 `ee2701e9e66baec16c6095e706770f5490f3df67`, equal to `origin/main`, with
 baseline GitHub Actions run `33035085603` completed `SUCCESS`.
 
-Implementation result: Batches 1-3 and all final gates are complete. External
-actual-source implementation review is pending; F3B is not `DONE`. No F4,
-backend, schema, generated contract, dependency, provider/config or realtime
-authority change was made.
+Implementation result: Batches 1-3 and all final gates are complete. The
+actual-source implementation review passed with findings `NONE`; implementation
+was committed at `5efe1346532b95b7fabdd521015fd9f8199a457f`; GitHub Actions run
+`33044682226` succeeded; F4 network-free composition acceptance passed. F3B is
+`DONE`. No F3B implementation change altered backend, schema, generated
+contract, dependency, provider/config or realtime authority.
+
+F4 closeout: initial acceptance `BLOCKED` on `F4-ACC-001`; finding-only
+remediation added network-free Human→AI Browser composition proof; remediation
+actual-source review `PASS`; accepted final commit
+`af33d89baa0355ae1ee5174a2ef8cfb5e7b14554`; GitHub Actions run `33050532295`
+`SUCCESS`; fresh independent final acceptance `PASS`; findings `NONE`;
+`F4-ACC-001 CLOSED`; no real provider/model call.
 
 Preserved F3A authorities:
 [`P1-5F-3A_web-discussion-functional-closure.md`](P1-5F-3A_web-discussion-functional-closure.md)
@@ -1099,9 +1108,18 @@ triggered: none.
   production build, live OpenAPI drift and Chromium `2/2` `PASS`; Master Plan
   SHA-256 `2388a9660320406cb35d5354126ad71c6849a98db7c4a356796ca951bf372f26`;
   `git diff --check` clean; staged count `0`.
-- F3B state: `DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN /
-  IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_IMPLEMENTATION_REVIEW_PENDING`; not
-  `DONE`.
+- F3B state: `DONE`; `DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN /
+  IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_IMPLEMENTATION_REVIEW_PASS /
+  COMMIT_PUSH_COMPLETE / CI_PASS / F4_COMPOSITION_ACCEPTANCE_PASS /
+  FINDINGS_NONE_OPEN`.
+- F3B accepted implementation baseline:
+  `5efe1346532b95b7fabdd521015fd9f8199a457f`; actual-source implementation
+  review `PASS`; GitHub Actions run `33044682226` `SUCCESS`.
 - Open findings: `NONE`.
-- F4: `NOT_STARTED`.
+- F4: `DONE`; initial acceptance `BLOCKED` on `F4-ACC-001`; finding-only
+  remediation actual-source review `PASS`; accepted final commit
+  `af33d89baa0355ae1ee5174a2ef8cfb5e7b14554`; GitHub Actions run `33050532295`
+  `SUCCESS`; fresh independent final acceptance `PASS`; findings `NONE`;
+  `F4-ACC-001 CLOSED`; network-free fake-provider composition only; no real
+  provider/model call.
 - Stage/commit/push authorization: none.
