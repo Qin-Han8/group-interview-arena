@@ -32,8 +32,10 @@ test("browser session recovers durable phases across API restart and reload", as
   let floorEvent: string | undefined;
   const lifecycleEvents: string[] = [];
   let humanSubmitCommand: string | undefined;
+  let humanSubmitActionId: string | undefined;
   let humanCreatedEvent: string | undefined;
   let humanReleaseEvent: string | undefined;
+  let laterUnrelatedReleaseEvent: string | undefined;
   let aiCreatedEvent: string | undefined;
   let releaseHumanConfirmation: (() => void) | undefined;
   let humanConfirmationReleased = false;
@@ -98,17 +100,28 @@ test("browser session recovers durable phases across API restart and reload", as
 
     socket.onMessage((message) => {
       const payload = message.toString();
-      if (payload.includes("session.start")) {
+      const command = JSON.parse(payload) as {
+        type?: string;
+        action_id?: string;
+      };
+      if (command.type === "session.start") {
         startCommand = payload;
       }
-      if (payload.includes("participant.utterance.submit")) {
+      if (command.type === "participant.utterance.submit") {
         humanSubmitCommand = payload;
+        humanSubmitActionId = command.action_id;
       }
       server.send(message);
     });
 
     server.onMessage((message) => {
       const payload = message.toString();
+      const event = JSON.parse(payload) as {
+        schema_version?: number;
+        type?: string;
+        action_id?: string | null;
+        payload?: { reason_code?: string };
+      };
       if (payload.includes("floor.granted")) {
         floorEvent ??= payload;
         lifecycleEvents.push(payload);
@@ -129,10 +142,15 @@ test("browser session recovers durable phases across API restart and reload", as
         aiCreatedEvent ??= payload;
       }
       if (
-        payload.includes("floor.released") &&
-        payload.includes('\"reason_code\":\"SPEAKER_FINISHED\"')
+        event.schema_version === 2 &&
+        event.type === "floor.released" &&
+        event.payload?.reason_code === "SPEAKER_FINISHED"
       ) {
-        humanReleaseEvent = payload;
+        if (event.action_id === humanSubmitActionId) {
+          humanReleaseEvent = payload;
+        } else if (humanReleaseEvent !== undefined) {
+          laterUnrelatedReleaseEvent = payload;
+        }
       }
 
       if (
@@ -623,6 +641,20 @@ test("browser session recovers durable phases across API restart and reload", as
   releaseHistoryTail?.();
 
   await expect.poll(() => humanReleaseEvent).toBeTruthy();
+  await test.step("a later unrelated release cannot replace the Human release", async () => {
+    await expect.poll(() => laterUnrelatedReleaseEvent).toBeTruthy();
+    const parsedUnrelatedRelease = JSON.parse(
+      laterUnrelatedReleaseEvent ?? "{}",
+    );
+    expect(parsedUnrelatedRelease).toMatchObject({
+      schema_version: 2,
+      type: "floor.released",
+      session_id: sessionId,
+      action_id: null,
+      payload: { reason_code: "SPEAKER_FINISHED" },
+    });
+  });
+
   const parsedHumanRelease = JSON.parse(humanReleaseEvent ?? "{}");
   expect(parsedHumanRelease).toMatchObject({
     schema_version: 2,
