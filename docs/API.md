@@ -440,7 +440,7 @@ P0-3D 已完成最小 API、OpenAPI authority、typed config、request correlati
 - P1-2B persistence/domain/seed、P1-2C safe API/session/Web vertical slice 与 P1-2D independent acceptance 均已完成；P1-2 `DONE`。
 - P1-3A～D 已完成；state/timing/command/event/snapshot、backend durable foundation 与 realtime/Web complete phase flow 已独立验收 `PASS`；P1-3 `DONE`，P1 保持 `IN_PROGRESS`。
 - P1-4A～E 已完成；P1-4 `DONE`，final independent verdict `PASS`。Safe snapshot/WS/Web floor projection 已实现且无 public floor command。
-- P1-5A～P1-5F retain historical `DONE` and their evidence。Parent P1-5 is `IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN` only for `P1-5R IN_PROGRESS / DESIGN_FROZEN`；R1/R2-A/R2-B/R3 and the implementation plan are `NOT_STARTED`。
+- P1-5A～P1-5F retain historical `DONE` and their evidence。Parent P1-5 is `IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN` only for `P1-5R IN_PROGRESS / DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN`；R1 is `NOT_STARTED / READY_FOR_IMPLEMENTATION`，and R2-A/R2-B/R3 remain dependency-blocked and `NOT_STARTED`。No API remediation is implemented。
 
 ### P2 and later
 

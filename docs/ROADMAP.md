@@ -6,7 +6,7 @@
 - P0-7 final outcome: initial `BLOCKED`; two documentation findings remediated; finding-only independent recheck `PASS`; P1 readiness `READY`
 - Current phase: P1 — `IN_PROGRESS`
 - Most recently completed historical task: P1-5F-4 — `DONE`
-- Current task gate: P1-5 — `IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN`; P1-5F and P1-5F-3/P1-5F-3A/P1-5F-3B/P1-5F-4 retain historical `DONE`; P1-5R — `IN_PROGRESS / DESIGN_FROZEN`; R1/R2-A/R2-B/R3 — `NOT_STARTED`; P1 remains `IN_PROGRESS`
+- Current task gate: P1-5 — `IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN`; P1-5F and P1-5F-3/P1-5F-3A/P1-5F-3B/P1-5F-4 retain historical `DONE`; P1-5R — `IN_PROGRESS / DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN`; R1 — `NOT_STARTED / READY_FOR_IMPLEMENTATION`; later batches remain dependency-blocked and `NOT_STARTED`; P1 remains `IN_PROGRESS`
 - P0 status: `DONE`; P0-1 through P0-7 completed
 - Target product version: V0.1 — Internal Validation
 - Source: [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) §30–31
@@ -18,7 +18,7 @@
 - `P0～P6`：研发推进阶段，描述按什么顺序建立能力；
 - `V0.1 / V0.5 / V1.0`：产品交付版本，描述某个可验证版本包含什么。
 
-阶段不是版本，P0-x/P1-x 也不是新增产品版本。P0 已完成不代表 V0.1 的全部业务能力已经实现；用户已明确批准进入 P1，P1 保持 `IN_PROGRESS`。P1-5A～P1-5F historically completed with their recorded review、commit/push、CI and acceptance evidence；P1-5F-4 retains `F4-ACC-001 CLOSED` and made no real provider/model call in its accepted path。Later real local acceptance exposed bounded correctness、long-session UX、visual-fidelity and AI-conversation-quality findings，so parent P1-5 is now `IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN` only for `P1-5R IN_PROGRESS / DESIGN_FROZEN`；all earlier child statuses remain historical `DONE`，and R1/R2-A/R2-B/R3 plus the implementation plan remain unstarted。
+阶段不是版本，P0-x/P1-x 也不是新增产品版本。P0 已完成不代表 V0.1 的全部业务能力已经实现；用户已明确批准进入 P1，P1 保持 `IN_PROGRESS`。P1-5A～P1-5F historically completed with their recorded review、commit/push、CI and acceptance evidence；P1-5F-4 retains `F4-ACC-001 CLOSED` and made no real provider/model call in its accepted path。Later real local acceptance exposed bounded correctness、long-session UX、visual-fidelity and AI-conversation-quality findings，so parent P1-5 is now `IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN` only for `P1-5R IN_PROGRESS / DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN`；all earlier child statuses remain historical `DONE`，R1 is ready but unstarted，and all later batches remain dependency-blocked and unstarted。
 
 ## 2. 开发阶段
 
@@ -113,9 +113,9 @@ P1-4A 已冻结 phase lifecycle 与 within-phase floor authority 分离、single
   - `P1-5F-3A — Web Discussion Functional Closure`：`DONE`；
   - `P1-5F-3B — Complete Discussion Page Composition`：`DONE`；`DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_IMPLEMENTATION_REVIEW_PASS / COMMIT_PUSH_COMPLETE / CI_PASS / F4_COMPOSITION_ACCEPTANCE_PASS / FINDINGS_NONE_OPEN`；
 - `P1-5F-4 — Composition E2E + Independent Acceptance`：`DONE`；initial acceptance `BLOCKED` on `F4-ACC-001`；finding-only remediation actual-source review `PASS`；accepted commit `af33d89baa0355ae1ee5174a2ef8cfb5e7b14554`；CI `33050532295` `SUCCESS`；independent final acceptance `PASS`；findings `NONE`；`F4-ACC-001 CLOSED`；network-free fake-provider composition only。
-- `P1-5R — Local Acceptance Remediation`：`IN_PROGRESS / DESIGN_FROZEN`；R1/R2-A/R2-B/R3 `NOT_STARTED`；future sequence R1 → R2-A → R2-B → R3 → final composition acceptance / independent acceptance；no implementation plan or remediation implementation exists in this checkpoint。
+- `P1-5R — Local Acceptance Remediation`：`IN_PROGRESS / DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN`；R1 `NOT_STARTED / READY_FOR_IMPLEMENTATION`；R2-A/R2-B/R3 and final acceptance remain dependency-blocked and `NOT_STARTED`；future sequence R1 → R2-A → R2-B → R3 → final composition acceptance / independent acceptance；no remediation implementation exists in this checkpoint。
 
-P1-5A 冻结 Scheduler 决定 who、AI Runtime 决定 what、provider 只负责 model I/O。P1-5B～P1-5F 的 historical implementation and acceptance evidence remains unchanged，including F3A/F3B/F4 `DONE` and `F4-ACC-001 CLOSED`。P1-5R now freezes R1 deterministic progression recovery、R2-A viewport/transcript ownership、R2-B responsive composition fidelity and R3 prompt/context/persona quality without implementing them。Parent P1-5 stays `IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN` until R1 → R2-A → R2-B → R3 and final acceptance complete；P1 remains `IN_PROGRESS`。完整边界见 [`exec-plans/P1-5_ai-runtime-foundation.md`](exec-plans/P1-5_ai-runtime-foundation.md) and [`exec-plans/P1-5R_local-acceptance-remediation.md`](exec-plans/P1-5R_local-acceptance-remediation.md)。
+P1-5A 冻结 Scheduler 决定 who、AI Runtime 决定 what、provider 只负责 model I/O。P1-5B～P1-5F 的 historical implementation and acceptance evidence remains unchanged，including F3A/F3B/F4 `DONE` and `F4-ACC-001 CLOSED`。P1-5R freezes R1 deterministic progression recovery、R2-A viewport/transcript ownership、R2-B responsive composition fidelity and R3 prompt/context/persona quality，and its detailed execution plan is now frozen without implementing them。Parent P1-5 stays `IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN` until R1 → R2-A → R2-B → R3 and final acceptance complete；P1 remains `IN_PROGRESS`。完整边界见 [`exec-plans/P1-5_ai-runtime-foundation.md`](exec-plans/P1-5_ai-runtime-foundation.md)、[`exec-plans/P1-5R_local-acceptance-remediation.md`](exec-plans/P1-5R_local-acceptance-remediation.md) and [`exec-plans/P1-5R_local-acceptance-remediation-implementation.md`](exec-plans/P1-5R_local-acceptance-remediation-implementation.md)。
 
 ## 5. 产品版本
 

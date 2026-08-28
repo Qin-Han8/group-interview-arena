@@ -4,7 +4,7 @@
 - Most recently completed phase: P0 — DONE
 - Current phase: P1 — IN_PROGRESS
 - Target version: V0.1 Internal Validation
-- Detailed design: P1-5A～P1-5F historically completed; P1-5R remediation is `IN_PROGRESS / DESIGN_FROZEN`
+- Detailed design: P1-5A～P1-5F historically completed; P1-5R remediation is `IN_PROGRESS / DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN`
 - Detailed operational checklist: Not started
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
@@ -18,7 +18,7 @@
 
 ## 当前版本范围
 
-P0-1～P0-7 均已完成，P0 整体已转为 `DONE`。P0-7 finding-only independent recheck `PASS` 后用户已批准进入 P1。P1-1～P1-4 and P1-5A～P1-5F retain historical `DONE`；P1-5 is `IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN` only for `P1-5R IN_PROGRESS / DESIGN_FROZEN`；R1/R2-A/R2-B/R3 and the implementation plan are `NOT_STARTED`。
+P0-1～P0-7 均已完成，P0 整体已转为 `DONE`。P0-7 finding-only independent recheck `PASS` 后用户已批准进入 P1。P1-1～P1-4 and P1-5A～P1-5F retain historical `DONE`；P1-5 is `IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN` only for `P1-5R IN_PROGRESS / DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN`；R1 is `NOT_STARTED / READY_FOR_IMPLEMENTATION`，and later batches remain dependency-blocked and `NOT_STARTED`。
 
 ## Implementation guidance
 

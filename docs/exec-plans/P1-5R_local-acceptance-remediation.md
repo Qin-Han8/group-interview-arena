@@ -1,6 +1,6 @@
 # P1-5R Local Acceptance Remediation — Design Freeze
 
-Status: `P1 IN_PROGRESS`; `P1-5 IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN`; `P1-5R IN_PROGRESS / DESIGN_FROZEN`; `R1 NOT_STARTED`; `R2-A NOT_STARTED`; `R2-B NOT_STARTED`; `R3 NOT_STARTED`
+Status: `P1 IN_PROGRESS`; `P1-5 IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN`; `P1-5R IN_PROGRESS / DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN`; `R1 NOT_STARTED / READY_FOR_IMPLEMENTATION`; `R2-A NOT_STARTED / BLOCKED_BY_R1`; `R2-B NOT_STARTED / BLOCKED_BY_R2-A`; `R3 NOT_STARTED / BLOCKED_BY_R2-B`
 
 Target version: `V0.1 Internal Validation`
 
@@ -54,7 +54,7 @@ R1
   -> independent acceptance
 ```
 
-Each future batch uses TDD and actual-source review before commit. Final independent acceptance occurs only against a committed, CI-green remediation baseline. The detailed implementation plan remains `NOT_STARTED` and is not part of this document.
+Each future batch uses TDD and actual-source review before commit. Final independent acceptance occurs only against a committed, CI-green remediation baseline. The detailed executable plan is frozen separately in [`P1-5R_local-acceptance-remediation-implementation.md`](P1-5R_local-acceptance-remediation-implementation.md).
 
 ## Accepted source observations
 
@@ -628,21 +628,23 @@ P1-5F-3A = DONE
 P1-5F-3B = DONE
 P1-5F-4 = DONE
 
-P1-5R = IN_PROGRESS / DESIGN_FROZEN
-R1 = NOT_STARTED
-R2-A = NOT_STARTED
-R2-B = NOT_STARTED
-R3 = NOT_STARTED
+P1-5R = IN_PROGRESS / DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN
+R1 = NOT_STARTED / READY_FOR_IMPLEMENTATION
+R2-A = NOT_STARTED / BLOCKED_BY_R1
+R2-B = NOT_STARTED / BLOCKED_BY_R2-A
+R3 = NOT_STARTED / BLOCKED_BY_R2-B
+Final acceptance = NOT_STARTED / BLOCKED_BY_R3
 
 F1 = OPEN
 F2 = OPEN
 Visual fidelity remediation = OPEN
 F3 = OPEN
 
-Implementation plan = NOT_STARTED
+Implementation plan = FROZEN
+Open implementation findings = NONE
 
 P1-5R-DES-001 = CLOSED
 Open design findings = NONE
 ```
 
-No remediation is implemented. The next governance-approved action is a separate detailed implementation-plan turn for Batch R1.
+No remediation is implemented. The next separately approved action is Batch R1 implementation under the frozen detailed plan.
