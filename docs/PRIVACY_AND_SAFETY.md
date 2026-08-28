@@ -1,9 +1,9 @@
 # 隐私、安全、合规与反作弊基线
 
-- Status: Active baseline through historically completed P1-5F; P1-5R is `IN_PROGRESS / DESIGN_FROZEN` and implements no privacy/runtime change
+- Status: Active baseline through historically completed P1-5F; P1-5R is `IN_PROGRESS / DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN`; R1 implementation is complete awaiting review and preserves the existing privacy boundary
 - Current phase: P1 — IN_PROGRESS
 - Target version: V0.1 Internal Validation
-- Detailed design: P1-5A～P1-5F historical privacy boundaries remain complete；P1-5R freezes public-only recent-context selection、Persona non-disclosure and network-free acceptance without implementation；full production/privacy design remains incomplete
+- Detailed design: P1-5A～P1-5F historical privacy boundaries remain complete；P1-5R contracts remain frozen；R1 implements only deterministic progression/catch-up and natural network-free acceptance，while R2-A/R2-B/R3 remain unimplemented；full production/privacy design remains incomplete
 - Security boundaries: Active from project start
 - P0-5A identity security boundary: completed / approved
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
@@ -171,7 +171,7 @@ The exact public fields、atomicity/recovery matrix and later acceptance are in 
 
 - P0-2：在架构决策中记录基础信任边界；完整威胁建模随实际接口、数据和 Provider 逐步细化。
 - P0-5C～P0-5E：backend/browser authentication、Cookie/CORS/CSRF 与最小日志边界已实现；P0-5E final outcome 为 `PASS after findings remediation and independent recheck`，P0-5 已转为 `DONE`。
-- P0：`DONE`；P1 is `IN_PROGRESS`，P1-1～P1-4 and P1-5A～P1-5F retain historical `DONE`；P1-5 is `IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN` for `P1-5R IN_PROGRESS / DESIGN_FROZEN`；R1/R2-A/R2-B/R3 are `NOT_STARTED`；this checkpoint made no real-model call and recorded no provider secret/raw response。
+- P0：`DONE`；P1 is `IN_PROGRESS`，P1-1～P1-4 and P1-5A～P1-5F retain historical `DONE`；P1-5 is `IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN` for `P1-5R IN_PROGRESS / DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN`；R1 is `IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PENDING` and F1 is `OPEN / IMPLEMENTATION_COMPLETE_AWAITING_REVIEW`；R2-A is `NOT_STARTED / BLOCKED_BY_R1`，R2-B/R3 are `NOT_STARTED`；this checkpoint made no real-model call and recorded no provider secret/raw response。
 - P2：完成语音同意、上传、保存和删除设计。
 - P4/P5：完成支付审计、公开隐私设置、投诉和发布合规检查。
 

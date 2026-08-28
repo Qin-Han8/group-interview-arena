@@ -1,6 +1,6 @@
 # P1-5R Local Acceptance Remediation — Design Freeze
 
-Status: `P1 IN_PROGRESS`; `P1-5 IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN`; `P1-5R IN_PROGRESS / DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN`; `R1 NOT_STARTED / READY_FOR_IMPLEMENTATION`; `R2-A NOT_STARTED / BLOCKED_BY_R1`; `R2-B NOT_STARTED / BLOCKED_BY_R2-A`; `R3 NOT_STARTED / BLOCKED_BY_R2-B`
+Status: `P1 IN_PROGRESS`; `P1-5 IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN`; `P1-5R IN_PROGRESS / DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN`; `R1 IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PENDING`; `F1 OPEN / IMPLEMENTATION_COMPLETE_AWAITING_REVIEW`; `R2-A NOT_STARTED / BLOCKED_BY_R1`; `R2-B NOT_STARTED / BLOCKED_BY_R2-A`; `R3 NOT_STARTED / BLOCKED_BY_R2-B`
 
 Target version: `V0.1 Internal Validation`
 
@@ -26,7 +26,7 @@ This document creates one post-closeout remediation checkpoint. It does not rewr
 - `P1-5F`, `P1-5F-3`, `P1-5F-3A`, `P1-5F-3B` and `P1-5F-4` remain `DONE`;
 - parent `P1-5` is currently reopened to `IN_PROGRESS` only because `P1-5R` is unresolved;
 - `P1-5R` is `IN_PROGRESS / DESIGN_FROZEN` after this docs-only checkpoint;
-- no remediation implementation is claimed.
+- in this original design-freeze checkpoint，no remediation implementation was claimed; the current R1 status is recorded in the document status block and frozen-status summary below.
 
 The open findings are:
 
@@ -629,13 +629,13 @@ P1-5F-3B = DONE
 P1-5F-4 = DONE
 
 P1-5R = IN_PROGRESS / DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN
-R1 = NOT_STARTED / READY_FOR_IMPLEMENTATION
+R1 = IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PENDING
 R2-A = NOT_STARTED / BLOCKED_BY_R1
 R2-B = NOT_STARTED / BLOCKED_BY_R2-A
 R3 = NOT_STARTED / BLOCKED_BY_R2-B
 Final acceptance = NOT_STARTED / BLOCKED_BY_R3
 
-F1 = OPEN
+F1 = OPEN / IMPLEMENTATION_COMPLETE_AWAITING_REVIEW
 F2 = OPEN
 Visual fidelity remediation = OPEN
 F3 = OPEN
@@ -647,4 +647,4 @@ P1-5R-DES-001 = CLOSED
 Open design findings = NONE
 ```
 
-No remediation is implemented. The next separately approved action is Batch R1 implementation under the frozen detailed plan.
+Batch R1 implementation is complete and awaits actual-source review. R1 is not DONE，F1 remains OPEN，and R2-A remains blocked by R1；the frozen design contract is unchanged。

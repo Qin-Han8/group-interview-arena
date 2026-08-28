@@ -1,14 +1,14 @@
 # AI 候选人与讨论编排骨架
 
-- Status: P1-2/P1-3/P1-4 and P1-5A～P1-5F historically completed; P1-5R is `IN_PROGRESS / DESIGN_FROZEN`; R1/R2-A/R2-B/R3 are `NOT_STARTED`
+- Status: P1-2/P1-3/P1-4 and P1-5A～P1-5F historically completed; P1-5R is `IN_PROGRESS / DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN`; R1 is `IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PENDING`; F1 is `OPEN / IMPLEMENTATION_COMPLETE_AWAITING_REVIEW`; R2-A is `NOT_STARTED / BLOCKED_BY_R1`; R2-B/R3 are `NOT_STARTED`
 - Current phase: P1 — IN_PROGRESS
 - Target version: V0.1 Internal Validation
-- Detailed orchestrator/agent design: P1-3A～D and P1-4A～E completed; P1-5A～P1-5F historical implementation/acceptance remains complete; P1-5R now freezes progression、long-session UX、visual fidelity and AI-conversation remediation without implementing it
+- Detailed orchestrator/agent design: P1-3A～D and P1-4A～E completed; P1-5A～P1-5F historical implementation/acceptance remains complete; P1-5R contracts remain frozen；R1 deterministic progression recovery is implemented and awaits actual-source review；R2-A/R2-B/R3 remain unimplemented
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
 
-本文件记录已确认的 AI 候选人/私有立场基础、P1-3 已实现的讨论状态机、P1-4 floor-control，以及 P1-5A～P1-5F 已完成能力。P1-5R 只冻结 R1/R2/R3 remediation；streaming、结构化记忆及 remediation implementation 仍未开始。
+本文件记录已确认的 AI 候选人/私有立场基础、P1-3 已实现的讨论状态机、P1-4 floor-control，以及 P1-5A～P1-5F 已完成能力。P1-5R design and implementation plan remain frozen；R1 remediation implementation is complete awaiting actual-source review，while R2-A/R2-B/R3、streaming and 结构化记忆 have not started。
 
 ## Confirmed by PROJECT_MASTER_PLAN
 
@@ -348,7 +348,7 @@ Generation Request 与 final Utterance 是不同 identity。一个 logical reque
 
 ## Future work
 
-- P1：`IN_PROGRESS`；P1-1～P1-4 and P1-5A～P1-5F retain historical `DONE`；P1-5 is `IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN` only for `P1-5R IN_PROGRESS / DESIGN_FROZEN`；R1/R2-A/R2-B/R3 are `NOT_STARTED`，and memory remains Deferred。
+- P1：`IN_PROGRESS`；P1-1～P1-4 and P1-5A～P1-5F retain historical `DONE`；P1-5 is `IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN` only for `P1-5R IN_PROGRESS / DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN`；R1 is `IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PENDING`；F1 is `OPEN / IMPLEMENTATION_COMPLETE_AWAITING_REVIEW`；R2-A is `NOT_STARTED / BLOCKED_BY_R1`；R2-B/R3 are `NOT_STARTED`，and memory remains Deferred。
 - P2：加入语音、打断、播放停止和恢复语义。
 - P3：建立角色行为与评分证据之间的校准边界。
 - P6/V1.0：扩展到 6～8 种角色和压力模式。

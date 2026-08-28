@@ -14,7 +14,7 @@ Accepted committed target: `30446af520e55977a7c7a4839e00ab1a0a94d44e`
 GitHub Actions: run `32945590023`; all four required jobs `PASS`;
 F3B/F4 retain historical `DONE`; current parent is
 `P1-5 IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN` for
-`P1-5R IN_PROGRESS / DESIGN_FROZEN`; R1/R2-A/R2-B/R3 `NOT_STARTED`
+`P1-5R IN_PROGRESS / DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN`; R1 `IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PENDING`; F1 `OPEN / IMPLEMENTATION_COMPLETE_AWAITING_REVIEW`; R2-A `NOT_STARTED / BLOCKED_BY_R1`; R2-B/R3 `NOT_STARTED`
 
 **Goal:** Close the V0.1 browser text-discussion functional loop on the
 completed F2 backend transport: durable transcript restore, exact-floor Human

@@ -1,6 +1,6 @@
 # P1-5 AI Runtime Foundation Execution Plan
 
-Status: `P1 IN_PROGRESS`; `P1-5 IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN`; P1-5A～P1-5F retain historical `DONE`; `P1-5F-3 DONE`; `P1-5F-3A DONE`; `P1-5F-3B DONE` with its recorded evidence；`P1-5F-4 DONE`; `P1-5R IN_PROGRESS / DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN`; R1 `NOT_STARTED / READY_FOR_IMPLEMENTATION`; R2-A/R2-B/R3 dependency-blocked and `NOT_STARTED`
+Status: `P1 IN_PROGRESS`; `P1-5 IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN`; P1-5A～P1-5F retain historical `DONE`; `P1-5F-3 DONE`; `P1-5F-3A DONE`; `P1-5F-3B DONE` with its recorded evidence；`P1-5F-4 DONE`; `P1-5R IN_PROGRESS / DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN`; R1 `IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PENDING`; F1 `OPEN / IMPLEMENTATION_COMPLETE_AWAITING_REVIEW`; R2-A `NOT_STARTED / BLOCKED_BY_R1`; R2-B/R3 dependency-blocked and `NOT_STARTED`
 
 Target version: `V0.1 Internal Validation`
 
@@ -580,7 +580,7 @@ P1-5D implementation and config-driven patch followed the frozen section above w
 
 ## P1-5F-1 design freeze — Realtime/Public Contract
 
-P1-5F-1 is the separately approved docs-only architectural freeze for exposing the completed P1-5E automatic AI orchestration through a public text-discussion contract。It created no backend、Web、WebSocket、REST、schema、migration、test、generated contract、dependency、configuration or infrastructure implementation in that design-freeze turn。Its later F2/F3/F4 descendants retain historical `DONE` and their evidence。The current hierarchy additionally has `P1-5 IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN` and `P1-5R IN_PROGRESS / DESIGN_FROZEN`；R1/R2-A/R2-B/R3 are `NOT_STARTED`。F4 acceptance used the network-free fake-provider path and made no real provider/model call。
+P1-5F-1 is the separately approved docs-only architectural freeze for exposing the completed P1-5E automatic AI orchestration through a public text-discussion contract。It created no backend、Web、WebSocket、REST、schema、migration、test、generated contract、dependency、configuration or infrastructure implementation in that design-freeze turn。Its later F2/F3/F4 descendants retain historical `DONE` and their evidence。At that P1-5F-1 design-freeze checkpoint，R1/R2-A/R2-B/R3 did not yet exist；the current P1-5R hierarchy is recorded in the dedicated remediation section below。F4 acceptance used the network-free fake-provider path and made no real provider/model call。
 
 ### Public protocol and deployment boundary
 
@@ -838,12 +838,12 @@ If later actual-source implementation disproves any of those facts，requires a 
 
 ## P1-5R post-closeout remediation design freeze
 
-P1-5R is the approved docs-only freeze for four findings found by real local acceptance after the historical P1-5 closeout。Its design and detailed implementation plan are frozen without invalidating prior completion evidence or creating remediation implementation。
+P1-5R is the approved remediation track for four findings found by real local acceptance after the historical P1-5 closeout。Its design and detailed implementation plan remain frozen without invalidating prior completion evidence；Batch R1 implementation is complete awaiting actual-source review。
 
 - R1 freezes deterministic phase-entry progression recovery and connected deadline catch-up ordering without a new scheduler authority or background loop。
 - R2-A freezes loaded-session viewport ownership、transcript-local scrolling and a presentation-only new-message return affordance；R2-B preserves the F3B Interview Simulation Studio composition across `1440x900`、`900x900` and `390x844`。
 - R3 freezes Prompt Version v2 selection、bounded recent public transcript context、pure Persona-to-behavior translation and three-layer network-free acceptance；real-provider checks remain separately approval-gated。
-- Current state is `P1-5R IN_PROGRESS / DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN`; R1 `NOT_STARTED / READY_FOR_IMPLEMENTATION`; R2-A `NOT_STARTED / BLOCKED_BY_R1`; R2-B `NOT_STARTED / BLOCKED_BY_R2-A`; R3 `NOT_STARTED / BLOCKED_BY_R2-B`; F1/F2/Visual fidelity remediation/F3 remain `OPEN`; open implementation findings `NONE`。
+- Current state is `P1-5R IN_PROGRESS / DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN`; R1 `IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PENDING`; F1 `OPEN / IMPLEMENTATION_COMPLETE_AWAITING_REVIEW`; R2-A `NOT_STARTED / BLOCKED_BY_R1`; R2-B `NOT_STARTED / BLOCKED_BY_R2-A`; R3 `NOT_STARTED / BLOCKED_BY_R2-B`; F2/Visual fidelity remediation/F3 remain `OPEN`; open implementation findings `NONE`。
 - Detailed implementation authority: [`P1-5R_local-acceptance-remediation-implementation.md`](P1-5R_local-acceptance-remediation-implementation.md)。
 - Frozen exact design、source-grounded feasibility、privacy exclusions、acceptance and stop conditions are in [`P1-5R_local-acceptance-remediation.md`](P1-5R_local-acceptance-remediation.md)。Future implementation order is R1 → R2-A → R2-B → R3 → final composition acceptance / independent acceptance。
 ## Decisions
@@ -896,5 +896,5 @@ P1-5R is the approved docs-only freeze for four findings found by real local acc
   - P1-5F-3：`DONE`；P1-5F-3A and P1-5F-3B are both `DONE`；
   - P1-5F-3B：`DONE` with `DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_IMPLEMENTATION_REVIEW_PASS / COMMIT_PUSH_COMPLETE / CI_PASS / F4_COMPOSITION_ACCEPTANCE_PASS / FINDINGS_NONE_OPEN`；accepted implementation baseline `5efe1346532b95b7fabdd521015fd9f8199a457f`；GitHub Actions run `33044682226` `SUCCESS`；
   - P1-5F-4：`DONE`；initial acceptance `BLOCKED` on `F4-ACC-001`；finding-only remediation actual-source review `PASS`；accepted commit `af33d89baa0355ae1ee5174a2ef8cfb5e7b14554`；GitHub Actions run `33050532295` `SUCCESS`；independent final acceptance `PASS`；findings `NONE`；`F4-ACC-001 CLOSED`；no real provider/model call。
-- P1-5R：`IN_PROGRESS / DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN`；R1 `NOT_STARTED / READY_FOR_IMPLEMENTATION`；R2-A/R2-B/R3 dependency-blocked and `NOT_STARTED`；no remediation implementation completed。
+- P1-5R：`IN_PROGRESS / DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN`；R1 `IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PENDING`；F1 `OPEN / IMPLEMENTATION_COMPLETE_AWAITING_REVIEW`；R2-A `NOT_STARTED / BLOCKED_BY_R1`；R2-B/R3 dependency-blocked and `NOT_STARTED`。
 - P1-5：`IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN`；historical P1-5A～P1-5F statuses remain `DONE`；P1 remains `IN_PROGRESS`。

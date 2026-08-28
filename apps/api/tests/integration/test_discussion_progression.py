@@ -13,6 +13,9 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from group_interview_arena_api.core.config import DatabaseSettings
 from group_interview_arena_api.db import (
     DiscussionEvent,
+    FloorDecision,
+    FloorGrant,
+    FloorIntervention,
     FloorRelease,
     SessionAction,
     SessionParticipant,
@@ -44,7 +47,11 @@ from group_interview_arena_api.modules.discussion_sessions.utterances import (
     SubmitHumanUtterance,
     submit_human_utterance,
 )
+from group_interview_arena_api.modules.floor_control import (
+    progression as floor_progression,
+)
 from group_interview_arena_api.modules.floor_control.domain import (
+    FLOOR_ENABLED_PHASES,
     FloorDecisionOutcome,
     FloorDecisionRecord,
     FloorPolicyReason,
@@ -53,6 +60,10 @@ from group_interview_arena_api.modules.floor_control.domain import (
     ParticipantAvailability,
     ReleaseFloorCommand,
     SafeDecisionMetadata,
+)
+from group_interview_arena_api.modules.floor_control.scheduler import (
+    V0_1_SCHEDULER_POLICY,
+    ScheduleFloorCommand,
 )
 from group_interview_arena_api.modules.floor_control.service import apply_floor_command
 from group_interview_arena_api.modules.question_personas.seed import (
@@ -496,5 +507,615 @@ def test_inconsistent_latest_human_checkpoint_fails_closed_without_ai_drive(
 
             assert result.outcome.value == "reconciliation_required"
             assert configured_calls == 0
+
+    run_async(exercise)
+
+
+@dataclass(frozen=True)
+class InitialPhaseContext:
+    engine: AsyncEngine
+    session_factory: async_sessionmaker[AsyncSession]
+    owner_id: UUID
+    session_id: UUID
+    human_participant_id: UUID
+    ai_participant_id: UUID
+
+
+@asynccontextmanager
+async def _initial_phase_context(
+    temporary_database: TemporaryDatabaseContext,
+    *,
+    phase: SessionStatus = SessionStatus.OPENING_STATEMENTS,
+):
+    engine = create_database_engine(temporary_database.database_settings())
+    session_factory = create_database_session_factory(engine)
+    try:
+        await seed_question_persona_foundation(session_factory)
+        owner_id = uuid4()
+        async with session_factory() as session:
+            async with session.begin():
+                session.add(
+                    User(
+                        id=owner_id,
+                        username=f"initial_progression_{owner_id.hex[:10]}",
+                        password_hash="test-only-password-hash",
+                    )
+                )
+        async with session_factory() as session:
+            created = await create_session(
+                session,
+                owner_id=owner_id,
+                question_version_id=INTERNAL_VALIDATION_BUNDLE.version_id,
+            )
+        async with session_factory() as session:
+            await apply_session_command(
+                session,
+                owner_id=owner_id,
+                command=SessionCommand(
+                    schema_version=1,
+                    command_type="session.start",
+                    session_id=created.session_id,
+                    action_id=uuid4(),
+                    payload={},
+                ),
+                duration_plan=PLAN,
+            )
+
+        while True:
+            async with session_factory() as session:
+                snapshot = await get_session_snapshot(
+                    session,
+                    owner_id=owner_id,
+                    session_id=created.session_id,
+                )
+            if snapshot.status is phase:
+                break
+            assert snapshot.phase_deadline_at is not None
+            async with session_factory() as session:
+                await reconcile_session_deadline(
+                    session,
+                    owner_id=owner_id,
+                    session_id=created.session_id,
+                    now=snapshot.phase_deadline_at,
+                )
+
+        async with session_factory() as session:
+            participants = tuple(
+                (
+                    await session.scalars(
+                        select(SessionParticipant)
+                        .where(SessionParticipant.session_id == created.session_id)
+                        .order_by(SessionParticipant.seat_order)
+                    )
+                ).all()
+            )
+        yield InitialPhaseContext(
+            engine=engine,
+            session_factory=session_factory,
+            owner_id=owner_id,
+            session_id=created.session_id,
+            human_participant_id=participants[0].id,
+            ai_participant_id=participants[1].id,
+        )
+    finally:
+        await dispose_database_engine(engine)
+
+
+def test_initial_phase_scheduler_identity_bytes_are_frozen() -> None:
+    identities = progression.derive_initial_scheduler_identities(
+        session_id=UUID("10000000-0000-4000-8000-000000000001"),
+        phase=SessionStatus.OPENING_STATEMENTS,
+        phase_entry_sequence=7,
+    )
+
+    assert identities == progression.SchedulerCheckpointIdentities(
+        schedule_action_id=UUID("db89ee13-0f75-4051-a44f-129d09737589"),
+        decision_id=UUID("497e178f-b910-4042-8a4c-e2f782971fbb"),
+        next_floor_grant_id=UUID("456e1223-cbb7-420b-ba03-6c30f67222a4"),
+        intervention_id=UUID("5bc66d02-c623-4177-bdc8-4f409d0d7b86"),
+    )
+
+
+@pytest.mark.parametrize("phase", tuple(FLOOR_ENABLED_PHASES))
+def test_exact_initial_phase_entry_proof_covers_every_floor_enabled_phase(
+    migrated_database: TemporaryDatabaseContext,
+    phase: SessionStatus,
+) -> None:
+    async def exercise() -> None:
+        async with _initial_phase_context(migrated_database, phase=phase) as context:
+            async with context.session_factory() as session:
+                aggregate = await session.get(SimulationSession, context.session_id)
+                assert aggregate is not None
+                state, proof = await progression._initial_phase_entry_checkpoint(  # pyright: ignore[reportPrivateUsage]
+                    session,
+                    owner_id=context.owner_id,
+                    aggregate=aggregate,
+                )
+                event = await session.get(
+                    DiscussionEvent,
+                    (context.session_id, aggregate.last_sequence),
+                )
+
+            assert state is progression._InitialPhaseCheckpointState.EXACT  # pyright: ignore[reportPrivateUsage]
+            assert proof is not None
+            assert event is not None
+            assert proof.phase is phase
+            assert proof.event_sequence == aggregate.last_sequence
+            assert proof.occurred_at == event.occurred_at
+            assert proof.phase_started_at == aggregate.phase_started_at
+            assert proof.phase_deadline_at == aggregate.phase_deadline_at
+
+    run_async(exercise)
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    (
+        "missing",
+        "sequence",
+        "version",
+        "type",
+        "status",
+        "previous_status",
+        "trigger",
+        "phase_started_at",
+        "phase_deadline_at",
+        "extra_payload",
+    ),
+)
+def test_initial_phase_entry_proof_drift_fails_closed_without_schedule(
+    migrated_database: TemporaryDatabaseContext,
+    mutation: str,
+) -> None:
+    async def exercise() -> None:
+        async with _initial_phase_context(migrated_database) as context:
+            async with context.session_factory() as session:
+                aggregate = await session.get(SimulationSession, context.session_id)
+                assert aggregate is not None
+                state, proof = await progression._initial_phase_entry_checkpoint(  # pyright: ignore[reportPrivateUsage]
+                    session,
+                    owner_id=context.owner_id,
+                    aggregate=aggregate,
+                )
+                assert state is progression._InitialPhaseCheckpointState.EXACT  # pyright: ignore[reportPrivateUsage]
+                assert proof is not None
+
+            async with context.session_factory() as session:
+                async with session.begin():
+                    aggregate = await session.get(
+                        SimulationSession,
+                        context.session_id,
+                    )
+                    assert aggregate is not None
+                    event = await session.get(
+                        DiscussionEvent,
+                        (context.session_id, aggregate.last_sequence),
+                    )
+                    assert event is not None
+                    if mutation == "missing":
+                        await session.delete(event)
+                    elif mutation == "sequence":
+                        aggregate.last_sequence += 1
+                    elif mutation == "version":
+                        event.event_version = 1
+                    elif mutation == "type":
+                        event.event_type = "session.created"
+                    else:
+                        payload = dict(event.payload)
+                        if mutation == "status":
+                            payload["status"] = SessionStatus.EXPLORATION.value
+                        elif mutation == "previous_status":
+                            payload["previous_status"] = SessionStatus.CREATED.value
+                        elif mutation == "trigger":
+                            payload["trigger"] = "USER_START"
+                        elif mutation == "phase_started_at":
+                            payload["phase_started_at"] = "2026-01-01T00:00:00Z"
+                        elif mutation == "phase_deadline_at":
+                            payload["phase_deadline_at"] = "2026-01-01T00:00:01Z"
+                        elif mutation == "extra_payload":
+                            payload["unexpected"] = True
+                        event.payload = payload
+
+            identities = progression.derive_initial_scheduler_identities(
+                session_id=context.session_id,
+                phase=proof.phase,
+                phase_entry_sequence=proof.event_sequence,
+            )
+            result = await floor_progression.drive_initial_scheduler_checkpoint(
+                context.session_factory,
+                owner_id=context.owner_id,
+                session_id=context.session_id,
+                phase_entry=proof,
+                identities=identities,
+                scheduling_policy=V0_1_SCHEDULER_POLICY,
+            )
+            async with context.session_factory() as session:
+                action = await session.get(
+                    SessionAction,
+                    (context.session_id, identities.schedule_action_id),
+                )
+
+            assert (
+                result.outcome
+                is floor_progression.SchedulerCheckpointOutcome.RECONCILIATION_REQUIRED
+            )
+            assert action is None
+
+    run_async(exercise)
+
+
+def test_initial_driver_reconstructs_exact_command_and_replays_one_checkpoint(
+    migrated_database: TemporaryDatabaseContext,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def exercise() -> None:
+        captured_commands: list[ScheduleFloorCommand] = []
+        real_apply = floor_progression.apply_scheduler_command
+
+        async def capture_command(
+            session: AsyncSession,
+            *,
+            owner_id: UUID,
+            command: ScheduleFloorCommand,
+        ):
+            captured_commands.append(command)
+            return await real_apply(session, owner_id=owner_id, command=command)
+
+        monkeypatch.setattr(
+            floor_progression,
+            "apply_scheduler_command",
+            capture_command,
+        )
+        async with _initial_phase_context(migrated_database) as context:
+            async with context.session_factory() as session:
+                aggregate = await session.get(SimulationSession, context.session_id)
+                assert aggregate is not None
+                state, proof = await progression._initial_phase_entry_checkpoint(  # pyright: ignore[reportPrivateUsage]
+                    session,
+                    owner_id=context.owner_id,
+                    aggregate=aggregate,
+                )
+            assert state is progression._InitialPhaseCheckpointState.EXACT  # pyright: ignore[reportPrivateUsage]
+            assert proof is not None
+            identities = progression.derive_initial_scheduler_identities(
+                session_id=context.session_id,
+                phase=proof.phase,
+                phase_entry_sequence=proof.event_sequence,
+            )
+
+            first = await floor_progression.drive_initial_scheduler_checkpoint(
+                context.session_factory,
+                owner_id=context.owner_id,
+                session_id=context.session_id,
+                phase_entry=proof,
+                identities=identities,
+                scheduling_policy=V0_1_SCHEDULER_POLICY,
+            )
+            second = await floor_progression.drive_initial_scheduler_checkpoint(
+                context.session_factory,
+                owner_id=context.owner_id,
+                session_id=context.session_id,
+                phase_entry=proof,
+                identities=identities,
+                scheduling_policy=V0_1_SCHEDULER_POLICY,
+            )
+
+            assert first == second
+            assert len(captured_commands) == 2
+            assert captured_commands[0] == captured_commands[1]
+            command = captured_commands[0]
+            assert command.expected_phase is proof.phase
+            assert command.expected_last_sequence == proof.event_sequence
+            assert command.expected_current_floor_grant_id is None
+            assert command.evaluated_at == proof.occurred_at
+            assert command.policy is V0_1_SCHEDULER_POLICY
+
+            async with context.session_factory() as session:
+                action_count = await session.scalar(
+                    select(func.count())
+                    .select_from(SessionAction)
+                    .where(
+                        SessionAction.session_id == context.session_id,
+                        SessionAction.action_id == identities.schedule_action_id,
+                    )
+                )
+                decision_count = await session.scalar(
+                    select(func.count())
+                    .select_from(FloorDecision)
+                    .where(FloorDecision.id == identities.decision_id)
+                )
+                grant_count = await session.scalar(
+                    select(func.count())
+                    .select_from(FloorGrant)
+                    .where(FloorGrant.id == identities.next_floor_grant_id)
+                )
+
+            assert action_count == 1
+            assert decision_count == 1
+            assert grant_count == 1
+
+    run_async(exercise)
+
+
+def test_resume_progression_naturally_grants_initial_human_floor(
+    migrated_database: TemporaryDatabaseContext,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def exercise() -> None:
+        configured_calls = 0
+
+        async def configured_drive(*_args: object, **_kwargs: object):
+            nonlocal configured_calls
+            configured_calls += 1
+            return ContinuousAiDriveResult(
+                outcome=ContinuousAiDriveOutcome.WAITING_FOR_HUMAN,
+                automated_ai_turns_advanced=0,
+            )
+
+        monkeypatch.setattr(
+            progression,
+            "drive_configured_ai_session",
+            configured_drive,
+        )
+        async with _initial_phase_context(migrated_database) as context:
+            result = await progression.resume_discussion_progression(
+                context.session_factory,
+                owner_id=context.owner_id,
+                session_id=context.session_id,
+            )
+            async with context.session_factory() as session:
+                aggregate = await session.get(SimulationSession, context.session_id)
+                assert aggregate is not None
+                assert aggregate.current_floor_grant_id is not None
+                grant = await session.get(
+                    FloorGrant,
+                    aggregate.current_floor_grant_id,
+                )
+                assert grant is not None
+                participant = await session.get(
+                    SessionParticipant,
+                    grant.participant_id,
+                )
+
+            assert (
+                result.outcome
+                is progression.DiscussionProgressionOutcome.NEXT_HUMAN_GRANTED
+            )
+            assert result.scheduler_result is not None
+            assert result.scheduler_result.next_participant_id == (
+                context.human_participant_id
+            )
+            assert participant is not None
+            assert participant.id == context.human_participant_id
+            assert configured_calls == 0
+
+    run_async(exercise)
+
+
+def test_resume_progression_naturally_grants_initial_ai_floor(
+    migrated_database: TemporaryDatabaseContext,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def exercise() -> None:
+        configured_calls = 0
+
+        async def configured_drive(*_args: object, **_kwargs: object):
+            nonlocal configured_calls
+            configured_calls += 1
+            return ContinuousAiDriveResult(
+                outcome=ContinuousAiDriveOutcome.WAITING_FOR_HUMAN,
+                automated_ai_turns_advanced=0,
+            )
+
+        monkeypatch.setattr(
+            progression,
+            "drive_configured_ai_session",
+            configured_drive,
+        )
+        async with _initial_phase_context(migrated_database) as context:
+            async with context.session_factory() as session:
+                async with session.begin():
+                    human = await session.get(
+                        SessionParticipant,
+                        context.human_participant_id,
+                    )
+                    assert human is not None
+                    human.availability = ParticipantAvailability.UNAVAILABLE
+
+            result = await progression.resume_discussion_progression(
+                context.session_factory,
+                owner_id=context.owner_id,
+                session_id=context.session_id,
+            )
+            async with context.session_factory() as session:
+                aggregate = await session.get(SimulationSession, context.session_id)
+                assert aggregate is not None
+                assert aggregate.current_floor_grant_id is not None
+                grant = await session.get(
+                    FloorGrant,
+                    aggregate.current_floor_grant_id,
+                )
+                assert grant is not None
+
+            assert (
+                result.outcome
+                is progression.DiscussionProgressionOutcome.AI_DRIVE_COMPLETED
+            )
+            assert result.scheduler_result is not None
+            assert result.scheduler_result.next_participant_id == (
+                context.ai_participant_id
+            )
+            assert grant.participant_id == context.ai_participant_id
+            assert configured_calls == 1
+
+    run_async(exercise)
+
+
+def test_repeated_initial_progression_converges_to_one_durable_checkpoint(
+    migrated_database: TemporaryDatabaseContext,
+) -> None:
+    async def exercise() -> None:
+        async with _initial_phase_context(migrated_database) as context:
+            async with context.session_factory() as session:
+                aggregate = await session.get(SimulationSession, context.session_id)
+                assert aggregate is not None
+                phase = SessionStatus(aggregate.status)
+                phase_entry_sequence = aggregate.last_sequence
+            identities = progression.derive_initial_scheduler_identities(
+                session_id=context.session_id,
+                phase=phase,
+                phase_entry_sequence=phase_entry_sequence,
+            )
+
+            first = await progression.resume_discussion_progression(
+                context.session_factory,
+                owner_id=context.owner_id,
+                session_id=context.session_id,
+            )
+            second = await progression.resume_discussion_progression(
+                context.session_factory,
+                owner_id=context.owner_id,
+                session_id=context.session_id,
+            )
+
+            async with context.session_factory() as session:
+                action_count = await session.scalar(
+                    select(func.count())
+                    .select_from(SessionAction)
+                    .where(
+                        SessionAction.session_id == context.session_id,
+                        SessionAction.action_id == identities.schedule_action_id,
+                    )
+                )
+                decision_count = await session.scalar(
+                    select(func.count())
+                    .select_from(FloorDecision)
+                    .where(FloorDecision.id == identities.decision_id)
+                )
+                active_grant_count = await session.scalar(
+                    select(func.count())
+                    .select_from(FloorGrant)
+                    .outerjoin(
+                        FloorRelease,
+                        FloorRelease.grant_id == FloorGrant.id,
+                    )
+                    .where(
+                        FloorGrant.session_id == context.session_id,
+                        FloorRelease.grant_id.is_(None),
+                    )
+                )
+
+            assert (
+                first.outcome
+                is progression.DiscussionProgressionOutcome.NEXT_HUMAN_GRANTED
+            )
+            assert second.outcome is progression.DiscussionProgressionOutcome.NO_WORK
+            assert action_count == 1
+            assert decision_count == 1
+            assert active_grant_count is not None
+            assert active_grant_count <= 1
+
+    run_async(exercise)
+
+
+def test_initial_intervention_replays_from_latest_current_phase_entry(
+    migrated_database: TemporaryDatabaseContext,
+) -> None:
+    async def exercise() -> None:
+        async with _initial_phase_context(migrated_database) as context:
+            async with context.session_factory() as session, session.begin():
+                aggregate = await session.get(SimulationSession, context.session_id)
+                assert aggregate is not None
+                phase = SessionStatus(aggregate.status)
+                phase_entry_sequence = aggregate.last_sequence
+                participants = tuple(
+                    (
+                        await session.scalars(
+                            select(SessionParticipant).where(
+                                SessionParticipant.session_id == context.session_id
+                            )
+                        )
+                    ).all()
+                )
+                for participant in participants:
+                    participant.availability = ParticipantAvailability.UNAVAILABLE
+
+            identities = progression.derive_initial_scheduler_identities(
+                session_id=context.session_id,
+                phase=phase,
+                phase_entry_sequence=phase_entry_sequence,
+            )
+
+            first = await progression.resume_discussion_progression(
+                context.session_factory,
+                owner_id=context.owner_id,
+                session_id=context.session_id,
+            )
+
+            async with context.session_factory() as session:
+                aggregate = await session.get(SimulationSession, context.session_id)
+                assert aggregate is not None
+                intervention_event = await session.scalar(
+                    select(DiscussionEvent).where(
+                        DiscussionEvent.session_id == context.session_id,
+                        DiscussionEvent.event_type == "floor.intervention_requested",
+                    )
+                )
+                assert intervention_event is not None
+                assert intervention_event.sequence > phase_entry_sequence
+                assert aggregate.last_sequence == intervention_event.sequence
+
+            second = await progression.resume_discussion_progression(
+                context.session_factory,
+                owner_id=context.owner_id,
+                session_id=context.session_id,
+            )
+
+            async with context.session_factory() as session:
+                schedule_actions = tuple(
+                    (
+                        await session.scalars(
+                            select(SessionAction).where(
+                                SessionAction.session_id == context.session_id,
+                                SessionAction.command_type == "floor.schedule",
+                            )
+                        )
+                    ).all()
+                )
+                decision_count = await session.scalar(
+                    select(func.count())
+                    .select_from(FloorDecision)
+                    .where(FloorDecision.session_id == context.session_id)
+                )
+                intervention_count = await session.scalar(
+                    select(func.count())
+                    .select_from(FloorIntervention)
+                    .where(FloorIntervention.session_id == context.session_id)
+                )
+                grant_count = await session.scalar(
+                    select(func.count())
+                    .select_from(FloorGrant)
+                    .where(FloorGrant.session_id == context.session_id)
+                )
+                intervention_event_count = await session.scalar(
+                    select(func.count())
+                    .select_from(DiscussionEvent)
+                    .where(
+                        DiscussionEvent.session_id == context.session_id,
+                        DiscussionEvent.event_type == "floor.intervention_requested",
+                    )
+                )
+
+            assert (
+                first.outcome
+                is progression.DiscussionProgressionOutcome.INTERVENTION_REQUESTED
+            )
+            assert second == first
+            assert len(schedule_actions) == 1
+            assert schedule_actions[0].action_id == identities.schedule_action_id
+            assert decision_count == 1
+            assert intervention_count == 1
+            assert grant_count == 0
+            assert intervention_event_count == 1
 
     run_async(exercise)

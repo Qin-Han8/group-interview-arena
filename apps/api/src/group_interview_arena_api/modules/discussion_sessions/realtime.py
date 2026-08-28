@@ -76,6 +76,13 @@ _ERROR_MESSAGES: dict[RealtimeErrorCode, str] = {
 }
 
 
+def _reconciliation_changed_lifecycle(events: Sequence[StoredEvent]) -> bool:
+    return any(
+        event.event_type == "session.state_changed" and event.event_version == 2
+        for event in events
+    )
+
+
 def _parse_command(text: str) -> RealtimeSessionCommand:
     raw = json.loads(text)
     if not isinstance(raw, dict):
@@ -252,7 +259,7 @@ def create_realtime_router(settings: Settings) -> APIRouter:
         progression_task: asyncio.Task[None] | None = None
         progression_lock = asyncio.Lock()
 
-        async def drain_committed_events() -> None:
+        async def drain_committed_events() -> tuple[StoredEvent, ...]:
             nonlocal sent_sequence
             async with send_lock:
                 async with session_factory() as session:
@@ -268,6 +275,7 @@ def create_realtime_router(settings: Settings) -> APIRouter:
                 for event in projected:
                     await _send_formal_event(websocket, event)
                     sent_sequence = event.sequence
+                return tuple(events)
 
         async def send_old_command_replay(events: Sequence[StoredEvent]) -> None:
             nonlocal sent_sequence
@@ -337,12 +345,16 @@ def create_realtime_router(settings: Settings) -> APIRouter:
                 while True:
                     await asyncio.sleep(0.25)
                     async with session_factory() as session:
-                        await reconcile_session_deadline(
+                        reconciliation_events = await reconcile_session_deadline(
                             session,
                             owner_id=user.user_id,
                             session_id=session_id,
                         )
-                    await drain_committed_events()
+                    drained_events = await drain_committed_events()
+                    if _reconciliation_changed_lifecycle(
+                        (*reconciliation_events, *drained_events)
+                    ):
+                        await kick_progression_best_effort()
             except asyncio.CancelledError:
                 raise
             except Exception:

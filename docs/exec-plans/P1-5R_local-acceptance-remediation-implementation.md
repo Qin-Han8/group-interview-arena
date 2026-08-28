@@ -2,9 +2,9 @@
 
 Status: P1 = IN_PROGRESS; P1-5 = IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN; P1-5R = IN_PROGRESS / DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN
 
-Batch status: R1 = NOT_STARTED / READY_FOR_IMPLEMENTATION; R2-A = NOT_STARTED / BLOCKED_BY_R1; R2-B = NOT_STARTED / BLOCKED_BY_R2-A; R3 = NOT_STARTED / BLOCKED_BY_R2-B; Final Acceptance = NOT_STARTED / BLOCKED_BY_R3
+Batch status: R1 = IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PENDING; R2-A = NOT_STARTED / BLOCKED_BY_R1; R2-B = NOT_STARTED / BLOCKED_BY_R2-A; R3 = NOT_STARTED / BLOCKED_BY_R2-B; Final Acceptance = NOT_STARTED / BLOCKED_BY_R3
 
-Findings: F1 = OPEN; F2 = OPEN; Visual fidelity remediation = OPEN; F3 = OPEN; P1-5R-IP-001 = CLOSED; Open implementation findings = NONE
+Findings: F1 = OPEN / IMPLEMENTATION_COMPLETE_AWAITING_REVIEW; F2 = OPEN; Visual fidelity remediation = OPEN; F3 = OPEN; P1-5R-IP-001 = CLOSED; Open implementation findings = NONE
 
 Target version: V0.1 Internal Validation
 
@@ -812,12 +812,12 @@ Stop and report before changing scope if implementation requires a schema/migrat
 P1 = IN_PROGRESS
 P1-5 = IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN
 P1-5R = IN_PROGRESS / DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN
-R1 = NOT_STARTED / READY_FOR_IMPLEMENTATION
+R1 = IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PENDING
 R2-A = NOT_STARTED / BLOCKED_BY_R1
 R2-B = NOT_STARTED / BLOCKED_BY_R2-A
 R3 = NOT_STARTED / BLOCKED_BY_R2-B
 Final acceptance = NOT_STARTED / BLOCKED_BY_R3
-F1 = OPEN
+F1 = OPEN / IMPLEMENTATION_COMPLETE_AWAITING_REVIEW
 F2 = OPEN
 Visual fidelity remediation = OPEN
 F3 = OPEN
@@ -825,4 +825,4 @@ P1-5R-IP-001 = CLOSED
 Open implementation findings = NONE
 ~~~
 
-No remediation is implemented. The next separately approved action is Batch R1 implementation under this frozen plan.
+Batch R1 implementation is complete and awaits actual-source review. R1 is not DONE，F1 remains OPEN，and R2-A remains blocked by R1；the frozen implementation contract is unchanged。

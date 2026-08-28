@@ -5,7 +5,7 @@ from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from queue import Empty, Queue
-from threading import Thread
+from threading import Event, Thread
 from typing import Never, Protocol, cast
 from uuid import UUID, uuid4
 
@@ -13,6 +13,7 @@ import pytest
 from fastapi import FastAPI
 from httpx import Cookies, Headers, Response
 from sqlalchemy import URL, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.testclient import (
     TestClient,
     WebSocketDenialResponse,
@@ -29,6 +30,7 @@ from group_interview_arena_api.core.config import (
 )
 from group_interview_arena_api.db import (
     DiscussionEvent,
+    FloorGrant,
     FloorRelease,
     SessionAction,
     SimulationSession,
@@ -39,7 +41,10 @@ from group_interview_arena_api.db.runtime import (
     dispose_database_engine,
 )
 from group_interview_arena_api.identity.cookies import SESSION_COOKIE_NAME
-from group_interview_arena_api.modules.discussion_sessions import realtime
+from group_interview_arena_api.modules.discussion_sessions import (
+    deadline_recovery,
+    realtime,
+)
 from group_interview_arena_api.modules.discussion_sessions.domain import (
     SessionStatus,
     StoredEvent,
@@ -286,6 +291,42 @@ async def _expire_phase_deadline(
             now = datetime.now(UTC)
             aggregate.phase_started_at = now - timedelta(seconds=31)
             aggregate.phase_deadline_at = now - timedelta(seconds=1)
+    finally:
+        await dispose_database_engine(engine)
+
+
+async def _recover_due_sessions_externally(
+    temporary_database: TemporaryDatabaseContext,
+) -> int:
+    engine = create_database_engine(temporary_database.database_settings())
+    try:
+        return await deadline_recovery.recover_due_sessions(
+            create_database_session_factory(engine)
+        )
+    finally:
+        await dispose_database_engine(engine)
+
+
+async def _active_floor_state(
+    temporary_database: TemporaryDatabaseContext,
+    session_id: UUID,
+) -> tuple[int, UUID | None]:
+    engine = create_database_engine(temporary_database.database_settings())
+    try:
+        session_factory = create_database_session_factory(engine)
+        async with session_factory() as session:
+            aggregate = await session.get(SimulationSession, session_id)
+            assert aggregate is not None
+            active_count = await session.scalar(
+                select(func.count())
+                .select_from(FloorGrant)
+                .outerjoin(FloorRelease, FloorRelease.grant_id == FloorGrant.id)
+                .where(
+                    FloorGrant.session_id == session_id,
+                    FloorRelease.grant_id.is_(None),
+                )
+            )
+            return int(active_count or 0), aggregate.current_floor_grant_id
     finally:
         await dispose_database_engine(engine)
 
@@ -816,6 +857,7 @@ def test_periodic_catchup_failure_closes_safely_without_raw_error(
             websocket.send_json(_start_command(session_id, uuid4()))
             assert websocket.receive_json()["sequence"] == 2
             assert websocket.receive_json()["sequence"] == 3
+            assert websocket.receive_json()["sequence"] == 4
             if failure_kind == "projection":
                 monkeypatch.setattr(
                     realtime,
@@ -825,7 +867,7 @@ def test_periodic_catchup_failure_closes_safely_without_raw_error(
             else:
                 monkeypatch.setattr(realtime, "_send_formal_event", fail_once)
             asyncio.run(
-                _schedule_floor(migrated_database, UUID(session_id)),
+                _expire_phase_deadline(migrated_database, UUID(session_id)),
                 loop_factory=asyncio.SelectorEventLoop,
             )
 
@@ -838,9 +880,9 @@ def test_periodic_catchup_failure_closes_safely_without_raw_error(
 
         durable = client.get(f"/sessions/{session_id}")
         assert durable.status_code == 200
-        assert durable.json()["status"] == "OPENING_STATEMENTS"
-        assert durable.json()["last_sequence"] == 4
-        assert durable.json()["floor"]["current_grant"] is not None
+        assert durable.json()["status"] == "EXPLORATION"
+        assert durable.json()["last_sequence"] == 6
+        assert durable.json()["floor"]["current_grant"] is None
 
     captured = capsys.readouterr()
     combined = captured.out + captured.err
@@ -899,11 +941,40 @@ def test_websocket_delivers_committed_phase_deadline_event(
                 advanced["payload"]["phase_started_at"]
                 == started["payload"]["phase_deadline_at"]
             )
+            granted = _receive_json_with_timeout(
+                websocket,
+                timeout_seconds=3.0,
+            )
+            assert granted["schema_version"] == 2
+            assert granted["type"] == "floor.granted"
+            assert granted["sequence"] == 4
+            payload = cast(dict[str, object], granted["payload"])
+            assert payload["phase"] == "OPENING_STATEMENTS"
 
         restored = client.get(f"/sessions/{session_id}")
         assert restored.status_code == 200
         assert restored.json()["status"] == "OPENING_STATEMENTS"
-        assert restored.json()["last_sequence"] == 3
+        assert restored.json()["last_sequence"] == 4
+        assert restored.json()["floor"]["current_grant"] is not None
+
+        with client.websocket_connect(
+            _ws_path(session_id, after_sequence=2),
+            headers={"Origin": TRUSTED_ORIGIN},
+        ) as websocket:
+            replayed_transition = websocket.receive_json()
+            replayed_grant = websocket.receive_json()
+            assert replayed_transition == advanced
+            assert replayed_grant == granted
+
+        with client.websocket_connect(
+            _ws_path(session_id, after_sequence=3),
+            headers={"Origin": TRUSTED_ORIGIN},
+        ) as websocket:
+            assert websocket.receive_json() == granted
+
+        converged = client.get(f"/sessions/{session_id}")
+        assert converged.status_code == 200
+        assert converged.json()["last_sequence"] == 4
 
 
 def test_websocket_projects_floor_grant_and_recovers_it_from_snapshot_and_catchup(
@@ -939,14 +1010,6 @@ def test_websocket_projects_floor_grant_and_recovers_it_from_snapshot_and_catchu
             assert phase_event["sequence"] == 3
             assert phase_event["payload"]["status"] == "OPENING_STATEMENTS"
 
-            scheduled = asyncio.run(
-                _schedule_floor(migrated_database, UUID(session_id)),
-                loop_factory=asyncio.SelectorEventLoop,
-            )
-            assert [(event.sequence, event.event_type) for event in scheduled] == [
-                (4, "floor.granted")
-            ]
-            assert scheduled[0].causation_action_id is not None
             granted = websocket.receive_json()
             assert granted["schema_version"] == 2
             assert granted["type"] == "floor.granted"
@@ -1249,3 +1312,186 @@ def test_websocket_replays_human_utterance_result_behind_connection_cursor(
             loop_factory=asyncio.SelectorEventLoop,
         )
         assert after == before
+
+
+def test_reconciliation_lifecycle_helper_requires_authoritative_state_change() -> None:
+    event = StoredEvent(
+        event_version=2,
+        event_type="session.state_changed",
+        session_id=uuid4(),
+        sequence=3,
+        occurred_at=datetime.now(UTC),
+        causation_action_id=None,
+        payload={},
+    )
+
+    assert realtime._reconciliation_changed_lifecycle(()) is False  # pyright: ignore[reportPrivateUsage]
+    assert realtime._reconciliation_changed_lifecycle((event,)) is True  # pyright: ignore[reportPrivateUsage]
+    assert (
+        realtime._reconciliation_changed_lifecycle(  # pyright: ignore[reportPrivateUsage]
+            (
+                StoredEvent(
+                    event_version=1,
+                    event_type=event.event_type,
+                    session_id=event.session_id,
+                    sequence=event.sequence,
+                    occurred_at=event.occurred_at,
+                    causation_action_id=None,
+                    payload={},
+                ),
+                StoredEvent(
+                    event_version=2,
+                    event_type="floor.granted",
+                    session_id=event.session_id,
+                    sequence=event.sequence + 1,
+                    occurred_at=event.occurred_at,
+                    causation_action_id=None,
+                    payload={},
+                ),
+            )
+        )
+        is False
+    )
+
+
+def test_websocket_external_reconciliation_drains_state_change_before_floor_kick(
+    migrated_database: TemporaryDatabaseContext,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    allow_periodic_reconciliation = Event()
+    periodic_reconciliation_counts: Queue[int] = Queue()
+    real_reconcile = realtime.reconcile_session_deadline
+
+    async def gate_periodic_reconciliation(
+        session: AsyncSession,
+        *,
+        owner_id: UUID,
+        session_id: UUID,
+        now: datetime | None = None,
+    ) -> list[StoredEvent]:
+        task = asyncio.current_task()
+        coroutine_name = task.get_coro().__qualname__ if task is not None else ""
+        if coroutine_name.endswith("catchup_committed_events"):
+            while not allow_periodic_reconciliation.is_set():
+                await asyncio.sleep(0.01)
+            events = await real_reconcile(
+                session,
+                owner_id=owner_id,
+                session_id=session_id,
+                now=now,
+            )
+            periodic_reconciliation_counts.put(len(events))
+            return events
+        return await real_reconcile(
+            session,
+            owner_id=owner_id,
+            session_id=session_id,
+            now=now,
+        )
+
+    monkeypatch.setattr(
+        realtime,
+        "reconcile_session_deadline",
+        gate_periodic_reconciliation,
+    )
+    application = _application(
+        migrated_database,
+        settings=Settings(
+            environment=Environment.TEST,
+            cors_origins=(TRUSTED_ORIGIN,),
+            session_phase_durations=SessionPhaseDurations(
+                preparation_seconds=30,
+                opening_statements_seconds=30,
+                exploration_seconds=30,
+                conflict_and_evaluation_seconds=30,
+                convergence_seconds=30,
+                final_summary_seconds=30,
+            ),
+        ),
+    )
+    with _client(application) as client:
+        _register(client, "ws_external_deadline_recovery")
+        snapshot = _create_session(client)
+        session_id = str(snapshot["id"])
+
+        with client.websocket_connect(
+            _ws_path(session_id),
+            headers={"Origin": TRUSTED_ORIGIN},
+        ) as websocket:
+            websocket.send_json(_start_command(session_id, uuid4()))
+            started = websocket.receive_json()
+            started_payload = cast(dict[str, object], started["payload"])
+            assert started["sequence"] == 2
+            assert started_payload["status"] == "PREPARATION"
+
+            asyncio.run(
+                _expire_phase_deadline(migrated_database, UUID(session_id)),
+                loop_factory=asyncio.SelectorEventLoop,
+            )
+            try:
+                externally_changed = asyncio.run(
+                    _recover_due_sessions_externally(migrated_database),
+                    loop_factory=asyncio.SelectorEventLoop,
+                )
+                assert externally_changed == 1
+            finally:
+                allow_periodic_reconciliation.set()
+
+            advanced = _receive_json_with_timeout(websocket, timeout_seconds=3.0)
+            advanced_payload = cast(dict[str, object], advanced["payload"])
+            assert advanced["type"] == "session.state_changed"
+            assert advanced["sequence"] == 3
+            assert advanced_payload["previous_status"] == "PREPARATION"
+            assert advanced_payload["status"] == "OPENING_STATEMENTS"
+
+            granted = _receive_json_with_timeout(websocket, timeout_seconds=3.0)
+            granted_payload = cast(dict[str, object], granted["payload"])
+            assert granted["type"] == "floor.granted"
+            assert isinstance(granted["sequence"], int)
+            assert isinstance(advanced["sequence"], int)
+            assert granted["sequence"] > advanced["sequence"]
+            assert granted_payload["phase"] == "OPENING_STATEMENTS"
+
+            assert periodic_reconciliation_counts.get(timeout=2.0) == 0
+            active_count, current_grant_id = asyncio.run(
+                _active_floor_state(migrated_database, UUID(session_id)),
+                loop_factory=asyncio.SelectorEventLoop,
+            )
+            assert active_count == 1
+            assert current_grant_id == UUID(str(granted_payload["grant_id"]))
+
+
+def test_websocket_catchup_without_reconciliation_does_not_kick_progression(
+    migrated_database: TemporaryDatabaseContext,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    progression_calls = 0
+
+    class NoWorkOutcome:
+        value = "no_work"
+
+    class NoWorkResult:
+        outcome = NoWorkOutcome()
+
+    async def count_progression(*_args: object, **_kwargs: object) -> NoWorkResult:
+        nonlocal progression_calls
+        progression_calls += 1
+        return NoWorkResult()
+
+    monkeypatch.setattr(
+        realtime,
+        "resume_discussion_progression",
+        count_progression,
+    )
+    application = _application(migrated_database)
+    with _client(application) as client:
+        _register(client, "ws_no_reconciliation_kick")
+        created = _create_session(client)
+        session_id = str(created["id"])
+
+        with client.websocket_connect(
+            _ws_path(session_id),
+            headers={"Origin": TRUSTED_ORIGIN},
+        ):
+            time.sleep(0.8)
+            assert progression_calls == 1

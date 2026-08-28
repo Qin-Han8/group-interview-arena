@@ -8,9 +8,9 @@
 - P0-5 identity boundary status: DONE
 - Most recently completed historical subphase: P1-5F-4 Composition E2E + Independent Acceptance — `DONE`
 - P0 status: DONE; P0-1 through P0-7 completed
-- P1 status: IN_PROGRESS; P1-1～P1-4 and P1-5A～P1-5F historical DONE; P1-5 IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN; P1-5R IN_PROGRESS / DESIGN_FROZEN; R1/R2-A/R2-B/R3 NOT_STARTED
+- P1 status: IN_PROGRESS; P1-1～P1-4 and P1-5A～P1-5F historical DONE; P1-5 IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN; P1-5R IN_PROGRESS / DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN; R1 IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PENDING; F1 OPEN / IMPLEMENTATION_COMPLETE_AWAITING_REVIEW; R2-A NOT_STARTED / BLOCKED_BY_R1; R2-B/R3 NOT_STARTED
 - Target version: V0.1 Internal Validation
-- Business architecture detail: P1-1～P1-4 completed; P1-5A～P1-5F historical runtime、transport、Web and acceptance remain complete; P1-5R freezes bounded remediation without changing architecture or authority
+- Business architecture detail: P1-1～P1-4 completed; P1-5A～P1-5F historical runtime、transport、Web and acceptance remain complete; P1-5R contracts remain frozen；R1 internal progression implementation is complete awaiting review without changing scheduler、realtime or public-contract authority
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -434,7 +434,7 @@ Redis 只在多 API workers、横向扩容、跨进程 WebSocket broadcast、dis
 - P0-5D：completed；真实 browser Cookie/CORS/CSRF 闭环已通过 Chromium 验证；
 - P0-5E：completed；final outcome `PASS after findings remediation and independent recheck`；
 - P0：`DONE`；P0-1～P0-7 completed；P0-7 finding-only independent recheck `PASS`，P1 readiness `READY`；其后用户已明确批准进入 P1；
-- P1：`IN_PROGRESS`；P1-1～P1-4 and P1-5A～P1-5F retain historical `DONE`；P1-5 is `IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN` for `P1-5R IN_PROGRESS / DESIGN_FROZEN`；R1/R2-A/R2-B/R3 are `NOT_STARTED`，and 记忆/基础报告 remain Deferred；
+- P1：`IN_PROGRESS`；P1-1～P1-4 and P1-5A～P1-5F retain historical `DONE`；P1-5 is `IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN` for `P1-5R IN_PROGRESS / DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN`；R1 is `IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PENDING`；F1 is `OPEN / IMPLEMENTATION_COMPLETE_AWAITING_REVIEW`；R2-A is `NOT_STARTED / BLOCKED_BY_R1`；R2-B/R3 are `NOT_STARTED`，and 记忆/基础报告 remain Deferred；
 - P2 以后：只在对应阶段获批后增加语音、评分训练和商业化能力。
 
 ## 与其他文档关系

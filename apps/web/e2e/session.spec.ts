@@ -11,18 +11,19 @@ const AI_CONTRIBUTION =
 const PRIVATE_NOTES = "仅在当前页面内存中保留的私人思路";
 const API_RESTART_REQUEST = process.env.GIA_E2E_API_RESTART_REQUEST;
 const API_RESTART_READY = process.env.GIA_E2E_API_RESTART_READY;
-const FLOOR_REQUEST = process.env.GIA_E2E_FLOOR_REQUEST;
-const FLOOR_READY = process.env.GIA_E2E_FLOOR_READY;
 
-test.setTimeout(45_000);
+test.setTimeout(150_000);
 
 test("browser session recovers durable phases across API restart and reload", async ({
   page,
 }, testInfo) => {
   const username = `P11D_${Date.now().toString(36)}`;
   const password = `P1-1D browser ${crypto.randomUUID()} phrase`;
+  expect(process.env.GIA_E2E_FLOOR_REQUEST).toBeUndefined();
+  expect(process.env.GIA_E2E_FLOOR_READY).toBeUndefined();
   let startCommand: string | undefined;
   let floorEvent: string | undefined;
+  const lifecycleEvents: string[] = [];
   let humanSubmitCommand: string | undefined;
   let humanCreatedEvent: string | undefined;
   let humanReleaseEvent: string | undefined;
@@ -64,7 +65,11 @@ test("browser session recovers durable phases across API restart and reload", as
     server.onMessage((message) => {
       const payload = message.toString();
       if (payload.includes("floor.granted")) {
-        floorEvent = payload;
+        floorEvent ??= payload;
+        lifecycleEvents.push(payload);
+      }
+      if (payload.includes("session.state_changed")) {
+        lifecycleEvents.push(payload);
       }
       const isHumanConfirmation =
         payload.includes("participant.utterance.created") &&
@@ -331,22 +336,6 @@ test("browser session recovers durable phases across API restart and reload", as
       exact: true,
     }),
   ).toBeVisible({ timeout: 10_000 });
-  expect(FLOOR_REQUEST).toBeTruthy();
-  expect(FLOOR_READY).toBeTruthy();
-  await writeFile(FLOOR_REQUEST!, sessionId, "utf8");
-  await expect
-    .poll(
-      async () => {
-        try {
-          await access(FLOOR_READY!);
-          return true;
-        } catch {
-          return false;
-        }
-      },
-      { timeout: 10_000 },
-    )
-    .toBe(true);
   await expect.poll(() => floorEvent).toBeTruthy();
   const parsedFloorEvent = JSON.parse(floorEvent ?? "{}");
   expect(parsedFloorEvent).toMatchObject({
@@ -519,8 +508,52 @@ test("browser session recovers durable phases across API restart and reload", as
     useInnerText: false,
   });
 
+  await expect
+    .poll(
+      () =>
+        lifecycleEvents.some((event) => {
+          const parsed = JSON.parse(event);
+          return (
+            parsed.type === "session.state_changed" &&
+            parsed.payload?.status === "EXPLORATION"
+          );
+        }),
+      { timeout: 25_000 },
+    )
+    .toBe(true);
+  await expect
+    .poll(
+      () =>
+        lifecycleEvents.some((event) => {
+          const parsed = JSON.parse(event);
+          return (
+            parsed.type === "floor.granted" &&
+            parsed.payload?.phase === "EXPLORATION"
+          );
+        }),
+      { timeout: 10_000 },
+    )
+    .toBe(true);
+  const parsedLifecycleEvents = lifecycleEvents.map((event) =>
+    JSON.parse(event),
+  );
+  const explorationTransitionIndex = parsedLifecycleEvents.findIndex(
+    (event) =>
+      event.type === "session.state_changed" &&
+      event.payload?.status === "EXPLORATION",
+  );
+  const explorationGrantIndex = parsedLifecycleEvents.findIndex(
+    (event) =>
+      event.type === "floor.granted" && event.payload?.phase === "EXPLORATION",
+  );
+  expect(explorationTransitionIndex).toBeGreaterThanOrEqual(0);
+  expect(explorationGrantIndex).toBeGreaterThan(explorationTransitionIndex);
+  expect(parsedLifecycleEvents[explorationGrantIndex].sequence).toBeGreaterThan(
+    parsedLifecycleEvents[explorationTransitionIndex].sequence,
+  );
+
   await expect(page.getByText("已完成", { exact: true }).first()).toBeVisible({
-    timeout: 25_000,
+    timeout: 100_000,
   });
   await expect(
     page.getByText("讨论已完成", { exact: true }).first(),

@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from enum import StrEnum
 from uuid import UUID, uuid5
 
@@ -22,7 +23,11 @@ from group_interview_arena_api.modules.ai_runtime.continuous import (
 from group_interview_arena_api.modules.ai_runtime.orchestration import (
     has_resumable_ai_work,
 )
-from group_interview_arena_api.modules.discussion_sessions.domain import SessionStatus
+from group_interview_arena_api.modules.discussion_sessions.domain import (
+    NEXT_DEADLINE_STATUS,
+    SessionStatus,
+    SessionTransitionTrigger,
+)
 from group_interview_arena_api.modules.discussion_sessions.utterances import (
     derive_human_utterance_id,
     human_utterance_command_digest,
@@ -36,10 +41,13 @@ from group_interview_arena_api.modules.floor_control.domain import (
     ParticipationRole,
 )
 from group_interview_arena_api.modules.floor_control.progression import (
+    InitialPhaseEntryProof,
+    InitialSchedulerCheckpointResult,
     ReleasedFloorProof,
     SchedulerCheckpointIdentities,
     SchedulerCheckpointOutcome,
     SchedulerCheckpointResult,
+    drive_initial_scheduler_checkpoint,
     drive_scheduler_checkpoint,
 )
 from group_interview_arena_api.modules.floor_control.scheduler import (
@@ -47,6 +55,8 @@ from group_interview_arena_api.modules.floor_control.scheduler import (
 )
 
 _HUMAN_PROGRESSION_NAMESPACE = UUID("9b347f1a-48fc-58d1-a1d3-e71e4ee861b4")
+
+_INITIAL_PROGRESSION_NAMESPACE = UUID("6a45d9ab-1d5d-5c96-b791-f82b884b20d8")
 
 
 class DiscussionProgressionOutcome(StrEnum):
@@ -63,7 +73,9 @@ class DiscussionProgressionOutcome(StrEnum):
 class DiscussionProgressionResult:
     outcome: DiscussionProgressionOutcome
     released_floor_grant_id: UUID | None = None
-    scheduler_result: SchedulerCheckpointResult | None = None
+    scheduler_result: (
+        SchedulerCheckpointResult | InitialSchedulerCheckpointResult | None
+    ) = None
     ai_drive_result: ContinuousAiDriveResult | None = None
 
 
@@ -95,6 +107,126 @@ def derive_human_scheduler_identities(
         decision_id=_deterministic_uuid4(f"{prefix}:decision"),
         next_floor_grant_id=_deterministic_uuid4(f"{prefix}:next-floor-grant"),
         intervention_id=_deterministic_uuid4(f"{prefix}:intervention"),
+    )
+
+
+class _InitialPhaseCheckpointState(StrEnum):
+    ABSENT = "absent"
+    EXACT = "exact"
+    INCONSISTENT = "inconsistent"
+
+
+def _initial_deterministic_uuid4(name: str) -> UUID:
+    derived = uuid5(_INITIAL_PROGRESSION_NAMESPACE, name)
+    return UUID(bytes=derived.bytes, version=4)
+
+
+def derive_initial_scheduler_identities(
+    *,
+    session_id: UUID,
+    phase: SessionStatus,
+    phase_entry_sequence: int,
+) -> SchedulerCheckpointIdentities:
+    prefix = f"initial-phase:{session_id}:{phase.value}:{phase_entry_sequence}"
+    return SchedulerCheckpointIdentities(
+        schedule_action_id=_initial_deterministic_uuid4(f"{prefix}:schedule-action"),
+        decision_id=_initial_deterministic_uuid4(f"{prefix}:decision"),
+        next_floor_grant_id=_initial_deterministic_uuid4(f"{prefix}:next-floor-grant"),
+        intervention_id=_initial_deterministic_uuid4(f"{prefix}:intervention"),
+    )
+
+
+def _canonical_event_timestamp(value: datetime) -> str:
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise ValueError("Phase-entry timestamp must be timezone-aware.")
+    return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
+
+
+def _previous_deadline_phase(phase: SessionStatus) -> SessionStatus:
+    for previous, current in NEXT_DEADLINE_STATUS.items():
+        if current is phase:
+            return previous
+    raise ValueError("Phase entry has no durable predecessor.")
+
+
+async def _initial_phase_entry_checkpoint(
+    session: AsyncSession,
+    *,
+    owner_id: UUID,
+    aggregate: SimulationSession,
+) -> tuple[_InitialPhaseCheckpointState, InitialPhaseEntryProof | None]:
+    try:
+        phase = SessionStatus(aggregate.status)
+    except ValueError:
+        return _InitialPhaseCheckpointState.INCONSISTENT, None
+    if (
+        aggregate.owner_user_id != owner_id
+        or phase not in FLOOR_ENABLED_PHASES
+        or aggregate.current_floor_grant_id is not None
+    ):
+        return _InitialPhaseCheckpointState.ABSENT, None
+
+    event = await session.scalar(
+        select(DiscussionEvent)
+        .where(
+            DiscussionEvent.session_id == aggregate.id,
+            DiscussionEvent.event_type == "session.state_changed",
+        )
+        .order_by(DiscussionEvent.sequence.desc())
+        .limit(1)
+    )
+    if event is None:
+        return _InitialPhaseCheckpointState.ABSENT, None
+    if event.sequence > aggregate.last_sequence:
+        return _InitialPhaseCheckpointState.INCONSISTENT, None
+    if event.sequence < aggregate.last_sequence:
+        latest_event = await session.get(
+            DiscussionEvent,
+            (aggregate.id, aggregate.last_sequence),
+        )
+        identities = derive_initial_scheduler_identities(
+            session_id=aggregate.id,
+            phase=phase,
+            phase_entry_sequence=event.sequence,
+        )
+        existing_action = await session.get(
+            SessionAction,
+            (aggregate.id, identities.schedule_action_id),
+        )
+        if latest_event is None or existing_action is None:
+            return _InitialPhaseCheckpointState.INCONSISTENT, None
+    if aggregate.phase_started_at is None or aggregate.phase_deadline_at is None:
+        return _InitialPhaseCheckpointState.INCONSISTENT, None
+    try:
+        expected_payload = {
+            "previous_status": _previous_deadline_phase(phase).value,
+            "status": phase.value,
+            "trigger": SessionTransitionTrigger.PHASE_DEADLINE.value,
+            "phase_started_at": _canonical_event_timestamp(aggregate.phase_started_at),
+            "phase_deadline_at": _canonical_event_timestamp(
+                aggregate.phase_deadline_at
+            ),
+        }
+        _canonical_event_timestamp(event.occurred_at)
+    except ValueError:
+        return _InitialPhaseCheckpointState.INCONSISTENT, None
+    if not (
+        event.event_version == 2
+        and event.event_type == "session.state_changed"
+        and event.causation_action_id is None
+        and event.payload == expected_payload
+    ):
+        return _InitialPhaseCheckpointState.INCONSISTENT, None
+
+    return (
+        _InitialPhaseCheckpointState.EXACT,
+        InitialPhaseEntryProof(
+            phase=phase,
+            event_sequence=event.sequence,
+            occurred_at=event.occurred_at,
+            phase_started_at=aggregate.phase_started_at,
+            phase_deadline_at=aggregate.phase_deadline_at,
+        ),
     )
 
 
@@ -243,7 +375,9 @@ async def _drive_configured(
     owner_id: UUID,
     session_id: UUID,
     released_floor_grant_id: UUID | None = None,
-    scheduler_result: SchedulerCheckpointResult | None = None,
+    scheduler_result: SchedulerCheckpointResult
+    | InitialSchedulerCheckpointResult
+    | None = None,
 ) -> DiscussionProgressionResult:
     ai_result = await drive_configured_ai_session(
         session_factory,
@@ -266,6 +400,8 @@ async def resume_discussion_progression(
 ) -> DiscussionProgressionResult:
     checkpoint_state = _HumanCheckpointState.ABSENT
     checkpoint: _HumanCheckpoint | None = None
+    initial_state = _InitialPhaseCheckpointState.ABSENT
+    initial_proof: InitialPhaseEntryProof | None = None
     try:
         async with session_factory() as session:
             aggregate = await session.scalar(
@@ -295,6 +431,15 @@ async def resume_discussion_progression(
                     owner_id=owner_id,
                     session_id=session_id,
                 )
+                if checkpoint_state is _HumanCheckpointState.ABSENT:
+                    (
+                        initial_state,
+                        initial_proof,
+                    ) = await _initial_phase_entry_checkpoint(
+                        session,
+                        owner_id=owner_id,
+                        aggregate=aggregate,
+                    )
     except ValueError:
         return DiscussionProgressionResult(
             outcome=DiscussionProgressionOutcome.RECONCILIATION_REQUIRED
@@ -321,7 +466,52 @@ async def resume_discussion_progression(
                 owner_id=owner_id,
                 session_id=session_id,
             )
-        return DiscussionProgressionResult(outcome=DiscussionProgressionOutcome.NO_WORK)
+        if (
+            initial_state is not _InitialPhaseCheckpointState.EXACT
+            or initial_proof is None
+        ):
+            return DiscussionProgressionResult(
+                outcome=DiscussionProgressionOutcome.RECONCILIATION_REQUIRED
+            )
+        identities = derive_initial_scheduler_identities(
+            session_id=session_id,
+            phase=initial_proof.phase,
+            phase_entry_sequence=initial_proof.event_sequence,
+        )
+        initial_result = await drive_initial_scheduler_checkpoint(
+            session_factory,
+            owner_id=owner_id,
+            session_id=session_id,
+            phase_entry=initial_proof,
+            identities=identities,
+            scheduling_policy=V0_1_SCHEDULER_POLICY,
+        )
+        if initial_result.outcome is SchedulerCheckpointOutcome.NEXT_AI_GRANTED:
+            return await _drive_configured(
+                session_factory,
+                owner_id=owner_id,
+                session_id=session_id,
+                scheduler_result=initial_result,
+            )
+        initial_outcome_map = {
+            SchedulerCheckpointOutcome.NEXT_HUMAN_GRANTED: (
+                DiscussionProgressionOutcome.NEXT_HUMAN_GRANTED
+            ),
+            SchedulerCheckpointOutcome.NO_GRANT: DiscussionProgressionOutcome.NO_GRANT,
+            SchedulerCheckpointOutcome.INTERVENTION_REQUESTED: (
+                DiscussionProgressionOutcome.INTERVENTION_REQUESTED
+            ),
+            SchedulerCheckpointOutcome.RECONCILIATION_REQUIRED: (
+                DiscussionProgressionOutcome.RECONCILIATION_REQUIRED
+            ),
+            SchedulerCheckpointOutcome.STATE_CHANGED: (
+                DiscussionProgressionOutcome.STATE_CHANGED
+            ),
+        }
+        return DiscussionProgressionResult(
+            outcome=initial_outcome_map[initial_result.outcome],
+            scheduler_result=initial_result,
+        )
 
     scheduler_result = await drive_scheduler_checkpoint(
         session_factory,
