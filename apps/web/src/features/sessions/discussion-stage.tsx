@@ -28,6 +28,9 @@ export type DiscussionStageProps = {
   currentGrant: SessionSnapshot["floor"]["current_grant"];
   confirmedTranscript: readonly ConfirmedUtterance[];
   transcriptContainerRef: RefObject<HTMLDivElement | null>;
+  hasNewTranscriptBelow: boolean;
+  onTranscriptScroll: () => void;
+  onReturnToLatest: () => void;
   draft: string;
   draftInspection: HumanDraftInspection;
   canSend: boolean;
@@ -72,15 +75,21 @@ function Transcript({
   participants,
   items,
   containerRef,
+  hasNewTranscriptBelow,
+  onTranscriptScroll,
+  onReturnToLatest,
 }: {
   participants: SessionSnapshot["floor"]["participants"];
   items: readonly ConfirmedUtterance[];
   containerRef: RefObject<HTMLDivElement | null>;
+  hasNewTranscriptBelow: boolean;
+  onTranscriptScroll: () => void;
+  onReturnToLatest: () => void;
 }) {
   return (
     <section
       aria-labelledby="confirmed-transcript-heading"
-      className="flex min-h-0 flex-1 flex-col"
+      className="relative flex min-h-0 flex-1 flex-col"
       data-testid="confirmed-transcript"
     >
       <h2 className="text-sm font-semibold" id="confirmed-transcript-heading">
@@ -89,6 +98,7 @@ function Transcript({
       <div
         className="mt-3 min-h-0 flex-1 overflow-y-auto pr-1"
         data-testid="confirmed-transcript-list"
+        onScroll={onTranscriptScroll}
         ref={containerRef}
       >
         {items.length === 0 ? (
@@ -123,6 +133,15 @@ function Transcript({
           </ol>
         )}
       </div>
+      {hasNewTranscriptBelow ? (
+        <button
+          className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full border border-neutral-300 bg-white px-3 py-1.5 text-sm font-medium text-neutral-800 shadow-sm"
+          onClick={onReturnToLatest}
+          type="button"
+        >
+          回到最新发言
+        </button>
+      ) : null}
     </section>
   );
 }
@@ -159,7 +178,7 @@ function Composer({
   return (
     <section
       aria-labelledby="human-composer-heading"
-      className="sticky bottom-0 border-t border-neutral-200 bg-white pt-4"
+      className="shrink-0 border-t border-neutral-200 bg-white pt-4"
       data-testid="human-composer"
     >
       <h2 className="text-sm font-semibold" id="human-composer-heading">
@@ -286,6 +305,9 @@ export default function DiscussionStage({
   confirmedTranscript,
   transcriptContainerRef,
   draft,
+  hasNewTranscriptBelow,
+  onTranscriptScroll,
+  onReturnToLatest,
   draftInspection,
   canSend,
   sendDisabledReason,
@@ -327,7 +349,7 @@ export default function DiscussionStage({
     <div className="flex h-full min-h-0 flex-col gap-4 p-4 sm:p-5">
       <ol
         aria-label="会话参与者"
-        className="grid grid-cols-2 gap-2 sm:grid-cols-4"
+        className="grid shrink-0 grid-cols-2 gap-2 sm:grid-cols-4"
         data-testid="participant-strip"
       >
         {candidates.map((participant) => {
@@ -355,7 +377,7 @@ export default function DiscussionStage({
       </ol>
 
       {terminalCopy ? (
-        <p className="rounded-lg bg-neutral-100 px-3 py-2 text-sm font-medium">
+        <p className="shrink-0 rounded-lg bg-neutral-100 px-3 py-2 text-sm font-medium">
           {terminalCopy}
         </p>
       ) : null}
@@ -363,7 +385,7 @@ export default function DiscussionStage({
       {notice ? (
         <p
           aria-live="polite"
-          className={`rounded-lg border px-3 py-2 text-sm ${
+          className={`shrink-0 rounded-lg border px-3 py-2 text-sm ${
             notice.tone === "fatal"
               ? "border-red-300 bg-red-50 text-red-800"
               : notice.tone === "recoverable"
@@ -379,6 +401,9 @@ export default function DiscussionStage({
       <Transcript
         containerRef={transcriptContainerRef}
         items={confirmedTranscript}
+        hasNewTranscriptBelow={hasNewTranscriptBelow}
+        onReturnToLatest={onReturnToLatest}
+        onTranscriptScroll={onTranscriptScroll}
         participants={participants}
       />
 

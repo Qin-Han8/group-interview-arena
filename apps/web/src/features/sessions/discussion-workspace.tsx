@@ -68,7 +68,7 @@ function SessionHeader({
   endAction,
 }: SessionHeaderProps) {
   return (
-    <header className="flex flex-wrap items-center justify-between gap-4 border-b border-neutral-200 bg-white px-4 py-3 sm:px-6">
+    <header className="flex shrink-0 flex-wrap items-center justify-between gap-4 border-b border-neutral-200 bg-white px-4 py-3 sm:px-6">
       <div className="min-w-0">
         <p className="text-xs font-medium tracking-[0.12em] text-neutral-500 uppercase">
           {productName}
@@ -132,12 +132,12 @@ export default function DiscussionWorkspace({
   }
 
   return (
-    <div className="flex min-h-dvh w-full flex-col bg-neutral-100 text-neutral-950">
+    <div className="flex h-dvh max-h-dvh w-full flex-col overflow-hidden bg-neutral-100 text-neutral-950">
       <SessionHeader {...header} />
 
       <nav
         aria-label="讨论工作区"
-        className="flex border-b border-neutral-200 bg-white md:hidden"
+        className="flex shrink-0 border-b border-neutral-200 bg-white md:hidden"
         role="tablist"
       >
         {SURFACES.map((surface, index) => {
@@ -164,7 +164,7 @@ export default function DiscussionWorkspace({
         })}
       </nav>
 
-      <div className="hidden items-center justify-end gap-2 border-b border-neutral-200 bg-white px-5 py-2 md:flex min-[1200px]:hidden">
+      <div className="hidden shrink-0 items-center justify-end gap-2 border-b border-neutral-200 bg-white px-5 py-2 md:flex min-[1200px]:hidden">
         <button
           aria-pressed={activeSurface === "task"}
           className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm aria-pressed:bg-neutral-900 aria-pressed:text-white"
@@ -184,7 +184,7 @@ export default function DiscussionWorkspace({
       </div>
 
       <div
-        className="relative min-h-0 flex-1 p-4 min-[1200px]:grid min-[1200px]:grid-cols-[minmax(15rem,1fr)_minmax(32rem,2.2fr)_minmax(15rem,1fr)] min-[1200px]:gap-4"
+        className="relative min-h-0 flex-1 overflow-hidden p-4 min-[1200px]:grid min-[1200px]:grid-cols-[minmax(15rem,1fr)_minmax(32rem,2.2fr)_minmax(15rem,1fr)] min-[1200px]:gap-4"
         data-support-surface={activeSurface}
         data-testid="discussion-workspace-grid"
       >
@@ -204,7 +204,7 @@ export default function DiscussionWorkspace({
           aria-labelledby="discussion-tab"
           className={`${
             activeSurface === "discussion" ? "block" : "hidden"
-          } studio-scroll-region h-full min-h-0 overflow-y-auto rounded-xl border border-neutral-200 bg-white md:block`}
+          } studio-scroll-region h-full min-h-0 overflow-hidden rounded-xl border border-neutral-200 bg-white md:block`}
           data-region-priority="primary"
           id="discussion-surface"
           role="tabpanel"

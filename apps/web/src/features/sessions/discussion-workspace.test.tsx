@@ -112,6 +112,42 @@ function WorkspaceHarness({ onMount }: { onMount?: (name: string) => void }) {
 }
 
 describe("DiscussionWorkspace", () => {
+  it("bounds only the loaded workspace and gives each region explicit height ownership", () => {
+    const { container } = render(<WorkspaceHarness />);
+
+    const root = container.firstElementChild;
+    expect(root).toHaveClass(
+      "flex",
+      "h-dvh",
+      "max-h-dvh",
+      "overflow-hidden",
+      "flex-col",
+    );
+    expect(screen.getByRole("banner")).toHaveClass("shrink-0");
+    expect(screen.getByRole("tablist", { name: "讨论工作区" })).toHaveClass(
+      "shrink-0",
+    );
+    expect(
+      screen.getByRole("button", { name: "打开题目与思考" }).parentElement,
+    ).toHaveClass("shrink-0");
+
+    const grid = screen.getByTestId("discussion-workspace-grid");
+    expect(grid).toHaveClass("min-h-0", "flex-1", "overflow-hidden");
+    expect(screen.getByRole("tabpanel", { name: "题目" })).toHaveClass(
+      "min-h-0",
+      "overflow-y-auto",
+    );
+    expect(screen.getByRole("tabpanel", { name: "进程" })).toHaveClass(
+      "min-h-0",
+      "overflow-y-auto",
+    );
+    expect(screen.getByRole("tabpanel", { name: "讨论" })).toHaveClass(
+      "h-full",
+      "min-h-0",
+      "overflow-hidden",
+    );
+  });
+
   it("renders one desktop three-region studio with Discussion as visual priority", () => {
     render(<WorkspaceHarness />);
 

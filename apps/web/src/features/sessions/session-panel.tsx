@@ -65,6 +65,24 @@ const SPEAKING_PHASES = [
   "FINAL_SUMMARY",
 ] as const;
 const TRANSCRIPT_FOLLOW_THRESHOLD_PX = 48;
+function isTranscriptNearBottom(container: HTMLDivElement) {
+  return (
+    container.scrollHeight - container.scrollTop - container.clientHeight <=
+    TRANSCRIPT_FOLLOW_THRESHOLD_PX
+  );
+}
+
+function hasAppendedConfirmedTail(
+  previous: readonly ConfirmedUtterance[],
+  next: readonly ConfirmedUtterance[],
+) {
+  if (next.length <= previous.length) return false;
+  return previous.every(
+    (item, index) =>
+      item.sequence === next[index]?.sequence &&
+      item.utterance_id === next[index]?.utterance_id,
+  );
+}
 
 type BoundQuestionLoadStatus = "loading" | "available" | "unavailable";
 
@@ -97,6 +115,7 @@ export default function SessionPanel({
   const [snapshot, setSnapshot] = useState<SessionSnapshot>();
   const [questions, setQuestions] = useState<QuestionSummary[]>();
   const [selectedQuestionId, setSelectedQuestionId] = useState("");
+  const [hasNewTranscriptBelow, setHasNewTranscriptBelow] = useState(false);
   const [question, setQuestion] = useState<QuestionDetail>();
   const [boundQuestionLoadStatus, setBoundQuestionLoadStatus] =
     useState<BoundQuestionLoadStatus>();
@@ -131,6 +150,25 @@ export default function SessionPanel({
   const interruptedAiGrantIdsRef = useRef(new Set<string>());
   const realtimeRef = useRef<SessionRealtimeClient | undefined>(undefined);
   const workspaceSessionIdRef = useRef<string | undefined>(undefined);
+  const scrollTranscriptToLatest = useCallback(() => {
+    const container = transcriptContainerRef.current;
+    if (container) {
+      if (typeof container.scrollTo === "function") {
+        container.scrollTo({ top: container.scrollHeight });
+      } else {
+        container.scrollTop = container.scrollHeight;
+      }
+    }
+    shouldFollowTranscriptRef.current = false;
+    setHasNewTranscriptBelow(false);
+  }, []);
+
+  const handleTranscriptScroll = useCallback(() => {
+    const container = transcriptContainerRef.current;
+    if (container && isTranscriptNearBottom(container)) {
+      setHasNewTranscriptBelow(false);
+    }
+  }, []);
 
   const updateClockFromSnapshot = useCallback((next: SessionSnapshot) => {
     if (!next.server_now) return;
@@ -146,6 +184,8 @@ export default function SessionPanel({
     (next: SessionSnapshot) => {
       if (workspaceSessionIdRef.current !== next.id) {
         workspaceSessionIdRef.current = next.id;
+        shouldFollowTranscriptRef.current = false;
+        setHasNewTranscriptBelow(false);
         setNotes("");
         setActiveSurface("discussion");
         setQuestion(undefined);
@@ -181,7 +221,22 @@ export default function SessionPanel({
 
   const applyRecoveryBundle = useCallback(
     (bundle: SessionRecoveryBundle) => {
-      shouldFollowTranscriptRef.current = false;
+      const previous = confirmedTranscriptRef.current;
+      const isSameWorkspace =
+        workspaceSessionIdRef.current === bundle.snapshot.id;
+      if (
+        isSameWorkspace &&
+        hasAppendedConfirmedTail(previous, bundle.transcript)
+      ) {
+        const container = transcriptContainerRef.current;
+        const shouldFollow =
+          container !== null && isTranscriptNearBottom(container);
+        shouldFollowTranscriptRef.current = shouldFollow;
+        setHasNewTranscriptBelow(!shouldFollow);
+      } else {
+        shouldFollowTranscriptRef.current = false;
+        setHasNewTranscriptBelow(false);
+      }
       confirmedTranscriptRef.current = bundle.transcript;
       setConfirmedTranscript(bundle.transcript);
       applySnapshot(bundle.snapshot);
@@ -192,17 +247,22 @@ export default function SessionPanel({
 
   useEffect(() => {
     confirmedTranscriptRef.current = confirmedTranscript;
-    if (shouldFollowTranscriptRef.current && transcriptContainerRef.current) {
-      if (typeof transcriptContainerRef.current.scrollTo === "function") {
-        transcriptContainerRef.current.scrollTo({
-          top: transcriptContainerRef.current.scrollHeight,
-        });
-      } else {
-        transcriptContainerRef.current.scrollTop =
-          transcriptContainerRef.current.scrollHeight;
-      }
+    const container = transcriptContainerRef.current;
+    if (!shouldFollowTranscriptRef.current || !container) {
+      shouldFollowTranscriptRef.current = false;
+      return;
     }
+    const scrollToLatest = () => {
+      if (typeof container.scrollTo === "function") {
+        container.scrollTo({ top: container.scrollHeight });
+      } else {
+        container.scrollTop = container.scrollHeight;
+      }
+    };
+    scrollToLatest();
+    const followFrame = window.requestAnimationFrame(scrollToLatest);
     shouldFollowTranscriptRef.current = false;
+    return () => window.cancelAnimationFrame(followFrame);
   }, [confirmedTranscript]);
 
   useEffect(() => {
@@ -297,21 +357,19 @@ export default function SessionPanel({
         const current = snapshotRef.current;
         if (!current) return;
         if (event.type === "participant.utterance.created") {
+          const previous = confirmedTranscriptRef.current;
           const container = transcriptContainerRef.current;
-          shouldFollowTranscriptRef.current =
-            container !== null &&
-            container.scrollHeight -
-              container.scrollTop -
-              container.clientHeight <=
-              TRANSCRIPT_FOLLOW_THRESHOLD_PX;
+          const shouldFollow =
+            container !== null && isTranscriptNearBottom(container);
           const incoming = confirmedUtteranceFromEvent(event);
-          const merged = mergeConfirmedTranscript(
-            confirmedTranscriptRef.current,
-            [incoming],
-          );
+          const merged = mergeConfirmedTranscript(previous, [incoming]);
           if (merged.kind === "conflict") {
             realtimeRef.current?.recoverAuthoritativeState();
             return;
+          }
+          if (hasAppendedConfirmedTail(previous, merged.items)) {
+            shouldFollowTranscriptRef.current = shouldFollow;
+            setHasNewTranscriptBelow(!shouldFollow);
           }
           confirmedTranscriptRef.current = merged.items;
           setConfirmedTranscript(merged.items);
@@ -602,6 +660,7 @@ export default function SessionPanel({
           aiWaitingLabel={aiWaitingLabel ?? null}
           canSend={canSend}
           confirmedTranscript={confirmedTranscript}
+          hasNewTranscriptBelow={hasNewTranscriptBelow}
           connection={connection}
           connectionLabel={connectionLabel(connection)}
           currentGrant={snapshot.floor.current_grant}
@@ -613,6 +672,8 @@ export default function SessionPanel({
             message: "这次 AI 发言未完成，讨论将继续。",
           }))}
           onDraftChange={setDraft}
+          onReturnToLatest={scrollTranscriptToLatest}
+          onTranscriptScroll={handleTranscriptScroll}
           onRestoreRejectedDraft={() => {
             if (!rejectedDraft) return;
             setDraft(rejectedDraft.content);

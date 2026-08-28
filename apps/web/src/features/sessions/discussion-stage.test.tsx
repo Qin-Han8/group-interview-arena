@@ -72,6 +72,9 @@ function stageProps(
     currentGrant: HUMAN_GRANT,
     confirmedTranscript: CONFIRMED,
     transcriptContainerRef: createRef<HTMLDivElement>(),
+    hasNewTranscriptBelow: false,
+    onTranscriptScroll: vi.fn(),
+    onReturnToLatest: vi.fn(),
     draft: "😀 current draft",
     draftInspection: {
       codePointCount: 15,
@@ -101,6 +104,73 @@ afterEach(() => {
 });
 
 describe("DiscussionStage", () => {
+  it("keeps fixed stage chrome outside the sole transcript scroller", () => {
+    const { container, rerender } = render(
+      <DiscussionStage
+        {...stageProps({ errorMessage: "会话暂时无法加载，请稍后重试。" })}
+      />,
+    );
+
+    expect(container.firstElementChild).toHaveClass(
+      "flex",
+      "h-full",
+      "min-h-0",
+      "flex-col",
+    );
+    expect(screen.getByTestId("participant-strip")).toHaveClass("shrink-0");
+    expect(screen.getByTestId("discussion-notice")).toHaveClass("shrink-0");
+    expect(screen.getByTestId("confirmed-transcript")).toHaveClass(
+      "min-h-0",
+      "flex-1",
+    );
+    expect(screen.getByTestId("confirmed-transcript-list")).toHaveClass(
+      "min-h-0",
+      "flex-1",
+      "overflow-y-auto",
+    );
+
+    rerender(
+      <DiscussionStage
+        {...stageProps({ status: "COMPLETED", showComposer: false })}
+      />,
+    );
+    expect(screen.getByText("讨论已完成", { exact: true })).toHaveClass(
+      "shrink-0",
+    );
+  });
+
+  it("renders only the controlled return-to-latest affordance and delegates actions", () => {
+    const onTranscriptScroll = vi.fn();
+    const onReturnToLatest = vi.fn();
+    const { rerender } = render(
+      <DiscussionStage
+        {...stageProps()}
+        {...{
+          hasNewTranscriptBelow: true,
+          onReturnToLatest,
+          onTranscriptScroll,
+        }}
+      />,
+    );
+
+    fireEvent.scroll(screen.getByTestId("confirmed-transcript-list"));
+    expect(onTranscriptScroll).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole("button", { name: "回到最新发言" }));
+    expect(onReturnToLatest).toHaveBeenCalledOnce();
+
+    rerender(
+      <DiscussionStage
+        {...stageProps()}
+        {...{
+          hasNewTranscriptBelow: false,
+          onReturnToLatest,
+          onTranscriptScroll,
+        }}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: "回到最新发言" })).toBeNull();
+  });
+
   it("renders the authoritative Human and AI roster in safe seat order", () => {
     const { container, rerender } = render(
       <DiscussionStage {...stageProps()} />,
@@ -210,10 +280,9 @@ describe("DiscussionStage", () => {
       metaKey: true,
     });
     expect(onSubmit).toHaveBeenCalledOnce();
-    expect(screen.getByTestId("human-composer")).toHaveClass(
-      "sticky",
-      "bottom-0",
-    );
+    const composer = screen.getByTestId("human-composer");
+    expect(composer).toHaveClass("shrink-0");
+    expect(composer).not.toHaveClass("sticky", "bottom-0");
   });
 
   it("keeps pending and rejected content separate and delegates explicit restore", () => {

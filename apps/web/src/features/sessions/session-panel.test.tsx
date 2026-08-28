@@ -846,6 +846,156 @@ describe("SessionPanel", () => {
     );
   });
 
+  it("owns live follow and unread-tail state without browser persistence", async () => {
+    expect(window.localStorage.length).toBe(0);
+    expect(window.sessionStorage.length).toBe(0);
+    const snapshot = discussionSnapshot(null);
+    const { realtime } = await renderRestoredSession(snapshot, [
+      HUMAN_TRANSCRIPT,
+    ]);
+    const transcript = screen.getByTestId("confirmed-transcript-list");
+    const scrollTo = vi.fn();
+    Object.defineProperties(transcript, {
+      scrollHeight: { configurable: true, value: 100 },
+      scrollTop: { configurable: true, value: 75, writable: true },
+      clientHeight: { configurable: true, value: 20 },
+      scrollTo: { configurable: true, value: scrollTo },
+    });
+    const nearItem: TranscriptUtterance = {
+      ...HUMAN_TRANSCRIPT,
+      utterance_id: "00000000-0000-4000-8000-000000000027",
+      sequence: 6,
+      action_id: null,
+      participant_id: AI_PARTICIPANT_ID,
+      actor_kind: "AI",
+    };
+
+    expect(screen.queryByRole("button", { name: "回到最新发言" })).toBeNull();
+    act(() => realtime.options().onEvent(utteranceEvent(nearItem)));
+    expect(scrollTo).toHaveBeenCalledWith({ top: 100 });
+    expect(screen.queryByRole("button", { name: "回到最新发言" })).toBeNull();
+
+    scrollTo.mockClear();
+    transcript.scrollTop = 0;
+    const awayItem: TranscriptUtterance = {
+      ...nearItem,
+      utterance_id: "00000000-0000-4000-8000-000000000028",
+      sequence: 7,
+    };
+    act(() => realtime.options().onEvent(utteranceEvent(awayItem)));
+    expect(transcript.scrollTop).toBe(0);
+    expect(scrollTo).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "回到最新发言" }));
+    expect(scrollTo).toHaveBeenCalledWith({ top: 100 });
+    expect(screen.queryByRole("button", { name: "回到最新发言" })).toBeNull();
+
+    scrollTo.mockClear();
+    transcript.scrollTop = 0;
+    act(() =>
+      realtime.options().onEvent(
+        utteranceEvent({
+          ...awayItem,
+          utterance_id: "00000000-0000-4000-8000-000000000029",
+          sequence: 8,
+        }),
+      ),
+    );
+    expect(screen.getByRole("button", { name: "回到最新发言" })).toBeVisible();
+    transcript.scrollTop = 35;
+    fireEvent.scroll(transcript);
+    expect(screen.queryByRole("button", { name: "回到最新发言" })).toBeNull();
+    expect(window.localStorage.length).toBe(0);
+    expect(window.sessionStorage.length).toBe(0);
+  });
+
+  it("follows only exact same-session recovery tails and resets unread on replacement", async () => {
+    const snapshot = discussionSnapshot(null);
+    const { realtime } = await renderRestoredSession(snapshot, [
+      HUMAN_TRANSCRIPT,
+    ]);
+    const transcript = screen.getByTestId("confirmed-transcript-list");
+    const scrollTo = vi.fn();
+    Object.defineProperties(transcript, {
+      scrollHeight: { configurable: true, value: 100 },
+      scrollTop: { configurable: true, value: 75, writable: true },
+      clientHeight: { configurable: true, value: 20 },
+      scrollTo: { configurable: true, value: scrollTo },
+    });
+    const tailOne: TranscriptUtterance = {
+      ...HUMAN_TRANSCRIPT,
+      utterance_id: "00000000-0000-4000-8000-000000000030",
+      sequence: 6,
+      action_id: null,
+      participant_id: AI_PARTICIPANT_ID,
+      actor_kind: "AI",
+    };
+
+    expect(screen.queryByRole("button", { name: "回到最新发言" })).toBeNull();
+    act(() =>
+      realtime.options().onRecoveryBundle({
+        snapshot: { ...snapshot, last_sequence: 6 },
+        transcript: [HUMAN_TRANSCRIPT, tailOne],
+      }),
+    );
+    expect(scrollTo).toHaveBeenCalledWith({ top: 100 });
+    expect(screen.queryByRole("button", { name: "回到最新发言" })).toBeNull();
+
+    scrollTo.mockClear();
+    transcript.scrollTop = 0;
+    const tailTwo: TranscriptUtterance = {
+      ...tailOne,
+      utterance_id: "00000000-0000-4000-8000-000000000031",
+      sequence: 7,
+    };
+    act(() =>
+      realtime.options().onRecoveryBundle({
+        snapshot: { ...snapshot, last_sequence: 7 },
+        transcript: [HUMAN_TRANSCRIPT, tailOne, tailTwo],
+      }),
+    );
+    expect(transcript.scrollTop).toBe(0);
+    expect(scrollTo).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "回到最新发言" })).toBeVisible();
+
+    const replacement: TranscriptUtterance = {
+      ...tailOne,
+      utterance_id: "00000000-0000-4000-8000-000000000032",
+    };
+    act(() =>
+      realtime.options().onRecoveryBundle({
+        snapshot: { ...snapshot, last_sequence: 6 },
+        transcript: [HUMAN_TRANSCRIPT, replacement],
+      }),
+    );
+    expect(scrollTo).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: "回到最新发言" })).toBeNull();
+
+    act(() =>
+      realtime.options().onRecoveryBundle({
+        snapshot: { ...snapshot, last_sequence: 7 },
+        transcript: [
+          HUMAN_TRANSCRIPT,
+          replacement,
+          { ...tailTwo, sequence: 7 },
+        ],
+      }),
+    );
+    expect(screen.getByRole("button", { name: "回到最新发言" })).toBeVisible();
+
+    act(() =>
+      realtime.options().onRecoveryBundle({
+        snapshot: {
+          ...snapshot,
+          id: "00000000-0000-4000-8000-000000000099",
+        },
+        transcript: [],
+      }),
+    );
+    expect(screen.queryByRole("button", { name: "回到最新发言" })).toBeNull();
+    expect(window.localStorage.length).toBe(0);
+    expect(window.sessionStorage.length).toBe(0);
+  });
+
   it("follows new confirmed speech only when the reader is near the bottom", async () => {
     const snapshot = discussionSnapshot(null);
     const { realtime } = await renderRestoredSession(snapshot, [

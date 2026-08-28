@@ -54,8 +54,16 @@ API_ROOT = Path(__file__).resolve().parents[2]
 REPOSITORY_ROOT = API_ROOT.parents[1]
 WEB_ROOT = REPOSITORY_ROOT / "apps" / "web"
 PRIVATE_SENTINEL = "P1_2C_PRIVATE_SENTINEL_DO_NOT_DISCLOSE"
-HUMAN_CONTRIBUTION = (
-    "  Human evidence: preserve this exact contribution.\nSecond line stays exact.  "
+HUMAN_CONTRIBUTION = "\n".join(
+    (
+        "  Human evidence: preserve this exact contribution.",
+        *(
+            f"Public evidence line {index:02d}: resource allocation trade-offs "
+            "stay concrete, attributable, and reviewable."
+            for index in range(1, 25)
+        ),
+        "Second line stays exact.  ",
+    )
 )
 AI_CONTRIBUTION = "F4 Browser deterministic fake AI contribution."
 PROMPT_VERSION_ID = UUID("55000000-0000-4000-8000-000000000001")

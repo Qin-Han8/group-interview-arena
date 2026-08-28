@@ -1,17 +1,17 @@
 # 当前任务清单
 
 - Status: P1 in progress; P1-1 through P1-4 completed; P1-5 historically closed after P1-5A～P1-5F completed and is now reopened only for P1-5R post-closeout remediation
-- Managed scope: P1-5R Batch R1 implementation within the frozen R1 production/test files plus narrow current-status synchronization；no generated/dependency/config/schema/provider/Web-production change or real provider/model call
+- Managed scope: P1-5R Batch R2-A viewport/transcript ownership implementation within the frozen R2-A production/test files plus narrow current-status synchronization；no R2-B/R3, backend production, generated/dependency/config/schema/provider, public-contract or real provider/model change
 - Most recently completed historical subphase: P1-5F-4 Composition E2E + Independent Acceptance — `DONE`
 - P0-7 final outcome: initial verdict `BLOCKED` with two documentation findings; remediation completed; finding-only independent recheck `PASS`; new blockers none; P1 readiness `READY`
 - Current phase: P1 — `IN_PROGRESS`
 - Most recently completed historical governance checkpoint: P1-5F-4 final independent acceptance — `PASS`; findings `NONE`; `F4-ACC-001 CLOSED`
-- Current task gate: P1-5 — `IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN`; P1-5F — historical `DONE`; P1-5F-3/P1-5F-3A/P1-5F-3B/P1-5F-4 — historical `DONE`; P1-5R — `IN_PROGRESS / DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN`; R1 — `IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PENDING`; F1 — `OPEN / IMPLEMENTATION_COMPLETE_AWAITING_REVIEW`; R2-A — `NOT_STARTED / BLOCKED_BY_R1`; R2-B/R3 remain dependency-blocked and `NOT_STARTED`; P1 remains `IN_PROGRESS`
+- Current task gate: P1-5 — `IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN`; P1-5F — historical `DONE`; P1-5F-3/P1-5F-3A/P1-5F-3B/P1-5F-4 — historical `DONE`; P1-5R — `IN_PROGRESS / DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN`; R1 — `DONE`; F1 — `CLOSED`; R2-A — `IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PENDING`; F2 — `OPEN / IMPLEMENTATION_COMPLETE_AWAITING_REVIEW`; R2-B/R3 remain dependency-blocked and `NOT_STARTED`; P1 remains `IN_PROGRESS`
 - P0 status: `DONE`; P0-1 through P0-7 completed
 - Allowed status values: `TODO` / `IN_PROGRESS` / `BLOCKED` / `DONE`
 - Related roadmap: [`ROADMAP.md`](ROADMAP.md)
 
-用户已明确批准正式进入 P1；P1 本身保持 `IN_PROGRESS`。P1-5A～P1-5F 的历史实现、review、commit/push、CI 和 acceptance 证据不变，P1-5F-4 的 `F4-ACC-001` 仍为 `CLOSED`，且 F4 accepted path 未调用 real provider/model。之后的真实本地验收发现 correctness、long-session UX、visual fidelity 和 AI conversation quality 问题，因此只重新打开 parent P1-5 为 `IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN`。P1-5R 的 design 和 detailed implementation plan 均已冻结；R1 已完成实现并等待 actual-source review，F1 仍为 open awaiting review；R2-A 仍由 R1 review gate 阻塞，R2-B/R3 尚未开始。
+用户已明确批准正式进入 P1；P1 本身保持 `IN_PROGRESS`。P1-5A～P1-5F 的历史实现、review、commit/push、CI 和 acceptance 证据不变，P1-5F-4 的 `F4-ACC-001` 仍为 `CLOSED`，且 F4 accepted path 未调用 real provider/model。之后的真实本地验收发现 correctness、long-session UX、visual fidelity 和 AI conversation quality 问题，因此只重新打开 parent P1-5 为 `IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN`。P1-5R 的 design 和 detailed implementation plan 均已冻结；R1 is accepted and DONE，F1 is CLOSED；R2-A implementation is complete and awaits actual-source review，F2 remains OPEN awaiting that review；R2-B remains blocked by R2-A，and R3 has not started。
 
 ## P0-1 — 仓库与文档治理
 
@@ -586,10 +586,10 @@
 - ID: `P1-5`
 - 名称：AI Runtime Foundation
 - Status: `IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN`
-- Approval state：P1-5A～P1-5F and P1-5F-1～P1-5F-4 retain historical `DONE`；P1-5F-3A/P1-5F-3B remain historical `DONE` with their recorded evidence；P1-5R is `IN_PROGRESS / DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN`；R1 is `IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PENDING`；F1 is `OPEN / IMPLEMENTATION_COMPLETE_AWAITING_REVIEW`；R2-A is `NOT_STARTED / BLOCKED_BY_R1`；R2-B/R3 remain dependency-blocked and `NOT_STARTED`。
+- Approval state：P1-5A～P1-5F and P1-5F-1～P1-5F-4 retain historical `DONE`；P1-5F-3A/P1-5F-3B remain historical `DONE` with their recorded evidence；P1-5R is `IN_PROGRESS / DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN`；R1 is `DONE`；F1 is `CLOSED`；R2-A is `IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PENDING`；F2 is `OPEN / IMPLEMENTATION_COMPLETE_AWAITING_REVIEW`；R2-B/R3 remain dependency-blocked and `NOT_STARTED`。
 - 目标：在既有 immutable question/persona、server-authoritative session lifecycle 与 deterministic floor control 之上，建立 provider-neutral、可追踪、可重试且不破坏 session integrity 的 AI utterance generation boundary。
-- In scope：P1-5R Batch R1 deterministic phase-entry progression、deadline drain-before-kick、natural Browser composition tests and necessary exact current-state synchronization within the frozen file map。
-- Out of scope for this checkpoint：R2-A/R2-B/R3；generated OpenAPI、schema/migration、dependency/lock、config/CI/Docker、prompt/seed、provider/model、public contract or Web production changes；real provider/model calls；later P1/P2 work。
+- In scope：P1-5R Batch R2-A loaded-workspace viewport containment、sole transcript scroll ownership、stable Composer、memory-only follow/unread state、three-viewport Browser proof and necessary exact current-state synchronization within the frozen file map。
+- Out of scope for this checkpoint：R2-B/R3；backend production、generated OpenAPI、schema/migration、dependency/lock、config/CI/Docker、prompt/seed、provider/model or public contract changes；real provider/model calls；later P1/P2 work。
 - Dependencies：P1-1/P1-2/P1-3/P1-4 `DONE`；Accepted `D-003`、`D-007`、`D-008`、`D-013`、`ADR-006`、`ADR-007`、`ADR-009`、`ADR-011`～`ADR-014`。
 - P1-5D acceptance result：the frozen Zhipu/configured-model/model-independent-configuration/request/timeouts are exact；provider/domain separation、safe error mapping、secret non-disclosure、one-request/no-retry behavior and existing P1-5C lifecycle/provenance invariants passed network-free tests and full PostgreSQL regression；HTTPX remains the single runtime dependency；no schema/API/WS/Web or automatic implementation was added；both actual-source reviews and the sanitized user smoke passed，so P1-5D is `DONE`。P1-5E-1 has separately passed its docs-only actual-source review with findings none and is `DONE`。
 
@@ -610,7 +610,7 @@
   - `P1-5F-3A — Web Discussion Functional Closure`：`DONE`；`DESIGN_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PASS / COMMIT_PUSH_COMPLETE / CI_PASS / INDEPENDENT_FINAL_ACCEPTANCE_PASS / FINDINGS_NONE_OPEN`；
   - `P1-5F-3B — Complete Discussion Page Composition`：`DONE` with `DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_IMPLEMENTATION_REVIEW_PASS / COMMIT_PUSH_COMPLETE / CI_PASS / F4_COMPOSITION_ACCEPTANCE_PASS / FINDINGS_NONE_OPEN`；committed implementation baseline `5efe1346532b95b7fabdd521015fd9f8199a457f`；GitHub Actions run `33044682226` `SUCCESS`；
 - `P1-5F-4 — Composition E2E + Independent Acceptance`：`DONE`；accepted commit `af33d89baa0355ae1ee5174a2ef8cfb5e7b14554`；GitHub Actions run `33050532295` `SUCCESS`；independent final acceptance `PASS`；findings `NONE`；`F4-ACC-001 CLOSED`；network-free fake-provider composition only；no real provider/model call。
-- `P1-5R — Local Acceptance Remediation`：`IN_PROGRESS / DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN`；R1 `IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PENDING`；F1 `OPEN / IMPLEMENTATION_COMPLETE_AWAITING_REVIEW`；R2-A `NOT_STARTED / BLOCKED_BY_R1`；R2-B `NOT_STARTED / BLOCKED_BY_R2-A`；R3 `NOT_STARTED / BLOCKED_BY_R2-B`；Final acceptance `NOT_STARTED / BLOCKED_BY_R3`；F2/Visual fidelity remediation/F3 remain `OPEN`；open implementation findings `NONE`。
+- `P1-5R — Local Acceptance Remediation`：`IN_PROGRESS / DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN`；R1 `DONE`；F1 `CLOSED`；R2-A `IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PENDING`；F2 `OPEN / IMPLEMENTATION_COMPLETE_AWAITING_REVIEW`；R2-B `NOT_STARTED / BLOCKED_BY_R2-A`；R3 `NOT_STARTED / BLOCKED_BY_R2-B`；Final acceptance `NOT_STARTED / BLOCKED_BY_R3`；Visual fidelity remediation/F3 remain `OPEN`；open implementation findings `NONE`。
 - P1-5F-2 and P1-5F-3A remain historical `DONE` with their previously recorded evidence。F3B implementation review、commit/push、CI and F4 composition acceptance passed with no findings open，so F3B and parent P1-5F-3 remain historical `DONE`。F4 initially `BLOCKED` on `F4-ACC-001`；finding-only remediation added network-free Human→AI Browser composition proof，its actual-source review passed，the accepted remediation commit and CI passed，and fresh independent final acceptance returned `PASS` with findings `NONE`；`F4-ACC-001` remains `CLOSED`。Parent P1-5 is now reopened only because P1-5R is unresolved；P1 remains `IN_PROGRESS`。
 
 ### P1-5F-3A design-freeze checkpoint
@@ -647,7 +647,7 @@
 - Baseline is clean committed `main` / `origin/main` `91671fe1afc19a9dcc4341184c23500852f96780`；baseline CI run `33054731104` is `completed / success` for that exact head；Master Plan SHA-256 remains `2388a9660320406cb35d5354126ad71c6849a98db7c4a356796ca951bf372f26`。
 - Real local acceptance reopened only parent P1-5 for four bounded findings：F1 progression correctness、F2 long-session viewport/follow UX、visual-fidelity remediation and F3 AI conversation quality。Historical P1-5A～P1-5F completion evidence is unchanged。
 - Frozen remediation batches are R1 deterministic phase-entry progression recovery；R2-A bounded viewport/transcript ownership and new-message return affordance；R2-B faithful Interview Simulation Studio responsive composition；R3 prompt v2、bounded recent public context and pure Persona translation。
-- Exact design contracts are frozen in [`exec-plans/P1-5R_local-acceptance-remediation.md`](exec-plans/P1-5R_local-acceptance-remediation.md)，and the executable batch/file/interface/TDD/gate plan is frozen in [`exec-plans/P1-5R_local-acceptance-remediation-implementation.md`](exec-plans/P1-5R_local-acceptance-remediation-implementation.md)。Batch R1 implementation is complete and awaits actual-source review；the frozen contracts remain unchanged。
+- Exact design contracts are frozen in [`exec-plans/P1-5R_local-acceptance-remediation.md`](exec-plans/P1-5R_local-acceptance-remediation.md)，and the executable batch/file/interface/TDD/gate plan is frozen in [`exec-plans/P1-5R_local-acceptance-remediation-implementation.md`](exec-plans/P1-5R_local-acceptance-remediation-implementation.md)。Batch R1 is accepted and `DONE`；Batch R2-A implementation is complete and awaits actual-source review；the frozen contracts remain unchanged。
 
 ### P1-5F-1 implementation checkpoint
 

@@ -3,8 +3,15 @@ import { access, writeFile } from "node:fs/promises";
 
 const API_BASE_URL = process.env.GIA_E2E_API_ORIGIN ?? "http://localhost:8000";
 const PRIVATE_SENTINEL = "P1_2C_PRIVATE_SENTINEL_DO_NOT_DISCLOSE";
-const HUMAN_CONTRIBUTION =
-  "  Human evidence: preserve this exact contribution.\nSecond line stays exact.  ";
+const HUMAN_CONTRIBUTION = [
+  "  Human evidence: preserve this exact contribution.",
+  ...Array.from(
+    { length: 24 },
+    (_, index) =>
+      `Public evidence line ${String(index + 1).padStart(2, "0")}: resource allocation trade-offs stay concrete, attributable, and reviewable.`,
+  ),
+  "Second line stays exact.  ",
+].join("\n");
 const AI_CONTRIBUTION =
   process.env.GIA_E2E_AI_CONTENT ??
   "F4 Browser deterministic fake AI contribution.";
@@ -30,6 +37,7 @@ test("browser session recovers durable phases across API restart and reload", as
   let aiCreatedEvent: string | undefined;
   let releaseHumanConfirmation: (() => void) | undefined;
   let humanConfirmationReleased = false;
+  let releaseHistoryTail: (() => void) | undefined;
   let authoritativeReadCount = 0;
   let workspaceWebSocketCount = 0;
 
@@ -50,6 +58,43 @@ test("browser session recovers durable phases across API restart and reload", as
     const server = socket.connectToServer();
     const bufferedServerFrames: Array<Parameters<typeof socket.send>[0]> = [];
     let bufferingHumanConfirmation = false;
+    const bufferedHistoryFrames: Array<Parameters<typeof socket.send>[0]> = [];
+    let bufferingHistoryTail = false;
+    let releasedHistoryTailCount = 0;
+    const isAiConfirmationFrame = (
+      frame: Parameters<typeof socket.send>[0],
+    ) => {
+      const payload = frame.toString();
+      return (
+        payload.includes("participant.utterance.created") &&
+        payload.includes('\"actor_kind\":\"AI\"')
+      );
+    };
+    const armHistoryTailRelease = () => {
+      if (releaseHistoryTail || !bufferingHistoryTail) return;
+      const nextAiIndex = bufferedHistoryFrames.findIndex(
+        isAiConfirmationFrame,
+      );
+      if (nextAiIndex < 0) return;
+      releaseHistoryTail = () => {
+        const releaseThroughIndex = bufferedHistoryFrames.findIndex(
+          isAiConfirmationFrame,
+        );
+        if (releaseThroughIndex < 0) return;
+        const frames = bufferedHistoryFrames.splice(0, releaseThroughIndex + 1);
+        for (const bufferedFrame of frames) socket.send(bufferedFrame);
+        releasedHistoryTailCount += 1;
+        releaseHistoryTail = undefined;
+        if (releasedHistoryTailCount >= 2) {
+          bufferingHistoryTail = false;
+          for (const bufferedFrame of bufferedHistoryFrames.splice(0)) {
+            socket.send(bufferedFrame);
+          }
+        } else {
+          armHistoryTailRelease();
+        }
+      };
+    };
 
     socket.onMessage((message) => {
       const payload = message.toString();
@@ -99,11 +144,18 @@ test("browser session recovers durable phases across API restart and reload", as
         releaseHumanConfirmation ??= () => {
           humanConfirmationReleased = true;
           bufferingHumanConfirmation = false;
-          for (const bufferedFrame of bufferedServerFrames.splice(0)) {
-            socket.send(bufferedFrame);
-          }
+          bufferingHistoryTail = true;
+          const [humanFrame, ...tailFrames] = bufferedServerFrames.splice(0);
+          if (humanFrame !== undefined) socket.send(humanFrame);
+          bufferedHistoryFrames.push(...tailFrames);
+          armHistoryTailRelease();
           releaseHumanConfirmation = undefined;
         };
+        return;
+      }
+      if (bufferingHistoryTail) {
+        bufferedHistoryFrames.push(message);
+        armHistoryTailRelease();
         return;
       }
 
@@ -134,6 +186,73 @@ test("browser session recovers durable phases across API restart and reload", as
     await page.screenshot({ fullPage: true, path });
     await testInfo.attach(name, { contentType: "image/png", path });
   };
+  const readLoadedLayout = () =>
+    page.evaluate(() => {
+      const transcript = document.querySelector<HTMLElement>(
+        '[data-testid="confirmed-transcript-list"]',
+      );
+      const discussion = document.querySelector<HTMLElement>(
+        "#discussion-surface",
+      );
+      const task = document.querySelector<HTMLElement>("#task-surface");
+      const progress = document.querySelector<HTMLElement>("#progress-surface");
+      const composer = document.querySelector<HTMLElement>(
+        '[data-testid="human-composer"]',
+      );
+      const root = discussion?.closest<HTMLElement>('[class~="h-dvh"]');
+      if (
+        !transcript ||
+        !discussion ||
+        !task ||
+        !progress ||
+        !composer ||
+        !root
+      ) {
+        throw new Error(
+          "Loaded workspace layout probe could not resolve required nodes.",
+        );
+      }
+      const rootBox = root.getBoundingClientRect();
+      const composerBox = composer.getBoundingClientRect();
+      const progressBox = progress.getBoundingClientRect();
+      const centerLongScrollOwners = Array.from(
+        discussion.querySelectorAll<HTMLElement>("*"),
+      )
+        .filter((element) => {
+          const overflowY = getComputedStyle(element).overflowY;
+          return (
+            (overflowY === "auto" || overflowY === "scroll") &&
+            element.scrollHeight > element.clientHeight
+          );
+        })
+        .map((element) => element.dataset.testid ?? element.id);
+      return {
+        viewportHeight: window.innerHeight,
+        documentHeight: Math.max(
+          document.documentElement.scrollHeight,
+          document.body.scrollHeight,
+        ),
+        root: { top: rootBox.top, bottom: rootBox.bottom },
+        transcript: {
+          scrollHeight: transcript.scrollHeight,
+          clientHeight: transcript.clientHeight,
+          scrollTop: transcript.scrollTop,
+        },
+        discussion: {
+          overflowY: getComputedStyle(discussion).overflowY,
+          scrollHeight: discussion.scrollHeight,
+          clientHeight: discussion.clientHeight,
+        },
+        task: {
+          overflowY: getComputedStyle(task).overflowY,
+          scrollHeight: task.scrollHeight,
+          clientHeight: task.clientHeight,
+        },
+        composer: { top: composerBox.top, bottom: composerBox.bottom },
+        progress: { top: progressBox.top, bottom: progressBox.bottom },
+        centerLongScrollOwners,
+      };
+    });
 
   await page.setViewportSize({ height: 900, width: 1440 });
   await page.goto("/");
@@ -225,11 +344,17 @@ test("browser session recovers durable phases across API restart and reload", as
   expect(discussionBox!.width).toBeGreaterThan(progressBox!.width);
   await page.getByLabel("发言草稿").scrollIntoViewIfNeeded();
   await expect(page.getByLabel("发言草稿")).toBeVisible();
+  const boundedDocumentHeightAtWideBaseline = await page.evaluate(() =>
+    Math.max(document.documentElement.scrollHeight, document.body.scrollHeight),
+  );
   await captureResponsiveEvidence("f3b-wide-1440x900");
 
   const authorityReadsBeforeSwitching = authoritativeReadCount;
   const webSocketsBeforeSwitching = workspaceWebSocketCount;
   await page.setViewportSize({ height: 900, width: 900 });
+  const boundedDocumentHeightAtTabletBaseline = await page.evaluate(() =>
+    Math.max(document.documentElement.scrollHeight, document.body.scrollHeight),
+  );
   await expect(discussionSurface).toBeVisible();
   await expect(taskSurface).toBeHidden();
   await expect(progressSurface).toBeHidden();
@@ -251,6 +376,9 @@ test("browser session recovers durable phases across API restart and reload", as
   await captureResponsiveEvidence("f3b-tablet-900x900");
 
   await page.setViewportSize({ height: 844, width: 390 });
+  const boundedDocumentHeightAtMobileBaseline = await page.evaluate(() =>
+    Math.max(document.documentElement.scrollHeight, document.body.scrollHeight),
+  );
   const tabs = page.getByRole("tab");
   await expect(tabs).toHaveText(["讨论", "题目", "进程"]);
   const discussionTab = page.getByRole("tab", { name: "讨论" });
@@ -418,6 +546,81 @@ test("browser session recovers durable phases across API restart and reload", as
   releaseHumanConfirmation?.();
   await expect.poll(exactConfirmedContributionCount).toBe(1);
   await expect(page.getByTestId("human-pending")).toHaveCount(0);
+  const transcriptList = page.getByTestId("confirmed-transcript-list");
+  const initialReturnToLatest = page.getByRole("button", {
+    name: "回到最新发言",
+  });
+  await expect(initialReturnToLatest).toBeVisible();
+  await initialReturnToLatest.click();
+  await expect
+    .poll(() =>
+      transcriptList.evaluate(
+        (element) =>
+          element.scrollHeight - element.scrollTop - element.clientHeight,
+      ),
+    )
+    .toBeLessThanOrEqual(48);
+  await page.getByTestId("human-composer").scrollIntoViewIfNeeded();
+  await page
+    .locator('[class~="h-dvh"]')
+    .evaluate((element) => element.scrollIntoView({ block: "start" }));
+  const desktopLayout = await readLoadedLayout();
+  expect(desktopLayout.documentHeight).toBe(
+    boundedDocumentHeightAtWideBaseline,
+  );
+  expect(desktopLayout.root.bottom - desktopLayout.root.top).toBe(
+    desktopLayout.viewportHeight,
+  );
+  expect(desktopLayout.transcript.scrollHeight).toBeGreaterThan(
+    desktopLayout.transcript.clientHeight,
+  );
+  expect(desktopLayout.discussion.overflowY).toBe("hidden");
+  expect(desktopLayout.centerLongScrollOwners).toEqual([
+    "confirmed-transcript-list",
+  ]);
+  expect(desktopLayout.task.overflowY).toBe("auto");
+  expect(desktopLayout.composer.top).toBeGreaterThanOrEqual(0);
+  expect(desktopLayout.composer.bottom).toBeLessThanOrEqual(
+    desktopLayout.viewportHeight,
+  );
+  expect(desktopLayout.progress.top).toBeGreaterThanOrEqual(0);
+  expect(desktopLayout.progress.bottom).toBeLessThanOrEqual(
+    desktopLayout.viewportHeight,
+  );
+  expect(
+    desktopLayout.transcript.scrollHeight -
+      desktopLayout.transcript.scrollTop -
+      desktopLayout.transcript.clientHeight,
+  ).toBeLessThanOrEqual(48);
+  await expect(page.getByRole("button", { name: "回到最新发言" })).toHaveCount(
+    0,
+  );
+  if (desktopLayout.task.scrollHeight > desktopLayout.task.clientHeight) {
+    const independentTaskScroll = await page.evaluate(() => {
+      const task = document.querySelector<HTMLElement>("#task-surface")!;
+      const transcript = document.querySelector<HTMLElement>(
+        '[data-testid="confirmed-transcript-list"]',
+      )!;
+      const transcriptBefore = transcript.scrollTop;
+      task.scrollTop = task.scrollHeight;
+      return {
+        taskMoved: task.scrollTop > 0,
+        transcriptUnchanged: transcript.scrollTop === transcriptBefore,
+      };
+    });
+    expect(independentTaskScroll).toEqual({
+      taskMoved: true,
+      transcriptUnchanged: true,
+    });
+  }
+  await captureResponsiveEvidence("r2a-long-wide-1440x900");
+  const historyScrollTop = await transcriptList.evaluate((element) => {
+    element.scrollTop = 0;
+    return element.scrollTop;
+  });
+  expect(historyScrollTop).toBe(0);
+  await expect.poll(() => releaseHistoryTail).toBeTruthy();
+  releaseHistoryTail?.();
 
   await expect.poll(() => humanReleaseEvent).toBeTruthy();
   const parsedHumanRelease = JSON.parse(humanReleaseEvent ?? "{}");
@@ -469,6 +672,99 @@ test("browser session recovers durable phases across API restart and reload", as
   await expect(confirmedAiUtterance).toHaveText(AI_CONTRIBUTION, {
     useInnerText: false,
   });
+  expect(await transcriptList.evaluate((element) => element.scrollTop)).toBe(
+    historyScrollTop,
+  );
+  const returnToLatest = page.getByRole("button", { name: "回到最新发言" });
+  await expect(returnToLatest).toBeVisible();
+  await returnToLatest.click();
+  await expect
+    .poll(() =>
+      transcriptList.evaluate(
+        (element) =>
+          element.scrollHeight - element.scrollTop - element.clientHeight,
+      ),
+    )
+    .toBeLessThanOrEqual(48);
+  await expect(returnToLatest).toHaveCount(0);
+  await expect.poll(() => releaseHistoryTail).toBeTruthy();
+  releaseHistoryTail?.();
+  await expect
+    .poll(exactConfirmedAiContributionCount)
+    .toBeGreaterThanOrEqual(2);
+  await expect
+    .poll(() =>
+      transcriptList.evaluate(
+        (element) =>
+          element.scrollHeight - element.scrollTop - element.clientHeight,
+      ),
+    )
+    .toBeLessThanOrEqual(48);
+  await expect(returnToLatest).toHaveCount(0);
+
+  const readsBeforeLongResponsiveSwitching = authoritativeReadCount;
+  const socketsBeforeLongResponsiveSwitching = workspaceWebSocketCount;
+  await page.setViewportSize({ height: 900, width: 900 });
+  await page
+    .locator('[class~="h-dvh"]')
+    .evaluate((element) => element.scrollIntoView({ block: "start" }));
+  let responsiveLayout = await readLoadedLayout();
+  expect(responsiveLayout.documentHeight).toBe(
+    boundedDocumentHeightAtTabletBaseline,
+  );
+  expect(responsiveLayout.root.bottom - responsiveLayout.root.top).toBe(900);
+  expect(responsiveLayout.transcript.scrollHeight).toBeGreaterThan(
+    responsiveLayout.transcript.clientHeight,
+  );
+  expect(responsiveLayout.discussion.overflowY).toBe("hidden");
+  expect(responsiveLayout.centerLongScrollOwners).toEqual([
+    "confirmed-transcript-list",
+  ]);
+  expect(responsiveLayout.composer.bottom).toBeLessThanOrEqual(900);
+  await page.getByRole("button", { name: "打开题目与思考" }).click();
+  await expect(taskSurface).toBeVisible();
+  await expect(progressSurface).toBeHidden();
+  await page.getByRole("button", { name: "打开训练进程" }).click();
+  await expect(taskSurface).toBeHidden();
+  await expect(progressSurface).toBeVisible();
+  await page.getByRole("button", { name: "关闭训练进程" }).click();
+  await expect(discussionSurface).toBeVisible();
+  await captureResponsiveEvidence("r2a-long-tablet-900x900");
+
+  await page.setViewportSize({ height: 844, width: 390 });
+  const longTabs = page.getByRole("tab");
+  await expect(longTabs).toHaveText(["讨论", "题目", "进程"]);
+  await expect(page.getByRole("tab", { name: "讨论" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await page
+    .locator('[class~="h-dvh"]')
+    .evaluate((element) => element.scrollIntoView({ block: "start" }));
+  responsiveLayout = await readLoadedLayout();
+  expect(responsiveLayout.documentHeight).toBe(
+    boundedDocumentHeightAtMobileBaseline,
+  );
+  expect(responsiveLayout.root.bottom - responsiveLayout.root.top).toBe(844);
+  expect(responsiveLayout.transcript.scrollHeight).toBeGreaterThan(
+    responsiveLayout.transcript.clientHeight,
+  );
+  expect(responsiveLayout.discussion.overflowY).toBe("hidden");
+  expect(responsiveLayout.centerLongScrollOwners).toEqual([
+    "confirmed-transcript-list",
+  ]);
+  expect(responsiveLayout.composer.bottom).toBeLessThanOrEqual(844);
+  await page.getByRole("tab", { name: "题目" }).click();
+  await page
+    .getByRole("textbox", { name: "我的思路 / 私人笔记" })
+    .fill(PRIVATE_NOTES);
+  await page.getByRole("tab", { name: "进程" }).click();
+  await page.getByRole("tab", { name: "讨论" }).click();
+  await expect(discussionSurface).toBeVisible();
+  expect(authoritativeReadCount).toBe(readsBeforeLongResponsiveSwitching);
+  expect(workspaceWebSocketCount).toBe(socketsBeforeLongResponsiveSwitching);
+  await captureResponsiveEvidence("r2a-long-mobile-390x844");
+  await page.setViewportSize({ height: 900, width: 1440 });
 
   await page.reload();
   await expect.poll(exactConfirmedContributionCount).toBe(1);
