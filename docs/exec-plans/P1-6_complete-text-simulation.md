@@ -1,12 +1,17 @@
 # P1-6 Complete Text Simulation Execution Plan
 
 - Status: `P1-6 IN_PROGRESS`
-- Current checkpoint: `P1-6A DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`
-- Finding-only external actual-source re-review verdict: `PASS`
-- Reviewed bundle: `group-interview-arena-review-20260830-044406.zip`
-- Reviewed bundle SHA-256: `6137E75B1E671A561D6280901680A7445C66F5EDBB34D456142F092492473E4D`
-- Findings: `P16A-REV-001 CLOSED`; `P16A-REV-002 CLOSED`; new findings `NONE`; open findings `NONE`
-- Remaining checkpoints: `P1-6B NOT_STARTED`; `P1-6C NOT_STARTED`; `P1-6D NOT_STARTED`; `P1-6E NOT_STARTED`
+- Previous checkpoint: `P1-6A DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`
+- Current checkpoint: `P1-6B DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`
+- P1-6A finding-only external actual-source re-review verdict: `PASS`
+- P1-6A reviewed bundle: `group-interview-arena-review-20260830-044406.zip`
+- P1-6A reviewed bundle SHA-256: `6137E75B1E671A561D6280901680A7445C66F5EDBB34D456142F092492473E4D`
+- P1-6A findings: `P16A-REV-001 CLOSED`; `P16A-REV-002 CLOSED`; new findings `NONE`; open findings `NONE`
+- P1-6B finding-only external actual-source re-review verdict: `PASS`
+- P1-6B finding-only re-review bundle: `group-interview-arena-review-20260830-062133.zip`
+- P1-6B finding-only re-review bundle SHA-256: `C10F2A9362EB6102C6C3F23D7BA66234FECC098BDE2A394D5A2738EBB97E701D`
+- P1-6B findings: `P16B-REV-001 CLOSED`; `P16B-REV-002 CLOSED`; `P16B-REV-003 CLOSED`; new findings `NONE`; open findings `NONE`
+- Remaining checkpoints: `P1-6C NOT_STARTED`; `P1-6D NOT_STARTED`; `P1-6E NOT_STARTED`
 - Parent phase: `P1 IN_PROGRESS`
 - Product target: `V0.1 Internal Validation`
 - Authority: [`PROJECT_MASTER_PLAN.md`](../PROJECT_MASTER_PLAN.md) > Accepted [`DECISIONS.md`](../DECISIONS.md) > [`ROADMAP.md`](../ROADMAP.md) > [`TASKS.md`](../TASKS.md) > this plan > domain docs > code
@@ -250,10 +255,248 @@ P1-6A closeout satisfies the following frozen gate:
 
 - this is the only new P1-6 architecture/scope/implementation-plan document;
 - only this plan, [`TASKS.md`](../TASKS.md) and [`ROADMAP.md`](../ROADMAP.md) change;
-- P1-5 remains `DONE`; P1/P1-6 are `IN_PROGRESS`; P1-6A has passed external actual-source review; P1-6B～E and P1-7/P1-8 are `NOT_STARTED`;
+- at the P1-6A closeout checkpoint, P1-5 remained `DONE`, P1/P1-6 remained `IN_PROGRESS`, P1-6A had passed external actual-source review, and P1-6B～E plus P1-7/P1-8 were `NOT_STARTED`;
 - `PROJECT_MASTER_PLAN.md` is byte-identical to the recorded SHA-256;
 - no code/schema/migration/API/Web/provider/prompt/dependency/CI/infrastructure change exists;
 - `git diff --check`, document links/status checks, `git diff --stat` and `git status --short` pass;
 - the default workflow is `$gia-phase-runner` → if a real diff exists, `$gia-review-bundle` → external actual-source review → finding-only remediation if needed → finding-only re-review → only then `DONE` and any separately authorized commit/push;
 - `$gia-phase-runner` and `$gia-review-bundle` may run in the same Codex conversation, while `$gia-review-bundle` itself must not modify, stage or commit source;
 - no independent review is required by this gate.
+
+## 10. P1-6B Design Freeze
+
+### 10.1 Checkpoint and actual-source calibration
+
+P1-6B is `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`. The finding-only external actual-source re-review verdict is `PASS` against `group-interview-arena-review-20260830-062133.zip` / SHA-256 `C10F2A9362EB6102C6C3F23D7BA66234FECC098BDE2A394D5A2738EBB97E701D`; `P16B-REV-001 CLOSED`; `P16B-REV-002 CLOSED`; `P16B-REV-003 CLOSED`; new findings `NONE`; open findings `NONE`. This checkpoint freezes production implementation architecture only; it creates no production code, schema, migration, API, WebSocket, Web, provider, prompt, dependency, CI or infrastructure change and does not start implementation. No independent review was run for this closeout.
+
+The approved architecture is **Evidence Ledger + Materialized Memory + Patch Journal + Lazy Semantic Compaction**. Current source calibrates it as follows:
+
+| Seam | Actual-source fact | Frozen consequence |
+|---|---|---|
+| Migration | The linear Alembic head is `f1a15b15c005`; current migrations use explicit PostgreSQL constraints, UUID identities, JSONB and downgrade paths. | P1-6B implementation may add one migration after this head and exactly two memory persistence responsibilities; no destructive rewrite or fabricated backfill. |
+| Evidence | `DiscussionEvent` is keyed by `(session_id, sequence)`; `participant.utterance.created` v1 stores participant, actor kind, floor grant, phase and content. | Real ordered public utterance events are the only semantic evidence input and remain unchanged. |
+| Public projection | `project_public_events` validates version/actor/action exposure before transcript/runtime consumption. | Memory input reuses the safe public projection semantics rather than reading private runtime state or trusting raw model claims. |
+| Cursor | Session sequence also contains non-utterance events. | `source_through_sequence` is a `DiscussionEvent.sequence` cursor through the last covered eligible public utterance; current/stale means whether a later eligible public utterance exists, not whether `SimulationSession.last_sequence` changed for unrelated floor/lifecycle events. |
+| Current AI context | Runtime loads public utterances newest-first and retains at most 6 utterances / 4000 content code points. | P1-6B replaces raw-window-only dependence with memory plus an uncovered raw tail while preserving explicit budgets. |
+| Privacy | `AuthorizedGenerationContext` joins only the current AI participant's `PersonaPrivateStance`; public discussion is loaded separately. | `MemoryDerivationInput` is a separate public-only type and never reuses candidate-authorized private context. |
+| Question context | `QuestionVersion` contains candidate-visible fields alongside evaluator/hidden/reference fields; existing `AuthorizedQuestionContext` already demonstrates an explicit public subset. | Memory uses a dedicated `PublicMemoryQuestionContext` allowlist equal to or narrower than that public subset; it never accepts an ORM row or generic dump. |
+| Prompt versioning | `PromptVersion` already provides immutable `prompt_key`, `version_number`, `purpose_code`, content digest and publish/retire chronology. | Reuse this table for a new semantic-memory prompt; never create `MemoryPromptVersion` or mutate published candidate V2. |
+| Generation context provenance | `GenerationRequestMetadata` V1 and its DB constraint allow exactly `schema_version` plus `configuration_version`; `request_digest` proves input integrity but does not expose reconstructable memory/raw-tail boundaries. | Preserve readable V1 rows and add a closed V2 metadata shape for memory-backed candidate context provenance in the existing generation request persistence. |
+| Provider transport | `GenerationProvider`/`ZhipuGenerationProvider` currently accept candidate-specific `RuntimeGenerationInput`, although vendor transport uses only rendered prompt and provider/model/config plus fixed invocation options. | The second real workload justifies a minimal project-owned model-invocation transport refinement during implementation so candidate and memory callers do not duplicate vendor HTTP; candidate generation lifecycle/persistence remains unchanged. |
+| Public surface | Memory has no current REST/WS/Web consumer and existing transcript/recovery contracts already expose authoritative facts. | P1-6B adds no public Memory REST API, WebSocket event or Web UI. |
+
+No approved architecture deviation is required. The provider transport calibration is the explicitly allowed minimal refinement with two real callers; it is not a provider registry, router, fallback framework or generic agent runtime.
+
+### 10.2 Architecture flow and authority boundaries
+
+```text
+authoritative public DiscussionEvent ledger
+  -> ordered public episode batch
+  -> public-only MemoryDerivationInput
+  -> MemoryDeriver proposes typed MemoryPatch[] only
+  -> strict parser + provenance/policy validation
+  -> project-owned deterministic reducer
+  -> current discussion_memory_states + append-only discussion_memory_revisions
+  -> current structured memory + uncompacted recent public tail
+  -> bounded DiscussionWorkingContext
+  -> candidate-local prompt composition / future Report / future Scoring
+```
+
+The new project-owned module boundary is `discussion_memory`, separate from `ai_runtime`:
+
+```text
+discussion events / public evidence
+  -> discussion_memory
+  -> DiscussionWorkingContext
+  -> ai_runtime
+```
+
+`discussion_memory` cannot depend on Persona, `PersonaPrivateStance`, candidate prompt rendering or candidate generation lifecycle. It owns typed memory, patches, validation, deterministic reduction, persistence projection, lazy maintenance and public working-context construction. It does not own session lifecycle, phase transition, floor, next speaker, scoring, public transcript truth or provider selection. P1-7 Report, P3 scoring/evaluation, P2 voice adapters and a future moderator may consume the same public structured-memory seam without becoming memory authorities.
+
+### 10.3 Evidence authority and persistence responsibilities
+
+`DiscussionEvent` / authoritative public utterance history remains the only evidence authority. Memory is a derived projection: it cannot rewrite/delete source events, fabricate evidence during rebuild or become historical truth. Every accepted semantic item provenance reference must resolve to a real allowlisted public utterance sequence in the same session and visible derivation range.
+
+P1-6B implementation freezes exactly two persistence responsibilities:
+
+1. `discussion_memory_states` — at most one hot-path current row per session:
+   - `session_id` as primary key and cascading FK to `simulation_sessions`;
+   - non-negative `revision` and `source_through_sequence`;
+   - positive `schema_version`, non-empty `derivation_version` and non-empty immutable project-owned `projection_version`;
+   - closed, validated `structured_state` JSONB;
+   - timezone-aware `updated_at`.
+2. `discussion_memory_revisions` — immutable append-only accepted patch journal:
+   - UUID `id`, `session_id`, positive `revision`, non-negative `base_revision`;
+   - `source_from_sequence` and `source_through_sequence` with a valid ordered range;
+   - closed `patches` JSONB, positive `schema_version`, non-empty `derivation_version` and non-empty immutable project-owned `projection_version`;
+   - SHA-256 `derivation_input_digest` and timezone-aware `created_at`;
+   - nullable `prompt_version_id` FK plus nullable `provider_identifier`, `model_identifier` and `configuration_version` as one all-or-none semantic-model provenance group. Non-model deterministic derivation leaves that group null; no generic model registry is introduced;
+   - unique `(session_id, revision)` and session-local revision/source indexes.
+
+An absent current row is logically empty revision 0/cursor 0. The first successful writer atomically inserts revision 1 plus the current row; uniqueness makes concurrent bootstrap losers stale. Every later successful write atomically appends revision `R+1` and CAS-updates the current row from `R` to `R+1`. A journal row never stores a full structured-state snapshot. Current state is the fast read, the patch journal is exact memory history, and `DiscussionEvent` is ultimate evidence.
+
+The three version responsibilities are separate: `schema_version` identifies structured-memory/patch data shape; `derivation_version` identifies semantic interpretation/derivation algorithm; `projection_version` identifies deterministic reducer semantics plus deterministic materialized-state policy semantics required for exact replay. A deterministic reducer/state-policy change receives a new immutable `projection_version`. Policy parameters that affect materialized replay output are bound to or resolvable by that version. No generic plugin/version registry and no reducer/policy table is created.
+
+### 10.4 Typed semantic state and stable item identity
+
+The closed structured state contains:
+
+- `proposals`;
+- `evaluation_criteria`;
+- `agreements`;
+- `open_conflicts`;
+- `discarded_options`;
+- optional `current_decision`.
+
+Each semantic `MemoryItem` has project-owned `memory_item_id`, closed `kind`, bounded `canonical_text`, minimal `status` (`ACTIVE`, `SUPERSEDED`, `DISCARDED`), validated `source_sequences`, `introduced_at_sequence`, `updated_at_sequence` and optional `superseded_by_id`. Dynamic phase, remaining time, current floor and next speaker never become durable semantic-memory truth.
+
+The deriver cannot assign durable IDs. For `ADD` or replacement content, the reducer allocates a deterministic UUID from session identity, target revision, patch ordinal and item kind. `UPDATE`, `SUPERSEDE` and `DISCARD` must target an existing compatible item ID. The materialized JSONB stays bounded: policy may deterministically evict the oldest terminal items before active items when size limits require it, while the journal preserves their history. No entity/edge/node, normalized memory-item, vector or graph table is created.
+
+### 10.5 MemoryPatch, derivation and deterministic reducer
+
+The project-owned contracts are:
+
+```text
+MemoryDerivationInput
+MemoryPatch
+MemoryDerivationResult
+MemoryDeriver Protocol
+```
+
+`MemoryDerivationInput` allowlists only session identity, previous public structured memory, the ordered new public utterance episode batch and an optional project-owned `PublicMemoryQuestionContext`. That question type is equal to or narrower than existing `AuthorizedQuestionContext` and contains only explicitly selected candidate-visible facts needed by derivation: question version identity, title, scenario, objective, public hard/soft constraints, public stakeholders and public options. It never accepts ORM `QuestionVersion`, generic `QuestionVersion.model_dump()`, `reference_dimensions`, `hidden_conflicts`, `acceptable_outcome_patterns`, private/evaluator/reference-answer metadata or system-only question configuration. Phase-specific public guidance, if genuinely needed, must be a deliberately projected public field; the entire `phase_prompts` map is not exposed by default.
+
+The input also forbids `PersonaPrivateStance`, `private_information`, `red_lines`, `concession_conditions`, participant-private strategy, user-private notes, credentials and candidate rendered prompts. Question-field allowlisting is explicit rather than inferred from whatever fields happen to exist on `QuestionVersion`.
+
+`MemoryDeriver` returns proposed closed operations only: `ADD`, `UPDATE`, `SUPERSEDE`, `DISCARD`. It cannot choose revision numbers, invent durable IDs/source sequences, write ORM state or alter session/floor/scoring authority. Provider text passes through a project-owned strict parser into the closed patch schema before any mutation.
+
+For every claimed `source_sequences` reference, application validation proves that the sequence exists, belongs to the same session, is an allowlisted public utterance, lies inside the derivation-visible source range and does not cross a private/system boundary. Speaker identity is derived from the projected source record. Any invalid or hallucinated provenance rejects the whole derivation result; it is never silently repaired or persisted.
+
+Only the deterministic reducer mutates memory:
+
+```text
+previous validated structured state
+  + validated ordered MemoryPatch[]
+  + target source range / target revision / MemoryPolicy
+  = next validated structured state
+```
+
+Source ordering/range coverage, cursor advancement, revision allocation, operation ordering, item identity/status transitions, provenance association, idempotent re-entry, journal replay, stale/current detection and state-size enforcement are deterministic. The same accepted journal plus its recorded `schema_version` and historical `projection_version` reproduce the same current state; `derivation_version` explains semantic interpretation but does not substitute for deterministic projection identity.
+
+### 10.6 Exact replay versus semantic rebuild
+
+Exact replay applies accepted patch journal revisions in `(session_id, revision)` order and resolves the historical deterministic reducer/materialized-state policy semantics recorded by each revision's `projection_version`. It must reproduce the same structured state and cursor and must never silently apply the latest reducer/policy behavior to older revisions. Missing/unknown projection semantics or a digest/schema/provenance mismatch fails replay rather than guessing. No generic version registry is required: implementation owns the finite supported projection-version dispatch in project code.
+
+Semantic rebuild re-reads immutable authoritative public history under a new derivation/prompt/model/config version and produces a newly validated patch set. A real LLM need not reproduce identical text or bits. Rebuild appends a new revision that transforms the current projection, retains old journal history and records new provenance; it never overwrites prior derivation records or source events. P1-6B leaves this additive seam without building branches, forks or a generic version-control system.
+
+### 10.7 Lazy semantic compaction and bounded MemoryPolicy
+
+The hot path uses:
+
+```text
+current materialized memory + uncompacted recent public utterance tail
+```
+
+When that combination provides complete coverage inside `DiscussionWorkingContext` budgets, maintenance performs no semantic model call. When the uncovered raw tail reaches a configurable high watermark, `MaintainDiscussionMemory(session_id)` selects the oldest eligible ordered episode batch and compacts enough data that a successful commit returns the tail to or below a lower target watermark. High/low hysteresis prevents per-utterance calls and threshold oscillation. Numeric production values are configuration, not schema.
+
+`MemoryPolicy` explicitly bounds max active items per semantic kind, canonical-text length, provenance references per item, patch operations per derivation, serialized structured-state size, retained terminal items, Working Context memory budget, recent raw-tail budget and high/low episode/codepoint watermarks. Parameters that affect deterministic materialized-state output—including size enforcement and terminal-item eviction—are bound to/resolvable by `projection_version`. High/low compaction trigger thresholds need not be duplicated per revision unless implementation proves they affect exact journal replay output. Tests freeze boundary behavior; the Design Freeze does not guess final commercial numbers.
+
+### 10.8 DiscussionWorkingContext and prompt compatibility
+
+`DiscussionWorkingContext` is a public structured application type containing memory revision/cursor, active proposals, criteria, agreements, conflicts, current decision, ordered recent public utterances, authoritative dynamic phase and computed remaining time. Semantic fields come from memory, the tail comes from evidence, and dynamic fields come from `SimulationSession`. It is not an opaque summary string.
+
+Every memory-backed candidate request persists a closed `GenerationRequestMetadata` V2 in the existing `LlmGenerationRequest.request_metadata` column. V2 records at least: `schema_version`, `configuration_version`, `working_context_version`, closed `context_mode`, `memory_revision`, `memory_source_through_sequence` and `context_source_through_sequence`. `memory_revision = 0` represents consumed logical empty memory; `memory_source_through_sequence` is that memory revision's represented public cursor; `context_source_through_sequence` is the highest public utterance sequence actually visible after adding the raw tail. `context_mode` distinguishes at least `MEMORY_WITH_RAW_TAIL` from `SAFE_RAW_FALLBACK`. `working_context_version` identifies project-owned assembly/render semantics independently from provider configuration.
+
+Historical V1 metadata rows with only `schema_version = 1` and `configuration_version` remain readable and are never rewritten. The V2 DB/domain constraint is additive/compatible and closed by schema version; it does not create a provenance service/table. `request_digest` remains integrity evidence but is not a substitute for PromptVersion + provider/model/config + exact memory revision/cursor + raw-tail boundary + Working Context version/mode provenance.
+
+Candidate-local composition continues to add only the current AI participant's authorized Persona/Private Stance after public Working Context construction. Candidate prompt rendering converts the structured context to text. Published `AI_CANDIDATE_TURN` V2 remains immutable and historically traceable. Implementation publishes a new immutable V3 using closed variables equivalent to `discussion_memory`, `recent_discussion` and `time_remaining_seconds` alongside the existing phase/private candidate variables; it never updates V2 in place.
+
+Semantic derivation reuses `PromptVersion` with `prompt_key = DISCUSSION_MEMORY_UPDATE` and `purpose_code = DISCUSSION_MEMORY_DERIVATION` (or source-compatible equivalent uppercase codes), plus its own public-only renderer/parser. It does not create `MemoryPromptVersion` or reuse `AuthorizedGenerationContext`.
+
+### 10.9 Minimal model/provider transport seam and output portability
+
+Because current `RuntimeGenerationInput` includes generation request, participant, floor and phase fields while Zhipu transport only needs rendered prompt, provider/model/config and invocation options, the second real memory caller would otherwise duplicate vendor HTTP or fake candidate identities. P1-6B implementation may therefore extract the smallest project-owned model-invocation transport input/result containing rendered prompt, provider/model/config identity, temperature, output budget and output expectation. Candidate generation and memory derivation adapt their domain inputs/results at this boundary; existing `LlmGenerationRequest`, `AiUtterance`, orchestration outcomes and candidate provider-neutral behavior remain candidate-owned and compatible.
+
+The memory domain never depends on Zhipu JSON mode. Baseline flow is model text → strict project-owned parser → closed typed schema → provenance/policy validation → patches. An adapter may later use constrained output without changing the domain contract. No registry, routing, fallback, marketplace, generic agent runtime or distributed model service is allowed.
+
+### 10.10 Concurrency, transaction and session locality
+
+The design is multi-process safe without Redis or a distributed lock:
+
+```text
+short read transaction: read state revision R + eligible public batch
+COMMIT
+external semantic derivation and strict validation
+short write transaction:
+  verify current revision/cursor still equal the base
+  append immutable revision R+1
+  insert/update materialized state R+1
+COMMIT
+```
+
+The write uses optimistic CAS through a conditional session-local insert/update plus uniqueness constraints. A loser discards the stale semantic result, re-reads current state and does not overwrite or blindly retry provider work. Journal append and materialized-state update succeed or roll back together. No model call occurs inside a database transaction. All normal reads/writes are `WHERE session_id = ?`; there is no global lock or cross-session aggregation on the hot path.
+
+### 10.11 Failure and fallback semantics
+
+- Case A: memory is stale but memory plus uncovered raw tail still gives complete bounded coverage — generate normally and do not call the semantic model merely to become current.
+- Case B: compaction is required and derivation fails, but complete public context still fits the safe raw fallback budget — use bounded raw fallback and emit safe observability.
+- Case C: derivation fails and complete necessary context no longer fits — never silently truncate earlier discussion. Raise project-owned `DiscussionWorkingContextUnavailable`; the AI-runtime caller maps it to its existing safe `CONTEXT_REJECTED` path before provider invocation, preserving session/floor/orchestration authority.
+
+If the model succeeds and the process crashes before save, public evidence remains intact and later maintenance may derive again. P1-6B creates no durable Memory job/worker/queue. `MaintainDiscussionMemory(session_id)` is an application seam whose caller may be replaced later without changing the memory domain.
+
+### 10.12 Privacy and observability
+
+Privacy tests use sentinels for Private Stance, private information, red lines, concession conditions, candidate rendered prompts, user-private notes and credentials across derivation input, journal/state JSON, logs and Working Context. No shared-memory path may contain or infer them as public facts.
+
+Existing structured logging/observability may add safe fields: `memory_revision`, `source_gap`, `raw_tail_size`, `memory_state_size`, `compaction_triggered`, `derivation_input_size`, `derivation_output_size`, `derivation_latency`, `patch_operation_count`, `derivation_failure`, `cas_conflict` and `fallback_used`. It must not log Private Stance, credentials, unnecessary verbatim user content or full sensitive prompts. No telemetry vendor/infrastructure is added.
+
+### 10.13 Scale, replaceability and explicit upgrade triggers
+
+The domain/interface passes the frozen tests: 10× sessions remain session-local with bounded state and short transactions; inline derivation can later move to a worker; JSONB current state can later gain normalized/vector/graph secondary projections; PostgreSQL tables can later partition/shard; and provider transport can change without consumer/domain rewrites. No future infrastructure is implemented now.
+
+Re-evaluate only on observed triggers:
+
+- worker/queue: model I/O is a measured online bottleneck, API waits saturate, or duplicate derivation cost is material;
+- pgvector/retrieval: active structured memory cannot bounded-fit or real cross-session semantic retrieval appears;
+- normalized memory-item table: Report/P3/operations require material cross-session SQL querying;
+- graph store: substantial cross-session/person/question temporal multi-hop queries become a real product need;
+- partition/sharding: table size/query/latency metrics justify it.
+
+### 10.14 Frozen implementation batches
+
+These are internal batches of one future P1-6B implementation checkpoint, not new governance stages:
+
+1. Memory domain + additive persistence — typed state/patches/reducer, materialized state, patch journal and migration.
+2. Semantic derivation boundary — public-only input, `MemoryDeriver`, semantic PromptVersion, strict parser/provenance validator and only the justified minimal provider-transport refinement.
+3. Lazy maintenance + Working Context — `MemoryPolicy`, hysteresis compaction, CAS, Working Context builder, additive closed `GenerationRequestMetadata` V2 persistence, immutable candidate prompt V3 and AI runtime caller integration with normal/fallback context provenance.
+4. Correctness/recovery proof — PostgreSQL migration, projection-versioned exact replay, semantic rebuild, concurrency/CAS, Persona/question evaluator privacy sentinels, hallucinated provenance rejection, bounded state/context, normal/fallback provenance, fallback and AI-context integration.
+
+### 10.15 Implementation acceptance matrix
+
+| Area | Required implementation acceptance |
+|---|---|
+| Evidence | Raw `DiscussionEvent` facts remain byte/sequence authoritative; no rewrite, deletion or fabricated backfill. |
+| Persistence | One current row/session plus append-only patch revisions record `schema_version`, `derivation_version` and `projection_version`; additive upgrade/downgrade, constraints, indexes and atomic state+journal write pass PostgreSQL tests. |
+| State | Closed typed semantic kinds/items/statuses, deterministic IDs/transitions and projection-version-bound bounded/eviction policy pass unit/property-style boundaries. |
+| Derivation | Public-only input uses explicit `PublicMemoryQuestionContext`; ORM/generic dumps and hidden/evaluator/reference question fields are rejected; closed parser, deterministic fake deriver and invalid-output rejection pass without real provider calls. |
+| Provenance | Wrong session/type/range/missing/hallucinated/private references reject the whole result; participant identity comes from source. |
+| Replay/rebuild | Accepted journal exact replay resolves every historical `projection_version` and reproduces state without latest-policy drift; unknown versions fail; semantic re-derivation records a new revision/provenance without changing source or old journal. |
+| Lazy compaction | No call below high watermark when full context fits; oldest eligible batch compacts toward low watermark; re-entry is idempotent. |
+| Working Context | Memory + full eligible raw tail + authoritative dynamic phase/time fit explicit budgets; no opaque summary-only dependency. |
+| Generation context provenance | Historical metadata V1 remains readable; every memory-backed candidate request persists closed V2 Prompt/provider/model/config plus working-context version/mode, exact memory revision/cursor and visible raw-tail upper sequence for both `MEMORY_WITH_RAW_TAIL` and `SAFE_RAW_FALLBACK`. |
+| Prompt compatibility | Candidate V2 remains immutable; new candidate V3 and semantic-memory prompt are separately versioned and historically resolvable. |
+| Provider | Candidate and memory callers share only minimal transport; domain stays vendor-neutral; no registry/router/fallback or duplicate vendor HTTP. |
+| Concurrency | Bootstrap and steady-state CAS admit one winner; stale result cannot append/update; state+journal are transactionally consistent. |
+| Transactions | No external model call occurs inside a transaction; read and write transactions remain short and session-local. |
+| Failure | Cases A/B/C are proved; Case C reaches safe `CONTEXT_REJECTED` without provider call, silent truncation or authority mutation. |
+| Privacy | Private/candidate/user/system sentinels and question-level evaluator/hidden/reference-answer sentinels never enter derivation input, state, journal, Working Context or logs. |
+| Compatibility | P1-3 lifecycle, P1-4 floor, P1-5 generation/orchestration and existing REST/WS/Web contracts remain compatible. |
+| Observability | Safe memory/compaction/CAS/fallback fields exist without sensitive payload logging or new telemetry infrastructure. |
+| Scale/YAGNI | Session-local bounded path passes; no Redis, queue, worker, vector, graph, normalized item table or speculative service is added. |
+
+### 10.16 Explicit non-goals, STOP conditions and review gate
+
+P1-6B Design Freeze and implementation exclude public Memory REST/WS/Web, Report/scoring, cross-session user memory, RAG/embeddings/pgvector, graph/Graphiti, Redis, queue/worker, microservice, multi-tenant system, billing, provider routing/fallback, voice and P1-7/P1-8 work.
+
+Stop before implementation or scope expansion if actual source later proves that: (1) the two-table shape cannot migrate additively; (2) public evidence cannot replay safely; (3) a public REST/WS change is required; (4) shared memory cannot isolate Private Stance; (5) optimistic CAS is unsafe in the current transaction model; (6) `PromptVersion` cannot support the semantic prompt without a new product decision; (7) transport refinement breaks accepted P1-5 contracts; (8) the master plan must change; (9) a new Accepted ADR/product decision is required; or (10) a 10× domain blocker cannot be addressed by replaceable infrastructure.
+
+Design-time STOP-condition result: `NONE`. The initial external actual-source review verdict was `BLOCKED` on exactly `P16B-REV-001`, `P16B-REV-002` and `P16B-REV-003` against `group-interview-arena-review-20260830-060509.zip` / SHA-256 `C0C7A7A589B1795DD917C11CF13B36FBCE245DFFD36CD20D5C96BAD80AC6EF26`. Finding-only remediation froze projection identity, persisted candidate Working Context provenance and explicit public question allowlisting. The finding-only external actual-source re-review verdict is `PASS` against `group-interview-arena-review-20260830-062133.zip` / SHA-256 `C10F2A9362EB6102C6C3F23D7BA66234FECC098BDE2A394D5A2738EBB97E701D`; `P16B-REV-001 CLOSED`; `P16B-REV-002 CLOSED`; `P16B-REV-003 CLOSED`; new findings `NONE`; open findings `NONE`. P1-6B is therefore `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; production implementation has not started and still requires separate approval. P1-6C～P1-6E and P1-7/P1-8 remain `NOT_STARTED`; P1-6/P1 remain `IN_PROGRESS`.

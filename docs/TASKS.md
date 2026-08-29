@@ -1,12 +1,12 @@
 # 当前任务清单
 
-- Status: P1 in progress; P1-1 through P1-5 completed; P1-6 is `IN_PROGRESS`; P1-6A is `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-6B～P1-6E are `NOT_STARTED`; `P16A-REV-001` and `P16A-REV-002` are `CLOSED`; open findings `NONE`
-- Managed scope: completed P1-6A finding-only external actual-source re-review governance closeout；no code/schema/migration/API/WebSocket/Web/provider/prompt/dependency/CI/infrastructure change or real-provider call
-- Current closeout checkpoint: P1-6A — `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-6 — `IN_PROGRESS`; P1-5 — `DONE`; open findings — `NONE`
+- Status: P1 in progress; P1-1 through P1-5 completed; P1-6 is `IN_PROGRESS`; P1-6A is `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-6B is `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-6C～P1-6E are `NOT_STARTED`; P1-7/P1-8 are `NOT_STARTED`; open findings `NONE`
+- Managed scope: P1-6B Design Freeze finding-only review closeout after external actual-source re-review `PASS`；no production code/schema/migration/API/WebSocket/Web/provider/prompt/dependency/CI/infrastructure change or real-provider call
+- Current design checkpoint: P1-6B — `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-6A — `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-6 — `IN_PROGRESS`; P1-5 — `DONE`; finding-only external actual-source re-review verdict — `PASS`; open findings — `NONE`
 - P0-7 final outcome: initial verdict `BLOCKED` with two documentation findings; remediation completed; finding-only independent recheck `PASS`; new blockers none; P1 readiness `READY`
 - Current phase: P1 — `IN_PROGRESS`
-- Most recently completed governance checkpoint: P1-6A finding-only external actual-source re-review — `PASS`; reviewed bundle `group-interview-arena-review-20260830-044406.zip`; SHA-256 `6137E75B1E671A561D6280901680A7445C66F5EDBB34D456142F092492473E4D`; `P16A-REV-001 CLOSED`; `P16A-REV-002 CLOSED`; new findings `NONE`; no new ADR or master-plan change; P1-5 accepted evidence remains unchanged
-- Current task gate: P1-5 — `DONE`; P1-6 — `IN_PROGRESS`; P1-6A — `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-6B～P1-6E — `NOT_STARTED`; P1-7/P1-8 — `NOT_STARTED`; `P16A-REV-001` — `CLOSED`; `P16A-REV-002` — `CLOSED`; open findings — `NONE`; P1 remains `IN_PROGRESS`
+- Current governance checkpoint: P1-6B finding-only external actual-source re-review — `PASS`; reviewed bundle `group-interview-arena-review-20260830-062133.zip`; SHA-256 `C10F2A9362EB6102C6C3F23D7BA66234FECC098BDE2A394D5A2738EBB97E701D`; `P16B-REV-001`, `P16B-REV-002` and `P16B-REV-003` are `CLOSED`; new findings `NONE`; open findings `NONE`; P1-6A accepted evidence remains unchanged
+- Current task gate: P1-5 — `DONE`; P1-6 — `IN_PROGRESS`; P1-6A — `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-6B — `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-6C～P1-6E — `NOT_STARTED`; P1-7/P1-8 — `NOT_STARTED`; `P16A-REV-001` — `CLOSED`; `P16A-REV-002` — `CLOSED`; `P16B-REV-001` — `CLOSED`; `P16B-REV-002` — `CLOSED`; `P16B-REV-003` — `CLOSED`; open findings — `NONE`; P1 remains `IN_PROGRESS`
 - P0 status: `DONE`; P0-1 through P0-7 completed
 - Allowed status values: `TODO` / `IN_PROGRESS` / `BLOCKED` / `DONE`
 - Related roadmap: [`ROADMAP.md`](ROADMAP.md)
@@ -747,8 +747,8 @@
 - ID: `P1-6`
 - 名称：完整文字模拟
 - Status: `IN_PROGRESS`
-- Approval state: P1-6A is `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-6B～P1-6E remain `NOT_STARTED` and require separate approval.
-- Dependencies: P1-5 `DONE`; P1-5R/P1-5R-POST tracks `CLOSED` with their historical open findings `NONE`; P1-6A `P16A-REV-001` and `P16A-REV-002` are `CLOSED` with open findings `NONE`.
+- Approval state: P1-6A and P1-6B are both `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-6B finding-only external actual-source re-review is `PASS`, while production implementation is not started or authorized; P1-6C～P1-6E remain `NOT_STARTED`.
+- Dependencies: P1-5 `DONE`; P1-5R/P1-5R-POST tracks `CLOSED` with their historical open findings `NONE`; P1-6A `P16A-REV-001` and `P16A-REV-002` are `CLOSED`; P1-6B `P16B-REV-001`, `P16B-REV-002` and `P16B-REV-003` are `CLOSED`; open findings `NONE`.
 - Goal: close the structured discussion-memory gap and compose/validate existing lifecycle, floor, AI runtime, public transport and Web capabilities as one complete Human + 3 AI text simulation.
 - Out of scope: P1-7 report/V0.1 content; P1-8 full-P1 acceptance; voice/ASR/TTS; billing/payment; provider routing/fallback; Redis/queue/RAG/microservices and deferred infrastructure.
 - Source plan: [`exec-plans/P1-6_complete-text-simulation.md`](exec-plans/P1-6_complete-text-simulation.md)
@@ -756,7 +756,7 @@
 ### Substep progress
 
 - `P1-6A — Scope Reconciliation + Commercial-Readiness Architecture Freeze`: `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; docs-only; finding-only external actual-source re-review `PASS`; open findings `NONE`;
-- `P1-6B — Structured Discussion Memory Gap Closure`: `NOT_STARTED`;
+- `P1-6B — Structured Discussion Memory Design Freeze`: `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; strict docs-only; finding-only external actual-source re-review `PASS`; open findings `NONE`;
 - `P1-6C — Full Text Simulation Composition`: `NOT_STARTED`;
 - `P1-6D — Recovery + Three-AI End-to-End Validation`: `NOT_STARTED`;
 - `P1-6E — P1-6 Independent Acceptance + Closeout`: `NOT_STARTED`.
@@ -768,7 +768,16 @@
 - Frozen memory is a public-only derived projection over authoritative raw utterance/discussion events. Source event/utterance ordering, source cursor advancement, revision allocation, stale/current detection, idempotent consumption/re-entry, provenance association and inference-free structural fields must be deterministic. Proposal semantic merge, agreement/conflict interpretation and concise semantic summary may use a project-owned semantic derivation boundary/LLM, but derivation must be bounded, public-only, versioned, source-provenance-traceable, derivation-version-traceable and safely replayable/rebuildable as a new memory revision; a deterministic fake/test provider supports stable tests, while a real external LLM is not required to be word-for-word or bit-for-bit deterministic on rebuild.
 - Authoritative raw public history remains the only evidence authority; semantic memory never replaces raw evidence. If semantic derivation is persisted, the design must leave an additive seam for derivation/prompt/model/config version provenance. P1-6A creates no schema/table.
 - P1-6B owns structured memory + bounded memory-backed context; P1-6C owns minimal composition; P1-6D owns one complete network-free Human + 3 distinct AI recovery path through final-summary closure; P1-6E owns P1-6-only independent acceptance.
-- Finding-only external actual-source re-review verdict is `PASS` against reviewed bundle `group-interview-arena-review-20260830-044406.zip` / SHA-256 `6137E75B1E671A561D6280901680A7445C66F5EDBB34D456142F092492473E4D`; `P16A-REV-001 CLOSED`; `P16A-REV-002 CLOSED`; new findings `NONE`; open findings `NONE`. P1-6A is therefore `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`. No independent review was run. P1-6B～P1-6E and P1-7/P1-8 remain `NOT_STARTED`.
+- Finding-only external actual-source re-review verdict is `PASS` against reviewed bundle `group-interview-arena-review-20260830-044406.zip` / SHA-256 `6137E75B1E671A561D6280901680A7445C66F5EDBB34D456142F092492473E4D`; `P16A-REV-001 CLOSED`; `P16A-REV-002 CLOSED`; new findings `NONE`; open findings `NONE`. P1-6A is therefore `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`. No independent review was run. At that closeout checkpoint, P1-6B～P1-6E and P1-7/P1-8 were `NOT_STARTED`; the current P1-6B Design Freeze status is recorded below.
+
+### P1-6B Design Freeze finding-only review closeout note
+
+- Approved architecture: authoritative public `DiscussionEvent` ledger → public-only semantic patch proposal → strict provenance/policy validation → deterministic reducer → one current materialized state plus append-only patch journal → bounded memory + raw tail `DiscussionWorkingContext`.
+- Actual-source calibration confirms additive PostgreSQL/Alembic evolution from head `f1a15b15c005`, safe public utterance projection, a separate candidate-only Private Stance boundary and reusable immutable `PromptVersion`. Current candidate-specific provider input makes a minimal shared model-transport refinement justified for the second real caller during implementation; no registry/router/fallback is authorized.
+- Finding-only remediation adds distinct immutable `projection_version` to both Memory persistence responsibilities and binds replay-affecting reducer/state-policy semantics to it; exact replay resolves historical projection semantics rather than the latest policy.
+- Memory-backed candidate generation freezes additive closed `GenerationRequestMetadata` V2 provenance for Working Context version/mode, exact memory revision/cursor and visible raw-tail boundary while preserving historical V1 rows; Batch 3 and acceptance cover normal and safe-fallback modes.
+- `MemoryDerivationInput` now accepts only explicit `PublicMemoryQuestionContext`, equal to or narrower than the existing public candidate subset; ORM/generic dumps plus hidden/evaluator/reference-answer question fields are forbidden and covered by privacy sentinels.
+- Initial external actual-source review verdict was `BLOCKED` against `group-interview-arena-review-20260830-060509.zip` / SHA-256 `C0C7A7A589B1795DD917C11CF13B36FBCE245DFFD36CD20D5C96BAD80AC6EF26` on exactly `P16B-REV-001`, `P16B-REV-002`, `P16B-REV-003`. After finding-only remediation, the finding-only external actual-source re-review verdict is `PASS` against `group-interview-arena-review-20260830-062133.zip` / SHA-256 `C10F2A9362EB6102C6C3F23D7BA66234FECC098BDE2A394D5A2738EBB97E701D`; `P16B-REV-001 CLOSED`; `P16B-REV-002 CLOSED`; `P16B-REV-003 CLOSED`; new findings `NONE`; open findings `NONE`. P1-6B is `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`. Design-time STOP conditions remain `NONE`; no tables/code were created, no independent review was run and production implementation still requires separate approval.
 
 ## P1-7 — Basic Report + V0.1 Content
 

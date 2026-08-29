@@ -2,11 +2,11 @@
 
 - Status: Active baseline
 - Most recently completed development phase: P0 — `DONE`
-- Current closeout checkpoint: P1-6A — `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-6 — `IN_PROGRESS`; P1-5 — `DONE`; `P16A-REV-001` — `CLOSED`; `P16A-REV-002` — `CLOSED`; open findings — `NONE`
+- Current design checkpoint: P1-6B — `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-6A — `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-6 — `IN_PROGRESS`; P1-5 — `DONE`; finding-only external actual-source re-review verdict — `PASS`; open findings — `NONE`
 - P0-7 final outcome: initial `BLOCKED`; two documentation findings remediated; finding-only independent recheck `PASS`; P1 readiness `READY`
 - Current phase: P1 — `IN_PROGRESS`
-- Most recently completed governance checkpoint: P1-6A finding-only external actual-source re-review — `PASS`; reviewed bundle `group-interview-arena-review-20260830-044406.zip`; SHA-256 `6137E75B1E671A561D6280901680A7445C66F5EDBB34D456142F092492473E4D`; `P16A-REV-001 CLOSED`; `P16A-REV-002 CLOSED`; new findings `NONE`; no code/schema/migration/API/Web/provider/prompt/dependency/CI/infrastructure change; no new ADR; P1-5 accepted evidence remains unchanged
-- Current task gate: P1-5 — `DONE`; P1-6 — `IN_PROGRESS`; P1-6A — `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-6B～P1-6E — `NOT_STARTED`; P1-7/P1-8 — `NOT_STARTED`; P1 remains `IN_PROGRESS`; `P16A-REV-001` — `CLOSED`; `P16A-REV-002` — `CLOSED`; open findings — `NONE`
+- Current governance checkpoint: P1-6B finding-only external actual-source re-review — `PASS`; reviewed bundle `group-interview-arena-review-20260830-062133.zip`; SHA-256 `C10F2A9362EB6102C6C3F23D7BA66234FECC098BDE2A394D5A2738EBB97E701D`; `P16B-REV-001`, `P16B-REV-002` and `P16B-REV-003` are `CLOSED`; new findings `NONE`; open findings `NONE`; P1-6A accepted evidence remains unchanged
+- Current task gate: P1-5 — `DONE`; P1-6 — `IN_PROGRESS`; P1-6A — `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-6B — `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-6C～P1-6E — `NOT_STARTED`; P1-7/P1-8 — `NOT_STARTED`; P1 remains `IN_PROGRESS`; `P16A-REV-001` — `CLOSED`; `P16A-REV-002` — `CLOSED`; `P16B-REV-001` — `CLOSED`; `P16B-REV-002` — `CLOSED`; `P16B-REV-003` — `CLOSED`; open findings — `NONE`
 - P0 status: `DONE`; P0-1 through P0-7 completed
 - Target product version: V0.1 — Internal Validation
 - Source: [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) §30–31
@@ -122,12 +122,14 @@ P1-5A 冻结 Scheduler 决定 who、AI Runtime 决定 what、provider 只负责 
 `P1-6 — Complete Text Simulation` is `IN_PROGRESS` with this frozen split:
 
 - `P1-6A — Scope Reconciliation + Commercial-Readiness Architecture Freeze`: `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; strict docs-only; finding-only external actual-source re-review `PASS`; `P16A-REV-001 CLOSED`; `P16A-REV-002 CLOSED`; open findings `NONE`;
-- `P1-6B — Structured Discussion Memory Gap Closure`: `NOT_STARTED`;
+- `P1-6B — Structured Discussion Memory Design Freeze`: `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; strict docs-only; finding-only external actual-source re-review `PASS`; open findings `NONE`; production implementation not started;
 - `P1-6C — Full Text Simulation Composition`: `NOT_STARTED`;
 - `P1-6D — Recovery + Three-AI End-to-End Validation`: `NOT_STARTED`;
 - `P1-6E — P1-6 Independent Acceptance + Closeout`: `NOT_STARTED`.
 
 P1-6A confirms that provider/runtime/orchestration, public Human/AI transport, REST/WS recovery, Web composition and phase closure are inherited rather than new implementation work. The remaining implementation gap is versioned, traceable, stale-detectable and rebuildable structured public discussion memory plus bounded memory-backed invocation context. Source ordering/cursor/revision/staleness/idempotency/provenance and inference-free structural fields must be deterministic; semantic derivation may use a bounded, public-only, versioned project-owned boundary and must remain source- and derivation-version-traceable, safely rebuildable as a new revision, and testable through a deterministic fake provider, without requiring a real external LLM to reproduce identical text or bits. Authoritative raw public history remains the only evidence authority, and semantic memory never replaces evidence. P1-6A creates no schema/table; P1-6D later composes one explicit Human + 3 distinct AI network-free recovery path. P1-7 report/content and P1-8 full-P1 acceptance remain `NOT_STARTED`. Exact boundaries are frozen in [`exec-plans/P1-6_complete-text-simulation.md`](exec-plans/P1-6_complete-text-simulation.md).
+
+P1-6B Design Freeze selects Evidence Ledger + Materialized Memory + Patch Journal + Lazy Semantic Compaction: the model proposes public-only typed patches, strict validation precedes a deterministic reducer, current state and immutable patch history have separate persistence responsibilities, and AI consumes bounded structured memory plus an uncompacted raw public tail. Finding-only remediation froze distinct `projection_version` replay semantics, persisted closed V2 candidate Working Context provenance and an explicit `PublicMemoryQuestionContext` allowlist with evaluator/hidden-field sentinels. The design remains session-local, optimistic-CAS safe, keeps model I/O outside transactions, preserves candidate-private isolation and existing public contracts, and defers workers/Redis/vector/graph/normalized-item infrastructure until explicit measured triggers. Finding-only external actual-source re-review verdict is `PASS` against `group-interview-arena-review-20260830-062133.zip` / SHA-256 `C10F2A9362EB6102C6C3F23D7BA66234FECC098BDE2A394D5A2738EBB97E701D`; `P16B-REV-001 CLOSED`; `P16B-REV-002 CLOSED`; `P16B-REV-003 CLOSED`; new findings `NONE`; open findings `NONE`. P1-6B is `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; implementation has not started. Exact boundaries remain frozen only in the existing parent plan.
 
 ## 5. 产品版本
 
