@@ -2,11 +2,11 @@
 
 - Status: Active baseline
 - Most recently completed development phase: P0 — `DONE`
-- Current closeout checkpoint: P1-5R-POST-REV-001 — `CLOSED`; P1-5R-POST-001 — `CLOSED`; P1-5R — `CLOSED`; P1-5 — `DONE`; open findings — `NONE`
+- Current closeout checkpoint: P1-6A — `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-6 — `IN_PROGRESS`; P1-5 — `DONE`; `P16A-REV-001` — `CLOSED`; `P16A-REV-002` — `CLOSED`; open findings — `NONE`
 - P0-7 final outcome: initial `BLOCKED`; two documentation findings remediated; finding-only independent recheck `PASS`; P1 readiness `READY`
 - Current phase: P1 — `IN_PROGRESS`
-- Most recently completed governance checkpoint: P1-5R-POST-001 remediation actual-source review — `PASS`; accepted commit `3b09d20a704c0fd3ff473ccb79311065b7e70408`; exact CI run `33257343273` `completed / success` with all four required jobs green; the previous P1-5R Independent Acceptance and closeout remain historical `PASS / CLOSED` evidence
-- Current task gate: P1-5 — `DONE`; P1-5R — `CLOSED`; P1-5R-POST-001 — `CLOSED`; P1-5R-POST-REV-001 — `CLOSED`; open findings — `NONE`; R1/R2-A/R2-B/R3 remain `DONE`; F1/F2/visual fidelity remediation/F3 remain `CLOSED`; Final Composition Acceptance and Independent Acceptance remain historical `PASS`; later post-closeout real-provider smoke discovery remains historical `EXECUTED / DEFECT_EXPOSED` evidence; formal R3.8 — `NOT_EXECUTED / REQUIRES_SEPARATE_EXPLICIT_USER_AUTHORIZATION`; no further real-provider call; P1 remains `IN_PROGRESS`
+- Most recently completed governance checkpoint: P1-6A finding-only external actual-source re-review — `PASS`; reviewed bundle `group-interview-arena-review-20260830-044406.zip`; SHA-256 `6137E75B1E671A561D6280901680A7445C66F5EDBB34D456142F092492473E4D`; `P16A-REV-001 CLOSED`; `P16A-REV-002 CLOSED`; new findings `NONE`; no code/schema/migration/API/Web/provider/prompt/dependency/CI/infrastructure change; no new ADR; P1-5 accepted evidence remains unchanged
+- Current task gate: P1-5 — `DONE`; P1-6 — `IN_PROGRESS`; P1-6A — `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-6B～P1-6E — `NOT_STARTED`; P1-7/P1-8 — `NOT_STARTED`; P1 remains `IN_PROGRESS`; `P16A-REV-001` — `CLOSED`; `P16A-REV-002` — `CLOSED`; open findings — `NONE`
 - P0 status: `DONE`; P0-1 through P0-7 completed
 - Target product version: V0.1 — Internal Validation
 - Source: [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) §30–31
@@ -118,6 +118,16 @@ P1-4A 已冻结 phase lifecycle 与 within-phase floor authority 分离、single
 - `P1-5R-POST-REV-001 — Real WebSocket teardown composition proof`：`CLOSED`；network-free Browser reload proves durable `RUNNING → FAILED / INTERNAL_ERROR → FAILED_REPLAY → INTERRUPTED` recovery，continued scheduling and no retry/utterance/release duplication；open findings `NONE`。
 
 P1-5A 冻结 Scheduler 决定 who、AI Runtime 决定 what、provider 只负责 model I/O。P1-5B～P1-5F 的 historical implementation and acceptance evidence remains unchanged，including F3A/F3B/F4 `DONE` and `F4-ACC-001 CLOSED`。P1-5R R1、R2-A、R2-B and R3 remain accepted and `DONE`，with F1、F2、visual fidelity remediation and F3 `CLOSED`；Final Composition Acceptance、Independent Acceptance and the committed P1-5R/P1-5 closeout remain historical `PASS / CLOSED` evidence。The later post-closeout real-provider smoke exposed P1-5R-POST-001；the remediation and P1-5R-POST-REV-001 actual-source review passed，accepted commit `3b09d20a704c0fd3ff473ccb79311065b7e70408` and exact CI run `33257343273` are green，so P1-5R-POST-REV-001、P1-5R-POST-001 and P1-5R are `CLOSED`，parent P1-5 is `DONE`，and open findings are `NONE`。Formal R3.8 remains `NOT_EXECUTED / REQUIRES_SEPARATE_EXPLICIT_USER_AUTHORIZATION`；no further real-provider call occurred。完整边界见 [`exec-plans/P1-5_ai-runtime-foundation.md`](exec-plans/P1-5_ai-runtime-foundation.md)、[`exec-plans/P1-5R_local-acceptance-remediation.md`](exec-plans/P1-5R_local-acceptance-remediation.md) and [`exec-plans/P1-5R_local-acceptance-remediation-implementation.md`](exec-plans/P1-5R_local-acceptance-remediation-implementation.md)。
+
+`P1-6 — Complete Text Simulation` is `IN_PROGRESS` with this frozen split:
+
+- `P1-6A — Scope Reconciliation + Commercial-Readiness Architecture Freeze`: `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; strict docs-only; finding-only external actual-source re-review `PASS`; `P16A-REV-001 CLOSED`; `P16A-REV-002 CLOSED`; open findings `NONE`;
+- `P1-6B — Structured Discussion Memory Gap Closure`: `NOT_STARTED`;
+- `P1-6C — Full Text Simulation Composition`: `NOT_STARTED`;
+- `P1-6D — Recovery + Three-AI End-to-End Validation`: `NOT_STARTED`;
+- `P1-6E — P1-6 Independent Acceptance + Closeout`: `NOT_STARTED`.
+
+P1-6A confirms that provider/runtime/orchestration, public Human/AI transport, REST/WS recovery, Web composition and phase closure are inherited rather than new implementation work. The remaining implementation gap is versioned, traceable, stale-detectable and rebuildable structured public discussion memory plus bounded memory-backed invocation context. Source ordering/cursor/revision/staleness/idempotency/provenance and inference-free structural fields must be deterministic; semantic derivation may use a bounded, public-only, versioned project-owned boundary and must remain source- and derivation-version-traceable, safely rebuildable as a new revision, and testable through a deterministic fake provider, without requiring a real external LLM to reproduce identical text or bits. Authoritative raw public history remains the only evidence authority, and semantic memory never replaces evidence. P1-6A creates no schema/table; P1-6D later composes one explicit Human + 3 distinct AI network-free recovery path. P1-7 report/content and P1-8 full-P1 acceptance remain `NOT_STARTED`. Exact boundaries are frozen in [`exec-plans/P1-6_complete-text-simulation.md`](exec-plans/P1-6_complete-text-simulation.md).
 
 ## 5. 产品版本
 
