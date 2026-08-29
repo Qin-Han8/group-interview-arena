@@ -190,6 +190,13 @@ describe("DiscussionStage", () => {
       "data-participant-state",
       "current",
     );
+    const currentHuman = within(strip).getByText("你").closest("li");
+    expect(currentHuman).toHaveAttribute("aria-current", "true");
+    expect(currentHuman).toHaveAttribute("data-current-speaker", "true");
+    expect(currentHuman).toHaveClass("ring-1", "ring-indigo-200", "shadow-sm");
+    expect(
+      within(strip).getByText("AI 候选人 1").closest("li"),
+    ).toHaveAttribute("data-current-speaker", "false");
 
     rerender(
       <DiscussionStage
@@ -202,6 +209,9 @@ describe("DiscussionStage", () => {
     expect(
       within(strip).getByText("AI 候选人 2").closest("li"),
     ).toHaveAttribute("data-participant-state", "current");
+    expect(
+      within(strip).getByText("AI 候选人 2").closest("li"),
+    ).toHaveAttribute("aria-current", "true");
     expect(
       within(strip).getByText("AI 候选人 2").closest("li"),
     ).toHaveTextContent("正在准备发言");
@@ -227,8 +237,27 @@ describe("DiscussionStage", () => {
 
     const transcript = screen.getByTestId("confirmed-transcript");
     const list = screen.getByTestId("confirmed-transcript-list");
+    expect(transcript).toHaveAttribute(
+      "data-presentation",
+      "professional-record",
+    );
+    expect(
+      within(transcript).getByRole("heading", { name: "讨论记录" }),
+    ).toHaveClass("text-base", "font-semibold");
+    expect(
+      within(list).getByRole("list", { name: "已确认讨论记录" }),
+    ).toHaveClass("divide-y", "divide-neutral-200");
     expect(list).not.toHaveAttribute("aria-live");
-    expect(within(list).getAllByRole("listitem")).toHaveLength(2);
+    const records = within(list).getAllByRole("listitem");
+    expect(records).toHaveLength(2);
+    for (const record of records) {
+      expect(record).toHaveAttribute(
+        "data-contribution-layout",
+        "aligned-record",
+      );
+      expect(record).toHaveClass("py-5", "first:pt-0", "last:pb-0");
+      expect(record).not.toHaveClass("rounded-lg");
+    }
     const exact = within(list).getByTestId(
       `utterance-content-${CONFIRMED[0].utterance_id}`,
     );
@@ -282,6 +311,24 @@ describe("DiscussionStage", () => {
     expect(onSubmit).toHaveBeenCalledOnce();
     const composer = screen.getByTestId("human-composer");
     expect(composer).toHaveClass("shrink-0");
+    expect(composer).toHaveAttribute("data-action-zone", "human-composer");
+    expect(composer).toHaveClass(
+      "rounded-xl",
+      "border",
+      "border-neutral-200",
+      "bg-neutral-50",
+    );
+    expect(screen.getByTestId("composer-status")).toHaveClass(
+      "text-neutral-600",
+    );
+    expect(screen.getByLabelText("发言草稿")).toHaveClass(
+      "focus-visible:ring-2",
+      "focus-visible:ring-indigo-500",
+    );
+    expect(screen.getByRole("button", { name: "发送发言" })).toHaveClass(
+      "border-indigo-600",
+      "bg-indigo-600",
+    );
     expect(composer).not.toHaveClass("sticky", "bottom-0");
   });
 
@@ -300,6 +347,14 @@ describe("DiscussionStage", () => {
           onRestoreRejectedDraft,
         })}
       />,
+    );
+    expect(screen.getByTestId("human-pending")).toHaveAttribute(
+      "data-presentation",
+      "pending-confirmation",
+    );
+    expect(screen.getByTestId("rejected-human-draft")).toHaveAttribute(
+      "data-presentation",
+      "rejected-recovery",
     );
 
     expect(screen.getByTestId("human-pending-content").textContent).toBe(

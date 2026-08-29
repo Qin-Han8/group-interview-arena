@@ -148,22 +148,61 @@ describe("DiscussionWorkspace", () => {
     );
   });
 
+  it("presents a compact truthful training-session header hierarchy", () => {
+    render(<WorkspaceHarness />);
+
+    const header = screen.getByRole("banner");
+    expect(header).toHaveAttribute("data-testid", "training-session-header");
+    const identity = within(header).getByTestId("studio-identity");
+    expect(identity).toHaveTextContent("AI 群面训练场");
+    expect(identity).toHaveTextContent("Interview Simulation Studio");
+    expect(
+      within(header).getByRole("heading", {
+        level: 1,
+        name: HEADER.sessionTitle,
+      }),
+    ).toHaveClass("text-xl", "font-semibold");
+    expect(within(header).getByTestId("header-phase")).toHaveAttribute(
+      "data-session-phase",
+      HEADER.phaseLabel,
+    );
+    expect(within(header).getByTestId("header-countdown")).toHaveTextContent(
+      HEADER.countdown!,
+    );
+    expect(within(header).getByTestId("header-actions")).toHaveTextContent(
+      "结束会话",
+    );
+  });
   it("renders one desktop three-region studio with Discussion as visual priority", () => {
     render(<WorkspaceHarness />);
 
     const grid = screen.getByTestId("discussion-workspace-grid");
     expect(grid).toHaveClass(
-      "min-[1200px]:grid-cols-[minmax(15rem,1fr)_minmax(32rem,2.2fr)_minmax(15rem,1fr)]",
+      "min-[1200px]:grid-cols-[minmax(16rem,0.85fr)_minmax(36rem,2.4fr)_minmax(16rem,0.85fr)]",
     );
+    expect(grid).toHaveAttribute("data-desktop-layout", "three-column");
     expect(screen.getByRole("tabpanel", { name: "题目" })).toHaveClass(
       "min-[1200px]:!block",
+    );
+    expect(screen.getByRole("tabpanel", { name: "题目" })).toHaveAttribute(
+      "data-region-priority",
+      "support",
     );
     expect(screen.getByRole("tabpanel", { name: "讨论" })).toHaveAttribute(
       "data-region-priority",
       "primary",
     );
+    expect(screen.getByRole("tabpanel", { name: "讨论" })).toHaveClass(
+      "min-[1200px]:shadow-[0_12px_32px_rgba(15,23,42,0.08)]",
+      "min-[1200px]:ring-1",
+      "min-[1200px]:ring-neutral-200",
+    );
     expect(screen.getByRole("tabpanel", { name: "进程" })).toHaveClass(
       "min-[1200px]:!block",
+    );
+    expect(screen.getByRole("tabpanel", { name: "进程" })).toHaveAttribute(
+      "data-region-priority",
+      "support",
     );
   });
 
@@ -175,6 +214,15 @@ describe("DiscussionWorkspace", () => {
     const progressPanel = screen.getByRole("tabpanel", { name: "进程" });
 
     expect(grid).toHaveClass("relative", "min-[1200px]:grid");
+    const tabletControls = screen.getByTestId("tablet-support-controls");
+    expect(tabletControls).toHaveAttribute(
+      "data-responsive-mode",
+      "tablet-support",
+    );
+    expect(tabletControls).toHaveClass("bg-neutral-50");
+    expect(tabletControls).toHaveClass("min-[1200px]:!hidden");
+    expect(taskPanel).toHaveAttribute("data-support-mode", "sheet");
+    expect(progressPanel).toHaveAttribute("data-support-mode", "sheet");
     expect(grid).not.toHaveClass("grid");
     expect(taskPanel).toHaveClass(
       "md:absolute",
@@ -213,6 +261,11 @@ describe("DiscussionWorkspace", () => {
     render(<WorkspaceHarness />);
 
     const tabs = screen.getAllByRole("tab");
+    const mobileTabs = screen.getByRole("tablist", {
+      name: "讨论工作区",
+    });
+    expect(mobileTabs).toHaveAttribute("data-responsive-mode", "mobile-tabs");
+    expect(mobileTabs).toHaveClass("bg-neutral-50");
     expect(tabs.map((tab) => tab.textContent)).toEqual([
       "讨论",
       "题目",
@@ -220,6 +273,10 @@ describe("DiscussionWorkspace", () => {
     ]);
     expect(tabs[0]).toHaveAttribute("aria-selected", "true");
     expect(tabs[0]).toHaveAttribute("tabindex", "0");
+    expect(tabs[0]).toHaveClass(
+      "aria-selected:border-indigo-600",
+      "aria-selected:text-indigo-700",
+    );
     expect(tabs[1]).toHaveAttribute("tabindex", "-1");
 
     for (const [index, surface] of SURFACE_EXPECTATIONS.entries()) {
@@ -267,6 +324,18 @@ describe("TaskBriefPanel", () => {
       />,
     );
 
+    expect(screen.getByTestId("task-brief-panel")).toHaveAttribute(
+      "data-information-hierarchy",
+      "task-brief",
+    );
+    expect(screen.getByTestId("task-brief-content")).toHaveAttribute(
+      "data-content-priority",
+      "primary",
+    );
+    expect(screen.getByRole("heading", { name: QUESTION.title })).toHaveClass(
+      "text-xl",
+      "font-semibold",
+    );
     expect(
       screen.getByRole("heading", { name: QUESTION.title }),
     ).toBeInTheDocument();
@@ -297,6 +366,16 @@ describe("TaskBriefPanel", () => {
     );
 
     const notes = screen.getByRole("textbox", { name: "我的思路 / 私人笔记" });
+    expect(
+      screen.getByRole("region", { name: "我的思路 / 私人笔记" }),
+    ).toHaveAttribute("data-private-notes", "memory-only");
+    expect(
+      screen.getByRole("region", { name: "我的思路 / 私人笔记" }),
+    ).toHaveClass("rounded-xl", "bg-neutral-50");
+    expect(notes).toHaveClass(
+      "focus-visible:ring-2",
+      "focus-visible:ring-indigo-500",
+    );
     expect(notes).toHaveValue("只在当前页面的思路");
     fireEvent.change(notes, { target: { value: "更新后的思路" } });
     expect(onNotesChange).toHaveBeenCalledWith("更新后的思路");
@@ -364,6 +443,10 @@ describe("SessionProgressPanel", () => {
       />,
     );
 
+    expect(screen.getByTestId("session-progress-panel")).toHaveAttribute(
+      "data-progress-model",
+      "six-phase",
+    );
     const phaseList = screen.getByRole("list", { name: "讨论阶段" });
     expect(
       within(phaseList)
@@ -376,6 +459,23 @@ describe("SessionProgressPanel", () => {
       "讨论与评估",
       "收敛决策",
       "最终总结",
+    ]);
+    const phases = within(phaseList).getAllByRole("listitem");
+    expect(phases.map((item) => item.dataset.phaseState)).toEqual([
+      "completed",
+      "completed",
+      "completed",
+      "current",
+      "upcoming",
+      "upcoming",
+    ]);
+    expect(phases.map((item) => item.dataset.phaseNumber)).toEqual([
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6",
     ]);
     expect(
       within(phaseList).getByText("讨论与评估").closest("li"),

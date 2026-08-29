@@ -68,28 +68,45 @@ function SessionHeader({
   endAction,
 }: SessionHeaderProps) {
   return (
-    <header className="flex shrink-0 flex-wrap items-center justify-between gap-4 border-b border-neutral-200 bg-white px-4 py-3 sm:px-6">
-      <div className="min-w-0">
+    <header
+      className="flex shrink-0 flex-wrap items-center justify-between gap-4 border-b border-neutral-200 bg-white px-4 py-3 shadow-[0_1px_0_rgba(15,23,42,0.03)] sm:px-6"
+      data-testid="training-session-header"
+    >
+      <div className="min-w-0" data-testid="studio-identity">
         <p className="text-xs font-medium tracking-[0.12em] text-neutral-500 uppercase">
           {productName}
         </p>
-        <h1 className="mt-1 truncate text-lg font-semibold tracking-tight">
+        <p className="mt-0.5 text-[0.625rem] font-medium tracking-[0.16em] text-indigo-600 uppercase">
+          Interview Simulation Studio
+        </p>
+        <h1 className="mt-1 truncate text-xl font-semibold tracking-tight text-neutral-950">
           {sessionTitle}
         </h1>
       </div>
 
       <div className="flex flex-wrap items-center justify-end gap-3 text-sm">
-        <p className="rounded-full bg-neutral-100 px-3 py-1.5 font-medium">
+        <p
+          className="rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1.5 font-medium text-indigo-950"
+          data-session-phase={phaseLabel}
+          data-testid="header-phase"
+        >
           {phaseLabel}
         </p>
         {countdown ? (
-          <p className="tabular-nums text-neutral-600">{countdown}</p>
+          <p
+            className="tabular-nums text-neutral-600"
+            data-testid="header-countdown"
+          >
+            {countdown}
+          </p>
         ) : null}
         <p className="text-neutral-600" data-connection-state={connection}>
           {connectionLabel}
         </p>
-        <HeaderAction action={startAction} />
-        <HeaderAction action={endAction} />
+        <div className="flex items-center gap-2" data-testid="header-actions">
+          <HeaderAction action={startAction} />
+          <HeaderAction action={endAction} />
+        </div>
       </div>
     </header>
   );
@@ -132,12 +149,16 @@ export default function DiscussionWorkspace({
   }
 
   return (
-    <div className="flex h-dvh max-h-dvh w-full flex-col overflow-hidden bg-neutral-100 text-neutral-950">
+    <div
+      className="flex h-dvh max-h-dvh w-full flex-col overflow-hidden bg-neutral-100 text-neutral-950"
+      data-product-surface="interview-simulation-studio"
+    >
       <SessionHeader {...header} />
 
       <nav
         aria-label="讨论工作区"
-        className="flex shrink-0 border-b border-neutral-200 bg-white md:hidden"
+        className="flex shrink-0 border-b border-neutral-200 bg-neutral-50 md:hidden"
+        data-responsive-mode="mobile-tabs"
         role="tablist"
       >
         {SURFACES.map((surface, index) => {
@@ -146,7 +167,7 @@ export default function DiscussionWorkspace({
             <button
               aria-controls={`${surface.id}-surface`}
               aria-selected={selected}
-              className="flex-1 border-b-2 border-transparent px-3 py-3 text-sm font-medium text-neutral-500 aria-selected:border-neutral-900 aria-selected:text-neutral-950"
+              className="flex-1 border-b-2 border-transparent px-3 py-3 text-sm font-medium text-neutral-500 aria-selected:border-indigo-600 aria-selected:text-indigo-700"
               id={`${surface.id}-tab`}
               key={surface.id}
               onClick={() => onActiveSurfaceChange(surface.id)}
@@ -164,7 +185,11 @@ export default function DiscussionWorkspace({
         })}
       </nav>
 
-      <div className="hidden shrink-0 items-center justify-end gap-2 border-b border-neutral-200 bg-white px-5 py-2 md:flex min-[1200px]:hidden">
+      <div
+        className="hidden shrink-0 items-center justify-end gap-2 border-b border-neutral-200 bg-neutral-50 px-5 py-2 md:flex min-[1200px]:!hidden"
+        data-responsive-mode="tablet-support"
+        data-testid="tablet-support-controls"
+      >
         <button
           aria-pressed={activeSurface === "task"}
           className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm aria-pressed:bg-neutral-900 aria-pressed:text-white"
@@ -184,7 +209,8 @@ export default function DiscussionWorkspace({
       </div>
 
       <div
-        className="relative min-h-0 flex-1 overflow-hidden p-4 min-[1200px]:grid min-[1200px]:grid-cols-[minmax(15rem,1fr)_minmax(32rem,2.2fr)_minmax(15rem,1fr)] min-[1200px]:gap-4"
+        className="relative min-h-0 flex-1 overflow-hidden p-4 min-[1200px]:grid min-[1200px]:grid-cols-[minmax(16rem,0.85fr)_minmax(36rem,2.4fr)_minmax(16rem,0.85fr)] min-[1200px]:gap-4"
+        data-desktop-layout="three-column"
         data-support-surface={activeSurface}
         data-testid="discussion-workspace-grid"
       >
@@ -192,7 +218,9 @@ export default function DiscussionWorkspace({
           aria-labelledby="task-tab"
           className={`${
             activeSurface === "task" ? "block" : "hidden"
-          } studio-scroll-region min-h-0 overflow-y-auto rounded-xl border border-neutral-200 bg-white p-4 md:absolute md:inset-y-4 md:right-4 md:z-20 md:w-96 md:max-w-[calc(100%_-_2rem)] md:shadow-xl min-[1200px]:!static min-[1200px]:!block min-[1200px]:!w-auto min-[1200px]:!max-w-none min-[1200px]:!shadow-none`}
+          } studio-scroll-region min-h-0 overflow-y-auto rounded-xl border border-neutral-200 bg-white p-4 md:absolute md:inset-y-4 md:right-4 md:z-20 md:w-96 md:max-w-[calc(100%_-_2rem)] md:shadow-xl min-[1200px]:!static min-[1200px]:!block min-[1200px]:!w-auto min-[1200px]:!max-w-none min-[1200px]:!bg-neutral-50 min-[1200px]:!shadow-none`}
+          data-support-mode="sheet"
+          data-region-priority="support"
           id="task-surface"
           role="tabpanel"
           tabIndex={0}
@@ -204,7 +232,7 @@ export default function DiscussionWorkspace({
           aria-labelledby="discussion-tab"
           className={`${
             activeSurface === "discussion" ? "block" : "hidden"
-          } studio-scroll-region h-full min-h-0 overflow-hidden rounded-xl border border-neutral-200 bg-white md:block`}
+          } studio-scroll-region h-full min-h-0 overflow-hidden rounded-xl border border-neutral-200 bg-white md:block min-[1200px]:shadow-[0_12px_32px_rgba(15,23,42,0.08)] min-[1200px]:ring-1 min-[1200px]:ring-neutral-200`}
           data-region-priority="primary"
           id="discussion-surface"
           role="tabpanel"
@@ -217,7 +245,9 @@ export default function DiscussionWorkspace({
           aria-labelledby="progress-tab"
           className={`${
             activeSurface === "progress" ? "block" : "hidden"
-          } studio-scroll-region min-h-0 overflow-y-auto rounded-xl border border-neutral-200 bg-white p-4 md:absolute md:inset-y-4 md:right-4 md:z-20 md:w-96 md:max-w-[calc(100%_-_2rem)] md:shadow-xl min-[1200px]:!static min-[1200px]:!block min-[1200px]:!w-auto min-[1200px]:!max-w-none min-[1200px]:!shadow-none`}
+          } studio-scroll-region min-h-0 overflow-y-auto rounded-xl border border-neutral-200 bg-white p-4 md:absolute md:inset-y-4 md:right-4 md:z-20 md:w-96 md:max-w-[calc(100%_-_2rem)] md:shadow-xl min-[1200px]:!static min-[1200px]:!block min-[1200px]:!w-auto min-[1200px]:!max-w-none min-[1200px]:!bg-neutral-50 min-[1200px]:!shadow-none`}
+          data-support-mode="sheet"
+          data-region-priority="support"
           id="progress-surface"
           role="tabpanel"
           tabIndex={0}

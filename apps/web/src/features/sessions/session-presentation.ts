@@ -73,7 +73,7 @@ export function participantLabel(
     (candidate) => candidate.participant_id === participantId,
   );
   if (!participant) return "会话参与者";
-  if (participant.actor_kind === "HUMAN") return "你（真人参与者）";
+  if (participant.actor_kind === "HUMAN") return "你";
   if (participant.actor_kind === "SYSTEM") return "系统主持";
 
   const aiParticipants = participants

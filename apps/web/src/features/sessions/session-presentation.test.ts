@@ -66,7 +66,7 @@ describe("session presentation helpers", () => {
 
   it("derives safe participant, floor lifecycle and reason labels", () => {
     expect(participantLabel(PARTICIPANTS, PARTICIPANTS[0].participant_id)).toBe(
-      "你（真人参与者）",
+      "你",
     );
     expect(participantLabel(PARTICIPANTS, PARTICIPANTS[1].participant_id)).toBe(
       "AI 候选人 2",

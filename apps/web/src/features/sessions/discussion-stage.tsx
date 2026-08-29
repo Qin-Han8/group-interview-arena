@@ -89,10 +89,11 @@ function Transcript({
   return (
     <section
       aria-labelledby="confirmed-transcript-heading"
+      data-presentation="professional-record"
       className="relative flex min-h-0 flex-1 flex-col"
       data-testid="confirmed-transcript"
     >
-      <h2 className="text-sm font-semibold" id="confirmed-transcript-heading">
+      <h2 className="text-base font-semibold" id="confirmed-transcript-heading">
         讨论记录
       </h2>
       <div
@@ -106,10 +107,14 @@ function Transcript({
             服务端确认的发言会显示在这里。
           </p>
         ) : (
-          <ol aria-label="已确认讨论记录" className="space-y-3">
+          <ol
+            aria-label="已确认讨论记录"
+            className="divide-y divide-neutral-200"
+          >
             {items.map((item) => (
               <li
-                className="border-b border-neutral-200 pb-4 last:border-b-0"
+                className="py-5 first:pt-0 last:pb-0"
+                data-contribution-layout="aligned-record"
                 key={item.utterance_id}
               >
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -178,7 +183,8 @@ function Composer({
   return (
     <section
       aria-labelledby="human-composer-heading"
-      className="shrink-0 border-t border-neutral-200 bg-white pt-4"
+      className="shrink-0 rounded-xl border border-neutral-200 bg-neutral-50 p-4"
+      data-action-zone="human-composer"
       data-testid="human-composer"
     >
       <h2 className="text-sm font-semibold" id="human-composer-heading">
@@ -191,14 +197,17 @@ function Composer({
         发言草稿
         <textarea
           aria-describedby="human-draft-count send-disabled-reason"
-          className="min-h-24 resize-y rounded-lg border border-neutral-300 bg-white p-3 leading-6"
+          className="min-h-24 resize-y rounded-lg border border-neutral-300 bg-white p-3 leading-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
           id="human-discussion-draft"
           onChange={(event) => onDraftChange(event.target.value)}
           onKeyDown={handleKeyDown}
           value={draft}
         />
       </label>
-      <div className="mt-2 flex items-start justify-between gap-3">
+      <div
+        className="mt-2 flex items-start justify-between gap-3 text-neutral-600"
+        data-testid="composer-status"
+      >
         <div>
           <p className="text-xs text-neutral-600" id="human-draft-count">
             {draftInspection.codePointCount} / 4000
@@ -212,7 +221,7 @@ function Composer({
           </p>
         </div>
         <button
-          className="rounded-md border border-neutral-900 bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-md border border-indigo-600 bg-indigo-600 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
           disabled={!canSend}
           onClick={onSubmit}
           type="button"
@@ -224,6 +233,7 @@ function Composer({
       {pendingContent ? (
         <aside
           className="mt-3 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm"
+          data-presentation="pending-confirmation"
           data-testid="human-pending"
         >
           <p>待服务器确认（尚未进入讨论记录）</p>
@@ -239,6 +249,7 @@ function Composer({
       {rejectedDraft ? (
         <aside
           className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm"
+          data-presentation="rejected-recovery"
           data-testid="rejected-human-draft"
         >
           <p>{rejectedDraft.message}</p>
@@ -359,9 +370,11 @@ export default function DiscussionStage({
             <li
               className={`rounded-lg border px-3 py-2 text-sm ${
                 current
-                  ? "border-indigo-500 bg-indigo-50 text-indigo-950"
+                  ? "border-indigo-500 bg-indigo-50 text-indigo-950 shadow-sm ring-1 ring-indigo-200"
                   : "border-neutral-200 bg-neutral-50 text-neutral-700"
               }`}
+              aria-current={current ? "true" : undefined}
+              data-current-speaker={current ? "true" : "false"}
               data-participant-state={current ? "current" : "neutral"}
               key={participant.participant_id}
             >

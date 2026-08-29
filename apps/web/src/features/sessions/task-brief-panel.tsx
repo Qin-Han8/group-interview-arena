@@ -38,7 +38,11 @@ function QuestionContent({ question }: { question: QuestionDetail }) {
   ].filter((value): value is string => Boolean(value));
 
   return (
-    <article className="space-y-5">
+    <article
+      className="space-y-5"
+      data-content-priority="primary"
+      data-testid="task-brief-content"
+    >
       <div>
         <h2 className="text-xl font-semibold tracking-tight">
           {question.title}
@@ -140,14 +144,19 @@ export default function TaskBriefPanel({
   onNotesChange,
 }: TaskBriefPanelProps): ReactNode {
   return (
-    <div className="flex min-h-0 flex-col gap-6">
+    <div
+      className="flex min-h-0 flex-col gap-6"
+      data-information-hierarchy="task-brief"
+      data-testid="task-brief-panel"
+    >
       <div className="min-h-0 flex-1 overflow-y-auto">
         <QuestionState state={questionState} />
       </div>
 
       <section
         aria-labelledby="private-notes-heading"
-        className="border-t border-neutral-200 pt-5"
+        className="rounded-xl border border-neutral-200 bg-neutral-50 p-4"
+        data-private-notes="memory-only"
       >
         <h2 className="text-sm font-semibold" id="private-notes-heading">
           我的思路 / 私人笔记
@@ -155,7 +164,7 @@ export default function TaskBriefPanel({
         <label className="mt-3 block" htmlFor="private-session-notes">
           <span className="sr-only">我的思路 / 私人笔记</span>
           <textarea
-            className="min-h-28 w-full resize-y rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm leading-6 outline-none focus-visible:border-neutral-700 focus-visible:ring-2 focus-visible:ring-neutral-300"
+            className="min-h-28 w-full resize-y rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm leading-6 outline-none focus-visible:border-indigo-500 focus-visible:ring-2 focus-visible:ring-indigo-500"
             id="private-session-notes"
             onChange={(event) => onNotesChange(event.target.value)}
             value={notes}

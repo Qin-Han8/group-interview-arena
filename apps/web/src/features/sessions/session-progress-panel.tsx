@@ -47,7 +47,11 @@ export default function SessionProgressPanel({
         : null;
 
   return (
-    <div className="flex min-h-0 flex-col gap-6">
+    <div
+      className="flex min-h-0 flex-col gap-6"
+      data-progress-model="six-phase"
+      data-testid="session-progress-panel"
+    >
       <section aria-labelledby="phase-progress-heading">
         <div className="flex items-baseline justify-between gap-3">
           <h2 className="text-sm font-semibold" id="phase-progress-heading">
@@ -67,19 +71,20 @@ export default function SessionProgressPanel({
                 ? "current"
                 : allCompleted || (activeIndex >= 0 && index < activeIndex)
                   ? "completed"
-                  : "remaining";
+                  : "upcoming";
             return (
               <li
                 aria-current={state === "current" ? "step" : undefined}
-                className={`rounded-md px-3 py-2 text-sm ${
+                className={`rounded-lg border-l-2 px-3 py-2 text-sm ${
                   state === "current"
-                    ? "bg-neutral-900 font-medium text-white"
+                    ? "border-indigo-500 bg-indigo-50 font-semibold text-indigo-950"
                     : state === "completed"
-                      ? "bg-neutral-100 text-neutral-700"
-                      : "text-neutral-500"
+                      ? "border-indigo-200 bg-neutral-50 text-neutral-700"
+                      : "border-neutral-200 text-neutral-500"
                 }`}
                 data-phase-state={state}
                 key={phase}
+                data-phase-number={index + 1}
               >
                 {phaseLabel(phase)}
               </li>

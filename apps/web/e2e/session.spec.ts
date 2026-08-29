@@ -346,6 +346,12 @@ test("browser session recovers durable phases across API restart and reload", as
 
   const taskSurface = page.locator("#task-surface");
   const discussionSurface = page.locator("#discussion-surface");
+  await expect(
+    page.locator('[data-product-surface="interview-simulation-studio"]'),
+  ).toHaveCount(1);
+  await expect(page.getByTestId("studio-identity")).toContainText(
+    "Interview Simulation Studio",
+  );
   const progressSurface = page.locator("#progress-surface");
   await expect(taskSurface).toBeVisible();
   await expect(discussionSurface).toBeVisible();
@@ -359,6 +365,11 @@ test("browser session recovers durable phases across API restart and reload", as
   expect(discussionBox).not.toBeNull();
   expect(progressBox).not.toBeNull();
   expect(discussionBox!.width).toBeGreaterThan(taskBox!.width);
+  expect(taskBox!.x + taskBox!.width).toBeLessThanOrEqual(discussionBox!.x);
+  expect(discussionBox!.x + discussionBox!.width).toBeLessThanOrEqual(
+    progressBox!.x,
+  );
+  expect(progressBox!.x + progressBox!.width).toBeLessThanOrEqual(1440);
   expect(discussionBox!.width).toBeGreaterThan(progressBox!.width);
   await page.getByLabel("发言草稿").scrollIntoViewIfNeeded();
   await expect(page.getByLabel("发言草稿")).toBeVisible();
@@ -378,6 +389,14 @@ test("browser session recovers durable phases across API restart and reload", as
   await expect(progressSurface).toBeHidden();
   await page.getByRole("button", { name: "打开题目与思考" }).click();
   await expect(taskSurface).toBeVisible();
+  const [tabletTaskBox, tabletDiscussionBox] = await Promise.all([
+    taskSurface.boundingBox(),
+    discussionSurface.boundingBox(),
+  ]);
+  expect(tabletTaskBox).not.toBeNull();
+  expect(tabletDiscussionBox).not.toBeNull();
+  expect(tabletDiscussionBox!.width).toBeGreaterThan(tabletTaskBox!.width);
+  expect(tabletTaskBox!.x + tabletTaskBox!.width).toBeLessThanOrEqual(900);
   await expect(progressSurface).toBeHidden();
   await page
     .getByRole("textbox", { name: "我的思路 / 私人笔记" })
@@ -397,6 +416,11 @@ test("browser session recovers durable phases across API restart and reload", as
   const boundedDocumentHeightAtMobileBaseline = await page.evaluate(() =>
     Math.max(document.documentElement.scrollHeight, document.body.scrollHeight),
   );
+  expect(
+    await page.evaluate(() =>
+      Math.max(document.documentElement.scrollWidth, document.body.scrollWidth),
+    ),
+  ).toBeLessThanOrEqual(390);
   const tabs = page.getByRole("tab");
   await expect(tabs).toHaveText(["讨论", "题目", "进程"]);
   const discussionTab = page.getByRole("tab", { name: "讨论" });
@@ -498,10 +522,13 @@ test("browser session recovers durable phases across API restart and reload", as
   expect(parsedFloorEvent.sequence).toBeGreaterThan(
     createdSession.last_sequence,
   );
-  await expect(
-    page.getByText("当前发言：你（真人参与者）", { exact: true }),
-  ).toBeVisible();
+  await expect(page.getByText("当前发言：你", { exact: true })).toBeVisible();
   await expect(page.getByText("发言权已授予", { exact: true })).toBeVisible();
+  await expect(
+    page.locator('[data-current-speaker="true"]').filter({
+      hasText: "你",
+    }),
+  ).toHaveAttribute("aria-current", "true");
   await expect(
     page.getByText("优先安排尚未发言的参与者", { exact: true }),
   ).toBeVisible();
