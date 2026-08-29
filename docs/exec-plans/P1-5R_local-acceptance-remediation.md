@@ -1,6 +1,6 @@
 # P1-5R Local Acceptance Remediation — Design Freeze
 
-Status: `P1 IN_PROGRESS`; `P1-5 REOPENED / POST_ACCEPTANCE_DEFECT_REVIEW_PENDING`; `P1-5R REOPENED / POST_ACCEPTANCE_DEFECT_REVIEW_PENDING`; `P1-5R-POST-001 IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PENDING`; `P1-5R-POST-REV-001 REMEDIATED / ACTUAL_SOURCE_REVIEW_PENDING`; `R1/R2-A/R2-B/R3 DONE`; `F1/F2/Visual fidelity remediation/F3 CLOSED`; `Historical Final Composition Acceptance PASS / DONE`; `Historical Independent Acceptance PASS`; `Previous P1-5R closeout PASS / CLOSED`; `Historical authorized R3.8 smoke EXECUTED / DEFECT_EXPOSED`; `Remediation real-provider calls 0`
+Status: `P1 IN_PROGRESS`; `P1-5 DONE`; `P1-5R CLOSED`; `P1-5R-POST-001 CLOSED`; `P1-5R-POST-REV-001 CLOSED`; `OPEN FINDINGS NONE`; `R1/R2-A/R2-B/R3 DONE`; `F1/F2/Visual fidelity remediation/F3 CLOSED`; `Historical Final Composition Acceptance PASS / DONE`; `Historical Independent Acceptance PASS`; `Previous P1-5R closeout PASS / CLOSED`; `Later post-closeout real-provider smoke EXECUTED / DEFECT_EXPOSED`; `Formal R3.8 NOT_EXECUTED / REQUIRES_SEPARATE_EXPLICIT_USER_AUTHORIZATION`; `No further real-provider call`; `Remediation review PASS`; `Accepted commit 3b09d20a704c0fd3ff473ccb79311065b7e70408`; `CI 33257343273 completed / success`
 
 Target version: `V0.1 Internal Validation`
 
@@ -615,9 +615,9 @@ The design is blocked and must return for approval if future implementation requ
 
 ## P1-5R-POST-001 — Cancelled in-flight generation recovery
 
-Status: `IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PENDING`
+Status: `CLOSED`
 
-A subsequent explicitly authorized R3.8 real-provider local smoke exposed a new post-closeout production defect without invalidating the earlier acceptance evidence：disconnect/reload cancellation could tear down the task while its generation request remained durably `RUNNING`，leaving no utterance and an indefinitely occupied AI floor。
+A later explicitly authorized post-closeout real-provider smoke exposed a new production defect without invalidating the earlier acceptance evidence：disconnect/reload cancellation could tear down the task while its generation request remained durably `RUNNING`，leaving no utterance and an indefinitely occupied AI floor。This historical smoke is defect-discovery evidence，not execution of the separately defined formal R3.8 checkpoint。
 
 The approved Option A remediation keeps ownership in the existing AI runtime and failure service：after a successful `RUNNING` claim，task cancellation abandons the provider result，durably records `FAILED / INTERNAL_ERROR` when `RUNNING` still owns authority，then re-raises `CancelledError`。Reconnect reuses the existing `FAILED_REPLAY → INTERRUPTED release → scheduler` path。A durable concurrent `COMPLETED` result wins and is never overwritten；an existing `FAILED` record remains terminal；no provider retry、duplicate request、AI utterance or floor release is permitted。
 
@@ -628,7 +628,7 @@ The remediation changes no schema/migration、REST/WS contract、scheduler polic
 ```text
 P1 = IN_PROGRESS
 
-P1-5 = REOPENED / POST_ACCEPTANCE_DEFECT_REVIEW_PENDING
+P1-5 = DONE
 Previous P1-5 closeout = PASS / DONE at commit 9d6270660cb7a358a62989a6a59bab2a521fa041
 
 P1-5A ... P1-5F = historical DONE
@@ -638,7 +638,7 @@ P1-5F-3A = DONE
 P1-5F-3B = DONE
 P1-5F-4 = DONE
 
-P1-5R = REOPENED / POST_ACCEPTANCE_DEFECT_REVIEW_PENDING
+P1-5R = CLOSED
 Previous P1-5R closeout = PASS / CLOSED at commit 9d6270660cb7a358a62989a6a59bab2a521fa041
 R1 = DONE
 R2-A = DONE
@@ -651,17 +651,22 @@ F1 = CLOSED
 F2 = CLOSED
 Visual fidelity remediation = CLOSED
 F3 = CLOSED
-Historical authorized R3.8 smoke = EXECUTED / DEFECT_EXPOSED
-Remediation real-provider calls = 0
-P1-5R-POST-001 = IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PENDING
-P1-5R-POST-REV-001 = REMEDIATED / ACTUAL_SOURCE_REVIEW_PENDING
-Current P1-5R review finding = P1-5R-POST-REV-001
+Historical post-closeout real-provider smoke = EXECUTED / DEFECT_EXPOSED
+Formal R3.8 = NOT_EXECUTED / REQUIRES_SEPARATE_EXPLICIT_USER_AUTHORIZATION
+Further real-provider calls after defect discovery = 0
+P1-5R-POST remediation actual-source review = PASS
+Accepted remediation commit = 3b09d20a704c0fd3ff473ccb79311065b7e70408
+Exact CI run = 33257343273 / completed / success / all four required jobs green
+P1-5R-POST-001 = CLOSED
+P1-5R-POST-REV-001 = CLOSED
+Current P1-5R review finding = NONE
 
 Implementation plan = FROZEN
 Open original implementation findings = NONE
 
 P1-5R-DES-001 = CLOSED
 Open design findings = NONE
+Open post-acceptance findings = NONE
 ```
 
-Batch R1、Batch R2-A、Batch R2-B and Batch R3 remain accepted and DONE，with F1、F2、visual fidelity remediation and F3 CLOSED。Final Composition Acceptance、Independent Acceptance and the committed P1-5R/P1-5 closeout remain historical `PASS / CLOSED` evidence。The subsequent authorized R3.8 smoke exposed P1-5R-POST-001；its implementation is complete and awaits actual-source review，so P1-5R and parent P1-5 are reopened only for that review gate。No further real-provider call occurred，and the frozen R1～R3 design contract is unchanged。
+Batch R1、Batch R2-A、Batch R2-B and Batch R3 remain accepted and DONE，with F1、F2、visual fidelity remediation and F3 CLOSED。Final Composition Acceptance、Independent Acceptance and the committed prior P1-5R/P1-5 closeout remain historical `PASS / CLOSED` evidence。The later post-closeout real-provider smoke exposed P1-5R-POST-001；the remediation actual-source review passed，accepted commit `3b09d20a704c0fd3ff473ccb79311065b7e70408` and exact CI run `33257343273` are green，P1-5R-POST-REV-001、P1-5R-POST-001 and P1-5R are `CLOSED`，parent P1-5 is `DONE`，and open findings are `NONE`。Formal R3.8 remains `NOT_EXECUTED / REQUIRES_SEPARATE_EXPLICIT_USER_AUTHORIZATION`；no further real-provider call occurred，and the frozen R1～R3 design contract is unchanged。
