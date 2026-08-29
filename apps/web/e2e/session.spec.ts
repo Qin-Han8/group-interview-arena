@@ -15,6 +15,7 @@ const HUMAN_CONTRIBUTION = [
 const AI_CONTRIBUTION =
   process.env.GIA_E2E_AI_CONTENT ??
   "F4 Browser deterministic fake AI contribution.";
+const R3_PROMPT_SENTINEL = "R3_PROMPT_CONTEXT_VERIFIED";
 const PRIVATE_NOTES = "仅在当前页面内存中保留的私人思路";
 const API_RESTART_REQUEST = process.env.GIA_E2E_API_RESTART_REQUEST;
 const API_RESTART_READY = process.env.GIA_E2E_API_RESTART_READY;
@@ -720,6 +721,7 @@ test("browser session recovers durable phases across API restart and reload", as
     },
   });
   expect(aiCreatedEvent).not.toContain(PRIVATE_SENTINEL);
+  expect(parsedAiEvent.payload.content).toContain(R3_PROMPT_SENTINEL);
   await expect
     .poll(exactConfirmedAiContributionCount)
     .toBeGreaterThanOrEqual(1);

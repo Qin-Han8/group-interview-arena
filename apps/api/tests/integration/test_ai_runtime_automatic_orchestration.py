@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from group_interview_arena_api.core.config import DatabaseSettings
 from group_interview_arena_api.db import (
     AiUtterance,
+    DiscussionEvent,
     FloorDecision,
     FloorGrant,
     FloorIntervention,
@@ -59,6 +60,7 @@ from group_interview_arena_api.modules.ai_runtime.runtime import (
     RuntimeGenerationOutcome,
     generate_ai_utterance,
 )
+from group_interview_arena_api.modules.ai_runtime.seed import AI_CANDIDATE_TURN_V2
 from group_interview_arena_api.modules.ai_runtime.service import (
     claim_generation_request,
     create_generation_request,
@@ -102,6 +104,10 @@ NOW = datetime(2026, 8, 24, 8, 0, tzinfo=UTC)
 PROMPT_ID = UUID("52000000-0000-4000-8000-000000000001")
 CURRENT_STANCE_SENTINEL = "CURRENT_STANCE_ONLY_P1_5E_2"
 OTHER_STANCE_SENTINEL = "OTHER_STANCE_FORBIDDEN_P1_5E_2"
+HUMAN_PUBLIC_CONTEXT_R3 = "HUMAN_PUBLIC_CONTEXT_AUTOMATIC_R3"
+AI_PUBLIC_CONTEXT_R3 = "AI_PUBLIC_CONTEXT_AUTOMATIC_R3"
+QUESTION_PHASE_INSTRUCTION_R3 = "QUESTION_PHASE_INSTRUCTION_AUTOMATIC_R3"
+INTERNAL_CONTEXT_SENTINEL_R3 = "PENDING_REJECTED_PROVIDER_LOG_INTERNAL_R3"
 PROMPT_TEMPLATE = """Session: $session_id
 Participant: $participant_id
 Grant: $floor_grant_id
@@ -440,6 +446,127 @@ def test_missing_exact_prompt_stops_before_provider_release_or_scheduler(
             assert await _mutation_counts(context) == before
 
         assert provider_calls == 0
+
+    run_async(exercise)
+
+
+def test_new_request_at_or_after_v2_publication_selects_and_persists_v2(
+    migrated_database: TemporaryDatabaseContext,
+) -> None:
+    async def exercise() -> None:
+        captured: list[RuntimeGenerationInput] = []
+
+        async def provider(
+            generation_input: RuntimeGenerationInput,
+        ) -> RawGenerationSuccess:
+            captured.append(generation_input)
+            return RawGenerationSuccess(content="V2 selected contribution.")
+
+        async with _automatic_runtime_context(
+            migrated_database,
+            grant_seat_index=1,
+        ) as context:
+            assert context.grant_id is not None
+            async with context.session_factory() as session:
+                await publish_prompt_version(session, AI_CANDIDATE_TURN_V2)
+            identities = derive_automatic_turn_identities(
+                session_id=context.session_id,
+                floor_grant_id=context.grant_id,
+            )
+
+            await drive_single_ai_turn(
+                context.session_factory,
+                owner_id=context.owner_id,
+                session_id=context.session_id,
+                provider=provider,
+                provider_identifier="local-test-provider",
+                model_identifier="automatic-test-model",
+                configuration_version="P1_5E_2_TEST",
+                scheduling_policy=V0_1_SCHEDULER_POLICY,
+            )
+
+            async with context.session_factory() as session:
+                request = await session.get(
+                    LlmGenerationRequest,
+                    identities.generation_request_id,
+                )
+            assert len(captured) == 1
+            assert captured[0].prompt_version_id == AI_CANDIDATE_TURN_V2.id
+            assert captured[0].prompt_version_number == 2
+            assert request is not None
+            assert request.prompt_version_id == AI_CANDIDATE_TURN_V2.id
+
+    run_async(exercise)
+
+
+def test_existing_request_keeps_persisted_v1_and_requested_at_after_v2_publication(
+    migrated_database: TemporaryDatabaseContext,
+) -> None:
+    async def exercise() -> None:
+        captured: list[RuntimeGenerationInput] = []
+
+        async def provider(
+            generation_input: RuntimeGenerationInput,
+        ) -> RawGenerationSuccess:
+            captured.append(generation_input)
+            return RawGenerationSuccess(content="Pinned v1 contribution.")
+
+        async with _automatic_runtime_context(
+            migrated_database,
+            grant_seat_index=1,
+        ) as context:
+            assert context.grant_id is not None
+            identities = derive_automatic_turn_identities(
+                session_id=context.session_id,
+                floor_grant_id=context.grant_id,
+            )
+            async with context.session_factory() as session:
+                grant = await session.get(FloorGrant, context.grant_id)
+            assert grant is not None
+            original_requested_at = grant.granted_at
+            async with context.session_factory() as session:
+                await create_generation_request(
+                    session,
+                    owner_id=context.owner_id,
+                    command=RequestGenerationCommand(
+                        request_id=identities.generation_request_id,
+                        session_id=context.session_id,
+                        participant_id=context.participants[1].id,
+                        floor_grant_id=context.grant_id,
+                        prompt_version_id=PROMPT_ID,
+                        provider_identifier="local-test-provider",
+                        model_identifier="automatic-test-model",
+                        request_metadata=GenerationRequestMetadata(
+                            configuration_version="P1_5E_2_TEST"
+                        ),
+                        requested_at=original_requested_at,
+                    ),
+                )
+            async with context.session_factory() as session:
+                await publish_prompt_version(session, AI_CANDIDATE_TURN_V2)
+
+            await drive_single_ai_turn(
+                context.session_factory,
+                owner_id=context.owner_id,
+                session_id=context.session_id,
+                provider=provider,
+                provider_identifier="local-test-provider",
+                model_identifier="automatic-test-model",
+                configuration_version="P1_5E_2_TEST",
+                scheduling_policy=V0_1_SCHEDULER_POLICY,
+            )
+
+            async with context.session_factory() as session:
+                request = await session.get(
+                    LlmGenerationRequest,
+                    identities.generation_request_id,
+                )
+            assert len(captured) == 1
+            assert captured[0].prompt_version_id == PROMPT_ID
+            assert captured[0].prompt_version_number == 1
+            assert request is not None
+            assert request.prompt_version_id == PROMPT_ID
+            assert request.requested_at == original_requested_at
 
     run_async(exercise)
 
@@ -1522,6 +1649,94 @@ def test_automatic_prompt_keeps_other_participant_private_stance_out(
             migrated_database,
             grant_seat_index=1,
         ) as context:
+            assert context.grant_id is not None
+            async with context.session_factory() as session:
+                await publish_prompt_version(session, AI_CANDIDATE_TURN_V2)
+            async with context.session_factory() as session:
+                async with session.begin():
+                    aggregate = await session.get(
+                        SimulationSession,
+                        context.session_id,
+                        with_for_update=True,
+                    )
+                    question = await session.get(
+                        QuestionVersion,
+                        INTERNAL_VALIDATION_BUNDLE.version_id,
+                    )
+                    assert aggregate is not None
+                    assert question is not None
+                    question.phase_prompts = {
+                        **question.phase_prompts,
+                        SessionStatus.OPENING_STATEMENTS.value: (
+                            QUESTION_PHASE_INSTRUCTION_R3
+                        ),
+                    }
+                    human_action_id = uuid4()
+                    session.add(
+                        SessionAction(
+                            session_id=context.session_id,
+                            action_id=human_action_id,
+                            command_version=1,
+                            command_type="participant.utterance.submit",
+                            payload_digest=bytes(32),
+                            created_at=NOW,
+                        )
+                    )
+                    await session.flush()
+                    aggregate.last_sequence += 1
+                    session.add(
+                        DiscussionEvent(
+                            session_id=context.session_id,
+                            sequence=aggregate.last_sequence,
+                            event_version=1,
+                            event_type="participant.utterance.created",
+                            causation_action_id=human_action_id,
+                            payload={
+                                "utterance_id": str(uuid4()),
+                                "participant_id": str(context.participants[0].id),
+                                "actor_kind": "HUMAN",
+                                "floor_grant_id": str(context.grant_id),
+                                "phase": SessionStatus.OPENING_STATEMENTS.value,
+                                "content": HUMAN_PUBLIC_CONTEXT_R3,
+                            },
+                            occurred_at=NOW,
+                        )
+                    )
+                    aggregate.last_sequence += 1
+                    session.add(
+                        DiscussionEvent(
+                            session_id=context.session_id,
+                            sequence=aggregate.last_sequence,
+                            event_version=1,
+                            event_type="participant.utterance.created",
+                            causation_action_id=None,
+                            payload={
+                                "utterance_id": str(uuid4()),
+                                "participant_id": str(context.participants[2].id),
+                                "actor_kind": "AI",
+                                "floor_grant_id": str(context.grant_id),
+                                "phase": SessionStatus.OPENING_STATEMENTS.value,
+                                "content": AI_PUBLIC_CONTEXT_R3,
+                            },
+                            occurred_at=NOW + timedelta(seconds=1),
+                        )
+                    )
+                    aggregate.last_sequence += 1
+                    session.add(
+                        DiscussionEvent(
+                            session_id=context.session_id,
+                            sequence=aggregate.last_sequence,
+                            event_version=1,
+                            event_type="provider.internal",
+                            causation_action_id=None,
+                            payload={"content": INTERNAL_CONTEXT_SENTINEL_R3},
+                            occurred_at=NOW + timedelta(seconds=2),
+                        )
+                    )
+            identities = derive_automatic_turn_identities(
+                session_id=context.session_id,
+                floor_grant_id=context.grant_id,
+            )
             result = await drive_single_ai_turn(
                 context.session_factory,
                 owner_id=context.owner_id,
@@ -1535,6 +1750,40 @@ def test_automatic_prompt_keeps_other_participant_private_stance_out(
 
             assert CURRENT_STANCE_SENTINEL in rendered_prompt
             assert OTHER_STANCE_SENTINEL not in rendered_prompt
+            assert rendered_prompt.index(
+                f"你：{HUMAN_PUBLIC_CONTEXT_R3}"
+            ) < rendered_prompt.index(f"AI 候选人 3：{AI_PUBLIC_CONTEXT_R3}")
+            assert "说话有结构，但保持口语讨论，不写成报告。" in rendered_prompt
+            assert "发言时长：通常发言约 40 秒。" in rendered_prompt
+            assert "OPENING_STATEMENTS：清楚表达初始立场" in rendered_prompt
+            assert QUESTION_PHASE_INSTRUCTION_R3 in rendered_prompt
+            assert "不是报告撰写者" in rendered_prompt
+            assert "一到两个有用要点" in rendered_prompt
+            assert "不要使用 Markdown 标题" in rendered_prompt
+            assert INTERNAL_CONTEXT_SENTINEL_R3 not in rendered_prompt
+            assert str(context.participants[0].id) not in rendered_prompt
+            assert str(context.participants[2].id) not in rendered_prompt
+            async with context.session_factory() as session:
+                request = await session.get(
+                    LlmGenerationRequest,
+                    identities.generation_request_id,
+                )
+                utterance = await session.get(AiUtterance, identities.utterance_id)
+                release = await session.get(FloorRelease, context.grant_id)
+                schedule = await session.get(
+                    SessionAction,
+                    (context.session_id, identities.schedule_action_id),
+                )
+            assert request is not None
+            assert request.prompt_version_id == AI_CANDIDATE_TURN_V2.id
+            assert request.provider_identifier == "local-test-provider"
+            assert request.model_identifier == "automatic-test-model"
+            assert request.request_metadata["configuration_version"] == "P1_5E_2_TEST"
+            assert utterance is not None
+            assert utterance.generation_request_id == request.id
+            assert release is not None
+            assert release.causation_action_id == identities.release_action_id
+            assert schedule is not None
             serialized_result = result.model_dump_json()
             assert CURRENT_STANCE_SENTINEL not in serialized_result
             assert OTHER_STANCE_SENTINEL not in serialized_result

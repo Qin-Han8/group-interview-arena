@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from group_interview_arena_api.db import (
     AiUtterance,
+    DiscussionEvent,
     FloorGrant,
     LlmGenerationRequest,
     PersonaPrivateStance,
@@ -19,6 +20,12 @@ from group_interview_arena_api.db import (
     QuestionVersion,
     SessionParticipant,
     SimulationSession,
+)
+from group_interview_arena_api.modules.ai_runtime.conversation_context import (
+    PublicDiscussionUtterance,
+    render_persona_behavior,
+    render_recent_discussion,
+    select_recent_public_discussion,
 )
 from group_interview_arena_api.modules.ai_runtime.domain import (
     AiRuntimePersistenceError,
@@ -56,7 +63,19 @@ from group_interview_arena_api.modules.ai_runtime.service import (
     create_generation_request,
     fail_generation_request,
 )
-from group_interview_arena_api.modules.discussion_sessions.domain import ACTIVE_PHASES
+from group_interview_arena_api.modules.discussion_sessions.domain import (
+    ACTIVE_PHASES,
+    SessionStatus,
+    StoredEvent,
+)
+from group_interview_arena_api.modules.discussion_sessions.public_events import (
+    PublicEventProjectionError,
+    project_public_events,
+)
+from group_interview_arena_api.modules.floor_control.domain import (
+    FLOOR_ENABLED_PHASES,
+    ParticipantActorKind,
+)
 from group_interview_arena_api.modules.question_personas.domain import (
     ConstraintItem,
     PriorityDimension,
@@ -206,6 +225,84 @@ def _priority_dimension(item: dict[str, object]) -> PriorityDimension:
         raise ValueError("Persisted private stance shape is invalid.") from error
 
 
+async def _load_recent_public_discussion(
+    session: AsyncSession,
+    *,
+    session_id: UUID,
+) -> tuple[PublicDiscussionUtterance, ...]:
+    rows = tuple(
+        (
+            await session.scalars(
+                select(DiscussionEvent)
+                .where(
+                    DiscussionEvent.session_id == session_id,
+                    DiscussionEvent.event_type == "participant.utterance.created",
+                )
+                .order_by(DiscussionEvent.sequence.desc())
+            )
+        ).all()
+    )
+    stored_events = tuple(
+        StoredEvent(
+            event_version=row.event_version,
+            event_type=row.event_type,
+            session_id=row.session_id,
+            sequence=row.sequence,
+            occurred_at=row.occurred_at,
+            causation_action_id=row.causation_action_id,
+            payload=row.payload,
+        )
+        for row in rows
+    )
+    try:
+        projected = await project_public_events(session, stored_events)
+        participant_ids = {
+            UUID(str(event.payload["participant_id"])) for event in projected
+        }
+        participants = {
+            participant.id: participant
+            for participant in (
+                await session.scalars(
+                    select(SessionParticipant).where(
+                        SessionParticipant.session_id == session_id,
+                        SessionParticipant.id.in_(participant_ids),
+                    )
+                )
+            ).all()
+        }
+        items: list[PublicDiscussionUtterance] = []
+        for event in projected:
+            participant_id = UUID(str(event.payload["participant_id"]))
+            participant = participants.get(participant_id)
+            actor_kind = ParticipantActorKind(str(event.payload["actor_kind"]))
+            phase = SessionStatus(str(event.payload["phase"]))
+            content = event.payload["content"]
+            if (
+                event.schema_version != 1
+                or event.type != "participant.utterance.created"
+                or event.session_id != session_id
+                or participant is None
+                or participant.actor_kind != actor_kind.value
+                or participant.seat_order <= 0
+                or phase not in FLOOR_ENABLED_PHASES
+                or not isinstance(content, str)
+            ):
+                raise ValueError("Durable public discussion fact is invalid.")
+            items.append(
+                PublicDiscussionUtterance(
+                    sequence=event.sequence,
+                    participant_id=participant_id,
+                    actor_kind=actor_kind,
+                    seat_order=participant.seat_order,
+                    phase=phase,
+                    content=content,
+                )
+            )
+        return select_recent_public_discussion(tuple(items))
+    except (PublicEventProjectionError, KeyError, TypeError, ValueError) as error:
+        raise GenerationContextError("Recent public discussion is invalid.") from error
+
+
 async def _assemble_generation_input(
     session_factory: async_sessionmaker[AsyncSession],
     *,
@@ -275,6 +372,10 @@ async def _assemble_generation_input(
         async with session_factory() as session:
             async with session.begin():
                 row = (await session.execute(statement)).one_or_none()
+                recent_public_discussion = await _load_recent_public_discussion(
+                    session,
+                    session_id=command.session_id,
+                )
     except SQLAlchemyError as error:
         raise AiRuntimePersistenceError(
             "Generation context transaction failed."
@@ -359,6 +460,8 @@ async def _assemble_generation_input(
         persona=persona_context,
         private_stance=private_stance,
         phase_instruction=question.phase_prompts.get(aggregate.status, ""),
+        recent_discussion=render_recent_discussion(recent_public_discussion),
+        persona_behavior=render_persona_behavior(persona_context),
     )
     asset = PromptTemplateAsset(
         id=prompt.id,

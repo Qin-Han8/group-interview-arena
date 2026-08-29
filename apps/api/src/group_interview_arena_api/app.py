@@ -40,6 +40,9 @@ from group_interview_arena_api.db.runtime import (
     dispose_database_engine,
 )
 from group_interview_arena_api.identity.routes import create_auth_router
+from group_interview_arena_api.modules.ai_runtime.seed import (
+    seed_ai_runtime_prompt_versions,
+)
 from group_interview_arena_api.modules.discussion_sessions.deadline_recovery import (
     DeadlineRecoveryRuntime,
     recover_due_sessions,
@@ -91,6 +94,7 @@ def create_app(
                 DATABASE_SESSION_FACTORY_STATE_KEY,
                 session_factory,
             )
+            await seed_ai_runtime_prompt_versions(session_factory)
             await recover_due_sessions(session_factory)
             deadline_recovery_runtime = start_deadline_recovery_runtime(session_factory)
             application.state.deadline_recovery_runtime = deadline_recovery_runtime

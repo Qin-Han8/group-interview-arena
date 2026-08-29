@@ -65,7 +65,10 @@ HUMAN_CONTRIBUTION = "\n".join(
         "Second line stays exact.  ",
     )
 )
-AI_CONTRIBUTION = "F4 Browser deterministic fake AI contribution."
+AI_CONTRIBUTION = (
+    "R3_PROMPT_CONTEXT_VERIFIED: deterministic network-free AI contribution."
+)
+R3_PHASE_INSTRUCTION = "R3_QUESTION_PHASE_INSTRUCTION"
 PROMPT_VERSION_ID = UUID("55000000-0000-4000-8000-000000000001")
 PROMPT_TEMPLATE = """Session: $session_id
 Participant: $participant_id
@@ -261,7 +264,37 @@ def _run_browser_flow(temporary_database: TemporaryDatabase) -> None:
             "import RawGenerationSuccess\n"
             "\n"
             "\n"
-            "async def _network_free_provider(_generation_input):\n"
+            "async def _network_free_provider(generation_input):\n"
+            "    rendered_prompt = generation_input.rendered_prompt\n"
+            "    checks = {\n"
+            "        'v2_id': str(generation_input.prompt_version_id) == "
+            "'56000000-0000-4000-8000-000000000002',\n"
+            "        'v2_number': generation_input.prompt_version_number == 2,\n"
+            "        'prompt_key': generation_input.prompt_key == "
+            "'AI_CANDIDATE_TURN',\n"
+            "        'phase': generation_input.phase == "
+            "'OPENING_STATEMENTS',\n"
+            "        'human_context': os.environ['GIA_E2E_HUMAN_CONTENT'] "
+            "in rendered_prompt,\n"
+            "        'human_label': '你：' in rendered_prompt,\n"
+            "        'persona_section': "
+            "'当前候选人的自然语言行为约束：' in rendered_prompt,\n"
+            "        'persona_duration': '发言时长：通常发言约 ' "
+            "in rendered_prompt,\n"
+            "        'phase_guidance': "
+            "'OPENING_STATEMENTS：清楚表达初始立场' in rendered_prompt,\n"
+            "        'question_phase_instruction': "
+            "os.environ['GIA_E2E_PHASE_INSTRUCTION'] in rendered_prompt,\n"
+            "        'candidate_boundary': '不是报告撰写者' "
+            "in rendered_prompt,\n"
+            "        'turn_style': '不要使用 Markdown 标题' "
+            "in rendered_prompt,\n"
+            "    }\n"
+            "    failed = [name for name, passed in checks.items() if not passed]\n"
+            "    if failed:\n"
+            "        return RawGenerationSuccess(\n"
+            "            content='R3_PROMPT_CONTEXT_FAILED:' + ','.join(failed)\n"
+            "        )\n"
             "    return RawGenerationSuccess(\n"
             "        content=os.environ['GIA_E2E_AI_CONTENT']\n"
             "    )\n"
@@ -306,6 +339,8 @@ def _run_browser_flow(temporary_database: TemporaryDatabase) -> None:
                 '"final_summary_seconds":20}'
             ),
             "GIA_E2E_AI_CONTENT": AI_CONTRIBUTION,
+            "GIA_E2E_HUMAN_CONTENT": HUMAN_CONTRIBUTION,
+            "GIA_E2E_PHASE_INSTRUCTION": R3_PHASE_INSTRUCTION,
             "PYTHONPATH": os.pathsep.join(
                 filter(
                     None,
@@ -637,7 +672,10 @@ async def _seed_browser_question_async(
                         acceptable_outcome_patterns=[
                             {"key": "PRIVATE_SENTINEL", "text": PRIVATE_SENTINEL}
                         ],
-                        phase_prompts={"PREPARATION": PRIVATE_SENTINEL},
+                        phase_prompts={
+                            "PREPARATION": PRIVATE_SENTINEL,
+                            "OPENING_STATEMENTS": R3_PHASE_INSTRUCTION,
+                        },
                         safety_tags=[PRIVATE_SENTINEL],
                     )
                 )

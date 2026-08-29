@@ -1,6 +1,6 @@
 # P1-5R Local Acceptance Remediation — Design Freeze
 
-Status: `P1 IN_PROGRESS`; `P1-5 IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN`; `P1-5R IN_PROGRESS / DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN`; `R1 DONE`; `F1 CLOSED`; `R2-A DONE`; `F2 CLOSED`; `R2-B IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PENDING`; `Visual fidelity remediation OPEN / IMPLEMENTATION_COMPLETE_AWAITING_REVIEW`; `R3 NOT_STARTED / BLOCKED_BY_R2-B`
+Status: `P1 IN_PROGRESS`; `P1-5 IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN`; `P1-5R IN_PROGRESS / DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN`; `R1 DONE`; `F1 CLOSED`; `R2-A DONE`; `F2 CLOSED`; `R2-B DONE`; `Visual fidelity remediation CLOSED`; `R3 IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PENDING`; `F3 OPEN / IMPLEMENTATION_COMPLETE_AWAITING_REVIEW`; `Final Acceptance NOT_STARTED / BLOCKED_BY_R3`; `R3.8 NOT_EXECUTED / REQUIRES_SEPARATE_EXPLICIT_USER_AUTHORIZATION`
 
 Target version: `V0.1 Internal Validation`
 
@@ -28,7 +28,7 @@ This document creates one post-closeout remediation checkpoint. It does not rewr
 - `P1-5R` is `IN_PROGRESS / DESIGN_FROZEN` after this docs-only checkpoint;
 - in this original design-freeze checkpoint，no remediation implementation was claimed; the current R1 status is recorded in the document status block and frozen-status summary below.
 
-The open findings are:
+At the original design-freeze checkpoint, the open findings were:
 
 - `F1 OPEN` — floor-enabled phases can enter without an initial scheduler checkpoint;
 - `F2 OPEN` — transcript growth can expand the document and push the composer/progress out of the useful viewport;
@@ -88,7 +88,7 @@ These observations reveal no requirement for a DB migration, public API/realtime
 
 ## R1 — Initial Phase Floor Scheduling
 
-Status: `NOT_STARTED`
+Status: `DONE`
 
 Severity: correctness blocker.
 
@@ -209,7 +209,7 @@ Future R1 implementation must prove:
 
 ## R2-A — Transcript Viewport / Scroll Ownership
 
-Status: `NOT_STARTED`
+Status: `DONE`
 
 Scope: Web-only presentation remediation. REST, WebSocket, backend events, DB, transcript persistence/identity/merge, session/floor semantics and browser persistence rules remain unchanged.
 
@@ -290,7 +290,7 @@ Large deterministic transcript content must prove:
 
 ## R2-B — Visual Composition / Product Fidelity
 
-Status: `NOT_STARTED`
+Status: `DONE`
 
 This is a fidelity remediation of the accepted `AI 群面训练场 / Interview Simulation Studio` direction, not screenshot pixel matching and not a new product design system.
 
@@ -407,7 +407,7 @@ Temporary screenshots may support human review but are not committed correctness
 
 ## R3 — Conversation Quality Foundation
 
-Status: `NOT_STARTED`
+Status: `IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PENDING`
 
 R3 first changes prompt/context quality. It does not initially change provider abstraction, provider/model, temperature, max tokens, streaming, thinking configuration or automatic retry.
 
@@ -631,14 +631,15 @@ P1-5F-4 = DONE
 P1-5R = IN_PROGRESS / DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN
 R1 = DONE
 R2-A = DONE
-R2-B = IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PENDING
-R3 = NOT_STARTED / BLOCKED_BY_R2-B
+R2-B = DONE
+R3 = IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PENDING
 Final acceptance = NOT_STARTED / BLOCKED_BY_R3
 
 F1 = CLOSED
 F2 = CLOSED
-Visual fidelity remediation = OPEN / IMPLEMENTATION_COMPLETE_AWAITING_REVIEW
-F3 = OPEN
+Visual fidelity remediation = CLOSED
+F3 = OPEN / IMPLEMENTATION_COMPLETE_AWAITING_REVIEW
+R3.8 = NOT_EXECUTED / REQUIRES_SEPARATE_EXPLICIT_USER_AUTHORIZATION
 
 Implementation plan = FROZEN
 Open implementation findings = NONE
@@ -647,4 +648,4 @@ P1-5R-DES-001 = CLOSED
 Open design findings = NONE
 ```
 
-Batch R1 and Batch R2-A are accepted and DONE，with F1 and F2 CLOSED。Batch R2-B implementation is complete and awaits actual-source review；visual fidelity remediation remains OPEN awaiting that review，R3 remains blocked by R2-B，and the frozen design contract is unchanged。
+Batch R1、Batch R2-A and Batch R2-B are accepted and DONE，with F1、F2 and visual fidelity remediation CLOSED。Batch R3 implementation is complete and awaits actual-source review；F3 remains OPEN awaiting that review；Final Acceptance remains blocked by R3；R3.8 was not executed and requires separate explicit user authorization；the frozen design contract is unchanged。

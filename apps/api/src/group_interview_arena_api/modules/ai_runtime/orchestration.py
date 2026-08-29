@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+from datetime import datetime
 from enum import StrEnum
 from uuid import UUID, uuid5
 
 from pydantic import UUID4
-from sqlalchemy import and_, select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from group_interview_arena_api.db import (
@@ -125,6 +126,29 @@ def derive_automatic_turn_identities(
         decision_id=_deterministic_uuid4(f"{prefix}:decision"),
         next_floor_grant_id=_deterministic_uuid4(f"{prefix}:next-floor-grant"),
         intervention_id=_deterministic_uuid4(f"{prefix}:intervention"),
+    )
+
+
+async def _select_effective_prompt_version(
+    session: AsyncSession,
+    *,
+    prompt_key: str,
+    purpose_code: str,
+    effective_at: datetime,
+) -> PromptVersion | None:
+    return await session.scalar(
+        select(PromptVersion)
+        .where(
+            PromptVersion.prompt_key == prompt_key,
+            PromptVersion.purpose_code == purpose_code,
+            PromptVersion.published_at <= effective_at,
+            or_(
+                PromptVersion.retired_at.is_(None),
+                PromptVersion.retired_at > effective_at,
+            ),
+        )
+        .order_by(PromptVersion.version_number.desc(), PromptVersion.id.asc())
+        .limit(1)
     )
 
 
@@ -547,19 +571,13 @@ async def drive_single_ai_turn(
         prompt_version_id: UUID
         requested_at = grant.granted_at
         if existing_request is None:
-            prompt = await session.scalar(
-                select(PromptVersion).where(
-                    and_(
-                        PromptVersion.prompt_key == "AI_CANDIDATE_TURN",
-                        PromptVersion.version_number == 1,
-                        PromptVersion.purpose_code == "CANDIDATE_UTTERANCE",
-                        PromptVersion.published_at <= grant.granted_at,
-                    )
-                )
+            prompt = await _select_effective_prompt_version(
+                session,
+                prompt_key="AI_CANDIDATE_TURN",
+                purpose_code="CANDIDATE_UTTERANCE",
+                effective_at=grant.granted_at,
             )
-            if prompt is None or (
-                prompt.retired_at is not None and prompt.retired_at <= grant.granted_at
-            ):
+            if prompt is None:
                 return SingleAiTurnResult(
                     outcome=SingleAiTurnOutcome.RECONCILIATION_REQUIRED,
                     processed_floor_grant_id=grant.id,

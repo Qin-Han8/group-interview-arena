@@ -22,6 +22,7 @@ from group_interview_arena_api.db import (
     LlmGenerationRequest,
     PersonaPrivateStance,
     QuestionVersion,
+    SessionAction,
     SessionParticipant,
     SimulationSession,
     User,
@@ -32,6 +33,9 @@ from group_interview_arena_api.db.runtime import (
     dispose_database_engine,
 )
 from group_interview_arena_api.modules.ai_runtime import runtime as runtime_module
+from group_interview_arena_api.modules.ai_runtime.conversation_context import (
+    render_recent_discussion,
+)
 from group_interview_arena_api.modules.ai_runtime.domain import (
     AiRuntimePersistenceError,
     GenerationContextError,
@@ -50,8 +54,10 @@ from group_interview_arena_api.modules.ai_runtime.generation import (
 from group_interview_arena_api.modules.ai_runtime.runtime import (
     GenerateAiUtteranceCommand,
     RuntimeGenerationOutcome,
+    _load_recent_public_discussion,  # pyright: ignore[reportPrivateUsage]
     generate_ai_utterance,
 )
+from group_interview_arena_api.modules.ai_runtime.seed import AI_CANDIDATE_TURN_V2
 from group_interview_arena_api.modules.ai_runtime.service import (
     claim_generation_request,
     create_generation_request,
@@ -74,6 +80,7 @@ from group_interview_arena_api.modules.floor_control.domain import (
     FloorPolicyReason,
     FloorReleaseReason,
     GrantFloorCommand,
+    ParticipantActorKind,
     ReleaseFloorCommand,
     SafeDecisionMetadata,
 )
@@ -316,6 +323,58 @@ def _command(
     )
 
 
+async def _append_public_utterance(
+    context: RuntimeContext,
+    *,
+    participant: SessionParticipant,
+    actor_kind: ParticipantActorKind,
+    content: str,
+    event_version: int = 1,
+) -> int:
+    async with context.session_factory() as session:
+        async with session.begin():
+            aggregate = await session.get(
+                SimulationSession,
+                context.session_id,
+                with_for_update=True,
+            )
+            assert aggregate is not None
+            aggregate.last_sequence += 1
+            action_id = None
+            if actor_kind is ParticipantActorKind.HUMAN:
+                action_id = uuid4()
+                session.add(
+                    SessionAction(
+                        session_id=context.session_id,
+                        action_id=action_id,
+                        command_version=1,
+                        command_type="participant.utterance.submit",
+                        payload_digest=bytes(32),
+                        created_at=NOW,
+                    )
+                )
+                await session.flush()
+            session.add(
+                DiscussionEvent(
+                    session_id=context.session_id,
+                    sequence=aggregate.last_sequence,
+                    event_version=event_version,
+                    event_type="participant.utterance.created",
+                    causation_action_id=action_id,
+                    payload={
+                        "utterance_id": str(uuid4()),
+                        "participant_id": str(participant.id),
+                        "actor_kind": actor_kind.value,
+                        "floor_grant_id": str(context.grant_id),
+                        "phase": SessionStatus.OPENING_STATEMENTS.value,
+                        "content": content,
+                    },
+                    occurred_at=NOW + timedelta(seconds=aggregate.last_sequence),
+                )
+            )
+            return aggregate.last_sequence
+
+
 async def _assert_runtime_unchanged(
     context: RuntimeContext,
     before: SimulationSession,
@@ -328,6 +387,159 @@ async def _assert_runtime_unchanged(
         assert after.phase_deadline_at == before.phase_deadline_at
         assert after.current_floor_grant_id == before.current_floor_grant_id
         assert after.last_sequence == before.last_sequence
+
+
+def test_recent_public_discussion_loads_same_session_contiguous_suffix(
+    migrated_database: TemporaryDatabaseContext,
+) -> None:
+    async def exercise() -> None:
+        async with _runtime_context(migrated_database) as context:
+            for index in range(1, 8):
+                participant = (
+                    context.participants[0] if index % 2 else context.participants[1]
+                )
+                actor_kind = (
+                    ParticipantActorKind.HUMAN if index % 2 else ParticipantActorKind.AI
+                )
+                await _append_public_utterance(
+                    context,
+                    participant=participant,
+                    actor_kind=actor_kind,
+                    content=f"PUBLIC_{index}",
+                )
+
+            async with context.session_factory() as session:
+                selected = await _load_recent_public_discussion(
+                    session,
+                    session_id=context.session_id,
+                )
+
+            assert tuple(item.content for item in selected) == (
+                "PUBLIC_2",
+                "PUBLIC_3",
+                "PUBLIC_4",
+                "PUBLIC_5",
+                "PUBLIC_6",
+                "PUBLIC_7",
+            )
+            assert tuple(item.actor_kind for item in selected) == (
+                ParticipantActorKind.AI,
+                ParticipantActorKind.HUMAN,
+                ParticipantActorKind.AI,
+                ParticipantActorKind.HUMAN,
+                ParticipantActorKind.AI,
+                ParticipantActorKind.HUMAN,
+            )
+            rendered = render_recent_discussion(selected)
+            assert "AI 候选人 2：PUBLIC_2" in rendered
+            assert "你：PUBLIC_3" in rendered
+            for item in selected:
+                assert str(item.participant_id) not in rendered
+
+    run_async(exercise)
+
+
+def test_v2_runtime_prompt_contains_public_context_and_current_persona_behavior_only(
+    migrated_database: TemporaryDatabaseContext,
+) -> None:
+    async def exercise() -> None:
+        pending_private_sentinel = "PENDING_REJECTED_PROVIDER_INTERNAL_R3"
+        human_public = "HUMAN_PUBLIC_CONTEXT_R3"
+        ai_public = "AI_PUBLIC_CONTEXT_R3"
+        captured: list[RuntimeGenerationInput] = []
+
+        async with _runtime_context(migrated_database) as context:
+            await _append_public_utterance(
+                context,
+                participant=context.participants[0],
+                actor_kind=ParticipantActorKind.HUMAN,
+                content=human_public,
+            )
+            await _append_public_utterance(
+                context,
+                participant=context.participants[1],
+                actor_kind=ParticipantActorKind.AI,
+                content=ai_public,
+            )
+            async with context.session_factory() as session:
+                async with session.begin():
+                    aggregate = await session.get(
+                        SimulationSession,
+                        context.session_id,
+                        with_for_update=True,
+                    )
+                    assert aggregate is not None
+                    aggregate.last_sequence += 1
+                    session.add(
+                        DiscussionEvent(
+                            session_id=context.session_id,
+                            sequence=aggregate.last_sequence,
+                            event_version=1,
+                            event_type="provider.internal",
+                            causation_action_id=None,
+                            payload={"content": pending_private_sentinel},
+                            occurred_at=NOW,
+                        )
+                    )
+            async with context.session_factory() as session:
+                await publish_prompt_version(session, AI_CANDIDATE_TURN_V2)
+
+            async def executor(
+                generation_input: RuntimeGenerationInput,
+            ) -> RawGenerationSuccess:
+                captured.append(generation_input)
+                return RawGenerationSuccess(content="Context-aware contribution.")
+
+            command = _command(context).model_copy(
+                update={
+                    "prompt_version_id": AI_CANDIDATE_TURN_V2.id,
+                    "occurred_at": AI_CANDIDATE_TURN_V2.published_at
+                    + timedelta(seconds=1),
+                }
+            )
+            result = await generate_ai_utterance(
+                context.session_factory,
+                owner_id=context.owner_id,
+                command=command,
+                executor=executor,
+            )
+
+            assert result.outcome is RuntimeGenerationOutcome.COMPLETED
+            assert len(captured) == 1
+            rendered = captured[0].rendered_prompt
+            assert rendered.index(f"你：{human_public}") < rendered.index(
+                f"AI 候选人 2：{ai_public}"
+            )
+            assert "说话有结构，但保持口语讨论，不写成报告。" in rendered
+            assert "发言时长：通常发言约 40 秒。" in rendered
+            assert CURRENT_STANCE_SENTINEL in rendered
+            assert OTHER_STANCE_SENTINEL not in rendered
+            assert pending_private_sentinel not in rendered
+
+    run_async(exercise)
+
+
+def test_malformed_durable_public_fact_fails_closed_before_provider_input(
+    migrated_database: TemporaryDatabaseContext,
+) -> None:
+    async def exercise() -> None:
+        async with _runtime_context(migrated_database) as context:
+            await _append_public_utterance(
+                context,
+                participant=context.participants[0],
+                actor_kind=ParticipantActorKind.HUMAN,
+                content="MALFORMED_VERSION_R3",
+                event_version=2,
+            )
+
+            async with context.session_factory() as session:
+                with pytest.raises(GenerationContextError):
+                    await _load_recent_public_discussion(
+                        session,
+                        session_id=context.session_id,
+                    )
+
+    run_async(exercise)
 
 
 async def _success_replay_and_context_isolation(

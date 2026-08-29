@@ -1,7 +1,7 @@
 import asyncio
 from collections.abc import Callable, Coroutine
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol
 from uuid import UUID, uuid4
 
@@ -40,6 +40,10 @@ from group_interview_arena_api.modules.ai_runtime.domain import (
     RequestGenerationCommand,
     StartGenerationCommand,
 )
+from group_interview_arena_api.modules.ai_runtime.orchestration import (
+    _select_effective_prompt_version,  # pyright: ignore[reportPrivateUsage]
+)
+from group_interview_arena_api.modules.ai_runtime.seed import AI_CANDIDATE_TURN_V2
 from group_interview_arena_api.modules.ai_runtime.service import (
     claim_generation_request,
     complete_generation_request,
@@ -596,6 +600,87 @@ def test_every_completed_return_path_requires_the_same_public_event_proof(
                     await complete_generation_request(
                         session, owner_id=owner_id, command=complete_command
                     )
+
+    run_async(exercise)
+
+
+def test_effective_prompt_selector_uses_highest_valid_version_and_exact_retirement(
+    migrated_database: TemporaryDatabaseContext,
+) -> None:
+    async def exercise() -> None:
+        engine = create_database_engine(migrated_database.database_settings())
+        session_factory = create_database_session_factory(engine)
+        publication = AI_CANDIDATE_TURN_V2.published_at
+        retired_key = "RETIRED_CANDIDATE_TURN"
+        retired_v1 = PromptVersionDefinition(
+            id=UUID("57000000-0000-4000-8000-000000000001"),
+            prompt_key=retired_key,
+            version_number=1,
+            purpose_code="CANDIDATE_UTTERANCE",
+            template_text="Retirement boundary v1.",
+            created_at=publication - timedelta(hours=1),
+            published_at=publication - timedelta(hours=1),
+        )
+        retired_v2 = PromptVersionDefinition(
+            id=UUID("57000000-0000-4000-8000-000000000002"),
+            prompt_key=retired_key,
+            version_number=2,
+            purpose_code="CANDIDATE_UTTERANCE",
+            template_text="Retirement boundary v2.",
+            created_at=publication,
+            published_at=publication,
+            retired_at=publication + timedelta(hours=1),
+        )
+        try:
+            async with session_factory() as session:
+                await publish_prompt_version(session, _prompt())
+            async with session_factory() as session:
+                await publish_prompt_version(session, AI_CANDIDATE_TURN_V2)
+            async with session_factory() as session:
+                await publish_prompt_version(session, retired_v1)
+            async with session_factory() as session:
+                await publish_prompt_version(session, retired_v2)
+
+            async with session_factory() as session:
+                assert retired_v2.retired_at is not None
+                before_v2 = await _select_effective_prompt_version(
+                    session,
+                    prompt_key="AI_CANDIDATE_TURN",
+                    purpose_code="CANDIDATE_UTTERANCE",
+                    effective_at=publication - timedelta(microseconds=1),
+                )
+                at_v2 = await _select_effective_prompt_version(
+                    session,
+                    prompt_key="AI_CANDIDATE_TURN",
+                    purpose_code="CANDIDATE_UTTERANCE",
+                    effective_at=publication,
+                )
+                after_v2 = await _select_effective_prompt_version(
+                    session,
+                    prompt_key="AI_CANDIDATE_TURN",
+                    purpose_code="CANDIDATE_UTTERANCE",
+                    effective_at=publication + timedelta(days=1),
+                )
+                at_retirement = await _select_effective_prompt_version(
+                    session,
+                    prompt_key=retired_key,
+                    purpose_code="CANDIDATE_UTTERANCE",
+                    effective_at=retired_v2.retired_at,
+                )
+                missing = await _select_effective_prompt_version(
+                    session,
+                    prompt_key="MISSING_PROMPT",
+                    purpose_code="CANDIDATE_UTTERANCE",
+                    effective_at=publication,
+                )
+
+            assert before_v2 is not None and before_v2.id == PROMPT_ID
+            assert at_v2 is not None and at_v2.id == AI_CANDIDATE_TURN_V2.id
+            assert after_v2 is not None and after_v2.id == AI_CANDIDATE_TURN_V2.id
+            assert at_retirement is not None and at_retirement.id == retired_v1.id
+            assert missing is None
+        finally:
+            await dispose_database_engine(engine)
 
     run_async(exercise)
 

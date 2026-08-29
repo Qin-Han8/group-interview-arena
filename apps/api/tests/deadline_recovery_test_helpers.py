@@ -11,6 +11,9 @@ class _NoopDeadlineRecoveryRuntime:
 
 
 def disable_deadline_recovery_runtime(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def seed_no_prompt_versions(_session_factory: Any) -> bool:
+        return False
+
     async def recover_no_due_sessions(_session_factory: Any) -> int:
         return 0
 
@@ -19,6 +22,11 @@ def disable_deadline_recovery_runtime(monkeypatch: pytest.MonkeyPatch) -> None:
     ) -> _NoopDeadlineRecoveryRuntime:
         return _NoopDeadlineRecoveryRuntime()
 
+    monkeypatch.setattr(
+        app_module,
+        "seed_ai_runtime_prompt_versions",
+        seed_no_prompt_versions,
+    )
     monkeypatch.setattr(app_module, "recover_due_sessions", recover_no_due_sessions)
     monkeypatch.setattr(
         app_module,

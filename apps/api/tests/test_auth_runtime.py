@@ -11,6 +11,7 @@ from pydantic import SecretStr, ValidationError
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 from starlette.responses import Response
 
+import group_interview_arena_api.app as app_module
 from group_interview_arena_api.app import create_app
 from group_interview_arena_api.core.config import (
     DatabaseSettings,
@@ -262,3 +263,77 @@ def test_auth_dependency_without_lifespan_fails_with_safe_envelope() -> None:
     assert error["code"] == "INTERNAL_ERROR"
     assert "Database runtime" not in response.text
     assert TEST_DATABASE_URL not in response.text
+
+
+def test_lifespan_publishes_prompt_before_recovery_and_runtime_start(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    events: list[str] = []
+
+    class _Runtime:
+        async def stop(self) -> None:
+            events.append("stop")
+
+    async def seed(_session_factory: object) -> bool:
+        events.append("seed")
+        return True
+
+    async def recover(_session_factory: object) -> int:
+        events.append("recover")
+        return 0
+
+    def start(_session_factory: object) -> _Runtime:
+        events.append("start")
+        return _Runtime()
+
+    monkeypatch.setattr(app_module, "seed_ai_runtime_prompt_versions", seed)
+    monkeypatch.setattr(app_module, "recover_due_sessions", recover)
+    monkeypatch.setattr(app_module, "start_deadline_recovery_runtime", start)
+    application = create_app(
+        Settings(environment=Environment.TEST),
+        DatabaseSettings(database_url=SecretStr(TEST_DATABASE_URL)),
+    )
+
+    async def enter_lifespan() -> None:
+        async with application.router.lifespan_context(application):
+            assert events == ["seed", "recover", "start"]
+
+    asyncio.run(enter_lifespan())
+
+    assert events == ["seed", "recover", "start", "stop"]
+
+
+def test_lifespan_prompt_publication_failure_aborts_before_recovery(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    events: list[str] = []
+
+    async def seed(_session_factory: object) -> bool:
+        events.append("seed")
+        raise RuntimeError("prompt publication conflict")
+
+    async def recover(_session_factory: object) -> int:
+        events.append("recover")
+        return 0
+
+    def start(_session_factory: object) -> object:
+        events.append("start")
+        return object()
+
+    monkeypatch.setattr(app_module, "seed_ai_runtime_prompt_versions", seed)
+    monkeypatch.setattr(app_module, "recover_due_sessions", recover)
+    monkeypatch.setattr(app_module, "start_deadline_recovery_runtime", start)
+    application = create_app(
+        Settings(environment=Environment.TEST),
+        DatabaseSettings(database_url=SecretStr(TEST_DATABASE_URL)),
+    )
+
+    async def enter_lifespan() -> None:
+        async with application.router.lifespan_context(application):
+            pass
+
+    with pytest.raises(RuntimeError, match="prompt publication conflict"):
+        asyncio.run(enter_lifespan())
+
+    assert events == ["seed"]
+    assert not hasattr(application.state, "deadline_recovery_runtime")

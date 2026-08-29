@@ -27,6 +27,8 @@ PROMPT_VARIABLES = frozenset(
         "persona_context",
         "private_stance",
         "phase_instruction",
+        "recent_discussion",
+        "persona_behavior",
     }
 )
 
@@ -86,6 +88,8 @@ class AuthorizedGenerationContext(ClosedDomainModel):
     persona: AuthorizedPersonaContext
     private_stance: PrivateStanceDefinition
     phase_instruction: str
+    recent_discussion: str
+    persona_behavior: str
 
 
 def _stable_json(value: object) -> str:
@@ -107,6 +111,8 @@ def prompt_variables(context: AuthorizedGenerationContext) -> dict[str, str]:
         "persona_context": _stable_json(context.persona.model_dump(mode="json")),
         "private_stance": _stable_json(context.private_stance.model_dump(mode="json")),
         "phase_instruction": context.phase_instruction,
+        "recent_discussion": context.recent_discussion,
+        "persona_behavior": context.persona_behavior,
     }
 
 
