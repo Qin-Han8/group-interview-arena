@@ -1,6 +1,6 @@
 # P1-5R Local Acceptance Remediation — Design Freeze
 
-Status: `P1 IN_PROGRESS`; `P1-5 IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN`; `P1-5R IN_PROGRESS / FINAL_COMPOSITION_REVIEW_PENDING`; `R1 DONE`; `F1 CLOSED`; `R2-A DONE`; `F2 CLOSED`; `R2-B DONE`; `Visual fidelity remediation CLOSED`; `R3 DONE`; `F3 CLOSED`; `Final Composition Acceptance IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PENDING`; `Independent Acceptance NOT_STARTED / BLOCKED_BY_FINAL_COMPOSITION`; `R3.8 NOT_EXECUTED / REQUIRES_SEPARATE_EXPLICIT_USER_AUTHORIZATION`
+Status: `P1 IN_PROGRESS`; `P1-5 DONE`; `P1-5R CLOSED`; `R1 DONE`; `F1 CLOSED`; `R2-A DONE`; `F2 CLOSED`; `R2-B DONE`; `Visual fidelity remediation CLOSED`; `R3 DONE`; `F3 CLOSED`; `Final Composition Acceptance PASS / DONE`; `Independent Acceptance PASS`; `Open findings NONE`; `R3.8 NOT_EXECUTED / REQUIRES_SEPARATE_EXPLICIT_USER_AUTHORIZATION`
 
 Target version: `V0.1 Internal Validation`
 
@@ -24,9 +24,9 @@ This document creates one post-closeout remediation checkpoint. It does not rewr
 
 - `P1-5A` through `P1-5F` retain their historical `DONE` checkpoints and evidence;
 - `P1-5F`, `P1-5F-3`, `P1-5F-3A`, `P1-5F-3B` and `P1-5F-4` remain `DONE`;
-- parent `P1-5` is currently reopened to `IN_PROGRESS` only because `P1-5R` is unresolved;
-- `P1-5R` is `IN_PROGRESS / DESIGN_FROZEN` after this docs-only checkpoint;
-- in this original design-freeze checkpoint，no remediation implementation was claimed; the current R1 status is recorded in the document status block and frozen-status summary below.
+- parent `P1-5` was reopened to `IN_PROGRESS` at the original design-freeze checkpoint because `P1-5R` was unresolved, and is now `DONE` after accepted closeout;
+- `P1-5R` was `IN_PROGRESS / DESIGN_FROZEN` after the original docs-only checkpoint and is now `CLOSED` after Final Composition Acceptance and Independent Acceptance both passed;
+- in this original design-freeze checkpoint，no remediation implementation was claimed; the current closeout status is recorded in the document status block and current-governance summary below.
 
 At the original design-freeze checkpoint, the open findings were:
 
@@ -613,13 +613,12 @@ The design is blocked and must return for approval if future implementation requ
 - mutation of Prompt v1 or rebinding of an existing generation request;
 - implementation outside the separately approved future batch.
 
-## Frozen status after this checkpoint
+## Current governance status after final closeout
 
 ```text
 P1 = IN_PROGRESS
 
-P1-5 = IN_PROGRESS
-reason = POST_CLOSEOUT_REMEDIATION_OPEN
+P1-5 = DONE
 
 P1-5A ... P1-5F = historical DONE
 P1-5F = DONE
@@ -628,19 +627,20 @@ P1-5F-3A = DONE
 P1-5F-3B = DONE
 P1-5F-4 = DONE
 
-P1-5R = IN_PROGRESS / FINAL_COMPOSITION_REVIEW_PENDING
+P1-5R = CLOSED
 R1 = DONE
 R2-A = DONE
 R2-B = DONE
 R3 = DONE
-Final Composition Acceptance = IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PENDING
-Independent Acceptance = NOT_STARTED / BLOCKED_BY_FINAL_COMPOSITION
+Final Composition Acceptance = PASS / DONE
+Independent Acceptance = PASS
 
 F1 = CLOSED
 F2 = CLOSED
 Visual fidelity remediation = CLOSED
 F3 = CLOSED
 R3.8 = NOT_EXECUTED / REQUIRES_SEPARATE_EXPLICIT_USER_AUTHORIZATION
+Open P1-5R findings = NONE
 
 Implementation plan = FROZEN
 Open implementation findings = NONE
@@ -649,4 +649,4 @@ P1-5R-DES-001 = CLOSED
 Open design findings = NONE
 ```
 
-Batch R1、Batch R2-A、Batch R2-B and Batch R3 are accepted and DONE，with F1、F2、visual fidelity remediation and F3 CLOSED。Final Composition Acceptance is `IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PENDING`；P1-5R remains `IN_PROGRESS / FINAL_COMPOSITION_REVIEW_PENDING`；Independent Acceptance remains `NOT_STARTED / BLOCKED_BY_FINAL_COMPOSITION`；R3.8 was not executed and requires separate explicit user authorization；the frozen design contract is unchanged。
+Batch R1、Batch R2-A、Batch R2-B and Batch R3 are accepted and DONE，with F1、F2、visual fidelity remediation and F3 CLOSED。Final Composition Acceptance is `PASS / DONE`；Independent Acceptance is `PASS`；open findings are `NONE`；P1-5R is `CLOSED` and parent P1-5 is `DONE`。R3.8 was not executed and requires separate explicit user authorization；the frozen design contract is unchanged。

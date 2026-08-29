@@ -1,10 +1,10 @@
 # P1-5R Local Acceptance Remediation — Detailed Implementation Plan
 
-Status: P1 = IN_PROGRESS; P1-5 = IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN; P1-5R = IN_PROGRESS / FINAL_COMPOSITION_REVIEW_PENDING
+Status: P1 = IN_PROGRESS; P1-5 = DONE; P1-5R = CLOSED
 
-Batch status: R1 = DONE; R2-A = DONE; R2-B = DONE; R3 = DONE; Final Composition Acceptance = IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PENDING; Independent Acceptance = NOT_STARTED / BLOCKED_BY_FINAL_COMPOSITION; R3.8 = NOT_EXECUTED / REQUIRES_SEPARATE_EXPLICIT_USER_AUTHORIZATION
+Batch status: R1 = DONE; R2-A = DONE; R2-B = DONE; R3 = DONE; Final Composition Acceptance = PASS / DONE; Independent Acceptance = PASS; R3.8 = NOT_EXECUTED / REQUIRES_SEPARATE_EXPLICIT_USER_AUTHORIZATION
 
-Findings: F1 = CLOSED; F2 = CLOSED; Visual fidelity remediation = CLOSED; F3 = CLOSED; P1-5R-IP-001 = CLOSED; Open implementation findings = NONE
+Findings: F1 = CLOSED; F2 = CLOSED; Visual fidelity remediation = CLOSED; F3 = CLOSED; P1-5R-IP-001 = CLOSED; Open implementation findings = NONE; Open P1-5R findings = NONE
 
 Target version: V0.1 Internal Validation
 
@@ -806,18 +806,18 @@ Coverage gaps: none. Source/design contradictions: none. P1-5R-IP-001: CLOSED. O
 
 Stop and report before changing scope if implementation requires a schema/migration, REST/OpenAPI/WS/public event change, scheduler policy/domain/service semantic change, second progression/realtime authority, browser-selected speaker, global Web store, browser business persistence, transcript merge change, provider adapter/parameter/model change, dependency, prompt v1 mutation/rebinding, RAG/memory system, or fake UI capability. Do not solve such a conflict by expanding a batch allowlist.
 
-## Frozen hierarchy after this plan turn
+## Current governance hierarchy after final closeout
 
 ~~~text
 P1 = IN_PROGRESS
-P1-5 = IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN
-P1-5R = IN_PROGRESS / FINAL_COMPOSITION_REVIEW_PENDING
+P1-5 = DONE
+P1-5R = CLOSED
 R1 = DONE
 R2-A = DONE
 R2-B = DONE
 R3 = DONE
-Final Composition Acceptance = IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PENDING
-Independent Acceptance = NOT_STARTED / BLOCKED_BY_FINAL_COMPOSITION
+Final Composition Acceptance = PASS / DONE
+Independent Acceptance = PASS
 F1 = CLOSED
 F2 = CLOSED
 Visual fidelity remediation = CLOSED
@@ -825,6 +825,7 @@ F3 = CLOSED
 R3.8 = NOT_EXECUTED / REQUIRES_SEPARATE_EXPLICIT_USER_AUTHORIZATION
 P1-5R-IP-001 = CLOSED
 Open implementation findings = NONE
+Open P1-5R findings = NONE
 ~~~
 
-Batch R1、Batch R2-A、Batch R2-B and Batch R3 are accepted and DONE，with F1、F2、visual fidelity remediation and F3 CLOSED。Final Composition Acceptance is `IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PENDING`；P1-5R remains `IN_PROGRESS / FINAL_COMPOSITION_REVIEW_PENDING`；Independent Acceptance remains `NOT_STARTED / BLOCKED_BY_FINAL_COMPOSITION`；R3.8 was not executed and requires separate explicit user authorization；the frozen implementation contract is unchanged。
+Batch R1、Batch R2-A、Batch R2-B and Batch R3 are accepted and DONE，with F1、F2、visual fidelity remediation and F3 CLOSED。Final Composition Acceptance is `PASS / DONE`；Independent Acceptance is `PASS`；open findings are `NONE`；P1-5R is `CLOSED` and parent P1-5 is `DONE`。R3.8 was not executed and requires separate explicit user authorization；the frozen implementation contract is unchanged。
