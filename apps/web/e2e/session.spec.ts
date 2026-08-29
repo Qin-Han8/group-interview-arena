@@ -32,6 +32,7 @@ test("browser session recovers durable phases across API restart and reload", as
   let startCommand: string | undefined;
   let floorEvent: string | undefined;
   const lifecycleEvents: string[] = [];
+  const floorReleaseEvents: string[] = [];
   let humanSubmitCommand: string | undefined;
   let humanSubmitActionId: string | undefined;
   let humanCreatedEvent: string | undefined;
@@ -41,6 +42,7 @@ test("browser session recovers durable phases across API restart and reload", as
   let releaseHumanConfirmation: (() => void) | undefined;
   let humanConfirmationReleased = false;
   let releaseHistoryTail: (() => void) | undefined;
+  let releaseBufferedHistoryRemainder: (() => void) | undefined;
   let authoritativeReadCount = 0;
   let workspaceWebSocketCount = 0;
 
@@ -74,7 +76,12 @@ test("browser session recovers durable phases across API restart and reload", as
       );
     };
     const armHistoryTailRelease = () => {
-      if (releaseHistoryTail || !bufferingHistoryTail) return;
+      if (
+        releaseHistoryTail ||
+        releaseBufferedHistoryRemainder ||
+        !bufferingHistoryTail
+      )
+        return;
       const nextAiIndex = bufferedHistoryFrames.findIndex(
         isAiConfirmationFrame,
       );
@@ -89,10 +96,13 @@ test("browser session recovers durable phases across API restart and reload", as
         releasedHistoryTailCount += 1;
         releaseHistoryTail = undefined;
         if (releasedHistoryTailCount >= 2) {
-          bufferingHistoryTail = false;
-          for (const bufferedFrame of bufferedHistoryFrames.splice(0)) {
-            socket.send(bufferedFrame);
-          }
+          releaseBufferedHistoryRemainder = () => {
+            bufferingHistoryTail = false;
+            for (const bufferedFrame of bufferedHistoryFrames.splice(0)) {
+              socket.send(bufferedFrame);
+            }
+            releaseBufferedHistoryRemainder = undefined;
+          };
         } else {
           armHistoryTailRelease();
         }
@@ -147,6 +157,7 @@ test("browser session recovers durable phases across API restart and reload", as
         event.type === "floor.released" &&
         event.payload?.reason_code === "SPEAKER_FINISHED"
       ) {
+        floorReleaseEvents.push(payload);
         if (event.action_id === humanSubmitActionId) {
           humanReleaseEvent = payload;
         } else if (humanReleaseEvent !== undefined) {
@@ -722,6 +733,7 @@ test("browser session recovers durable phases across API restart and reload", as
   });
   expect(aiCreatedEvent).not.toContain(PRIVATE_SENTINEL);
   expect(parsedAiEvent.payload.content).toContain(R3_PROMPT_SENTINEL);
+  expect(parsedAiEvent.sequence).toBeGreaterThan(parsedHumanRelease.sequence);
   await expect
     .poll(exactConfirmedAiContributionCount)
     .toBeGreaterThanOrEqual(1);
@@ -750,9 +762,7 @@ test("browser session recovers durable phases across API restart and reload", as
   await expect(returnToLatest).toHaveCount(0);
   await expect.poll(() => releaseHistoryTail).toBeTruthy();
   releaseHistoryTail?.();
-  await expect
-    .poll(exactConfirmedAiContributionCount)
-    .toBeGreaterThanOrEqual(2);
+  await expect.poll(exactConfirmedAiContributionCount).toBe(2);
   await expect
     .poll(() =>
       transcriptList.evaluate(
@@ -762,6 +772,27 @@ test("browser session recovers durable phases across API restart and reload", as
     )
     .toBeLessThanOrEqual(48);
   await expect(returnToLatest).toHaveCount(0);
+  const parsedAiRelease = floorReleaseEvents
+    .map((event) => JSON.parse(event))
+    .find(
+      (event) =>
+        event.payload?.grant_id === parsedAiEvent.payload.floor_grant_id,
+    );
+  expect(parsedAiRelease).toMatchObject({
+    schema_version: 2,
+    type: "floor.released",
+    session_id: sessionId,
+    sequence: parsedAiEvent.sequence + 1,
+    action_id: null,
+    payload: {
+      grant_id: parsedAiEvent.payload.floor_grant_id,
+      participant_id: parsedAiEvent.payload.participant_id,
+      phase: "OPENING_STATEMENTS",
+      reason_code: "SPEAKER_FINISHED",
+    },
+  });
+  expect(releaseBufferedHistoryRemainder).toBeDefined();
+  releaseBufferedHistoryRemainder?.();
 
   const readsBeforeLongResponsiveSwitching = authoritativeReadCount;
   const socketsBeforeLongResponsiveSwitching = workspaceWebSocketCount;
@@ -919,6 +950,20 @@ test("browser session recovers durable phases across API restart and reload", as
     page.getByText("正在安排下一位发言者", { exact: true }),
   ).toHaveCount(0);
   await expect.poll(exactConfirmedContributionCount).toBe(1);
+  const completedLifecycle = lifecycleEvents
+    .map((event) => JSON.parse(event))
+    .filter((event) => event.type === "session.state_changed")
+    .map((event) => event.payload?.status as string)
+    .filter((status, index, statuses) => statuses.indexOf(status) === index);
+  expect(completedLifecycle).toEqual([
+    "PREPARATION",
+    "OPENING_STATEMENTS",
+    "EXPLORATION",
+    "CONFLICT_AND_EVALUATION",
+    "CONVERGENCE",
+    "FINAL_SUMMARY",
+    "COMPLETED",
+  ]);
 
   const authoritative = await page.evaluate(
     async ({ apiBaseUrl, session }) => {

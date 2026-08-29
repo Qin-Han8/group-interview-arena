@@ -1,6 +1,6 @@
 # P1-5R Local Acceptance Remediation — Design Freeze
 
-Status: `P1 IN_PROGRESS`; `P1-5 IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN`; `P1-5R IN_PROGRESS / DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN`; `R1 DONE`; `F1 CLOSED`; `R2-A DONE`; `F2 CLOSED`; `R2-B DONE`; `Visual fidelity remediation CLOSED`; `R3 IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PENDING`; `F3 OPEN / IMPLEMENTATION_COMPLETE_AWAITING_REVIEW`; `Final Acceptance NOT_STARTED / BLOCKED_BY_R3`; `R3.8 NOT_EXECUTED / REQUIRES_SEPARATE_EXPLICIT_USER_AUTHORIZATION`
+Status: `P1 IN_PROGRESS`; `P1-5 IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN`; `P1-5R IN_PROGRESS / FINAL_COMPOSITION_REVIEW_PENDING`; `R1 DONE`; `F1 CLOSED`; `R2-A DONE`; `F2 CLOSED`; `R2-B DONE`; `Visual fidelity remediation CLOSED`; `R3 DONE`; `F3 CLOSED`; `Final Composition Acceptance IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PENDING`; `Independent Acceptance NOT_STARTED / BLOCKED_BY_FINAL_COMPOSITION`; `R3.8 NOT_EXECUTED / REQUIRES_SEPARATE_EXPLICIT_USER_AUTHORIZATION`
 
 Target version: `V0.1 Internal Validation`
 
@@ -407,7 +407,7 @@ Temporary screenshots may support human review but are not committed correctness
 
 ## R3 — Conversation Quality Foundation
 
-Status: `IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PENDING`
+Status: `DONE`
 
 R3 first changes prompt/context quality. It does not initially change provider abstraction, provider/model, temperature, max tokens, streaming, thinking configuration or automatic retry.
 
@@ -628,17 +628,18 @@ P1-5F-3A = DONE
 P1-5F-3B = DONE
 P1-5F-4 = DONE
 
-P1-5R = IN_PROGRESS / DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN
+P1-5R = IN_PROGRESS / FINAL_COMPOSITION_REVIEW_PENDING
 R1 = DONE
 R2-A = DONE
 R2-B = DONE
-R3 = IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PENDING
-Final acceptance = NOT_STARTED / BLOCKED_BY_R3
+R3 = DONE
+Final Composition Acceptance = IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PENDING
+Independent Acceptance = NOT_STARTED / BLOCKED_BY_FINAL_COMPOSITION
 
 F1 = CLOSED
 F2 = CLOSED
 Visual fidelity remediation = CLOSED
-F3 = OPEN / IMPLEMENTATION_COMPLETE_AWAITING_REVIEW
+F3 = CLOSED
 R3.8 = NOT_EXECUTED / REQUIRES_SEPARATE_EXPLICIT_USER_AUTHORIZATION
 
 Implementation plan = FROZEN
@@ -648,4 +649,4 @@ P1-5R-DES-001 = CLOSED
 Open design findings = NONE
 ```
 
-Batch R1、Batch R2-A and Batch R2-B are accepted and DONE，with F1、F2 and visual fidelity remediation CLOSED。Batch R3 implementation is complete and awaits actual-source review；F3 remains OPEN awaiting that review；Final Acceptance remains blocked by R3；R3.8 was not executed and requires separate explicit user authorization；the frozen design contract is unchanged。
+Batch R1、Batch R2-A、Batch R2-B and Batch R3 are accepted and DONE，with F1、F2、visual fidelity remediation and F3 CLOSED。Final Composition Acceptance is `IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PENDING`；P1-5R remains `IN_PROGRESS / FINAL_COMPOSITION_REVIEW_PENDING`；Independent Acceptance remains `NOT_STARTED / BLOCKED_BY_FINAL_COMPOSITION`；R3.8 was not executed and requires separate explicit user authorization；the frozen design contract is unchanged。
