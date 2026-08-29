@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { access, writeFile } from "node:fs/promises";
+import { access, readFile, writeFile } from "node:fs/promises";
 
 const API_BASE_URL = process.env.GIA_E2E_API_ORIGIN ?? "http://localhost:8000";
 const PRIVATE_SENTINEL = "P1_2C_PRIVATE_SENTINEL_DO_NOT_DISCLOSE";
@@ -19,6 +19,8 @@ const R3_PROMPT_SENTINEL = "R3_PROMPT_CONTEXT_VERIFIED";
 const PRIVATE_NOTES = "仅在当前页面内存中保留的私人思路";
 const API_RESTART_REQUEST = process.env.GIA_E2E_API_RESTART_REQUEST;
 const API_RESTART_READY = process.env.GIA_E2E_API_RESTART_READY;
+const PROVIDER_BLOCKED = process.env.GIA_E2E_PROVIDER_BLOCKED;
+const PROVIDER_CANCELLED = process.env.GIA_E2E_PROVIDER_CANCELLED;
 
 test.setTimeout(150_000);
 
@@ -29,6 +31,8 @@ test("browser session recovers durable phases across API restart and reload", as
   const password = `P1-1D browser ${crypto.randomUUID()} phrase`;
   expect(process.env.GIA_E2E_FLOOR_REQUEST).toBeUndefined();
   expect(process.env.GIA_E2E_FLOOR_READY).toBeUndefined();
+  expect(PROVIDER_BLOCKED).toBeTruthy();
+  expect(PROVIDER_CANCELLED).toBeTruthy();
   let startCommand: string | undefined;
   let floorEvent: string | undefined;
   const lifecycleEvents: string[] = [];
@@ -39,6 +43,7 @@ test("browser session recovers durable phases across API restart and reload", as
   let humanReleaseEvent: string | undefined;
   let laterUnrelatedReleaseEvent: string | undefined;
   let aiCreatedEvent: string | undefined;
+  const aiCreatedEvents: string[] = [];
   let releaseHumanConfirmation: (() => void) | undefined;
   let humanConfirmationReleased = false;
   let releaseHistoryTail: (() => void) | undefined;
@@ -151,17 +156,16 @@ test("browser session recovers durable phases across API restart and reload", as
         payload.includes('\"actor_kind\":\"AI\"')
       ) {
         aiCreatedEvent ??= payload;
+        aiCreatedEvents.push(payload);
       }
-      if (
-        event.schema_version === 2 &&
-        event.type === "floor.released" &&
-        event.payload?.reason_code === "SPEAKER_FINISHED"
-      ) {
+      if (event.schema_version === 2 && event.type === "floor.released") {
         floorReleaseEvents.push(payload);
-        if (event.action_id === humanSubmitActionId) {
-          humanReleaseEvent = payload;
-        } else if (humanReleaseEvent !== undefined) {
-          laterUnrelatedReleaseEvent = payload;
+        if (event.payload?.reason_code === "SPEAKER_FINISHED") {
+          if (event.action_id === humanSubmitActionId) {
+            humanReleaseEvent = payload;
+          } else if (humanReleaseEvent !== undefined) {
+            laterUnrelatedReleaseEvent = payload;
+          }
         }
       }
 
@@ -794,6 +798,101 @@ test("browser session recovers durable phases across API restart and reload", as
   expect(releaseBufferedHistoryRemainder).toBeDefined();
   releaseBufferedHistoryRemainder?.();
 
+  await expect
+    .poll(
+      async () => {
+        try {
+          await access(PROVIDER_BLOCKED!);
+          return true;
+        } catch {
+          return false;
+        }
+      },
+      { timeout: 10_000 },
+    )
+    .toBe(true);
+  const runningProviderState = JSON.parse(
+    await readFile(PROVIDER_BLOCKED!, "utf8"),
+  ) as { floor_grant_id: string; request_status: string };
+  expect(runningProviderState).toMatchObject({ request_status: "RUNNING" });
+  const socketsBeforeCancellationReload = workspaceWebSocketCount;
+
+  await page.reload();
+
+  await expect
+    .poll(
+      async () => {
+        try {
+          await access(PROVIDER_CANCELLED!);
+          return true;
+        } catch {
+          return false;
+        }
+      },
+      { timeout: 10_000 },
+    )
+    .toBe(true);
+  const cancelledProviderState = JSON.parse(
+    await readFile(PROVIDER_CANCELLED!, "utf8"),
+  ) as { floor_grant_id: string };
+  expect(cancelledProviderState.floor_grant_id).toBe(
+    runningProviderState.floor_grant_id,
+  );
+  await expect(page.getByText("连接正常").first()).toBeVisible();
+  expect(workspaceWebSocketCount).toBeGreaterThan(
+    socketsBeforeCancellationReload,
+  );
+  await expect
+    .poll(
+      () =>
+        floorReleaseEvents.filter((rawEvent) => {
+          const event = JSON.parse(rawEvent);
+          return (
+            event.payload?.grant_id === runningProviderState.floor_grant_id &&
+            event.payload?.reason_code === "INTERRUPTED"
+          );
+        }).length,
+      { timeout: 10_000 },
+    )
+    .toBe(1);
+  const interruptedRelease = floorReleaseEvents
+    .map((rawEvent) => JSON.parse(rawEvent))
+    .find(
+      (event) =>
+        event.payload?.grant_id === runningProviderState.floor_grant_id &&
+        event.payload?.reason_code === "INTERRUPTED",
+    );
+  expect(interruptedRelease).toMatchObject({
+    schema_version: 2,
+    type: "floor.released",
+    session_id: sessionId,
+    action_id: null,
+    payload: {
+      grant_id: runningProviderState.floor_grant_id,
+      reason_code: "INTERRUPTED",
+    },
+  });
+  expect(
+    aiCreatedEvents.filter(
+      (rawEvent) =>
+        JSON.parse(rawEvent).payload?.floor_grant_id ===
+        runningProviderState.floor_grant_id,
+    ),
+  ).toHaveLength(0);
+  await expect
+    .poll(
+      () =>
+        lifecycleEvents.some((rawEvent) => {
+          const event = JSON.parse(rawEvent);
+          return (
+            event.type === "floor.granted" &&
+            event.sequence > interruptedRelease.sequence
+          );
+        }),
+      { timeout: 10_000 },
+    )
+    .toBe(true);
+
   const readsBeforeLongResponsiveSwitching = authoritativeReadCount;
   const socketsBeforeLongResponsiveSwitching = workspaceWebSocketCount;
   await page.setViewportSize({ height: 900, width: 900 });
@@ -964,6 +1063,22 @@ test("browser session recovers durable phases across API restart and reload", as
     "FINAL_SUMMARY",
     "COMPLETED",
   ]);
+  expect(
+    floorReleaseEvents.filter((rawEvent) => {
+      const event = JSON.parse(rawEvent);
+      return (
+        event.payload?.grant_id === runningProviderState.floor_grant_id &&
+        event.payload?.reason_code === "INTERRUPTED"
+      );
+    }),
+  ).toHaveLength(1);
+  expect(
+    aiCreatedEvents.filter(
+      (rawEvent) =>
+        JSON.parse(rawEvent).payload?.floor_grant_id ===
+        runningProviderState.floor_grant_id,
+    ),
+  ).toHaveLength(0);
 
   const authoritative = await page.evaluate(
     async ({ apiBaseUrl, session }) => {

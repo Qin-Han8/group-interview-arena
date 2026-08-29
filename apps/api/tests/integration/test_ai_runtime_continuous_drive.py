@@ -36,6 +36,7 @@ from group_interview_arena_api.modules.ai_runtime.domain import (
     GenerationFailureCode,
     GenerationRequestMetadata,
     GenerationRequestStatus,
+    PersistUtteranceCommand,
     PromptVersionDefinition,
 )
 from group_interview_arena_api.modules.ai_runtime.generation import (
@@ -45,7 +46,9 @@ from group_interview_arena_api.modules.ai_runtime.generation import (
     RuntimeGenerationInput,
 )
 from group_interview_arena_api.modules.ai_runtime.orchestration import (
+    SingleAiTurnOutcome,
     derive_automatic_turn_identities,
+    drive_single_ai_turn,
 )
 from group_interview_arena_api.modules.ai_runtime.runtime import (
     GenerateAiUtteranceCommand,
@@ -53,6 +56,7 @@ from group_interview_arena_api.modules.ai_runtime.runtime import (
     generate_ai_utterance,
 )
 from group_interview_arena_api.modules.ai_runtime.service import (
+    complete_generation_request,
     publish_prompt_version,
 )
 from group_interview_arena_api.modules.discussion_sessions.domain import (
@@ -638,7 +642,7 @@ def test_concurrent_continuous_drives_preserve_one_winner_per_grant(
     run_async(exercise)
 
 
-def test_cancellation_leaves_running_request_fail_closed_on_reentry(
+def test_cancellation_terminalizes_running_request_and_reentry_continues(
     migrated_database: TemporaryDatabaseContext,
 ) -> None:
     async def exercise() -> None:
@@ -652,34 +656,209 @@ def test_cancellation_leaves_running_request_fail_closed_on_reentry(
             return RawGenerationSuccess(content="unreachable")
 
         async with _continuous_runtime_context(migrated_database) as context:
-            task = asyncio.create_task(_drive(context, blocking_provider))
-            await started.wait()
-            task.cancel()
-            with pytest.raises(asyncio.CancelledError):
-                await task
-
-            reentry_calls = 0
-
-            async def reentry_provider(
-                _generation_input: RuntimeGenerationInput,
-            ) -> RawGenerationSuccess:
-                nonlocal reentry_calls
-                reentry_calls += 1
-                return RawGenerationSuccess(content="must not run")
-
-            reentry = await _drive(context, reentry_provider)
             identities = derive_automatic_turn_identities(
                 session_id=context.session_id,
                 floor_grant_id=context.initial_ai_grant_id,
             )
+            task = asyncio.create_task(_drive(context, blocking_provider))
+            await started.wait()
+            async with context.session_factory() as session:
+                running_request = await session.get(
+                    LlmGenerationRequest, identities.generation_request_id
+                )
+                running_utterance_count = int(
+                    await session.scalar(
+                        select(func.count())
+                        .select_from(AiUtterance)
+                        .where(
+                            AiUtterance.floor_grant_id == context.initial_ai_grant_id
+                        )
+                    )
+                    or 0
+                )
+            assert running_request is not None
+            assert running_request.status == GenerationRequestStatus.RUNNING
+            assert running_utterance_count == 0
+
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+
+            async with context.session_factory() as session:
+                cancelled_request = await session.get(
+                    LlmGenerationRequest, identities.generation_request_id
+                )
+                cancelled_utterance_count = int(
+                    await session.scalar(
+                        select(func.count())
+                        .select_from(AiUtterance)
+                        .where(
+                            AiUtterance.floor_grant_id == context.initial_ai_grant_id
+                        )
+                    )
+                    or 0
+                )
+            assert cancelled_request is not None
+            assert cancelled_request.status == GenerationRequestStatus.FAILED
+            assert (
+                cancelled_request.failure_code == GenerationFailureCode.INTERNAL_ERROR
+            )
+            assert cancelled_utterance_count == 0
+
+            failed_replay_provider_calls = 0
+
+            async def failed_replay_provider(
+                _generation_input: RuntimeGenerationInput,
+            ) -> RawGenerationSuccess:
+                nonlocal failed_replay_provider_calls
+                failed_replay_provider_calls += 1
+                return RawGenerationSuccess(content="must not run")
+
+            replay = await drive_single_ai_turn(
+                context.session_factory,
+                owner_id=context.owner_id,
+                session_id=context.session_id,
+                provider=failed_replay_provider,
+                provider_identifier="local-test-provider",
+                model_identifier="continuous-test-model",
+                configuration_version="P1_5E_3_TEST",
+                scheduling_policy=V0_1_SCHEDULER_POLICY,
+            )
+            assert replay.outcome is SingleAiTurnOutcome.NEXT_AI_GRANTED
+            assert replay.runtime_outcome is RuntimeGenerationOutcome.FAILED_REPLAY
+            assert replay.failure_code is GenerationFailureCode.INTERNAL_ERROR
+            assert failed_replay_provider_calls == 0
+
+            continuation_provider_calls: list[UUID] = []
+
+            async def continuation_provider(
+                generation_input: RuntimeGenerationInput,
+            ) -> RawGenerationSuccess:
+                continuation_provider_calls.append(generation_input.floor_grant_id)
+                return RawGenerationSuccess(content="Independent next AI turn.")
+
+            continuation = await _drive(context, continuation_provider)
+            async with context.session_factory() as session:
+                request_after_reentry = await session.get(
+                    LlmGenerationRequest, identities.generation_request_id
+                )
+                release = await session.get(FloorRelease, context.initial_ai_grant_id)
+                initial_request_count = int(
+                    await session.scalar(
+                        select(func.count())
+                        .select_from(LlmGenerationRequest)
+                        .where(
+                            LlmGenerationRequest.floor_grant_id
+                            == context.initial_ai_grant_id
+                        )
+                    )
+                    or 0
+                )
+                initial_utterance_count = int(
+                    await session.scalar(
+                        select(func.count())
+                        .select_from(AiUtterance)
+                        .where(
+                            AiUtterance.floor_grant_id == context.initial_ai_grant_id
+                        )
+                    )
+                    or 0
+                )
+                initial_release_count = int(
+                    await session.scalar(
+                        select(func.count())
+                        .select_from(FloorRelease)
+                        .where(FloorRelease.grant_id == context.initial_ai_grant_id)
+                    )
+                    or 0
+                )
+                schedule_count = int(
+                    await session.scalar(
+                        select(func.count())
+                        .select_from(SessionAction)
+                        .where(
+                            SessionAction.session_id == context.session_id,
+                            SessionAction.action_id == identities.schedule_action_id,
+                        )
+                    )
+                    or 0
+                )
+
+            assert continuation.outcome is ContinuousAiDriveOutcome.WAITING_FOR_HUMAN
+            assert continuation.automated_ai_turns_advanced == 1
+            assert len(continuation_provider_calls) == 1
+            assert continuation_provider_calls[0] != context.initial_ai_grant_id
+            assert request_after_reentry is not None
+            assert request_after_reentry.status == GenerationRequestStatus.FAILED
+            assert (
+                request_after_reentry.failure_code
+                == GenerationFailureCode.INTERNAL_ERROR
+            )
+            assert release is not None
+            assert release.reason_code == FloorReleaseReason.INTERRUPTED
+            assert initial_request_count == initial_release_count == schedule_count == 1
+            assert initial_utterance_count == 0
+
+    run_async(exercise)
+
+
+def test_durable_completion_is_not_overwritten_by_cancellation_cleanup(
+    migrated_database: TemporaryDatabaseContext,
+) -> None:
+    async def exercise() -> None:
+        started = asyncio.Event()
+
+        async def blocking_provider(
+            _generation_input: RuntimeGenerationInput,
+        ) -> RawGenerationSuccess:
+            started.set()
+            await asyncio.Event().wait()
+            return RawGenerationSuccess(content="unreachable")
+
+        async with _continuous_runtime_context(migrated_database) as context:
+            identities = derive_automatic_turn_identities(
+                session_id=context.session_id,
+                floor_grant_id=context.initial_ai_grant_id,
+            )
+            task = asyncio.create_task(_drive(context, blocking_provider))
+            await started.wait()
+
+            async with context.session_factory() as session:
+                completed = await complete_generation_request(
+                    session,
+                    owner_id=context.owner_id,
+                    command=PersistUtteranceCommand(
+                        utterance_id=identities.utterance_id,
+                        session_id=context.session_id,
+                        generation_request_id=identities.generation_request_id,
+                        content="Concurrent durable completion wins.",
+                        persisted_at=datetime.now(UTC),
+                    ),
+                )
+            assert completed.status is GenerationRequestStatus.COMPLETED
+
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+
             async with context.session_factory() as session:
                 request = await session.get(
                     LlmGenerationRequest, identities.generation_request_id
                 )
+                utterance_count = int(
+                    await session.scalar(
+                        select(func.count())
+                        .select_from(AiUtterance)
+                        .where(
+                            AiUtterance.floor_grant_id == context.initial_ai_grant_id
+                        )
+                    )
+                    or 0
+                )
 
-            assert reentry.outcome is ContinuousAiDriveOutcome.RECONCILIATION_REQUIRED
-            assert reentry_calls == 0
             assert request is not None
-            assert request.status == GenerationRequestStatus.RUNNING
+            assert request.status == GenerationRequestStatus.COMPLETED
+            assert request.failure_code is None
+            assert utterance_count == 1
 
     run_async(exercise)

@@ -1,10 +1,10 @@
 # P1-5R Local Acceptance Remediation — Detailed Implementation Plan
 
-Status: P1 = IN_PROGRESS; P1-5 = DONE; P1-5R = CLOSED
+Status: P1 = IN_PROGRESS; P1-5 = REOPENED / POST_ACCEPTANCE_DEFECT_REVIEW_PENDING; P1-5R = REOPENED / POST_ACCEPTANCE_DEFECT_REVIEW_PENDING
 
-Batch status: R1 = DONE; R2-A = DONE; R2-B = DONE; R3 = DONE; Final Composition Acceptance = PASS / DONE; Independent Acceptance = PASS; R3.8 = NOT_EXECUTED / REQUIRES_SEPARATE_EXPLICIT_USER_AUTHORIZATION
+Batch status: R1 = DONE; R2-A = DONE; R2-B = DONE; R3 = DONE; Historical Final Composition Acceptance = PASS / DONE; Historical Independent Acceptance = PASS; Previous P1-5R closeout = PASS / CLOSED; Historical authorized R3.8 smoke = EXECUTED / DEFECT_EXPOSED; Remediation real-provider calls = 0
 
-Findings: F1 = CLOSED; F2 = CLOSED; Visual fidelity remediation = CLOSED; F3 = CLOSED; P1-5R-IP-001 = CLOSED; Open implementation findings = NONE; Open P1-5R findings = NONE
+Findings: F1 = CLOSED; F2 = CLOSED; Visual fidelity remediation = CLOSED; F3 = CLOSED; P1-5R-IP-001 = CLOSED; P1-5R-POST-001 = IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PENDING; P1-5R-POST-REV-001 = REMEDIATED / ACTUAL_SOURCE_REVIEW_PENDING
 
 Target version: V0.1 Internal Validation
 
@@ -735,6 +735,8 @@ Run frozen-lock install, Web format/lint/typecheck/full Vitest/build, live OpenA
 - Scope gate: no key/model/output in repository or governance evidence.
 - Review checkpoint: optional smoke cannot substitute for actual-source review or deterministic tests.
 
+Post-closeout historical evidence：a later explicitly authorized R3.8 real-provider local smoke was executed and exposed P1-5R-POST-001。No further real-provider call is authorized or made during this remediation。
+
 ### R3 batch gate
 
 From apps/api run uv sync --frozen, uv lock --check, Ruff check/format, Pyright, focused R3 unit/integration tests, all non-integration tests, all integration tests, and the full suite. Run Alembic heads/current/check and migration regressions against the established PostgreSQL environment. The focused PostgreSQL gate must start a normal create_app(...) lifespan against a fresh migrated application database and assert the exact v2 UUID, key, version, purpose, template digest/text, created_at, published_at, and retired_at after supported bootstrap; it must repeat startup as an exact no-op, prove conflicting identity/version aborts startup, and prove v1 remains byte/field unchanged. The selection gate separately proves pre-publication grants choose v1, at/post-publication new requests persist/select/render v2, and existing requests retain their persisted prompt_version_id. From root run Web format/lint/typecheck/test/build and network-free Browser E2E. Require exact R3 allowlist, schema/migration/REST/WS/generated/dependency/provider/config diffs empty, Master Plan hash, privacy/static scan, git diff --check, staged zero. Run review bundle, external actual-source review, then user commit/push and exact CI green. F3 closes only on accepted evidence.
@@ -802,30 +804,45 @@ Every implementation batch must additionally prove:
 
 Coverage gaps: none. Source/design contradictions: none. P1-5R-IP-001: CLOSED. Open implementation findings: none.
 
+## P1-5R-POST-001 implementation checkpoint
+
+- Status: `IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PENDING`。
+- Baseline: clean committed `main` / `origin/main` `9d6270660cb7a358a62989a6a59bab2a521fa041`，which contains the legitimate prior P1-5R/P1-5 closeout after Independent Acceptance `PASS`。
+- RED: a deterministic blocking fake provider proves the request is durably `RUNNING` with zero utterance before cancellation；the pre-fix task propagates `CancelledError` but leaves the request orphaned `RUNNING`。
+- GREEN: `generate_ai_utterance(...)` catches cancellation across all post-claim work，uses the existing `fail_generation_request(...)` authority to terminalize `RUNNING → FAILED / INTERNAL_ERROR`，then re-raises `CancelledError`。
+- Recovery: reconnect/resume observes `FAILED_REPLAY`，releases the exact AI floor as `INTERRUPTED`，runs the unchanged scheduler and processes only a newly granted AI turn；the cancelled grant has one request、zero utterances、one release and one deterministic schedule action。
+- Review finding remediation: P1-5R-POST-REV-001 is `REMEDIATED / ACTUAL_SOURCE_REVIEW_PENDING`。The existing network-free Browser harness blocks the third provider call only after PostgreSQL proves its request is durably `RUNNING` with zero utterances；an actual page reload tears down the workspace WebSocket and cancels the owning progression task；normal reconnect/resume then proves `FAILED / INTERNAL_ERROR → FAILED_REPLAY`，exactly one `INTERRUPTED` release，continued scheduling，no retry for the cancelled grant and no duplicate request、utterance or release。The Browser suite is rerun with `2 passed`。
+- Race safety: the existing aggregate/request locks serialize completion and failure；a durable `COMPLETED` request causes cancellation cleanup to leave it unchanged，while existing `FAILED` state is terminal and the cancelled `RUNNING` row fails exactly once。
+- Scope: runtime source、one existing PostgreSQL integration test file and current governance only；no schema/migration、REST/WS、scheduler、Prompt/context、provider/model/config/timeout、Web or dependency change；real-provider calls during remediation `0`。
+
 ## Stop conditions
 
 Stop and report before changing scope if implementation requires a schema/migration, REST/OpenAPI/WS/public event change, scheduler policy/domain/service semantic change, second progression/realtime authority, browser-selected speaker, global Web store, browser business persistence, transcript merge change, provider adapter/parameter/model change, dependency, prompt v1 mutation/rebinding, RAG/memory system, or fake UI capability. Do not solve such a conflict by expanding a batch allowlist.
 
-## Current governance hierarchy after final closeout
+## Current governance hierarchy after post-acceptance remediation
 
 ~~~text
 P1 = IN_PROGRESS
-P1-5 = DONE
-P1-5R = CLOSED
+P1-5 = REOPENED / POST_ACCEPTANCE_DEFECT_REVIEW_PENDING
+Previous P1-5 closeout = PASS / DONE at commit 9d6270660cb7a358a62989a6a59bab2a521fa041
+P1-5R = REOPENED / POST_ACCEPTANCE_DEFECT_REVIEW_PENDING
+Previous P1-5R closeout = PASS / CLOSED at commit 9d6270660cb7a358a62989a6a59bab2a521fa041
 R1 = DONE
 R2-A = DONE
 R2-B = DONE
 R3 = DONE
-Final Composition Acceptance = PASS / DONE
-Independent Acceptance = PASS
+Historical Final Composition Acceptance = PASS / DONE
+Historical Independent Acceptance = PASS
 F1 = CLOSED
 F2 = CLOSED
 Visual fidelity remediation = CLOSED
 F3 = CLOSED
-R3.8 = NOT_EXECUTED / REQUIRES_SEPARATE_EXPLICIT_USER_AUTHORIZATION
+Historical authorized R3.8 smoke = EXECUTED / DEFECT_EXPOSED
+Remediation real-provider calls = 0
 P1-5R-IP-001 = CLOSED
-Open implementation findings = NONE
-Open P1-5R findings = NONE
+P1-5R-POST-001 = IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PENDING
+P1-5R-POST-REV-001 = REMEDIATED / ACTUAL_SOURCE_REVIEW_PENDING
+Current P1-5R review finding = P1-5R-POST-REV-001
 ~~~
 
-Batch R1、Batch R2-A、Batch R2-B and Batch R3 are accepted and DONE，with F1、F2、visual fidelity remediation and F3 CLOSED。Final Composition Acceptance is `PASS / DONE`；Independent Acceptance is `PASS`；open findings are `NONE`；P1-5R is `CLOSED` and parent P1-5 is `DONE`。R3.8 was not executed and requires separate explicit user authorization；the frozen implementation contract is unchanged。
+Batch R1、Batch R2-A、Batch R2-B and Batch R3 remain accepted and DONE，with F1、F2、visual fidelity remediation and F3 CLOSED。Final Composition Acceptance、Independent Acceptance and the committed P1-5R/P1-5 closeout remain historical `PASS / CLOSED` evidence。The subsequent authorized R3.8 smoke exposed P1-5R-POST-001；its implementation is complete and awaits actual-source review，so P1-5R and parent P1-5 are reopened only for that review gate。No further real-provider call occurred，and the frozen R1～R3 implementation contract is unchanged。

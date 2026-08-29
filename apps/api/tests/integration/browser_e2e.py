@@ -1,4 +1,5 @@
 import asyncio
+import json
 import os
 import shutil
 import socket
@@ -235,7 +236,7 @@ def _run_playwright(*, environment_overrides: dict[str, str]) -> None:
         )
 
 
-def _run_browser_flow(temporary_database: TemporaryDatabase) -> None:
+def _run_browser_flow(temporary_database: TemporaryDatabase) -> UUID:
     _require_available_port(WEB_PORT)
     _require_available_port(API_PORT)
 
@@ -255,9 +256,17 @@ def _run_browser_flow(temporary_database: TemporaryDatabase) -> None:
         web_log = temporary_path / "web.log"
         restart_request = temporary_path / "restart-api.request"
         restart_ready = temporary_path / "restart-api.ready"
+        provider_blocked = temporary_path / "provider-blocked.json"
+        provider_cancelled = temporary_path / "provider-cancelled.json"
+        provider_calls = temporary_path / "provider-calls.jsonl"
         fake_app_module = temporary_path / "gia_e2e_fake_provider_app.py"
         fake_app_module.write_text(
+            "import asyncio\n"
+            "import json\n"
             "import os\n"
+            "from pathlib import Path\n"
+            "\n"
+            "import psycopg\n"
             "\n"
             "from group_interview_arena_api.modules.ai_runtime import composition\n"
             "from group_interview_arena_api.modules.ai_runtime.generation "
@@ -265,11 +274,20 @@ def _run_browser_flow(temporary_database: TemporaryDatabase) -> None:
             "\n"
             "\n"
             "_provider_call_count = 0\n"
+            "_blocked_provider = asyncio.Event()\n"
             "\n"
             "\n"
             "async def _network_free_provider(generation_input):\n"
             "    global _provider_call_count\n"
             "    _provider_call_count += 1\n"
+            "    floor_grant_id = str(generation_input.floor_grant_id)\n"
+            "    with Path(os.environ['GIA_E2E_PROVIDER_CALLS']).open(\n"
+            "        'a', encoding='utf-8'\n"
+            "    ) as call_log:\n"
+            "        call_log.write(json.dumps({\n"
+            "            'call': _provider_call_count,\n"
+            "            'floor_grant_id': floor_grant_id,\n"
+            "        }) + '\\n')\n"
             "    rendered_prompt = generation_input.rendered_prompt\n"
             "    checks = {\n"
             "        'v2_id': str(generation_input.prompt_version_id) == "
@@ -311,6 +329,39 @@ def _run_browser_flow(temporary_database: TemporaryDatabase) -> None:
             "        return RawGenerationSuccess(\n"
             "            content='R3_PROMPT_CONTEXT_FAILED:' + ','.join(failed)\n"
             "        )\n"
+            "    if _provider_call_count == 3:\n"
+            "        database_url = os.environ['GIA_API_DATABASE_URL'].replace(\n"
+            "            'postgresql+psycopg://', 'postgresql://', 1\n"
+            "        )\n"
+            "        with psycopg.connect(database_url) as connection:\n"
+            "            durable_rows = connection.execute(\n"
+            '                "SELECT request.status, request.failure_code, "\n'
+            '                "count(utterance.id) FROM llm_generation_requests "\n'
+            '                "AS request LEFT JOIN ai_utterances AS utterance "\n'
+            '                "ON utterance.generation_request_id = request.id "\n'
+            '                "WHERE request.floor_grant_id = %s "\n'
+            '                "GROUP BY request.id",\n'
+            "                (generation_input.floor_grant_id,),\n"
+            "            ).fetchall()\n"
+            "        if durable_rows != [('RUNNING', None, 0)]:\n"
+            "            raise RuntimeError(\n"
+            "                f'Blocked provider durable state mismatch: {durable_rows!r}'\n"
+            "            )\n"
+            "        Path(os.environ['GIA_E2E_PROVIDER_BLOCKED']).write_text(\n"
+            "            json.dumps({\n"
+            "                'floor_grant_id': floor_grant_id,\n"
+            "                'request_status': 'RUNNING',\n"
+            "            }),\n"
+            "            encoding='utf-8',\n"
+            "        )\n"
+            "        try:\n"
+            "            await _blocked_provider.wait()\n"
+            "        except asyncio.CancelledError:\n"
+            "            Path(os.environ['GIA_E2E_PROVIDER_CANCELLED']).write_text(\n"
+            "                json.dumps({'floor_grant_id': floor_grant_id}),\n"
+            "                encoding='utf-8',\n"
+            "            )\n"
+            "            raise\n"
             "    return RawGenerationSuccess(\n"
             "        content=os.environ['GIA_E2E_AI_CONTENT']\n"
             "    )\n"
@@ -357,6 +408,9 @@ def _run_browser_flow(temporary_database: TemporaryDatabase) -> None:
             "GIA_E2E_AI_CONTENT": AI_CONTRIBUTION,
             "GIA_E2E_HUMAN_CONTENT": HUMAN_CONTRIBUTION,
             "GIA_E2E_PHASE_INSTRUCTION": R3_PHASE_INSTRUCTION,
+            "GIA_E2E_PROVIDER_BLOCKED": str(provider_blocked),
+            "GIA_E2E_PROVIDER_CANCELLED": str(provider_cancelled),
+            "GIA_E2E_PROVIDER_CALLS": str(provider_calls),
             "PYTHONPATH": os.pathsep.join(
                 filter(
                     None,
@@ -432,6 +486,8 @@ def _run_browser_flow(temporary_database: TemporaryDatabase) -> None:
                             "GIA_E2E_API_RESTART_REQUEST": str(restart_request),
                             "GIA_E2E_API_RESTART_READY": str(restart_ready),
                             "GIA_E2E_AI_CONTENT": AI_CONTRIBUTION,
+                            "GIA_E2E_PROVIDER_BLOCKED": str(provider_blocked),
+                            "GIA_E2E_PROVIDER_CANCELLED": str(provider_cancelled),
                         }
                     )
                 finally:
@@ -442,6 +498,29 @@ def _run_browser_flow(temporary_database: TemporaryDatabase) -> None:
                 if coordinator_errors:
                     raise RuntimeError("API restart coordinator failed.") from (
                         coordinator_errors[0]
+                    )
+                blocked_state = json.loads(provider_blocked.read_text(encoding="utf-8"))
+                cancelled_state = json.loads(
+                    provider_cancelled.read_text(encoding="utf-8")
+                )
+                provider_call_rows = [
+                    json.loads(line)
+                    for line in provider_calls.read_text(encoding="utf-8").splitlines()
+                ]
+                cancelled_grant_id = UUID(cancelled_state["floor_grant_id"])
+                if blocked_state["floor_grant_id"] != str(cancelled_grant_id):
+                    raise RuntimeError(
+                        "Browser E2E blocked/cancelled provider grant did not match."
+                    )
+                if (
+                    sum(
+                        row["floor_grant_id"] == str(cancelled_grant_id)
+                        for row in provider_call_rows
+                    )
+                    != 1
+                ):
+                    raise RuntimeError(
+                        "Browser E2E retried the cancelled provider floor grant."
                     )
         except Exception:
             print("API server log tail:", file=sys.stderr)
@@ -456,9 +535,13 @@ def _run_browser_flow(temporary_database: TemporaryDatabase) -> None:
                 current_api[0] = None
             _wait_for_port_release(WEB_PORT)
             _wait_for_port_release(API_PORT)
+        return cancelled_grant_id
 
 
-def _verify_session_persistence(temporary_database: TemporaryDatabase) -> None:
+def _verify_session_persistence(
+    temporary_database: TemporaryDatabase,
+    cancelled_grant_id: UUID,
+) -> None:
     database_url = temporary_database.database_url
     with psycopg.connect(
         host=database_url.host,
@@ -532,6 +615,27 @@ def _verify_session_persistence(temporary_database: TemporaryDatabase) -> None:
             "AND event.payload->>'content' = %s "
             "ORDER BY event.sequence",
             (session_id, AI_CONTRIBUTION),
+        ).fetchall()
+        cancelled_request_rows = connection.execute(
+            "SELECT status, failure_code FROM llm_generation_requests "
+            "WHERE session_id = %s AND floor_grant_id = %s",
+            (session_id, cancelled_grant_id),
+        ).fetchall()
+        cancelled_utterance_count = connection.execute(
+            "SELECT count(*) FROM ai_utterances "
+            "WHERE session_id = %s AND floor_grant_id = %s",
+            (session_id, cancelled_grant_id),
+        ).fetchone()
+        cancelled_release_rows = connection.execute(
+            "SELECT reason_code FROM floor_releases "
+            "WHERE session_id = %s AND grant_id = %s",
+            (session_id, cancelled_grant_id),
+        ).fetchall()
+        cancelled_public_release_rows = connection.execute(
+            "SELECT payload->>'reason_code' FROM discussion_events "
+            "WHERE session_id = %s AND event_type = 'floor.released' "
+            "AND payload->>'grant_id' = %s",
+            (session_id, str(cancelled_grant_id)),
         ).fetchall()
 
         if human_event_rows:
@@ -647,6 +751,22 @@ def _verify_session_persistence(temporary_database: TemporaryDatabase) -> None:
             raise RuntimeError(
                 "Browser E2E fake-provider AI persistence evidence did not match."
             )
+    if cancelled_request_rows != [("FAILED", "INTERNAL_ERROR")]:
+        raise RuntimeError(
+            "Browser E2E cancelled generation request was not FAILED/INTERNAL_ERROR."
+        )
+    if cancelled_utterance_count != (0,):
+        raise RuntimeError(
+            "Browser E2E cancelled generation unexpectedly persisted an utterance."
+        )
+    if cancelled_release_rows != [("INTERRUPTED",)]:
+        raise RuntimeError(
+            "Browser E2E cancelled AI floor was not released once as INTERRUPTED."
+        )
+    if cancelled_public_release_rows != [("INTERRUPTED",)]:
+        raise RuntimeError(
+            "Browser E2E cancelled AI floor public release was not exactly once."
+        )
 
 
 async def _seed_browser_question_async(
@@ -721,14 +841,15 @@ def main() -> int:
     ) as temporary_database:
         migrate_database(temporary_database)
         _seed_browser_question(temporary_database)
-        _run_browser_flow(temporary_database)
-        _verify_session_persistence(temporary_database)
+        cancelled_grant_id = _run_browser_flow(temporary_database)
+        _verify_session_persistence(temporary_database, cancelled_grant_id)
 
     print(
         "P1-5F-4 browser E2E passed with exact durable Human submit/restore, "
         "real scheduler/runtime composition through the network-free fake provider, "
         "durable public AI transcript recovery, contiguous event history, matching "
-        "speaker-finished release, immutable question binding, reload/API-restart "
+        "speaker-finished release, reload-driven cancelled-provider FAILED_REPLAY and "
+        "exact INTERRUPTED release, immutable question binding, reload/API-restart "
         "recovery and private isolation; temporary database and servers were cleaned."
     )
     return 0

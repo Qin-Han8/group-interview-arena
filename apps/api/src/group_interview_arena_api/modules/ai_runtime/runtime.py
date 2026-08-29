@@ -1,3 +1,4 @@
+import asyncio
 from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from enum import StrEnum
@@ -660,80 +661,89 @@ async def generate_ai_utterance(
         )
 
     try:
-        raw_result = await executor(generation_input)
-    except Exception:
-        raw_result = RawGenerationFailure(
-            failure_code=GenerationFailureCode.INTERNAL_ERROR
-        )
-    validated = validate_generation_result(raw_result)
-    if validated.failure_code is not None:
-        failed = await _fail_generation(
-            session_factory,
-            owner_id=owner_id,
-            command=command,
-            failure_code=validated.failure_code,
-        )
-        return _confirmed_failure_result(
-            command,
-            failed,
-            confirmed_outcome=RuntimeGenerationOutcome.FAILED,
-        )
-    assert validated.content is not None
-
-    try:
-        async with session_factory() as session:
-            completed = await complete_generation_request(
-                session,
-                owner_id=owner_id,
-                command=PersistUtteranceCommand(
-                    utterance_id=command.utterance_id,
-                    session_id=command.session_id,
-                    generation_request_id=command.generation_request_id,
-                    content=validated.content,
-                    persisted_at=command.occurred_at,
-                ),
+        try:
+            raw_result = await executor(generation_input)
+        except Exception:
+            raw_result = RawGenerationFailure(
+                failure_code=GenerationFailureCode.INTERNAL_ERROR
             )
-    except GenerationContextError:
-        failed = await _fail_generation(
-            session_factory,
-            owner_id=owner_id,
-            command=command,
-            failure_code=GenerationFailureCode.INTERNAL_ERROR,
-        )
-        return _confirmed_failure_result(
-            command,
-            failed,
-            confirmed_outcome=RuntimeGenerationOutcome.STALE_RESULT,
-        )
-    except GenerationRequestConflictError:
-        return _result(command, RuntimeGenerationOutcome.REQUEST_CONFLICT)
-    except AiRuntimePersistenceError:
-        winning_utterance_id = await _existing_floor_utterance(
-            session_factory,
-            session_id=command.session_id,
-            floor_grant_id=command.floor_grant_id,
-        )
-        failed = await _fail_generation(
-            session_factory,
-            owner_id=owner_id,
-            command=command,
-            failure_code=GenerationFailureCode.INTERNAL_ERROR,
-        )
-        if winning_utterance_id is not None:
+        validated = validate_generation_result(raw_result)
+        if validated.failure_code is not None:
+            failed = await _fail_generation(
+                session_factory,
+                owner_id=owner_id,
+                command=command,
+                failure_code=validated.failure_code,
+            )
             return _confirmed_failure_result(
                 command,
                 failed,
-                confirmed_outcome=RuntimeGenerationOutcome.SUPERSEDED,
+                confirmed_outcome=RuntimeGenerationOutcome.FAILED,
             )
-        return _confirmed_failure_result(
-            command,
-            failed,
-            confirmed_outcome=RuntimeGenerationOutcome.FAILED,
-        )
+        assert validated.content is not None
 
-    return _result(
-        command,
-        RuntimeGenerationOutcome.COMPLETED,
-        request_status=completed.status,
-        utterance_id=completed.utterance_id,
-    )
+        try:
+            async with session_factory() as session:
+                completed = await complete_generation_request(
+                    session,
+                    owner_id=owner_id,
+                    command=PersistUtteranceCommand(
+                        utterance_id=command.utterance_id,
+                        session_id=command.session_id,
+                        generation_request_id=command.generation_request_id,
+                        content=validated.content,
+                        persisted_at=command.occurred_at,
+                    ),
+                )
+        except GenerationContextError:
+            failed = await _fail_generation(
+                session_factory,
+                owner_id=owner_id,
+                command=command,
+                failure_code=GenerationFailureCode.INTERNAL_ERROR,
+            )
+            return _confirmed_failure_result(
+                command,
+                failed,
+                confirmed_outcome=RuntimeGenerationOutcome.STALE_RESULT,
+            )
+        except GenerationRequestConflictError:
+            return _result(command, RuntimeGenerationOutcome.REQUEST_CONFLICT)
+        except AiRuntimePersistenceError:
+            winning_utterance_id = await _existing_floor_utterance(
+                session_factory,
+                session_id=command.session_id,
+                floor_grant_id=command.floor_grant_id,
+            )
+            failed = await _fail_generation(
+                session_factory,
+                owner_id=owner_id,
+                command=command,
+                failure_code=GenerationFailureCode.INTERNAL_ERROR,
+            )
+            if winning_utterance_id is not None:
+                return _confirmed_failure_result(
+                    command,
+                    failed,
+                    confirmed_outcome=RuntimeGenerationOutcome.SUPERSEDED,
+                )
+            return _confirmed_failure_result(
+                command,
+                failed,
+                confirmed_outcome=RuntimeGenerationOutcome.FAILED,
+            )
+
+        return _result(
+            command,
+            RuntimeGenerationOutcome.COMPLETED,
+            request_status=completed.status,
+            utterance_id=completed.utterance_id,
+        )
+    except asyncio.CancelledError:
+        await _fail_generation(
+            session_factory,
+            owner_id=owner_id,
+            command=command,
+            failure_code=GenerationFailureCode.INTERNAL_ERROR,
+        )
+        raise
