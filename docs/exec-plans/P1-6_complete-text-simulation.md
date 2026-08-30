@@ -1,8 +1,16 @@
 # P1-6 Complete Text Simulation Execution Plan
 
 - Status: `P1-6 IN_PROGRESS`
-- Previous checkpoint: `P1-6B DONE / DESIGN_SCOPE_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PASS`
-- Current checkpoint: `P1-6C Design Freeze DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`
+- Previous checkpoint: `P1-6C DONE / DESIGN_SCOPE_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PASS`
+- Current checkpoint: `P1-6D Design Freeze DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`
+- P1-6D initial external actual-source review verdict: `BLOCKED`
+- P1-6D initial reviewed bundle: `group-interview-arena-review-20260831-004302.zip`
+- P1-6D initial reviewed bundle SHA-256: `7CE39C1EB4DE8314DCE7DB1CDE9809EB386E0E0CADDED8620D11B47FDB1791D0`
+- P1-6D finding-only external actual-source re-review verdict: `PASS`
+- P1-6D finding-only reviewed bundle: `group-interview-arena-review-20260831-005931.zip`
+- P1-6D finding-only reviewed bundle SHA-256: `502D21B84410EDD606C806C188FFFF1FAF6C8E8ACE3F08381B86E9FA13E29A66`
+- P1-6D findings: `P16D-REV-001 CLOSED`; `P16D-REV-002 CLOSED`; new findings `NONE`; open findings `NONE`
+- P1-6D production implementation: `NOT_STARTED`
 - P1-6C production implementation: `DONE / DESIGN_SCOPE_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PASS`
 - P1-6C Design Freeze external actual-source review verdict: `PASS`
 - P1-6C Design Freeze reviewed bundle: `group-interview-arena-review-20260830-170659.zip`
@@ -24,7 +32,8 @@
 - P1-6B implementation reviewed bundle: `group-interview-arena-review-20260830-150847.zip`
 - P1-6B implementation reviewed bundle SHA-256: `0EAA4B3FEE82F4D8A82D5098CECFDA1BF04F9161B7A63E7F7779B2512D9347F6`
 - P1-6B implementation findings: `P16B-IMP-001 CLOSED`; `P16B-IMP-002 CLOSED`; `P16B-IMP-003 CLOSED`; `P16B-IMP-004 CLOSED`; `P16B-IMP-005 CLOSED`; `P16B-IMP-006 CLOSED`; `P16B-IMP-007 CLOSED`; new findings `NONE`; open findings `NONE`
-- Remaining checkpoints: `P1-6D NOT_STARTED`; `P1-6E NOT_STARTED`
+- P1-6D design-time production wiring gap: `NONE`; design-time STOP conditions: `NONE`; production source changes: `NONE`
+- Remaining checkpoint: `P1-6E NOT_STARTED`
 - Parent phase: `P1 IN_PROGRESS`
 - Product target: `V0.1 Internal Validation`
 - Authority: [`PROJECT_MASTER_PLAN.md`](../PROJECT_MASTER_PLAN.md) > Accepted [`DECISIONS.md`](../DECISIONS.md) > [`ROADMAP.md`](../ROADMAP.md) > [`TASKS.md`](../TASKS.md) > this plan > domain docs > code
@@ -512,7 +521,7 @@ P1-6B Design Freeze and implementation exclude public Memory REST/WS/Web, Report
 
 Stop before implementation or scope expansion if actual source later proves that: (1) the two-table shape cannot migrate additively; (2) public evidence cannot replay safely; (3) a public REST/WS change is required; (4) shared memory cannot isolate Private Stance; (5) optimistic CAS is unsafe in the current transaction model; (6) `PromptVersion` cannot support the semantic prompt without a new product decision; (7) transport refinement breaks accepted P1-5 contracts; (8) the master plan must change; (9) a new Accepted ADR/product decision is required; or (10) a 10× domain blocker cannot be addressed by replaceable infrastructure.
 
-Design-time STOP-condition result: `NONE`. The initial external actual-source review verdict was `BLOCKED` on exactly `P16B-REV-001`, `P16B-REV-002` and `P16B-REV-003` against `group-interview-arena-review-20260830-060509.zip` / SHA-256 `C0C7A7A589B1795DD917C11CF13B36FBCE245DFFD36CD20D5C96BAD80AC6EF26`. Finding-only remediation froze projection identity, persisted candidate Working Context provenance and explicit public question allowlisting. The finding-only external actual-source re-review verdict is `PASS` against `group-interview-arena-review-20260830-062133.zip` / SHA-256 `C10F2A9362EB6102C6C3F23D7BA66234FECC098BDE2A394D5A2738EBB97E701D`; `P16B-REV-001 CLOSED`; `P16B-REV-002 CLOSED`; `P16B-REV-003 CLOSED`; new findings `NONE`; open findings `NONE`. The approved production implementation is now `DONE / DESIGN_SCOPE_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PASS`. Implementation finding-only actual-source re-review verdict is `PASS` against `group-interview-arena-review-20260830-150847.zip` / SHA-256 `0EAA4B3FEE82F4D8A82D5098CECFDA1BF04F9161B7A63E7F7779B2512D9347F6`; `P16B-IMP-001`, `P16B-IMP-002`, `P16B-IMP-003`, `P16B-IMP-004`, `P16B-IMP-005`, `P16B-IMP-006`, `P16B-IMP-007` are `CLOSED`; new findings `NONE`; open findings `NONE`. P1-6C Design Freeze is `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-6C production implementation is `DONE / DESIGN_SCOPE_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PASS`; implementation findings `NONE`; P1-6D/P1-6E plus P1-7/P1-8 remain `NOT_STARTED`; P1-6/P1 remain `IN_PROGRESS`.
+Design-time STOP-condition result: `NONE`. The initial external actual-source review verdict was `BLOCKED` on exactly `P16B-REV-001`, `P16B-REV-002` and `P16B-REV-003` against `group-interview-arena-review-20260830-060509.zip` / SHA-256 `C0C7A7A589B1795DD917C11CF13B36FBCE245DFFD36CD20D5C96BAD80AC6EF26`. Finding-only remediation froze projection identity, persisted candidate Working Context provenance and explicit public question allowlisting. The finding-only external actual-source re-review verdict is `PASS` against `group-interview-arena-review-20260830-062133.zip` / SHA-256 `C10F2A9362EB6102C6C3F23D7BA66234FECC098BDE2A394D5A2738EBB97E701D`; `P16B-REV-001 CLOSED`; `P16B-REV-002 CLOSED`; `P16B-REV-003 CLOSED`; new findings `NONE`; open findings `NONE`. The approved production implementation is now `DONE / DESIGN_SCOPE_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PASS`. Implementation finding-only actual-source re-review verdict is `PASS` against `group-interview-arena-review-20260830-150847.zip` / SHA-256 `0EAA4B3FEE82F4D8A82D5098CECFDA1BF04F9161B7A63E7F7779B2512D9347F6`; `P16B-IMP-001`, `P16B-IMP-002`, `P16B-IMP-003`, `P16B-IMP-004`, `P16B-IMP-005`, `P16B-IMP-006`, `P16B-IMP-007` are `CLOSED`; new findings `NONE`; open findings `NONE`. P1-6C Design Freeze is `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-6C production implementation is `DONE / DESIGN_SCOPE_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PASS`; implementation findings `NONE`. At the P1-6B closeout checkpoint, P1-6D/P1-6E plus P1-7/P1-8 were `NOT_STARTED`; current status is governed by the plan header and later checkpoint sections.
 
 ## 11. P1-6C Design Freeze
 
@@ -618,4 +627,133 @@ P1-6C production implementation is `DONE / DESIGN_SCOPE_FROZEN / IMPLEMENTATION_
 
 The proof covers accepted Memory revision plus low-watermark raw-tail composition, exact candidate V3 and `GenerationRequestMetadata` V2 provenance, bounded `SAFE_RAW_FALLBACK`, unsafe-context rejection before candidate generation, public-evidence authority, cross-seat Private Stance exclusion, lifecycle/floor ownership and repeat progression without duplicate Memory revision, utterance or public event. The initial RED was limited to invalid synthetic Human evidence in the test fixture and an incorrect full-compaction test expectation; correcting the fixture to valid AI public evidence and asserting the frozen lazy high/low watermark semantics produced GREEN. No production wiring defect was found, production source changes are `NONE`, implementation STOP conditions are `NONE`, and no real provider call or P1-6D work occurred.
 
-Fresh gates: focused composition proof `3 passed`; affected PostgreSQL progression/composition/continuous/orchestration/runtime slice `87 passed`; API unit regression `521 passed` with `197 deselected`; Ruff lint `PASS`; Ruff format-check `143 files already formatted`; Pyright `0 errors, 0 warnings, 0 informations`. External actual-source implementation review verdict is `PASS` against `group-interview-arena-review-20260830-235324.zip` / SHA-256 `1E1FBE37255E294AEA76A4E4CC68E49490556C804BE77804731F78CF56EB944B`; implementation findings `NONE`; new findings `NONE`; open findings `NONE`; production wiring gap `NONE`; production source changes `NONE`. P1-6D/P1-6E remain `NOT_STARTED`, and P1-6/P1 remain `IN_PROGRESS`.
+Fresh gates: focused composition proof `3 passed`; affected PostgreSQL progression/composition/continuous/orchestration/runtime slice `87 passed`; API unit regression `521 passed` with `197 deselected`; Ruff lint `PASS`; Ruff format-check `143 files already formatted`; Pyright `0 errors, 0 warnings, 0 informations`. External actual-source implementation review verdict is `PASS` against `group-interview-arena-review-20260830-235324.zip` / SHA-256 `1E1FBE37255E294AEA76A4E4CC68E49490556C804BE77804731F78CF56EB944B`; implementation findings `NONE`; new findings `NONE`; open findings `NONE`; production wiring gap `NONE`; production source changes `NONE`. P1-6D Design Freeze is now `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-6D production implementation and P1-6E remain `NOT_STARTED`, and P1-6/P1 remain `IN_PROGRESS`.
+
+## 12. P1-6D Recovery / Three-AI End-to-End Validation Design Freeze
+
+P1-6D is a dedicated network-free Browser Acceptance Scenario, separate from the existing layout-heavy session Browser proof. It composes the already accepted P1-3 lifecycle, P1-4 floor/scheduler, P1-5 recovery/runtime, P1-6B Memory and P1-6C production caller chain; it creates no second lifecycle, scheduler, recovery engine, provider router or Memory authority. Actual-source calibration at baseline `6204bb030299671dcd22b5bb5c765c5c1262dd58` found proof gaps only: production wiring gap `NONE`, production source changes default to `NONE`, and design-time STOP conditions `NONE`.
+
+P1-6D Design Freeze is `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; production implementation is `NOT_STARTED`. This closeout accepts the frozen design and scope only; it does not authorize implementation, enter P1-6E, or run independent acceptance.
+
+### 12.1 Actual-source calibration and pre-existing coverage
+
+The existing [`browser_e2e.py`](../../apps/api/tests/integration/browser_e2e.py), [`session.spec.ts`](../../apps/web/e2e/session.spec.ts), [`playwright.config.ts`](../../apps/web/playwright.config.ts), Web package runner and Chromium CI job already provide an isolated temporary PostgreSQL database, migrated/seeded API, real Web process, Chromium, product UI session creation/start, REST + WebSocket observation, Human submission, reload/reconnect, API restart, cancelled generation recovery, durable verification, cleanup and the accepted lifecycle through `FINAL_SUMMARY -> COMPLETED`. The existing test is intentionally retained as the broad recovery/layout proof.
+
+The accepted P1-6C [`test_full_text_simulation_composition.py`](../../apps/api/tests/integration/test_full_text_simulation_composition.py) separately proves the real progression caller chain with one network-free provider that implements semantic `invoke(ModelInvocationInput)` and candidate `__call__(RuntimeGenerationInput)`, durable Memory revision, candidate V3, `GenerationRequestMetadata` V2, safe fallback, unsafe-context rejection, privacy and re-entry idempotency.
+
+Neither proof alone establishes the P1-6D contract. The current Browser fake is candidate-only, cancels by a global call ordinal, logs insufficient identity/workload/provenance data, proves only one AI contribution and uses one private sentinel. The P1-6C proof is backend-focused and does not exercise a complete Human + 3 AI Browser/restart journey. Actual source also proves that current `browser_e2e.py` invokes `test:e2e:browser`, that script invokes unfiltered `playwright test`, and the Playwright `testDir` discovers all `apps/web/e2e` specs. Therefore adding the dedicated spec without explicit selection would run it under the legacy API/provider/database harness. These are future test-isolation/proof gaps, not production defects.
+
+### 12.2 Frozen scenario boundary and ownership
+
+The future P1-6D scenario is a second, dedicated Browser spec with its own harness. The harness owns environment mechanics: isolated database, API/Web processes, restart coordinator, deterministic provider, persistent cross-restart signals/logs, post-run database verifier and cleanup. The Browser spec owns only the visible product journey: create/start, observe roster and phases, submit legitimate Human turns, reload/reconnect, request API restart, arm/cause one cancellation and observe safe continuation. It must not duplicate responsive, scroll, layout or screenshot assertions from `session.spec.ts`.
+
+Existing production ownership remains unchanged:
+
+| Concern | Frozen owner |
+|---|---|
+| Lifecycle and accepted phase order | P1-3 |
+| Speaker selection, grants and releases | P1-4 |
+| Candidate generation and cancellation recovery | P1-5/P1-6B runtime and orchestration |
+| Public semantic Memory and Working Context | P1-6B |
+| Normal production composition root | P1-6C existing progression |
+| Public snapshot/transcript/realtime rendering | Existing REST/WS/Web |
+| P1-6D | Acceptance composition and durable proof only |
+
+### 12.3 Dedicated harness and future file map
+
+The frozen future implementation shape is:
+
+- new `apps/api/tests/integration/p1_6d_browser_e2e.py`: dedicated process/database/provider/restart/durable-verifier harness;
+- new `apps/web/e2e/p1-6d-full-session.spec.ts`: product-journey-only Browser scenario;
+- minimal test-only adjustment to existing `apps/api/tests/integration/browser_e2e.py` and/or `apps/web/package.json` runner scripts so the legacy harness explicitly selects the complete existing legacy Browser suite and the dedicated harness explicitly selects only `p1-6d-full-session.spec.ts`;
+- minimal `apps/api/tests/integration/conftest.py` prefix allowlist extension for an isolated `gia_p16d_` database identity;
+- required minimal `.github/workflows/ci.yml` cleanup-prefix recognition for `gia_p16d_`; the existing Chromium job remains the owner and no new CI job is added;
+- these three governance documents only when status/evidence changes.
+
+Production source, schema/migration, public REST/WS/Web contracts, provider/runtime behavior, prompt assets and dependencies default to no change. Any additional file requires a directly observed RED gap and the STOP/re-approval rule in §12.12.
+
+The frozen runner topology is explicit and sequential:
+
+```text
+web:test:e2e
+  -> legacy browser harness
+       -> explicit selector for the complete existing legacy Browser suite
+          (baseline auth.spec.ts + session.spec.ts, or source-compatible explicit selector)
+       -> complete legacy harness cleanup
+  -> dedicated P1-6D harness
+       -> explicit selector for p1-6d-full-session.spec.ts only
+       -> complete dedicated harness cleanup
+```
+
+No unfiltered legacy `playwright test` may discover the P1-6D spec. Playwright keeps `workers = 1`; the two harnesses never overlap, and this finding does not authorize a new parallelism architecture.
+
+### 12.4 Authoritative roster and three-AI identity proof
+
+The scenario resolves participant identity from the authoritative session snapshot created by the existing roster service, not from provider-call position, UI label text or assumed seat ordering. It must prove exactly one Human plus exactly three AI participants, three unique authoritative AI `participant_id` values, and one or more durable public AI utterances from each of those three IDs. Provider logs record workload type, session, participant, floor grant, phase and relevant prompt/provenance fields so calls can be correlated across API restart.
+
+AI output is deterministic but distinct per authoritative participant. Assertions use durable participant/event/request relations; the proof must fail if one AI speaks three times while another never speaks.
+
+### 12.5 Active Human contribution strategy
+
+The Browser observes the authoritative current floor. Whenever the Human owns a live eligible floor, it submits one legitimate phase-aware public contribution through the existing UI and waits for the accepted public event/release before continuing. It does not mutate the database, manufacture events, bypass the UI command path or depend on fixed wall-clock sleeps. A per-grant record prevents duplicate Human submission after reload/reconnect.
+
+Human content is deterministic and tagged by phase/grant for post-run correlation. The harness/verifier proves each accepted Human utterance belongs to the Human participant and an authoritative floor, while P1-4 remains the only speaker authority.
+
+### 12.6 Dual-workload Memory and candidate proof
+
+The network-free provider implements both accepted interfaces in one persistent test seam:
+
+- semantic `invoke(ModelInvocationInput)` returns strict valid `MemoryPatch` JSON derived only from public input;
+- candidate `__call__(RuntimeGenerationInput)` returns deterministic participant-distinct public text.
+
+Persistent logs survive API restart and distinguish semantic from candidate workloads. The run must prove at least one semantic invocation creates a durable Memory revision; a later candidate uses immutable `AI_CANDIDATE_TURN` V3 and `GenerationRequestMetadata` V2 with `memory_revision > 0`; its recorded memory cursor and recent public raw-tail boundary match the visible authoritative evidence; and after API restart later generation continues from durable Memory rather than resetting it. Memory/rebuild may append derived revisions but must not rewrite, delete or replace any authoritative public `DiscussionEvent`.
+
+### 12.7 Three-seat privacy sentinels
+
+Each AI Private Stance carries a different unmistakable sentinel. For sentinel A/B/C, the future proof checks absence from every other candidate's rendered prompt/input, `MemoryDerivationInput`, persisted structured Memory, patch-journal semantic payload, shared Working Context, public utterances/events, REST/WS payloads, Browser DOM, persistent provider logs and safe observability output. Evaluator/reference-answer metadata and provider credentials receive equivalent absence assertions.
+
+The current candidate may consume only its own authorized private stance at the candidate-local boundary. A sentinel must never be copied into public candidate output. DiscussionEvent remains the sole public evidence authority; semantic Memory is never treated as raw evidence.
+
+### 12.8 Recovery and cancellation protocol
+
+The single scenario runs these ordered stages:
+
+1. Normal composition: all three authoritative AI participants speak and Memory is created/consumed.
+2. Browser reload: reconnect from the durable watermark without duplicate public facts or work.
+3. API restart: stop and restart the API against the same database, then prove snapshot/transcript/realtime and Memory-backed generation continue.
+4. Eligible-candidate cancellation: after restart, the Browser/harness arms cancellation for the **next eligible candidate generation**, identified by authoritative participant/floor/runtime input rather than a global provider-call ordinal. The provider exposes a file-backed `RUNNING` signal and blocks that exact candidate call. The Browser reload/disconnect cancels it; the harness records exactly one candidate attempt for the grant, a durable failed request in the existing safe state, no AI utterance/public utterance event, exactly one durable/public `INTERRUPTED` release, and subsequent scheduling/generation through `COMPLETED`.
+
+Semantic calls cannot accidentally consume the cancellation arm. The persistent arm, running, cancelled and call-log files make behavior observable across process boundaries without network access or provider credentials.
+
+### 12.9 Durable idempotency and lifecycle verifier
+
+After the Browser finishes, the harness queries PostgreSQL and fails unless all of the following hold:
+
+- one session exists with exactly one Human and three AI participants;
+- event sequences are contiguous and public utterance/event identity relations are one-to-one;
+- every authoritative AI ID contributed and accepted Human turns are attributable to valid Human floors;
+- each grant has at most one generation request, at most one AI utterance and exactly one terminal release; the cancelled grant has exactly the frozen failure/release shape from §12.8;
+- reload, reconnect, API restart and repeated progression created no duplicate request, utterance, event, release, Memory consumption or revision-chain break;
+- Memory revision/cursor, candidate V3 and metadata V2 provenance match the actual evidence consumed;
+- the exact accepted phase order is `PREPARATION -> OPENING_STATEMENTS -> EXPLORATION -> CONFLICT_AND_EVALUATION -> CONVERGENCE -> FINAL_SUMMARY -> COMPLETED`;
+- terminal session state is `COMPLETED` with no current floor and no live phase timing.
+
+### 12.10 Inherited P1-6C failure-proof boundary
+
+P1-6D owns only the normal memory-enabled full journey: durable Memory revision; candidate V3 and metadata V2 consumption/provenance; reload/reconnect; API restart; one intentional next-eligible-candidate cancellation/recovery; legitimate Human + three-AI participation; and full lifecycle completion. The one cancellation is the parent P1-6D generation-failure boundary.
+
+`SAFE_RAW_FALLBACK` and unsafe-context rejection remain accepted P1-6C focused backend composition proofs. P1-6D must not add a second fallback or unsafe-context scenario merely for phase ownership. Those P1-6C tests are inherited regressions and are rerun only if future P1-6D work changes a directly relevant runtime/Memory seam.
+
+### 12.11 Serial runner and Chromium CI contract
+
+`pnpm web:test:e2e` remains the single package/CI entry. It must first run the legacy harness with an explicit selector covering the complete existing legacy suite, wait for complete cleanup, then run the dedicated harness with an explicit selector for only `p1-6d-full-session.spec.ts`, and wait for its cleanup. The existing `chromium-e2e` job remains the owner. Required cleanup recognition for the frozen dedicated `gia_p16d_` prefix is added minimally; there is no parallel Browser execution, additional CI job, real provider call or secret requirement.
+
+Implementation verification must include the dedicated scenario, the explicitly selected complete legacy Browser regression, directly affected API/database checks, format/lint/type checks, single-head/migration checks only if actual changes require them, and repository/governance checks. P1-6C fallback/unsafe-context tests are rerun only when a relevant runtime/Memory seam changes. This Design Freeze runs none of those implementation suites.
+
+### 12.12 Production-change gate, STOP conditions and review gate
+
+Implementation begins test-first and production changes remain `NONE` unless a focused RED result proves a real existing-wiring defect. Stop and request explicit approval before changing production behavior, schema/migration, public REST/WS/Web contracts, PromptVersion/provider/runtime contracts, participant/lifecycle/floor ownership, Memory architecture, dependencies or CI topology; before adding a coordinator/router/worker/queue; if exact cancellation cannot be addressed through the existing floor/runtime seam; if three-AI identity requires call ordinals instead of authoritative IDs; if private sentinels cannot remain isolated; or if [`PROJECT_MASTER_PLAN.md`](../PROJECT_MASTER_PLAN.md) or an ADR must change.
+
+The initial external actual-source review of `group-interview-arena-review-20260831-004302.zip` / SHA-256 `7CE39C1EB4DE8314DCE7DB1CDE9809EB386E0E0CADDED8620D11B47FDB1791D0` returned `BLOCKED` on exactly `P16D-REV-001` and `P16D-REV-002`. Finding-only remediation froze explicit legacy/dedicated Browser selector isolation plus required `gia_p16d_` cleanup recognition, and restored fallback/unsafe-context ownership to P1-6C.
+
+External finding-only actual-source re-review returned `PASS` against `group-interview-arena-review-20260831-005931.zip` / SHA-256 `502D21B84410EDD606C806C188FFFF1FAF6C8E8ACE3F08381B86E9FA13E29A66`; `P16D-REV-001 CLOSED`; `P16D-REV-002 CLOSED`; new findings `NONE`; open findings `NONE`. P1-6D Design Freeze is therefore `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; production implementation remains `NOT_STARTED`. No independent review occurred, P1-6E remains `NOT_STARTED`, and implementation still requires separate explicit user approval.
