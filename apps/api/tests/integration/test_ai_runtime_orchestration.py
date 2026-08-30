@@ -1,4 +1,5 @@
 import asyncio
+import json
 from collections.abc import Callable, Coroutine
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -19,6 +20,8 @@ from group_interview_arena_api.core.config import (
 from group_interview_arena_api.db import (
     AiUtterance,
     DiscussionEvent,
+    DiscussionMemoryRevision,
+    DiscussionMemoryState,
     LlmGenerationRequest,
     PersonaPrivateStance,
     QuestionVersion,
@@ -41,6 +44,7 @@ from group_interview_arena_api.modules.ai_runtime.domain import (
     GenerationContextError,
     GenerationFailureCode,
     GenerationRequestMetadata,
+    GenerationRequestMetadataV2,
     GenerationRequestStatus,
     PromptVersionDefinition,
     RequestGenerationCommand,
@@ -48,6 +52,7 @@ from group_interview_arena_api.modules.ai_runtime.domain import (
 from group_interview_arena_api.modules.ai_runtime.generation import (
     DeterministicGenerationHarness,
     DeterministicGenerationMode,
+    ModelInvocationInput,
     RawGenerationSuccess,
     RuntimeGenerationInput,
 )
@@ -57,11 +62,44 @@ from group_interview_arena_api.modules.ai_runtime.runtime import (
     _load_recent_public_discussion,  # pyright: ignore[reportPrivateUsage]
     generate_ai_utterance,
 )
-from group_interview_arena_api.modules.ai_runtime.seed import AI_CANDIDATE_TURN_V2
+from group_interview_arena_api.modules.ai_runtime.seed import (
+    AI_CANDIDATE_TURN_V2,
+    AI_CANDIDATE_TURN_V3,
+    DISCUSSION_MEMORY_UPDATE_V2,
+)
 from group_interview_arena_api.modules.ai_runtime.service import (
     claim_generation_request,
     create_generation_request,
     publish_prompt_version,
+)
+from group_interview_arena_api.modules.discussion_memory.application import (
+    DiscussionMemoryPersistenceError,
+    MemoryMaintenanceOutcome,
+    MemorySemanticProvenance,
+    load_discussion_memory_projection,
+    load_public_memory_utterances,
+    maintain_discussion_memory,
+    rebuild_discussion_memory,
+)
+from group_interview_arena_api.modules.discussion_memory.derivation import (
+    DeterministicFakeMemoryDeriver,
+    MemoryDerivationInput,
+    MemoryDerivationResult,
+    MemoryDerivationUnavailable,
+)
+from group_interview_arena_api.modules.discussion_memory.domain import (
+    AcceptedMemoryRevision,
+    DiscussionContextMode,
+    MemoryItemKind,
+    MemoryItemStatus,
+    MemoryPatch,
+    MemoryPatchOperation,
+    MemoryPolicy,
+    StructuredDiscussionMemory,
+    replay_memory_revisions,
+)
+from group_interview_arena_api.modules.discussion_memory.working_context import (
+    build_discussion_working_context,
 )
 from group_interview_arena_api.modules.discussion_sessions.domain import (
     PhaseDurationPlan,
@@ -646,8 +684,13 @@ async def _success_replay_and_context_isolation(
             )
             assert request is not None and request.status == "COMPLETED"
             assert request.request_metadata == {
-                "schema_version": 1,
+                "schema_version": 2,
                 "configuration_version": "P1_5C_DETERMINISTIC",
+                "context_mode": "MEMORY_WITH_RAW_TAIL",
+                "memory_revision": 0,
+                "memory_source_through_sequence": 0,
+                "context_source_through_sequence": 0,
+                "working_context_version": "DISCUSSION_WORKING_CONTEXT_V1",
             }
             assert utterances == 1
 
@@ -737,8 +780,13 @@ async def _zhipu_mocked_provider_success_and_provenance(
         assert request.provider_identifier == "zhipu"
         assert request.model_identifier == "glm-4.7-flashx"
         assert request.request_metadata == {
-            "schema_version": 1,
+            "schema_version": 2,
             "configuration_version": "ZHIPU_CHAT_DEV_V1",
+            "context_mode": "MEMORY_WITH_RAW_TAIL",
+            "memory_revision": 0,
+            "memory_source_through_sequence": 0,
+            "context_source_through_sequence": 0,
+            "working_context_version": "DISCUSSION_WORKING_CONTEXT_V1",
         }
         assert utterance is not None
         assert utterance.content == "Use the shared criteria to compare options."
@@ -1457,5 +1505,1435 @@ def test_failure_persistence_failure_never_claims_durable_failed(
         lambda: _failure_persistence_failure_preserves_running_truth(
             migrated_database,
             monkeypatch,
+        )
+    )
+
+
+async def _memory_replay_rebuild_and_privacy_proof(
+    temporary_database: TemporaryDatabaseContext,
+) -> None:
+    async with _runtime_context(temporary_database) as context:
+        async with context.session_factory() as session:
+            async with session.begin():
+                question = await session.get(
+                    QuestionVersion, INTERNAL_VALIDATION_BUNDLE.version_id
+                )
+                assert question is not None
+                question.reference_dimensions = [{"value": "REFERENCE_SENTINEL_P16B"}]
+                question.hidden_conflicts = [{"value": "HIDDEN_SENTINEL_P16B"}]
+                question.acceptable_outcome_patterns = [
+                    {"value": "EVALUATOR_SENTINEL_P16B"}
+                ]
+        for index in range(3):
+            await _append_public_utterance(
+                context,
+                participant=context.participants[index],
+                actor_kind=(
+                    ParticipantActorKind.HUMAN
+                    if index == 0
+                    else ParticipantActorKind.AI
+                ),
+                content=f"PUBLIC_EVIDENCE_{index}",
+            )
+        async with context.session_factory() as session:
+            before = tuple(
+                (row.sequence, row.event_type, dict(row.payload))
+                for row in (
+                    await session.scalars(
+                        select(DiscussionEvent)
+                        .where(DiscussionEvent.session_id == context.session_id)
+                        .order_by(DiscussionEvent.sequence)
+                    )
+                ).all()
+            )
+
+        captured: list[MemoryDerivationInput] = []
+
+        class CapturingDeriver:
+            def derive(self, value: MemoryDerivationInput) -> MemoryDerivationResult:
+                captured.append(value)
+                return DeterministicFakeMemoryDeriver().derive(value)
+
+        policy = MemoryPolicy(high_watermark_utterances=3, low_watermark_utterances=1)
+        first = await maintain_discussion_memory(
+            context.session_factory,
+            session_id=context.session_id,
+            deriver=CapturingDeriver(),
+            provenance=MemorySemanticProvenance(),
+            policy=policy,
+            now=NOW,
+        )
+        assert first.outcome is MemoryMaintenanceOutcome.UPDATED
+        assert len(captured) == 1
+        privacy_surface = captured[0].model_dump_json()
+        for sentinel in (
+            CURRENT_STANCE_SENTINEL,
+            OTHER_STANCE_SENTINEL,
+            "REFERENCE_SENTINEL_P16B",
+            "HIDDEN_SENTINEL_P16B",
+            "EVALUATOR_SENTINEL_P16B",
+            PROVIDER_SECRET_SENTINEL,
+        ):
+            assert sentinel not in privacy_surface
+
+        second = await maintain_discussion_memory(
+            context.session_factory,
+            session_id=context.session_id,
+            deriver=CapturingDeriver(),
+            provenance=MemorySemanticProvenance(),
+            policy=policy,
+            now=NOW,
+        )
+        assert second.outcome is MemoryMaintenanceOutcome.NOOP_BELOW_HIGH_WATERMARK
+        assert len(captured) == 1
+
+        async with context.session_factory() as session:
+            state = await session.get(DiscussionMemoryState, context.session_id)
+            revisions = tuple(
+                (
+                    await session.scalars(
+                        select(DiscussionMemoryRevision)
+                        .where(
+                            DiscussionMemoryRevision.session_id == context.session_id
+                        )
+                        .order_by(DiscussionMemoryRevision.revision)
+                    )
+                ).all()
+            )
+        assert state is not None and len(revisions) == 1
+        accepted = tuple(
+            AcceptedMemoryRevision(
+                revision=row.revision,
+                base_revision=row.base_revision,
+                source_from_sequence=row.source_from_sequence,
+                source_through_sequence=row.source_through_sequence,
+                schema_version=row.schema_version,
+                derivation_version=row.derivation_version,
+                projection_version=row.projection_version,
+                patches=tuple(MemoryPatch.model_validate(item) for item in row.patches),
+            )
+            for row in revisions
+        )
+        replayed = replay_memory_revisions(
+            session_id=context.session_id, revisions=accepted
+        )
+        assert replayed.state == StructuredDiscussionMemory.model_validate(
+            state.structured_state
+        )
+        persisted_surface = repr((state.structured_state, revisions[0].patches))
+        assert CURRENT_STANCE_SENTINEL not in persisted_surface
+        assert "HIDDEN_SENTINEL_P16B" not in persisted_surface
+
+        rebuilt = await rebuild_discussion_memory(
+            context.session_factory,
+            session_id=context.session_id,
+            deriver=DeterministicFakeMemoryDeriver(),
+            provenance=MemorySemanticProvenance(),
+            derivation_version="discussion-memory-derivation/v2",
+            policy=policy,
+            now=NOW + timedelta(seconds=1),
+        )
+        assert rebuilt.outcome is MemoryMaintenanceOutcome.UPDATED
+        assert rebuilt.projection.revision == 2
+        assert rebuilt.projection.source_through_sequence == before[-1][0]
+        assert (
+            rebuilt.projection.source_through_sequence
+            >= first.projection.source_through_sequence
+        )
+        async with context.session_factory() as session:
+            after = tuple(
+                (row.sequence, row.event_type, dict(row.payload))
+                for row in (
+                    await session.scalars(
+                        select(DiscussionEvent)
+                        .where(DiscussionEvent.session_id == context.session_id)
+                        .order_by(DiscussionEvent.sequence)
+                    )
+                ).all()
+            )
+            chain = tuple(
+                (
+                    await session.scalars(
+                        select(DiscussionMemoryRevision)
+                        .where(
+                            DiscussionMemoryRevision.session_id == context.session_id
+                        )
+                        .order_by(DiscussionMemoryRevision.revision)
+                    )
+                ).all()
+            )
+            rebuilt_state = await session.get(DiscussionMemoryState, context.session_id)
+        assert after == before
+        assert [(item.base_revision, item.revision) for item in chain] == [
+            (0, 1),
+            (1, 2),
+        ]
+        assert chain[1].derivation_version == "discussion-memory-derivation/v2"
+        assert rebuilt_state is not None
+        rebuilt_replay = replay_memory_revisions(
+            session_id=context.session_id,
+            revisions=tuple(
+                AcceptedMemoryRevision(
+                    revision=row.revision,
+                    base_revision=row.base_revision,
+                    source_from_sequence=row.source_from_sequence,
+                    source_through_sequence=row.source_through_sequence,
+                    schema_version=row.schema_version,
+                    derivation_version=row.derivation_version,
+                    projection_version=row.projection_version,
+                    patches=tuple(
+                        MemoryPatch.model_validate(item) for item in row.patches
+                    ),
+                )
+                for row in chain
+            ),
+        )
+        assert rebuilt_replay.revision == rebuilt_state.revision == 2
+        assert rebuilt_replay.state == StructuredDiscussionMemory.model_validate(
+            rebuilt_state.structured_state
+        )
+
+
+def test_memory_replay_rebuild_and_privacy_are_evidence_preserving(
+    migrated_database: TemporaryDatabaseContext,
+) -> None:
+    run_async(lambda: _memory_replay_rebuild_and_privacy_proof(migrated_database))
+
+
+async def _maintain_and_rebuild_use_frozen_v1_projection_semantics(
+    temporary_database: TemporaryDatabaseContext,
+) -> None:
+    async with _runtime_context(temporary_database) as context:
+        for index in range(3):
+            await _append_public_utterance(
+                context,
+                participant=context.participants[1],
+                actor_kind=ParticipantActorKind.AI,
+                content=f"FROZEN_V1_INITIAL_{index}",
+            )
+
+        class AddProposal:
+            def derive(self, value: MemoryDerivationInput) -> MemoryDerivationResult:
+                return MemoryDerivationResult(
+                    patches=(
+                        MemoryPatch(
+                            operation=MemoryPatchOperation.ADD,
+                            kind=MemoryItemKind.PROPOSAL,
+                            canonical_text="方案 A",
+                            source_sequences=(value.utterances[0].sequence,),
+                        ),
+                    )
+                )
+
+        caller_policy = MemoryPolicy(
+            high_watermark_utterances=3,
+            low_watermark_utterances=1,
+            max_terminal_items=0,
+        )
+        first = await maintain_discussion_memory(
+            context.session_factory,
+            session_id=context.session_id,
+            deriver=AddProposal(),
+            provenance=MemorySemanticProvenance(),
+            policy=caller_policy,
+            now=NOW,
+        )
+        assert first.outcome is MemoryMaintenanceOutcome.UPDATED
+        for index in range(3):
+            await _append_public_utterance(
+                context,
+                participant=context.participants[1],
+                actor_kind=ParticipantActorKind.AI,
+                content=f"FROZEN_V1_NEXT_{index}",
+            )
+
+        class SupersedeActiveProposal:
+            def __init__(self, text: str) -> None:
+                self.text = text
+
+            def derive(self, value: MemoryDerivationInput) -> MemoryDerivationResult:
+                target = next(
+                    item
+                    for item in value.previous_memory.state.proposals
+                    if item.status is MemoryItemStatus.ACTIVE
+                )
+                return MemoryDerivationResult(
+                    patches=(
+                        MemoryPatch(
+                            operation=MemoryPatchOperation.SUPERSEDE,
+                            kind=MemoryItemKind.PROPOSAL,
+                            target_memory_item_id=target.memory_item_id,
+                            canonical_text=self.text,
+                            source_sequences=(value.utterances[0].sequence,),
+                        ),
+                    )
+                )
+
+        second = await maintain_discussion_memory(
+            context.session_factory,
+            session_id=context.session_id,
+            deriver=SupersedeActiveProposal("方案 B"),
+            provenance=MemorySemanticProvenance(),
+            policy=caller_policy,
+            now=NOW + timedelta(seconds=1),
+        )
+        assert second.outcome is MemoryMaintenanceOutcome.UPDATED
+        assert [item.status for item in second.projection.state.proposals] == [
+            MemoryItemStatus.SUPERSEDED,
+            MemoryItemStatus.ACTIVE,
+        ]
+        rebuilt = await rebuild_discussion_memory(
+            context.session_factory,
+            session_id=context.session_id,
+            deriver=SupersedeActiveProposal("方案 C"),
+            provenance=MemorySemanticProvenance(),
+            derivation_version="discussion-memory-derivation/frozen-v1",
+            policy=caller_policy,
+            now=NOW + timedelta(seconds=2),
+        )
+        assert rebuilt.outcome is MemoryMaintenanceOutcome.UPDATED
+        assert [item.status for item in rebuilt.projection.state.proposals] == [
+            MemoryItemStatus.SUPERSEDED,
+            MemoryItemStatus.SUPERSEDED,
+            MemoryItemStatus.ACTIVE,
+        ]
+        async with context.session_factory() as session:
+            rows = tuple(
+                (
+                    await session.scalars(
+                        select(DiscussionMemoryRevision)
+                        .where(
+                            DiscussionMemoryRevision.session_id == context.session_id
+                        )
+                        .order_by(DiscussionMemoryRevision.revision)
+                    )
+                ).all()
+            )
+            state = await session.get(DiscussionMemoryState, context.session_id)
+        assert state is not None
+        replayed = replay_memory_revisions(
+            session_id=context.session_id,
+            revisions=_accepted_memory_revisions(rows),
+        )
+        assert replayed.source_through_sequence == state.source_through_sequence
+        assert replayed.state == StructuredDiscussionMemory.model_validate(
+            state.structured_state
+        )
+
+
+def test_maintain_and_rebuild_accept_v1_only_with_frozen_projection_semantics(
+    migrated_database: TemporaryDatabaseContext,
+) -> None:
+    run_async(
+        lambda: _maintain_and_rebuild_use_frozen_v1_projection_semantics(
+            migrated_database
+        )
+    )
+
+
+async def _memory_bootstrap_cas_proof(
+    temporary_database: TemporaryDatabaseContext,
+) -> None:
+    async with _runtime_context(temporary_database) as context:
+        for index in range(3):
+            await _append_public_utterance(
+                context,
+                participant=context.participants[index],
+                actor_kind=(
+                    ParticipantActorKind.HUMAN
+                    if index == 0
+                    else ParticipantActorKind.AI
+                ),
+                content=f"CAS_PUBLIC_{index}",
+            )
+        both_read = asyncio.Event()
+        release = asyncio.Event()
+        entered = 0
+
+        class BarrierDeriver:
+            async def derive(
+                self, value: MemoryDerivationInput
+            ) -> MemoryDerivationResult:
+                nonlocal entered
+                entered += 1
+                if entered == 2:
+                    both_read.set()
+                await release.wait()
+                return DeterministicFakeMemoryDeriver().derive(value)
+
+        policy = MemoryPolicy(high_watermark_utterances=3, low_watermark_utterances=1)
+        calls = tuple(
+            asyncio.create_task(
+                maintain_discussion_memory(
+                    context.session_factory,
+                    session_id=context.session_id,
+                    deriver=BarrierDeriver(),
+                    provenance=MemorySemanticProvenance(),
+                    policy=policy,
+                    now=NOW,
+                )
+            )
+            for _ in range(2)
+        )
+        await both_read.wait()
+        release.set()
+        results = await asyncio.gather(*calls)
+        assert {item.outcome for item in results} == {
+            MemoryMaintenanceOutcome.UPDATED,
+            MemoryMaintenanceOutcome.CAS_CONFLICT,
+        }
+        async with context.session_factory() as session:
+            state = await session.get(DiscussionMemoryState, context.session_id)
+            revisions = tuple(
+                (
+                    await session.scalars(
+                        select(DiscussionMemoryRevision).where(
+                            DiscussionMemoryRevision.session_id == context.session_id
+                        )
+                    )
+                ).all()
+            )
+        assert state is not None and state.revision == 1
+        assert len(revisions) == 1
+        assert (revisions[0].base_revision, revisions[0].revision) == (0, 1)
+
+
+def test_memory_bootstrap_cas_has_one_atomic_winner(
+    migrated_database: TemporaryDatabaseContext,
+) -> None:
+    run_async(lambda: _memory_bootstrap_cas_proof(migrated_database))
+
+
+async def _non_race_integrity_failure_is_not_cas(
+    temporary_database: TemporaryDatabaseContext,
+    *,
+    rebuild: bool,
+) -> None:
+    async with _runtime_context(temporary_database) as context:
+        for index in range(3):
+            await _append_public_utterance(
+                context,
+                participant=context.participants[1],
+                actor_kind=ParticipantActorKind.AI,
+                content=f"NON_RACE_INTEGRITY_{index}",
+            )
+        invalid_fk_provenance = MemorySemanticProvenance(
+            prompt_version_id=uuid4(),
+            provider_identifier="test-provider",
+            model_identifier="test-model",
+            configuration_version="TEST_CONFIG",
+        )
+        with pytest.raises(DiscussionMemoryPersistenceError):
+            if rebuild:
+                await rebuild_discussion_memory(
+                    context.session_factory,
+                    session_id=context.session_id,
+                    deriver=DeterministicFakeMemoryDeriver(),
+                    provenance=invalid_fk_provenance,
+                    derivation_version="discussion-memory-derivation/integrity-test",
+                    policy=MemoryPolicy(
+                        high_watermark_utterances=3,
+                        low_watermark_utterances=1,
+                    ),
+                    now=NOW,
+                )
+            else:
+                await maintain_discussion_memory(
+                    context.session_factory,
+                    session_id=context.session_id,
+                    deriver=DeterministicFakeMemoryDeriver(),
+                    provenance=invalid_fk_provenance,
+                    policy=MemoryPolicy(
+                        high_watermark_utterances=3,
+                        low_watermark_utterances=1,
+                    ),
+                    now=NOW,
+                )
+        async with context.session_factory() as session:
+            state = await session.get(DiscussionMemoryState, context.session_id)
+            revision_count = await session.scalar(
+                select(func.count())
+                .select_from(DiscussionMemoryRevision)
+                .where(DiscussionMemoryRevision.session_id == context.session_id)
+            )
+        assert state is None
+        assert revision_count == 0
+
+
+@pytest.mark.parametrize("rebuild", [False, True], ids=["maintain", "rebuild"])
+def test_non_race_integrity_failure_surfaces_as_persistence_error(
+    migrated_database: TemporaryDatabaseContext,
+    rebuild: bool,
+) -> None:
+    run_async(
+        lambda: _non_race_integrity_failure_is_not_cas(
+            migrated_database,
+            rebuild=rebuild,
+        )
+    )
+
+
+async def _working_context_fallback_provenance_proof(
+    temporary_database: TemporaryDatabaseContext,
+) -> None:
+    async with _runtime_context(temporary_database) as context:
+        for index in range(12):
+            await _append_public_utterance(
+                context,
+                participant=context.participants[1],
+                actor_kind=ParticipantActorKind.AI,
+                content=f"BOUNDED_FALLBACK_{index}",
+            )
+        calls = 0
+
+        async def provider(_input: RuntimeGenerationInput) -> RawGenerationSuccess:
+            nonlocal calls
+            calls += 1
+            return RawGenerationSuccess(content="safe fallback response")
+
+        command = _command(context)
+        result = await generate_ai_utterance(
+            context.session_factory,
+            owner_id=context.owner_id,
+            command=command,
+            executor=provider,
+        )
+        assert result.outcome is RuntimeGenerationOutcome.COMPLETED
+        assert calls == 1
+        async with context.session_factory() as session:
+            request = await session.get(
+                LlmGenerationRequest, command.generation_request_id
+            )
+        assert request is not None
+        assert request.request_metadata == {
+            "schema_version": 2,
+            "configuration_version": "P1_5C_DETERMINISTIC",
+            "working_context_version": "DISCUSSION_WORKING_CONTEXT_V1",
+            "context_mode": "SAFE_RAW_FALLBACK",
+            "memory_revision": 0,
+            "memory_source_through_sequence": 0,
+            "context_source_through_sequence": 16,
+        }
+
+
+def test_derivation_failure_uses_complete_bounded_raw_fallback_with_v2_provenance(
+    migrated_database: TemporaryDatabaseContext,
+) -> None:
+    run_async(lambda: _working_context_fallback_provenance_proof(migrated_database))
+
+
+async def _unsafe_context_rejects_without_provider(
+    temporary_database: TemporaryDatabaseContext,
+) -> None:
+    async with _runtime_context(temporary_database) as context:
+        for index in range(13):
+            await _append_public_utterance(
+                context,
+                participant=context.participants[1],
+                actor_kind=ParticipantActorKind.AI,
+                content=f"UNSAFE_OVERFLOW_{index}",
+            )
+        calls = 0
+
+        async def provider(_input: RuntimeGenerationInput) -> RawGenerationSuccess:
+            nonlocal calls
+            calls += 1
+            return RawGenerationSuccess(content="must not run")
+
+        command = _command(context)
+        result = await generate_ai_utterance(
+            context.session_factory,
+            owner_id=context.owner_id,
+            command=command,
+            executor=provider,
+        )
+        assert result.outcome is RuntimeGenerationOutcome.CONTEXT_REJECTED
+        assert calls == 0
+        async with context.session_factory() as session:
+            assert (
+                await session.get(LlmGenerationRequest, command.generation_request_id)
+                is None
+            )
+
+
+def test_uncoverable_context_fails_safely_before_provider_or_request(
+    migrated_database: TemporaryDatabaseContext,
+) -> None:
+    run_async(lambda: _unsafe_context_rejects_without_provider(migrated_database))
+
+
+async def _stale_memory_complete_tail_continues_normally(
+    temporary_database: TemporaryDatabaseContext,
+) -> None:
+    async with _runtime_context(temporary_database) as context:
+        for index in range(3):
+            await _append_public_utterance(
+                context,
+                participant=context.participants[index],
+                actor_kind=(
+                    ParticipantActorKind.HUMAN
+                    if index == 0
+                    else ParticipantActorKind.AI
+                ),
+                content=f"COMPACTED_{index}",
+            )
+        compacted = await maintain_discussion_memory(
+            context.session_factory,
+            session_id=context.session_id,
+            deriver=DeterministicFakeMemoryDeriver(),
+            provenance=MemorySemanticProvenance(),
+            policy=MemoryPolicy(
+                high_watermark_utterances=3, low_watermark_utterances=1
+            ),
+            now=NOW,
+        )
+        assert compacted.outcome is MemoryMaintenanceOutcome.UPDATED
+        for index in range(2):
+            await _append_public_utterance(
+                context,
+                participant=context.participants[1],
+                actor_kind=ParticipantActorKind.AI,
+                content=f"RAW_TAIL_{index}",
+            )
+
+        async def provider(_input: RuntimeGenerationInput) -> RawGenerationSuccess:
+            return RawGenerationSuccess(content="memory plus complete tail")
+
+        command = _command(context)
+        result = await generate_ai_utterance(
+            context.session_factory,
+            owner_id=context.owner_id,
+            command=command,
+            executor=provider,
+        )
+        assert result.outcome is RuntimeGenerationOutcome.COMPLETED
+        async with context.session_factory() as session:
+            request = await session.get(
+                LlmGenerationRequest, command.generation_request_id
+            )
+        assert request is not None
+        assert request.request_metadata["context_mode"] == "MEMORY_WITH_RAW_TAIL"
+        assert request.request_metadata["memory_revision"] == 1
+        assert request.request_metadata["memory_source_through_sequence"] == 6
+        assert request.request_metadata["context_source_through_sequence"] == 9
+
+
+def test_stale_memory_plus_complete_raw_tail_continues_without_semantic_call(
+    migrated_database: TemporaryDatabaseContext,
+) -> None:
+    run_async(lambda: _stale_memory_complete_tail_continues_normally(migrated_database))
+
+
+async def _durable_v2_requested_memory_context_is_recovered_exactly(
+    temporary_database: TemporaryDatabaseContext,
+) -> None:
+    async with _runtime_context(temporary_database) as context:
+        async with context.session_factory() as session:
+            await publish_prompt_version(session, AI_CANDIDATE_TURN_V3)
+        for index in range(3):
+            await _append_public_utterance(
+                context,
+                participant=context.participants[1],
+                actor_kind=ParticipantActorKind.AI,
+                content=f"RECOVERY_ORIGINAL_MEMORY_{index}",
+            )
+        policy = MemoryPolicy(high_watermark_utterances=3, low_watermark_utterances=1)
+        original = await maintain_discussion_memory(
+            context.session_factory,
+            session_id=context.session_id,
+            deriver=DeterministicFakeMemoryDeriver(),
+            provenance=MemorySemanticProvenance(),
+            policy=policy,
+            now=NOW,
+        )
+        assert original.outcome is MemoryMaintenanceOutcome.UPDATED
+        original_tail_sequence = await _append_public_utterance(
+            context,
+            participant=context.participants[0],
+            actor_kind=ParticipantActorKind.HUMAN,
+            content="RECOVERY_ORIGINAL_RAW_TAIL",
+        )
+        metadata = GenerationRequestMetadataV2(
+            configuration_version="P1_5C_DETERMINISTIC",
+            working_context_version="DISCUSSION_WORKING_CONTEXT_V1",
+            context_mode=DiscussionContextMode.MEMORY_WITH_RAW_TAIL,
+            memory_revision=original.projection.revision,
+            memory_source_through_sequence=(
+                original.projection.source_through_sequence
+            ),
+            context_source_through_sequence=original_tail_sequence,
+        )
+        command = _command(context).model_copy(
+            update={
+                "prompt_version_id": AI_CANDIDATE_TURN_V3.id,
+                "occurred_at": AI_CANDIDATE_TURN_V3.published_at + timedelta(seconds=1),
+            }
+        )
+        async with context.session_factory() as session:
+            await create_generation_request(
+                session,
+                owner_id=context.owner_id,
+                command=command.request_command(metadata),
+            )
+
+        for index in range(3):
+            await _append_public_utterance(
+                context,
+                participant=context.participants[1],
+                actor_kind=ParticipantActorKind.AI,
+                content=f"RECOVERY_NEWER_MEMORY_{index}",
+            )
+        advanced = await maintain_discussion_memory(
+            context.session_factory,
+            session_id=context.session_id,
+            deriver=DeterministicFakeMemoryDeriver(),
+            provenance=MemorySemanticProvenance(),
+            policy=policy,
+            now=NOW + timedelta(seconds=1),
+        )
+        assert advanced.outcome is MemoryMaintenanceOutcome.UPDATED
+        assert advanced.projection.revision > original.projection.revision
+
+        captured: list[RuntimeGenerationInput] = []
+
+        async def provider(
+            generation_input: RuntimeGenerationInput,
+        ) -> RawGenerationSuccess:
+            captured.append(generation_input)
+            return RawGenerationSuccess(content="exact memory recovery")
+
+        result = await generate_ai_utterance(
+            context.session_factory,
+            owner_id=context.owner_id,
+            command=command,
+            executor=provider,
+        )
+        assert result.outcome is RuntimeGenerationOutcome.COMPLETED
+        assert len(captured) == 1
+        rendered = captured[0].rendered_prompt
+        assert "RECOVERY_ORIGINAL_MEMORY_0" in rendered
+        assert "RECOVERY_ORIGINAL_RAW_TAIL" in rendered
+        assert "RECOVERY_NEWER_MEMORY_0" not in rendered
+
+        async def must_not_run(
+            _generation_input: RuntimeGenerationInput,
+        ) -> RawGenerationSuccess:
+            raise AssertionError("completed durable replay must not invoke provider")
+
+        replay = await generate_ai_utterance(
+            context.session_factory,
+            owner_id=context.owner_id,
+            command=command,
+            executor=must_not_run,
+        )
+        assert replay.outcome is RuntimeGenerationOutcome.COMPLETED_REPLAY
+        async with context.session_factory() as session:
+            request = await session.get(
+                LlmGenerationRequest, command.generation_request_id
+            )
+            request_count = await session.scalar(
+                select(func.count())
+                .select_from(LlmGenerationRequest)
+                .where(LlmGenerationRequest.id == command.generation_request_id)
+            )
+            utterance_count = await session.scalar(
+                select(func.count())
+                .select_from(AiUtterance)
+                .where(
+                    AiUtterance.generation_request_id == command.generation_request_id
+                )
+            )
+        assert request is not None
+        assert request.request_metadata == metadata.model_dump(mode="json")
+        assert request_count == 1
+        assert utterance_count == 1
+
+
+def test_durable_requested_v2_recovers_exact_historical_memory_and_raw_tail(
+    migrated_database: TemporaryDatabaseContext,
+) -> None:
+    run_async(
+        lambda: _durable_v2_requested_memory_context_is_recovered_exactly(
+            migrated_database
+        )
+    )
+
+
+async def _durable_v2_requested_raw_fallback_is_recovered_exactly(
+    temporary_database: TemporaryDatabaseContext,
+) -> None:
+    async with _runtime_context(temporary_database) as context:
+        async with context.session_factory() as session:
+            await publish_prompt_version(session, AI_CANDIDATE_TURN_V3)
+        boundary = 0
+        for index in range(5):
+            boundary = await _append_public_utterance(
+                context,
+                participant=context.participants[0],
+                actor_kind=ParticipantActorKind.HUMAN,
+                content=f"RECOVERY_FALLBACK_ORIGINAL_{index}",
+            )
+        metadata = GenerationRequestMetadataV2(
+            configuration_version="P1_5C_DETERMINISTIC",
+            working_context_version="DISCUSSION_WORKING_CONTEXT_V1",
+            context_mode=DiscussionContextMode.SAFE_RAW_FALLBACK,
+            memory_revision=0,
+            memory_source_through_sequence=0,
+            context_source_through_sequence=boundary,
+        )
+        command = _command(context).model_copy(
+            update={
+                "prompt_version_id": AI_CANDIDATE_TURN_V3.id,
+                "occurred_at": AI_CANDIDATE_TURN_V3.published_at + timedelta(seconds=1),
+            }
+        )
+        async with context.session_factory() as session:
+            await create_generation_request(
+                session,
+                owner_id=context.owner_id,
+                command=command.request_command(metadata),
+            )
+        await _append_public_utterance(
+            context,
+            participant=context.participants[1],
+            actor_kind=ParticipantActorKind.AI,
+            content="RECOVERY_FALLBACK_NEWER_MUST_BE_EXCLUDED",
+        )
+
+        captured: list[RuntimeGenerationInput] = []
+
+        async def provider(
+            generation_input: RuntimeGenerationInput,
+        ) -> RawGenerationSuccess:
+            captured.append(generation_input)
+            return RawGenerationSuccess(content="exact raw fallback recovery")
+
+        result = await generate_ai_utterance(
+            context.session_factory,
+            owner_id=context.owner_id,
+            command=command,
+            executor=provider,
+        )
+        assert result.outcome is RuntimeGenerationOutcome.COMPLETED
+        assert len(captured) == 1
+        rendered = captured[0].rendered_prompt
+        assert "RECOVERY_FALLBACK_ORIGINAL_0" in rendered
+        assert "RECOVERY_FALLBACK_ORIGINAL_4" in rendered
+        assert "RECOVERY_FALLBACK_NEWER_MUST_BE_EXCLUDED" not in rendered
+        async with context.session_factory() as session:
+            request = await session.get(
+                LlmGenerationRequest, command.generation_request_id
+            )
+        assert request is not None
+        assert request.request_metadata == metadata.model_dump(mode="json")
+
+
+def test_durable_requested_v2_recovers_exact_safe_raw_fallback_boundary(
+    migrated_database: TemporaryDatabaseContext,
+) -> None:
+    run_async(
+        lambda: _durable_v2_requested_raw_fallback_is_recovered_exactly(
+            migrated_database
+        )
+    )
+
+
+async def _mocked_semantic_model_persists_and_feeds_candidate_context(
+    temporary_database: TemporaryDatabaseContext,
+) -> None:
+    async with _runtime_context(temporary_database) as context:
+        async with context.session_factory() as session:
+            await publish_prompt_version(session, AI_CANDIDATE_TURN_V3)
+            await publish_prompt_version(session, DISCUSSION_MEMORY_UPDATE_V2)
+        first_sequence = 0
+        for index in range(12):
+            sequence = await _append_public_utterance(
+                context,
+                participant=context.participants[index % len(context.participants)],
+                actor_kind=(
+                    ParticipantActorKind.HUMAN
+                    if index % len(context.participants) == 0
+                    else ParticipantActorKind.AI
+                ),
+                content=f"MOCKED_SEMANTIC_PUBLIC_{index}",
+            )
+            if first_sequence == 0:
+                first_sequence = sequence
+
+        class MockedSharedTransport:
+            def __init__(self) -> None:
+                self.semantic_inputs: list[ModelInvocationInput] = []
+                self.candidate_inputs: list[RuntimeGenerationInput] = []
+
+            async def invoke(
+                self, invocation: ModelInvocationInput
+            ) -> RawGenerationSuccess:
+                self.semantic_inputs.append(invocation)
+                return RawGenerationSuccess(
+                    content=json.dumps(
+                        {
+                            "patches": [
+                                {
+                                    "operation": "ADD",
+                                    "kind": "PROPOSAL",
+                                    "target_memory_item_id": None,
+                                    "canonical_text": "MOCKED_SEMANTIC_MEMORY",
+                                    "source_sequences": [first_sequence],
+                                }
+                            ]
+                        }
+                    )
+                )
+
+            async def __call__(
+                self, generation_input: RuntimeGenerationInput
+            ) -> RawGenerationSuccess:
+                self.candidate_inputs.append(generation_input)
+                return RawGenerationSuccess(content="mocked semantic candidate")
+
+        transport = MockedSharedTransport()
+        command = _command(context).model_copy(
+            update={
+                "prompt_version_id": AI_CANDIDATE_TURN_V3.id,
+                "occurred_at": AI_CANDIDATE_TURN_V3.published_at + timedelta(seconds=2),
+            }
+        )
+        result = await generate_ai_utterance(
+            context.session_factory,
+            owner_id=context.owner_id,
+            command=command,
+            executor=transport,
+        )
+        assert result.outcome is RuntimeGenerationOutcome.COMPLETED
+        assert len(transport.semantic_inputs) == 1
+        semantic_prompt = transport.semantic_inputs[0].rendered_prompt
+        assert '{"patches":[]}' in semantic_prompt
+        assert "target_memory_item_id" in semantic_prompt
+        assert "source_sequences" in semantic_prompt
+        assert "MOCKED_SEMANTIC_PUBLIC_0" in semantic_prompt
+        assert len(transport.candidate_inputs) == 1
+        assert "MOCKED_SEMANTIC_MEMORY" in transport.candidate_inputs[0].rendered_prompt
+        async with context.session_factory() as session:
+            state = await session.get(DiscussionMemoryState, context.session_id)
+            revision = await session.scalar(
+                select(DiscussionMemoryRevision).where(
+                    DiscussionMemoryRevision.session_id == context.session_id,
+                    DiscussionMemoryRevision.revision == 1,
+                )
+            )
+            request = await session.get(
+                LlmGenerationRequest, command.generation_request_id
+            )
+        assert state is not None
+        assert "MOCKED_SEMANTIC_MEMORY" in repr(state.structured_state)
+        assert revision is not None
+        assert revision.prompt_version_id == DISCUSSION_MEMORY_UPDATE_V2.id
+        assert request is not None
+        assert request.request_metadata["schema_version"] == 2
+        assert request.request_metadata["context_mode"] == "MEMORY_WITH_RAW_TAIL"
+        assert request.request_metadata["memory_revision"] == 1
+
+
+def test_mocked_semantic_model_uses_closed_v2_contract_and_persists_provenance(
+    migrated_database: TemporaryDatabaseContext,
+) -> None:
+    run_async(
+        lambda: _mocked_semantic_model_persists_and_feeds_candidate_context(
+            migrated_database
+        )
+    )
+
+
+async def _malformed_semantic_model_output_uses_safe_raw_fallback(
+    temporary_database: TemporaryDatabaseContext,
+) -> None:
+    async with _runtime_context(temporary_database) as context:
+        async with context.session_factory() as session:
+            await publish_prompt_version(session, AI_CANDIDATE_TURN_V3)
+            await publish_prompt_version(session, DISCUSSION_MEMORY_UPDATE_V2)
+        for index in range(12):
+            await _append_public_utterance(
+                context,
+                participant=context.participants[1],
+                actor_kind=ParticipantActorKind.AI,
+                content=f"MALFORMED_SEMANTIC_PUBLIC_{index}",
+            )
+
+        class MalformedSemanticTransport:
+            def __init__(self) -> None:
+                self.semantic_calls = 0
+                self.candidate_inputs: list[RuntimeGenerationInput] = []
+
+            async def invoke(
+                self, _invocation: ModelInvocationInput
+            ) -> RawGenerationSuccess:
+                self.semantic_calls += 1
+                return RawGenerationSuccess(content="{not-json")
+
+            async def __call__(
+                self, generation_input: RuntimeGenerationInput
+            ) -> RawGenerationSuccess:
+                self.candidate_inputs.append(generation_input)
+                return RawGenerationSuccess(content="safe raw fallback candidate")
+
+        transport = MalformedSemanticTransport()
+        command = _command(context).model_copy(
+            update={
+                "prompt_version_id": AI_CANDIDATE_TURN_V3.id,
+                "occurred_at": AI_CANDIDATE_TURN_V3.published_at + timedelta(seconds=2),
+            }
+        )
+        result = await generate_ai_utterance(
+            context.session_factory,
+            owner_id=context.owner_id,
+            command=command,
+            executor=transport,
+        )
+        assert result.outcome is RuntimeGenerationOutcome.COMPLETED
+        assert transport.semantic_calls == 1
+        assert len(transport.candidate_inputs) == 1
+        assert (
+            "MALFORMED_SEMANTIC_PUBLIC_0"
+            in transport.candidate_inputs[0].rendered_prompt
+        )
+        async with context.session_factory() as session:
+            state = await session.get(DiscussionMemoryState, context.session_id)
+            request = await session.get(
+                LlmGenerationRequest, command.generation_request_id
+            )
+        assert state is None
+        assert request is not None
+        assert request.request_metadata["context_mode"] == "SAFE_RAW_FALLBACK"
+        assert request.request_metadata["memory_revision"] == 0
+
+
+def test_malformed_semantic_model_output_falls_back_safely_without_persistence(
+    migrated_database: TemporaryDatabaseContext,
+) -> None:
+    run_async(
+        lambda: _malformed_semantic_model_output_uses_safe_raw_fallback(
+            migrated_database
+        )
+    )
+
+
+def _bounded_batch_result(value: MemoryDerivationInput) -> MemoryDerivationResult:
+    return MemoryDerivationResult(
+        patches=(
+            MemoryPatch(
+                operation=MemoryPatchOperation.ADD,
+                kind=MemoryItemKind.PROPOSAL,
+                canonical_text=f"bounded batch through {value.utterances[-1].sequence}",
+                source_sequences=(
+                    value.utterances[0].sequence,
+                    value.utterances[-1].sequence,
+                ),
+            ),
+        )
+    )
+
+
+async def _large_backlog_catches_up_in_bounded_batches(
+    temporary_database: TemporaryDatabaseContext,
+) -> None:
+    async with _runtime_context(temporary_database) as context:
+        for index in range(100):
+            await _append_public_utterance(
+                context,
+                participant=context.participants[1],
+                actor_kind=ParticipantActorKind.AI,
+                content=f"LARGE_BACKLOG_{index}",
+            )
+        batch_sizes: list[int] = []
+
+        class BoundedDeriver:
+            def derive(self, value: MemoryDerivationInput) -> MemoryDerivationResult:
+                batch_sizes.append(len(value.utterances))
+                return _bounded_batch_result(value)
+
+        result = await maintain_discussion_memory(
+            context.session_factory,
+            session_id=context.session_id,
+            deriver=BoundedDeriver(),
+            provenance=MemorySemanticProvenance(),
+            policy=MemoryPolicy(),
+            now=NOW,
+        )
+        assert result.outcome is MemoryMaintenanceOutcome.UPDATED
+        assert batch_sizes == [64, 30]
+        async with context.session_factory() as session:
+            projection = await load_discussion_memory_projection(
+                session, session_id=context.session_id
+            )
+            history = await load_public_memory_utterances(
+                session, session_id=context.session_id
+            )
+            revisions = tuple(
+                (
+                    await session.scalars(
+                        select(DiscussionMemoryRevision)
+                        .where(
+                            DiscussionMemoryRevision.session_id == context.session_id
+                        )
+                        .order_by(DiscussionMemoryRevision.revision)
+                    )
+                ).all()
+            )
+        assert [(row.base_revision, row.revision) for row in revisions] == [
+            (0, 1),
+            (1, 2),
+        ]
+        assert (
+            revisions[0].source_through_sequence + 1
+            == revisions[1].source_from_sequence
+        )
+        working_context = build_discussion_working_context(
+            projection=projection,
+            complete_public_history=history,
+            phase=SessionStatus.OPENING_STATEMENTS.value,
+            now=NOW,
+            phase_deadline_at=None,
+            policy=MemoryPolicy(),
+        )
+        assert len(working_context.recent_public_utterances) == 6
+        assert working_context.context_source_through_sequence == history[-1].sequence
+
+
+def test_large_backlog_catches_up_in_bounded_contiguous_batches(
+    migrated_database: TemporaryDatabaseContext,
+) -> None:
+    run_async(lambda: _large_backlog_catches_up_in_bounded_batches(migrated_database))
+
+
+async def _catch_up_derivation_failure_stops_safely(
+    temporary_database: TemporaryDatabaseContext,
+) -> None:
+    async with _runtime_context(temporary_database) as context:
+        for index in range(100):
+            await _append_public_utterance(
+                context,
+                participant=context.participants[1],
+                actor_kind=ParticipantActorKind.AI,
+                content=f"FAILING_BACKLOG_{index}",
+            )
+        batch_sizes: list[int] = []
+
+        class SecondBatchFails:
+            def derive(self, value: MemoryDerivationInput) -> MemoryDerivationResult:
+                batch_sizes.append(len(value.utterances))
+                if len(batch_sizes) == 2:
+                    raise MemoryDerivationUnavailable("second bounded batch failed")
+                return _bounded_batch_result(value)
+
+        with pytest.raises(MemoryDerivationUnavailable):
+            await maintain_discussion_memory(
+                context.session_factory,
+                session_id=context.session_id,
+                deriver=SecondBatchFails(),
+                provenance=MemorySemanticProvenance(),
+                policy=MemoryPolicy(),
+                now=NOW,
+            )
+        assert batch_sizes == [64, 30]
+        async with context.session_factory() as session:
+            state = await session.get(DiscussionMemoryState, context.session_id)
+            revision_count = await session.scalar(
+                select(func.count())
+                .select_from(DiscussionMemoryRevision)
+                .where(DiscussionMemoryRevision.session_id == context.session_id)
+            )
+        assert state is not None and state.revision == 1
+        assert revision_count == 1
+
+
+def test_catch_up_derivation_failure_is_finite_and_preserves_committed_prefix(
+    migrated_database: TemporaryDatabaseContext,
+) -> None:
+    run_async(lambda: _catch_up_derivation_failure_stops_safely(migrated_database))
+
+
+def _accepted_memory_revisions(
+    rows: tuple[DiscussionMemoryRevision, ...],
+) -> tuple[AcceptedMemoryRevision, ...]:
+    return tuple(
+        AcceptedMemoryRevision(
+            revision=row.revision,
+            base_revision=row.base_revision,
+            source_from_sequence=row.source_from_sequence,
+            source_through_sequence=row.source_through_sequence,
+            schema_version=row.schema_version,
+            derivation_version=row.derivation_version,
+            projection_version=row.projection_version,
+            patches=tuple(MemoryPatch.model_validate(item) for item in row.patches),
+        )
+        for row in rows
+    )
+
+
+async def _bounded_semantic_rebuild_proof(
+    temporary_database: TemporaryDatabaseContext,
+) -> None:
+    async with _runtime_context(temporary_database) as context:
+        async with context.session_factory() as session:
+            await publish_prompt_version(session, DISCUSSION_MEMORY_UPDATE_V2)
+        for index in range(100):
+            await _append_public_utterance(
+                context,
+                participant=context.participants[1],
+                actor_kind=ParticipantActorKind.AI,
+                content=f"REBUILD_LONG_HISTORY_{index}",
+            )
+        async with context.session_factory() as session:
+            before = tuple(
+                (
+                    row.sequence,
+                    row.event_version,
+                    row.event_type,
+                    dict(row.payload),
+                )
+                for row in (
+                    await session.scalars(
+                        select(DiscussionEvent)
+                        .where(DiscussionEvent.session_id == context.session_id)
+                        .order_by(DiscussionEvent.sequence)
+                    )
+                ).all()
+            )
+
+        batch_sizes: list[int] = []
+        previous_revisions: list[int] = []
+
+        class BoundedRebuildDeriver:
+            def derive(self, value: MemoryDerivationInput) -> MemoryDerivationResult:
+                batch_sizes.append(len(value.utterances))
+                previous_revisions.append(value.previous_memory.revision)
+                return _bounded_batch_result(value)
+
+        provenance = MemorySemanticProvenance(
+            prompt_version_id=DISCUSSION_MEMORY_UPDATE_V2.id,
+            provider_identifier="mocked-semantic-provider",
+            model_identifier="mocked-semantic-model",
+            configuration_version="REBUILD_CONFIG_V2",
+        )
+        rebuilt = await rebuild_discussion_memory(
+            context.session_factory,
+            session_id=context.session_id,
+            deriver=BoundedRebuildDeriver(),
+            provenance=provenance,
+            derivation_version="discussion-memory-derivation/rebuild-v2",
+            policy=MemoryPolicy(),
+            now=NOW,
+        )
+        assert rebuilt.outcome is MemoryMaintenanceOutcome.UPDATED
+        assert batch_sizes == [64, 36]
+        assert previous_revisions == [0, 1]
+
+        async with context.session_factory() as session:
+            after = tuple(
+                (
+                    row.sequence,
+                    row.event_version,
+                    row.event_type,
+                    dict(row.payload),
+                )
+                for row in (
+                    await session.scalars(
+                        select(DiscussionEvent)
+                        .where(DiscussionEvent.session_id == context.session_id)
+                        .order_by(DiscussionEvent.sequence)
+                    )
+                ).all()
+            )
+            rows = tuple(
+                (
+                    await session.scalars(
+                        select(DiscussionMemoryRevision)
+                        .where(
+                            DiscussionMemoryRevision.session_id == context.session_id
+                        )
+                        .order_by(DiscussionMemoryRevision.revision)
+                    )
+                ).all()
+            )
+            state = await session.get(DiscussionMemoryState, context.session_id)
+        assert after == before
+        assert [(row.base_revision, row.revision) for row in rows] == [
+            (0, 1),
+            (1, 2),
+        ]
+        assert rows[0].source_through_sequence + 1 == rows[1].source_from_sequence
+        assert all(
+            row.derivation_version == "discussion-memory-derivation/rebuild-v2"
+            and row.prompt_version_id == DISCUSSION_MEMORY_UPDATE_V2.id
+            and row.provider_identifier == "mocked-semantic-provider"
+            and row.model_identifier == "mocked-semantic-model"
+            and row.configuration_version == "REBUILD_CONFIG_V2"
+            for row in rows
+        )
+        assert state is not None
+        replayed = replay_memory_revisions(
+            session_id=context.session_id,
+            revisions=_accepted_memory_revisions(rows),
+        )
+        assert replayed.revision == state.revision == rebuilt.projection.revision == 2
+        assert replayed.source_through_sequence == state.source_through_sequence
+        assert replayed.state == StructuredDiscussionMemory.model_validate(
+            state.structured_state
+        )
+
+
+def test_semantic_rebuild_over_100_public_utterances_is_bounded_and_replayable(
+    migrated_database: TemporaryDatabaseContext,
+) -> None:
+    run_async(lambda: _bounded_semantic_rebuild_proof(migrated_database))
+
+
+async def _bounded_semantic_rebuild_later_failure_preserves_prefix(
+    temporary_database: TemporaryDatabaseContext,
+) -> None:
+    async with _runtime_context(temporary_database) as context:
+        async with context.session_factory() as session:
+            await publish_prompt_version(session, DISCUSSION_MEMORY_UPDATE_V2)
+        for index in range(100):
+            await _append_public_utterance(
+                context,
+                participant=context.participants[1],
+                actor_kind=ParticipantActorKind.AI,
+                content=f"REBUILD_LATER_FAILURE_{index}",
+            )
+        async with context.session_factory() as session:
+            before = tuple(
+                (
+                    row.sequence,
+                    row.event_type,
+                    dict(row.payload),
+                )
+                for row in (
+                    await session.scalars(
+                        select(DiscussionEvent)
+                        .where(DiscussionEvent.session_id == context.session_id)
+                        .order_by(DiscussionEvent.sequence)
+                    )
+                ).all()
+            )
+        batch_sizes: list[int] = []
+
+        class LaterBatchFails:
+            def derive(self, value: MemoryDerivationInput) -> MemoryDerivationResult:
+                batch_sizes.append(len(value.utterances))
+                if len(batch_sizes) == 2:
+                    raise MemoryDerivationUnavailable("later rebuild batch failed")
+                return _bounded_batch_result(value)
+
+        with pytest.raises(MemoryDerivationUnavailable):
+            await rebuild_discussion_memory(
+                context.session_factory,
+                session_id=context.session_id,
+                deriver=LaterBatchFails(),
+                provenance=MemorySemanticProvenance(
+                    prompt_version_id=DISCUSSION_MEMORY_UPDATE_V2.id,
+                    provider_identifier="mocked-semantic-provider",
+                    model_identifier="mocked-semantic-model",
+                    configuration_version="REBUILD_FAILURE_CONFIG",
+                ),
+                derivation_version="discussion-memory-derivation/rebuild-failure",
+                policy=MemoryPolicy(),
+                now=NOW,
+            )
+        assert batch_sizes == [64, 36]
+        async with context.session_factory() as session:
+            after = tuple(
+                (
+                    row.sequence,
+                    row.event_type,
+                    dict(row.payload),
+                )
+                for row in (
+                    await session.scalars(
+                        select(DiscussionEvent)
+                        .where(DiscussionEvent.session_id == context.session_id)
+                        .order_by(DiscussionEvent.sequence)
+                    )
+                ).all()
+            )
+            rows = tuple(
+                (
+                    await session.scalars(
+                        select(DiscussionMemoryRevision)
+                        .where(
+                            DiscussionMemoryRevision.session_id == context.session_id
+                        )
+                        .order_by(DiscussionMemoryRevision.revision)
+                    )
+                ).all()
+            )
+            state = await session.get(DiscussionMemoryState, context.session_id)
+        assert after == before
+        assert len(rows) == 1
+        assert state is not None and state.revision == 1
+        replayed = replay_memory_revisions(
+            session_id=context.session_id,
+            revisions=_accepted_memory_revisions(rows),
+        )
+        assert replayed.state == StructuredDiscussionMemory.model_validate(
+            state.structured_state
+        )
+
+
+def test_semantic_rebuild_later_batch_failure_is_finite_and_preserves_prefix(
+    migrated_database: TemporaryDatabaseContext,
+) -> None:
+    run_async(
+        lambda: _bounded_semantic_rebuild_later_failure_preserves_prefix(
+            migrated_database
+        )
+    )
+
+
+async def _bounded_semantic_rebuild_budget_exhaustion_preserves_prefix(
+    temporary_database: TemporaryDatabaseContext,
+) -> None:
+    async with _runtime_context(temporary_database) as context:
+        for index in range(100):
+            await _append_public_utterance(
+                context,
+                participant=context.participants[1],
+                actor_kind=ParticipantActorKind.AI,
+                content=f"REBUILD_BUDGET_{index}",
+            )
+
+        class BoundedBudgetDeriver:
+            def derive(self, value: MemoryDerivationInput) -> MemoryDerivationResult:
+                return _bounded_batch_result(value)
+
+        with pytest.raises(
+            DiscussionMemoryPersistenceError, match="rebuild step budget exhausted"
+        ):
+            await rebuild_discussion_memory(
+                context.session_factory,
+                session_id=context.session_id,
+                deriver=BoundedBudgetDeriver(),
+                provenance=MemorySemanticProvenance(),
+                derivation_version="discussion-memory-derivation/rebuild-budget",
+                policy=MemoryPolicy(max_rebuild_steps=1),
+                now=NOW,
+            )
+        async with context.session_factory() as session:
+            state = await session.get(DiscussionMemoryState, context.session_id)
+            count = await session.scalar(
+                select(func.count())
+                .select_from(DiscussionMemoryRevision)
+                .where(DiscussionMemoryRevision.session_id == context.session_id)
+            )
+        assert state is not None and state.revision == 1
+        assert count == 1
+
+
+def test_semantic_rebuild_step_budget_exhaustion_is_finite(
+    migrated_database: TemporaryDatabaseContext,
+) -> None:
+    run_async(
+        lambda: _bounded_semantic_rebuild_budget_exhaustion_preserves_prefix(
+            migrated_database
         )
     )

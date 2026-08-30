@@ -15,6 +15,7 @@ QUESTION_PERSONA_FOUNDATION_REVISION = "f1a12b15c002"
 SESSION_PHASE_TIMING_REVISION = "f1a13b15c003"
 FLOOR_CONTROL_FOUNDATION_REVISION = "f1a14b15c004"
 AI_RUNTIME_PERSISTENCE_REVISION = "f1a15b15c005"
+DISCUSSION_MEMORY_REVISION = "f1a16b16c006"
 
 
 def _alembic_config() -> Config:
@@ -31,7 +32,7 @@ def test_alembic_config_uses_project_migration_directory_without_url() -> None:
     assert config.get_main_option("sqlalchemy.url") is None
 
 
-def test_migration_history_is_linear_with_single_ai_runtime_head() -> None:
+def test_migration_history_is_linear_with_single_discussion_memory_head() -> None:
     script = ScriptDirectory.from_config(_alembic_config())
     baseline = script.get_revision(BASELINE_REVISION)
     identity = script.get_revision(IDENTITY_REVISION)
@@ -40,9 +41,11 @@ def test_migration_history_is_linear_with_single_ai_runtime_head() -> None:
     session_phase_timing = script.get_revision(SESSION_PHASE_TIMING_REVISION)
     floor_control = script.get_revision(FLOOR_CONTROL_FOUNDATION_REVISION)
     ai_runtime = script.get_revision(AI_RUNTIME_PERSISTENCE_REVISION)
+    discussion_memory = script.get_revision(DISCUSSION_MEMORY_REVISION)
 
-    assert script.get_heads() == [AI_RUNTIME_PERSISTENCE_REVISION]
+    assert script.get_heads() == [DISCUSSION_MEMORY_REVISION]
     assert [revision.revision for revision in script.walk_revisions()] == [
+        DISCUSSION_MEMORY_REVISION,
         AI_RUNTIME_PERSISTENCE_REVISION,
         FLOOR_CONTROL_FOUNDATION_REVISION,
         SESSION_PHASE_TIMING_REVISION,
@@ -79,6 +82,10 @@ def test_migration_history_is_linear_with_single_ai_runtime_head() -> None:
     assert ai_runtime.down_revision == FLOOR_CONTROL_FOUNDATION_REVISION
     assert ai_runtime.branch_labels == set()
     assert ai_runtime.dependencies is None
+    assert discussion_memory.revision == DISCUSSION_MEMORY_REVISION
+    assert discussion_memory.down_revision == AI_RUNTIME_PERSISTENCE_REVISION
+    assert discussion_memory.branch_labels == set()
+    assert discussion_memory.dependencies is None
 
 
 def test_baseline_upgrade_and_downgrade_are_zero_op() -> None:
@@ -105,6 +112,8 @@ def test_migration_target_metadata_has_exact_product_tables() -> None:
         "ai_utterances",
         "auth_sessions",
         "discussion_events",
+        "discussion_memory_revisions",
+        "discussion_memory_states",
         "floor_decisions",
         "floor_grants",
         "floor_interventions",

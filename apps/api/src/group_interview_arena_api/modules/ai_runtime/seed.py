@@ -67,8 +67,111 @@ AI_CANDIDATE_TURN_V2 = PromptVersionDefinition(
 )
 
 
+_AI_CANDIDATE_TURN_V3_TEMPLATE = _AI_CANDIDATE_TURN_V2_TEMPLATE.replace(
+    "最近公开讨论（可能为空；只回应其中确实有用的内容）：\n$recent_discussion",
+    "结构化公开讨论记忆（可能为空；它是派生上下文，不是原始证据）：\n"
+    "$discussion_memory\n\n"
+    "记忆游标之后的完整公开发言尾部（可能为空）：\n$recent_discussion\n\n"
+    "当前阶段剩余秒数（未知时为 UNKNOWN）：\n$time_remaining_seconds",
+)
+
+
+AI_CANDIDATE_TURN_V3 = PromptVersionDefinition(
+    id=UUID("56000000-0000-4000-8000-000000000003"),
+    prompt_key="AI_CANDIDATE_TURN",
+    version_number=3,
+    purpose_code="CANDIDATE_UTTERANCE",
+    template_text=_AI_CANDIDATE_TURN_V3_TEMPLATE,
+    created_at=datetime(2026, 8, 30, 0, 0, tzinfo=UTC),
+    published_at=datetime(2026, 8, 30, 0, 0, tzinfo=UTC),
+    retired_at=None,
+)
+
+
+_DISCUSSION_MEMORY_UPDATE_V1_TEMPLATE = """你负责从公开群面发言中提出结构化讨论记忆补丁。
+
+只使用输入中的公开题目字段、既有公开记忆与公开发言证据。
+只输出一个 JSON object，唯一顶层字段为 patches；不得编造 source_sequences，
+不得分配持久 memory_item_id，不得改变会话阶段、发言权、评分或参与者身份。
+
+公开 derivation input：
+$memory_derivation_input
+"""
+
+
+DISCUSSION_MEMORY_UPDATE_V1 = PromptVersionDefinition(
+    id=UUID("56000000-0000-4000-8000-000000000101"),
+    prompt_key="DISCUSSION_MEMORY_UPDATE",
+    version_number=1,
+    purpose_code="DISCUSSION_MEMORY_DERIVATION",
+    template_text=_DISCUSSION_MEMORY_UPDATE_V1_TEMPLATE,
+    created_at=datetime(2026, 8, 30, 0, 0, tzinfo=UTC),
+    published_at=datetime(2026, 8, 30, 0, 0, tzinfo=UTC),
+    retired_at=None,
+)
+
+
+_DISCUSSION_MEMORY_UPDATE_V2_TEMPLATE = """你负责从公开群面发言中提出结构化讨论记忆补丁。
+
+Evidence boundary:
+- Use only public question fields, previous public structured memory, and public
+  input utterances present in $memory_derivation_input.
+- Never use or request private stance, evaluator/reference-answer metadata,
+  provider credentials, or any other non-public data.
+
+Output contract:
+- Output exactly one JSON object with exactly one top-level field: "patches".
+- "patches" is an array. If no justified change exists, output {"patches":[]}.
+- Every patch object has exactly these fields:
+  "operation", "kind", "target_memory_item_id", "canonical_text",
+  and "source_sequences".
+- operation is exactly one of ADD, UPDATE, SUPERSEDE, DISCARD.
+- kind is exactly one of PROPOSAL, EVALUATION_CRITERION, AGREEMENT,
+  OPEN_CONFLICT, DISCARDED_OPTION, CURRENT_DECISION.
+- source_sequences is a non-empty array of positive integers in strictly increasing
+  order. Every value must identify an utterance in the input utterances.
+  Do not reuse a sequence merely because it appears in previous
+  memory, and must not invent, reorder, or duplicate source sequences.
+
+Operation rules:
+- ADD: target_memory_item_id is null; canonical_text is non-empty text.
+- UPDATE: target_memory_item_id is the UUID of an active item of the same kind;
+  canonical_text is non-empty replacement text.
+- SUPERSEDE: target_memory_item_id is the UUID of an active item of the same
+  kind; canonical_text is non-empty replacement text.
+- DISCARD: target_memory_item_id is the UUID of an active item of the same kind;
+  canonical_text is null.
+
+Do not allocate a new persistent memory_item_id. Do not invent target IDs,
+source provenance, derivation provenance, or facts. Do not change session phase,
+floor control, scoring, or participant identity. Return JSON only, with no
+Markdown or explanatory text.
+
+Public derivation input:
+$memory_derivation_input
+"""
+
+
+DISCUSSION_MEMORY_UPDATE_V2 = PromptVersionDefinition(
+    id=UUID("56000000-0000-4000-8000-000000000102"),
+    prompt_key="DISCUSSION_MEMORY_UPDATE",
+    version_number=2,
+    purpose_code="DISCUSSION_MEMORY_DERIVATION",
+    template_text=_DISCUSSION_MEMORY_UPDATE_V2_TEMPLATE,
+    created_at=datetime(2026, 8, 30, 0, 1, tzinfo=UTC),
+    published_at=datetime(2026, 8, 30, 0, 1, tzinfo=UTC),
+    retired_at=None,
+)
+
+
 async def seed_ai_runtime_prompt_versions(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> bool:
     async with session_factory() as session:
-        return await publish_prompt_version(session, AI_CANDIDATE_TURN_V2)
+        results = [
+            await publish_prompt_version(session, AI_CANDIDATE_TURN_V2),
+            await publish_prompt_version(session, AI_CANDIDATE_TURN_V3),
+            await publish_prompt_version(session, DISCUSSION_MEMORY_UPDATE_V1),
+            await publish_prompt_version(session, DISCUSSION_MEMORY_UPDATE_V2),
+        ]
+        return any(results)

@@ -26,6 +26,8 @@ EXPECTED_PRODUCT_TABLES = {
     "ai_utterances",
     "auth_sessions",
     "discussion_events",
+    "discussion_memory_revisions",
+    "discussion_memory_states",
     "floor_decisions",
     "floor_grants",
     "floor_interventions",

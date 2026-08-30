@@ -9,8 +9,68 @@ from group_interview_arena_api.modules.ai_runtime import seed as seed_module
 from group_interview_arena_api.modules.ai_runtime.prompting import PROMPT_VARIABLES
 from group_interview_arena_api.modules.ai_runtime.seed import (
     AI_CANDIDATE_TURN_V2,
+    AI_CANDIDATE_TURN_V3,
+    DISCUSSION_MEMORY_UPDATE_V1,
+    DISCUSSION_MEMORY_UPDATE_V2,
     seed_ai_runtime_prompt_versions,
 )
+
+
+def test_candidate_v3_is_additive_and_memory_backed_without_mutating_v2() -> None:
+    assert AI_CANDIDATE_TURN_V2.version_number == 2
+    assert AI_CANDIDATE_TURN_V3.version_number == 3
+    assert AI_CANDIDATE_TURN_V3.id == UUID("56000000-0000-4000-8000-000000000003")
+    assert "$discussion_memory" in AI_CANDIDATE_TURN_V3.template_text
+    assert "$recent_discussion" in AI_CANDIDATE_TURN_V3.template_text
+    assert "$time_remaining_seconds" in AI_CANDIDATE_TURN_V3.template_text
+
+
+def test_discussion_memory_prompt_has_separate_immutable_public_only_identity() -> None:
+    definition = DISCUSSION_MEMORY_UPDATE_V1
+    assert definition.id == UUID("56000000-0000-4000-8000-000000000101")
+    assert definition.prompt_key == "DISCUSSION_MEMORY_UPDATE"
+    assert definition.version_number == 1
+    assert definition.purpose_code == "DISCUSSION_MEMORY_DERIVATION"
+    assert "$memory_derivation_input" in definition.template_text
+    assert "Private Stance" not in definition.template_text
+
+
+def test_discussion_memory_v2_freezes_one_self_describing_closed_patch_contract() -> (
+    None
+):
+    definition = DISCUSSION_MEMORY_UPDATE_V2
+    template = definition.template_text
+    assert definition.id == UUID("56000000-0000-4000-8000-000000000102")
+    assert definition.prompt_key == "DISCUSSION_MEMORY_UPDATE"
+    assert definition.version_number == 2
+    assert definition.purpose_code == "DISCUSSION_MEMORY_DERIVATION"
+    assert definition.created_at > DISCUSSION_MEMORY_UPDATE_V1.created_at
+    assert "$memory_derivation_input" in template
+    for required in (
+        '{"patches":[]}',
+        "operation",
+        "kind",
+        "target_memory_item_id",
+        "canonical_text",
+        "source_sequences",
+        "ADD",
+        "UPDATE",
+        "SUPERSEDE",
+        "DISCARD",
+        "PROPOSAL",
+        "EVALUATION_CRITERION",
+        "AGREEMENT",
+        "OPEN_CONFLICT",
+        "DISCARDED_OPTION",
+        "CURRENT_DECISION",
+        "positive",
+        "strictly increasing",
+        "input utterances",
+        "must not invent",
+        "public",
+    ):
+        assert required in template
+    assert "Private Stance" not in template
 
 
 def test_ai_candidate_turn_v2_has_exact_immutable_identity_and_vocabulary() -> None:
@@ -99,4 +159,9 @@ def test_ai_runtime_prompt_seed_returns_exact_publication_result(
     )
 
     assert result is inserted
-    assert published == [(session, AI_CANDIDATE_TURN_V2)]
+    assert published == [
+        (session, AI_CANDIDATE_TURN_V2),
+        (session, AI_CANDIDATE_TURN_V3),
+        (session, DISCUSSION_MEMORY_UPDATE_V1),
+        (session, DISCUSSION_MEMORY_UPDATE_V2),
+    ]

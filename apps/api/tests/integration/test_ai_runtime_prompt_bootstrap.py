@@ -28,7 +28,12 @@ from group_interview_arena_api.modules.ai_runtime.domain import (
     PromptVersionDefinition,
     PromptVersionMutationError,
 )
-from group_interview_arena_api.modules.ai_runtime.seed import AI_CANDIDATE_TURN_V2
+from group_interview_arena_api.modules.ai_runtime.seed import (
+    AI_CANDIDATE_TURN_V2,
+    AI_CANDIDATE_TURN_V3,
+    DISCUSSION_MEMORY_UPDATE_V1,
+    DISCUSSION_MEMORY_UPDATE_V2,
+)
 from group_interview_arena_api.modules.ai_runtime.service import publish_prompt_version
 
 pytestmark = pytest.mark.integration
@@ -93,8 +98,18 @@ async def _verify_normal_lifespan_publication(
                 count = await session.scalar(
                     select(func.count()).select_from(PromptVersion)
                 )
+                v3 = await session.get(PromptVersion, AI_CANDIDATE_TURN_V3.id)
+                memory_prompt = await session.get(
+                    PromptVersion, DISCUSSION_MEMORY_UPDATE_V1.id
+                )
+                memory_prompt_v2 = await session.get(
+                    PromptVersion, DISCUSSION_MEMORY_UPDATE_V2.id
+                )
             assert row is not None
-            assert count == 1
+            assert count == 4
+            assert v3 is not None
+            assert memory_prompt is not None
+            assert memory_prompt_v2 is not None
             snapshot = _prompt_snapshot(row)
             assert snapshot == (
                 expected.id,
@@ -151,7 +166,7 @@ async def _verify_v1_is_immutable_during_bootstrap(
             )
         assert after is not None
         assert v2 is not None
-        assert count == 2
+        assert count == 5
         assert _prompt_snapshot(after) == before_snapshot
 
 

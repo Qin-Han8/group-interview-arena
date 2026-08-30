@@ -59,6 +59,8 @@ EXPECTED_PRODUCT_TABLES = P1_2_PRODUCT_TABLES | {
     "floor_grants",
     "floor_interventions",
     "floor_releases",
+    "discussion_memory_revisions",
+    "discussion_memory_states",
     "llm_generation_requests",
     "prompt_versions",
     "session_participants",
@@ -305,7 +307,13 @@ def test_database_downgrades_to_p1_4_and_reupgrades_to_head(
             revision=FLOOR_CONTROL_FOUNDATION_REVISION,
             version_table_exists=True,
             product_tables=EXPECTED_PRODUCT_TABLES
-            - {"ai_utterances", "llm_generation_requests", "prompt_versions"},
+            - {
+                "ai_utterances",
+                "llm_generation_requests",
+                "prompt_versions",
+                "discussion_memory_revisions",
+                "discussion_memory_states",
+            },
         )
 
         command.upgrade(config, "head")

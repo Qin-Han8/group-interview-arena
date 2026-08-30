@@ -2,7 +2,7 @@
 
 - Status: `P1-6 IN_PROGRESS`
 - Previous checkpoint: `P1-6A DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`
-- Current checkpoint: `P1-6B DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`
+- Current checkpoint: `P1-6B DONE / DESIGN_SCOPE_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PASS`
 - P1-6A finding-only external actual-source re-review verdict: `PASS`
 - P1-6A reviewed bundle: `group-interview-arena-review-20260830-044406.zip`
 - P1-6A reviewed bundle SHA-256: `6137E75B1E671A561D6280901680A7445C66F5EDBB34D456142F092492473E4D`
@@ -11,6 +11,10 @@
 - P1-6B finding-only re-review bundle: `group-interview-arena-review-20260830-062133.zip`
 - P1-6B finding-only re-review bundle SHA-256: `C10F2A9362EB6102C6C3F23D7BA66234FECC098BDE2A394D5A2738EBB97E701D`
 - P1-6B findings: `P16B-REV-001 CLOSED`; `P16B-REV-002 CLOSED`; `P16B-REV-003 CLOSED`; new findings `NONE`; open findings `NONE`
+- P1-6B implementation external actual-source review verdict: `PASS`
+- P1-6B implementation reviewed bundle: `group-interview-arena-review-20260830-150847.zip`
+- P1-6B implementation reviewed bundle SHA-256: `0EAA4B3FEE82F4D8A82D5098CECFDA1BF04F9161B7A63E7F7779B2512D9347F6`
+- P1-6B implementation findings: `P16B-IMP-001 CLOSED`; `P16B-IMP-002 CLOSED`; `P16B-IMP-003 CLOSED`; `P16B-IMP-004 CLOSED`; `P16B-IMP-005 CLOSED`; `P16B-IMP-006 CLOSED`; `P16B-IMP-007 CLOSED`; new findings `NONE`; open findings `NONE`
 - Remaining checkpoints: `P1-6C NOT_STARTED`; `P1-6D NOT_STARTED`; `P1-6E NOT_STARTED`
 - Parent phase: `P1 IN_PROGRESS`
 - Product target: `V0.1 Internal Validation`
@@ -267,7 +271,7 @@ P1-6A closeout satisfies the following frozen gate:
 
 ### 10.1 Checkpoint and actual-source calibration
 
-P1-6B is `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`. The finding-only external actual-source re-review verdict is `PASS` against `group-interview-arena-review-20260830-062133.zip` / SHA-256 `C10F2A9362EB6102C6C3F23D7BA66234FECC098BDE2A394D5A2738EBB97E701D`; `P16B-REV-001 CLOSED`; `P16B-REV-002 CLOSED`; `P16B-REV-003 CLOSED`; new findings `NONE`; open findings `NONE`. This checkpoint freezes production implementation architecture only; it creates no production code, schema, migration, API, WebSocket, Web, provider, prompt, dependency, CI or infrastructure change and does not start implementation. No independent review was run for this closeout.
+P1-6B Design Freeze is `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`. The finding-only external actual-source re-review verdict is `PASS` against `group-interview-arena-review-20260830-062133.zip` / SHA-256 `C10F2A9362EB6102C6C3F23D7BA66234FECC098BDE2A394D5A2738EBB97E701D`; `P16B-REV-001 CLOSED`; `P16B-REV-002 CLOSED`; `P16B-REV-003 CLOSED`; new findings `NONE`; open findings `NONE`. The separately approved production implementation is now `DONE / DESIGN_SCOPE_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PASS`; implementation finding-only actual-source re-review verdict is `PASS` against `group-interview-arena-review-20260830-150847.zip` / SHA-256 `0EAA4B3FEE82F4D8A82D5098CECFDA1BF04F9161B7A63E7F7779B2512D9347F6`; `P16B-IMP-001`, `P16B-IMP-002`, `P16B-IMP-003`, `P16B-IMP-004`, `P16B-IMP-005`, `P16B-IMP-006`, `P16B-IMP-007` are `CLOSED`; new findings `NONE`; open findings `NONE`; P1-6C～P1-6E remain `NOT_STARTED`. No independent review was run.
 
 The approved architecture is **Evidence Ledger + Materialized Memory + Patch Journal + Lazy Semantic Compaction**. Current source calibrates it as follows:
 
@@ -499,4 +503,4 @@ P1-6B Design Freeze and implementation exclude public Memory REST/WS/Web, Report
 
 Stop before implementation or scope expansion if actual source later proves that: (1) the two-table shape cannot migrate additively; (2) public evidence cannot replay safely; (3) a public REST/WS change is required; (4) shared memory cannot isolate Private Stance; (5) optimistic CAS is unsafe in the current transaction model; (6) `PromptVersion` cannot support the semantic prompt without a new product decision; (7) transport refinement breaks accepted P1-5 contracts; (8) the master plan must change; (9) a new Accepted ADR/product decision is required; or (10) a 10× domain blocker cannot be addressed by replaceable infrastructure.
 
-Design-time STOP-condition result: `NONE`. The initial external actual-source review verdict was `BLOCKED` on exactly `P16B-REV-001`, `P16B-REV-002` and `P16B-REV-003` against `group-interview-arena-review-20260830-060509.zip` / SHA-256 `C0C7A7A589B1795DD917C11CF13B36FBCE245DFFD36CD20D5C96BAD80AC6EF26`. Finding-only remediation froze projection identity, persisted candidate Working Context provenance and explicit public question allowlisting. The finding-only external actual-source re-review verdict is `PASS` against `group-interview-arena-review-20260830-062133.zip` / SHA-256 `C10F2A9362EB6102C6C3F23D7BA66234FECC098BDE2A394D5A2738EBB97E701D`; `P16B-REV-001 CLOSED`; `P16B-REV-002 CLOSED`; `P16B-REV-003 CLOSED`; new findings `NONE`; open findings `NONE`. P1-6B is therefore `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; production implementation has not started and still requires separate approval. P1-6C～P1-6E and P1-7/P1-8 remain `NOT_STARTED`; P1-6/P1 remain `IN_PROGRESS`.
+Design-time STOP-condition result: `NONE`. The initial external actual-source review verdict was `BLOCKED` on exactly `P16B-REV-001`, `P16B-REV-002` and `P16B-REV-003` against `group-interview-arena-review-20260830-060509.zip` / SHA-256 `C0C7A7A589B1795DD917C11CF13B36FBCE245DFFD36CD20D5C96BAD80AC6EF26`. Finding-only remediation froze projection identity, persisted candidate Working Context provenance and explicit public question allowlisting. The finding-only external actual-source re-review verdict is `PASS` against `group-interview-arena-review-20260830-062133.zip` / SHA-256 `C10F2A9362EB6102C6C3F23D7BA66234FECC098BDE2A394D5A2738EBB97E701D`; `P16B-REV-001 CLOSED`; `P16B-REV-002 CLOSED`; `P16B-REV-003 CLOSED`; new findings `NONE`; open findings `NONE`. The approved production implementation is now `DONE / DESIGN_SCOPE_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PASS`. Implementation finding-only actual-source re-review verdict is `PASS` against `group-interview-arena-review-20260830-150847.zip` / SHA-256 `0EAA4B3FEE82F4D8A82D5098CECFDA1BF04F9161B7A63E7F7779B2512D9347F6`; `P16B-IMP-001`, `P16B-IMP-002`, `P16B-IMP-003`, `P16B-IMP-004`, `P16B-IMP-005`, `P16B-IMP-006`, `P16B-IMP-007` are `CLOSED`; new findings `NONE`; open findings `NONE`. P1-6C～P1-6E and P1-7/P1-8 remain `NOT_STARTED`; P1-6/P1 remain `IN_PROGRESS`.

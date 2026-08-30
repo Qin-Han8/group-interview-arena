@@ -2,6 +2,7 @@ import asyncio
 from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from enum import StrEnum
+from typing import cast
 from uuid import UUID
 
 from pydantic import UUID4, field_validator
@@ -11,7 +12,6 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from group_interview_arena_api.db import (
     AiUtterance,
-    DiscussionEvent,
     FloorGrant,
     LlmGenerationRequest,
     PersonaPrivateStance,
@@ -25,7 +25,6 @@ from group_interview_arena_api.db import (
 from group_interview_arena_api.modules.ai_runtime.conversation_context import (
     PublicDiscussionUtterance,
     render_persona_behavior,
-    render_recent_discussion,
     select_recent_public_discussion,
 )
 from group_interview_arena_api.modules.ai_runtime.domain import (
@@ -35,7 +34,8 @@ from group_interview_arena_api.modules.ai_runtime.domain import (
     GenerationContextError,
     GenerationFailureCode,
     GenerationRequestConflictError,
-    GenerationRequestMetadata,
+    GenerationRequestMetadataAny,
+    GenerationRequestMetadataV2,
     GenerationRequestSnapshot,
     GenerationRequestStatus,
     GenerationStateError,
@@ -43,9 +43,11 @@ from group_interview_arena_api.modules.ai_runtime.domain import (
     PersistUtteranceCommand,
     RequestGenerationCommand,
     StartGenerationCommand,
+    parse_generation_request_metadata,
 )
 from group_interview_arena_api.modules.ai_runtime.generation import (
     GenerationExecutor,
+    ModelInvoker,
     RawGenerationFailure,
     RuntimeGenerationInput,
     validate_generation_result,
@@ -54,9 +56,14 @@ from group_interview_arena_api.modules.ai_runtime.prompting import (
     AuthorizedGenerationContext,
     AuthorizedPersonaContext,
     AuthorizedQuestionContext,
+    MemoryBackedAuthorizedGenerationContext,
     PromptRenderError,
     PromptTemplateAsset,
     render_authorized_prompt,
+    render_memory_backed_authorized_prompt,
+)
+from group_interview_arena_api.modules.ai_runtime.seed import (
+    DISCUSSION_MEMORY_UPDATE_V2,
 )
 from group_interview_arena_api.modules.ai_runtime.service import (
     claim_generation_request,
@@ -64,19 +71,36 @@ from group_interview_arena_api.modules.ai_runtime.service import (
     create_generation_request,
     fail_generation_request,
 )
+from group_interview_arena_api.modules.discussion_memory.application import (
+    DiscussionMemoryPersistenceError,
+    MemorySemanticProvenance,
+    load_discussion_memory_projection,
+    load_discussion_memory_projection_at_revision,
+    load_public_memory_utterances,
+    maintain_discussion_memory,
+)
+from group_interview_arena_api.modules.discussion_memory.derivation import (
+    MemoryDerivationInput,
+    MemoryDerivationResult,
+    MemoryDerivationUnavailable,
+    ModelBackedMemoryDeriver,
+)
+from group_interview_arena_api.modules.discussion_memory.domain import (
+    DEFAULT_MEMORY_POLICY,
+    DiscussionContextMode,
+)
+from group_interview_arena_api.modules.discussion_memory.working_context import (
+    DISCUSSION_WORKING_CONTEXT_V1,
+    DiscussionWorkingContextUnavailable,
+    build_discussion_working_context,
+    render_structured_discussion_memory,
+    render_working_context_recent_discussion,
+)
 from group_interview_arena_api.modules.discussion_sessions.domain import (
     ACTIVE_PHASES,
     SessionStatus,
-    StoredEvent,
 )
-from group_interview_arena_api.modules.discussion_sessions.public_events import (
-    PublicEventProjectionError,
-    project_public_events,
-)
-from group_interview_arena_api.modules.floor_control.domain import (
-    FLOOR_ENABLED_PHASES,
-    ParticipantActorKind,
-)
+from group_interview_arena_api.modules.floor_control.domain import ParticipantActorKind
 from group_interview_arena_api.modules.question_personas.domain import (
     ConstraintItem,
     PriorityDimension,
@@ -108,7 +132,7 @@ class GenerateAiUtteranceCommand(ClosedDomainModel):
     prompt_version_id: UUID4
     provider_identifier: Identifier
     model_identifier: Identifier
-    request_metadata: GenerationRequestMetadata
+    request_metadata: GenerationRequestMetadataAny
     occurred_at: datetime
 
     @field_validator("occurred_at")
@@ -118,7 +142,9 @@ class GenerateAiUtteranceCommand(ClosedDomainModel):
             raise ValueError("timestamp must be timezone-aware")
         return value.astimezone(UTC)
 
-    def request_command(self) -> RequestGenerationCommand:
+    def request_command(
+        self, request_metadata: GenerationRequestMetadataAny | None = None
+    ) -> RequestGenerationCommand:
         return RequestGenerationCommand(
             request_id=self.generation_request_id,
             session_id=self.session_id,
@@ -127,7 +153,7 @@ class GenerateAiUtteranceCommand(ClosedDomainModel):
             prompt_version_id=self.prompt_version_id,
             provider_identifier=self.provider_identifier,
             model_identifier=self.model_identifier,
-            request_metadata=self.request_metadata,
+            request_metadata=request_metadata or self.request_metadata,
             requested_at=self.occurred_at,
         )
 
@@ -226,82 +252,26 @@ def _priority_dimension(item: dict[str, object]) -> PriorityDimension:
         raise ValueError("Persisted private stance shape is invalid.") from error
 
 
-async def _load_recent_public_discussion(
-    session: AsyncSession,
-    *,
-    session_id: UUID,
+async def _load_recent_public_discussion(  # pyright: ignore[reportUnusedFunction]
+    session: AsyncSession, *, session_id: UUID
 ) -> tuple[PublicDiscussionUtterance, ...]:
-    rows = tuple(
-        (
-            await session.scalars(
-                select(DiscussionEvent)
-                .where(
-                    DiscussionEvent.session_id == session_id,
-                    DiscussionEvent.event_type == "participant.utterance.created",
-                )
-                .order_by(DiscussionEvent.sequence.desc())
-            )
-        ).all()
-    )
-    stored_events = tuple(
-        StoredEvent(
-            event_version=row.event_version,
-            event_type=row.event_type,
-            session_id=row.session_id,
-            sequence=row.sequence,
-            occurred_at=row.occurred_at,
-            causation_action_id=row.causation_action_id,
-            payload=row.payload,
-        )
-        for row in rows
-    )
+    """Historical P1-5 raw-window seam over the safe public memory loader."""
     try:
-        projected = await project_public_events(session, stored_events)
-        participant_ids = {
-            UUID(str(event.payload["participant_id"])) for event in projected
-        }
-        participants = {
-            participant.id: participant
-            for participant in (
-                await session.scalars(
-                    select(SessionParticipant).where(
-                        SessionParticipant.session_id == session_id,
-                        SessionParticipant.id.in_(participant_ids),
-                    )
-                )
-            ).all()
-        }
-        items: list[PublicDiscussionUtterance] = []
-        for event in projected:
-            participant_id = UUID(str(event.payload["participant_id"]))
-            participant = participants.get(participant_id)
-            actor_kind = ParticipantActorKind(str(event.payload["actor_kind"]))
-            phase = SessionStatus(str(event.payload["phase"]))
-            content = event.payload["content"]
-            if (
-                event.schema_version != 1
-                or event.type != "participant.utterance.created"
-                or event.session_id != session_id
-                or participant is None
-                or participant.actor_kind != actor_kind.value
-                or participant.seat_order <= 0
-                or phase not in FLOOR_ENABLED_PHASES
-                or not isinstance(content, str)
-            ):
-                raise ValueError("Durable public discussion fact is invalid.")
-            items.append(
-                PublicDiscussionUtterance(
-                    sequence=event.sequence,
-                    participant_id=participant_id,
-                    actor_kind=actor_kind,
-                    seat_order=participant.seat_order,
-                    phase=phase,
-                    content=content,
-                )
-            )
-        return select_recent_public_discussion(tuple(items))
-    except (PublicEventProjectionError, KeyError, TypeError, ValueError) as error:
+        history = await load_public_memory_utterances(session, session_id=session_id)
+    except DiscussionMemoryPersistenceError as error:
         raise GenerationContextError("Recent public discussion is invalid.") from error
+    newest_first = tuple(
+        PublicDiscussionUtterance(
+            sequence=item.sequence,
+            participant_id=item.participant_id,
+            actor_kind=ParticipantActorKind(item.actor_kind),
+            seat_order=item.seat_order,
+            phase=SessionStatus(item.phase),
+            content=item.content,
+        )
+        for item in reversed(history)
+    )
+    return select_recent_public_discussion(newest_first)
 
 
 async def _assemble_generation_input(
@@ -309,7 +279,9 @@ async def _assemble_generation_input(
     *,
     owner_id: UUID,
     command: GenerateAiUtteranceCommand,
-) -> RuntimeGenerationInput:
+    compaction_failed: bool = False,
+    persisted_metadata: GenerationRequestMetadataV2 | None = None,
+) -> tuple[RuntimeGenerationInput, GenerationRequestMetadataV2]:
     statement = (
         select(
             SimulationSession,
@@ -373,11 +345,92 @@ async def _assemble_generation_input(
         async with session_factory() as session:
             async with session.begin():
                 row = (await session.execute(statement)).one_or_none()
-                recent_public_discussion = await _load_recent_public_discussion(
-                    session,
-                    session_id=command.session_id,
+                public_history = await load_public_memory_utterances(
+                    session, session_id=command.session_id
                 )
-    except SQLAlchemyError as error:
+                if persisted_metadata is None:
+                    memory_projection = await load_discussion_memory_projection(
+                        session, session_id=command.session_id
+                    )
+                else:
+                    if (
+                        persisted_metadata.working_context_version
+                        != DISCUSSION_WORKING_CONTEXT_V1
+                    ):
+                        raise GenerationContextError(
+                            "Persisted Working Context version is unsupported."
+                        )
+                    if (
+                        persisted_metadata.context_mode
+                        is DiscussionContextMode.MEMORY_WITH_RAW_TAIL
+                    ):
+                        memory_projection = (
+                            await load_discussion_memory_projection_at_revision(
+                                session,
+                                session_id=command.session_id,
+                                revision=persisted_metadata.memory_revision,
+                            )
+                        )
+                        if (
+                            memory_projection.source_through_sequence
+                            != persisted_metadata.memory_source_through_sequence
+                        ):
+                            raise GenerationContextError(
+                                "Persisted memory cursor does not match its revision."
+                            )
+                        public_history = tuple(
+                            item
+                            for item in public_history
+                            if (
+                                memory_projection.source_through_sequence
+                                < item.sequence
+                                <= persisted_metadata.context_source_through_sequence
+                            )
+                        )
+                        if (
+                            persisted_metadata.context_source_through_sequence
+                            > memory_projection.source_through_sequence
+                            and (
+                                not public_history
+                                or public_history[-1].sequence
+                                != persisted_metadata.context_source_through_sequence
+                            )
+                        ):
+                            raise GenerationContextError(
+                                "Persisted raw-tail cursor is unavailable."
+                            )
+                        compaction_failed = False
+                    else:
+                        if (
+                            persisted_metadata.memory_revision != 0
+                            or persisted_metadata.memory_source_through_sequence != 0
+                        ):
+                            raise GenerationContextError(
+                                "Persisted raw fallback cannot reference memory."
+                            )
+                        memory_projection = (
+                            await load_discussion_memory_projection_at_revision(
+                                session,
+                                session_id=command.session_id,
+                                revision=0,
+                            )
+                        )
+                        public_history = tuple(
+                            item
+                            for item in public_history
+                            if item.sequence
+                            <= persisted_metadata.context_source_through_sequence
+                        )
+                        if persisted_metadata.context_source_through_sequence > 0 and (
+                            not public_history
+                            or public_history[-1].sequence
+                            != persisted_metadata.context_source_through_sequence
+                        ):
+                            raise GenerationContextError(
+                                "Persisted raw fallback cursor is unavailable."
+                            )
+                        compaction_failed = True
+    except (DiscussionMemoryPersistenceError, SQLAlchemyError) as error:
         raise AiRuntimePersistenceError(
             "Generation context transaction failed."
         ) from error
@@ -402,6 +455,21 @@ async def _assemble_generation_input(
         or assignment.id != participant.question_persona_assignment_id
     ):
         raise GenerationContextError("Generation context is unavailable.")
+
+    try:
+        working_context = build_discussion_working_context(
+            projection=memory_projection,
+            complete_public_history=public_history,
+            phase=aggregate.status,
+            now=command.occurred_at,
+            phase_deadline_at=aggregate.phase_deadline_at,
+            policy=DEFAULT_MEMORY_POLICY,
+            compaction_failed=compaction_failed,
+        )
+    except DiscussionWorkingContextUnavailable as error:
+        raise GenerationContextError(
+            "Discussion working context is unavailable."
+        ) from error
 
     question_context = AuthorizedQuestionContext(
         version_id=question.id,
@@ -452,7 +520,7 @@ async def _assemble_generation_input(
         red_lines=tuple(stance.red_lines),
         preferred_group_role=stance.preferred_group_role,
     )
-    authorized_context = AuthorizedGenerationContext(
+    context_values = dict(
         session_id=aggregate.id,
         participant_id=participant.id,
         floor_grant_id=grant.id,
@@ -461,7 +529,7 @@ async def _assemble_generation_input(
         persona=persona_context,
         private_stance=private_stance,
         phase_instruction=question.phase_prompts.get(aggregate.status, ""),
-        recent_discussion=render_recent_discussion(recent_public_discussion),
+        recent_discussion=render_working_context_recent_discussion(working_context),
         persona_behavior=render_persona_behavior(persona_context),
     )
     asset = PromptTemplateAsset(
@@ -470,7 +538,24 @@ async def _assemble_generation_input(
         version_number=prompt.version_number,
         template_text=prompt.template_text,
     )
-    return RuntimeGenerationInput(
+    if prompt.prompt_key == "AI_CANDIDATE_TURN" and prompt.version_number >= 3:
+        rendered_prompt = render_memory_backed_authorized_prompt(
+            asset,
+            MemoryBackedAuthorizedGenerationContext(
+                **context_values,
+                discussion_memory=render_structured_discussion_memory(working_context),
+                time_remaining_seconds=(
+                    "UNKNOWN"
+                    if working_context.remaining_time_seconds is None
+                    else str(working_context.remaining_time_seconds)
+                ),
+            ),
+        )
+    else:
+        rendered_prompt = render_authorized_prompt(
+            asset, AuthorizedGenerationContext(**context_values)
+        )
+    generation_input = RuntimeGenerationInput(
         generation_request_id=command.generation_request_id,
         session_id=command.session_id,
         participant_id=command.participant_id,
@@ -479,23 +564,87 @@ async def _assemble_generation_input(
         prompt_version_id=prompt.id,
         prompt_key=prompt.prompt_key,
         prompt_version_number=prompt.version_number,
-        rendered_prompt=render_authorized_prompt(asset, authorized_context),
+        rendered_prompt=rendered_prompt,
         provider_identifier=command.provider_identifier,
         model_identifier=command.model_identifier,
-        configuration_version=command.request_metadata.configuration_version,
+        configuration_version=(
+            persisted_metadata.configuration_version
+            if persisted_metadata is not None
+            else command.request_metadata.configuration_version
+        ),
     )
+    metadata = GenerationRequestMetadataV2(
+        configuration_version=(
+            persisted_metadata.configuration_version
+            if persisted_metadata is not None
+            else command.request_metadata.configuration_version
+        ),
+        working_context_version=working_context.working_context_version,
+        context_mode=working_context.context_mode,
+        memory_revision=working_context.memory_revision,
+        memory_source_through_sequence=working_context.memory_source_through_sequence,
+        context_source_through_sequence=working_context.context_source_through_sequence,
+    )
+    if persisted_metadata is not None and metadata != persisted_metadata:
+        raise GenerationContextError(
+            "Recovered Working Context does not match persisted provenance."
+        )
+    return generation_input, metadata
 
 
-async def _request_identity_exists(
+class _UnavailableMemoryDeriver:
+    def derive(self, _input: MemoryDerivationInput) -> MemoryDerivationResult:
+        raise MemoryDerivationUnavailable("shared semantic transport is unavailable")
+
+
+async def _maintain_for_generation(
+    session_factory: async_sessionmaker[AsyncSession],
+    *,
+    command: GenerateAiUtteranceCommand,
+    executor: GenerationExecutor,
+) -> bool:
+    invoke = getattr(executor, "invoke", None)
+    if callable(invoke):
+        deriver = ModelBackedMemoryDeriver(
+            invoker=cast(ModelInvoker, executor),
+            template_text=DISCUSSION_MEMORY_UPDATE_V2.template_text,
+            provider_identifier=command.provider_identifier,
+            model_identifier=command.model_identifier,
+            configuration_version=command.request_metadata.configuration_version,
+        )
+        provenance = MemorySemanticProvenance(
+            prompt_version_id=DISCUSSION_MEMORY_UPDATE_V2.id,
+            provider_identifier=command.provider_identifier,
+            model_identifier=command.model_identifier,
+            configuration_version=command.request_metadata.configuration_version,
+        )
+    else:
+        deriver = _UnavailableMemoryDeriver()
+        provenance = MemorySemanticProvenance()
+    try:
+        await maintain_discussion_memory(
+            session_factory,
+            session_id=command.session_id,
+            deriver=deriver,
+            provenance=provenance,
+            policy=DEFAULT_MEMORY_POLICY,
+            now=command.occurred_at,
+        )
+        return False
+    except DiscussionMemoryPersistenceError, MemoryDerivationUnavailable, ValueError:
+        return True
+
+
+async def _load_request_identity_metadata(
     session_factory: async_sessionmaker[AsyncSession],
     *,
     owner_id: UUID,
     command: GenerateAiUtteranceCommand,
-) -> bool:
+) -> GenerationRequestMetadataAny | None:
     try:
         async with session_factory() as session:
-            request_id = await session.scalar(
-                select(LlmGenerationRequest.id)
+            metadata = await session.scalar(
+                select(LlmGenerationRequest.request_metadata)
                 .join(
                     SimulationSession,
                     SimulationSession.id == LlmGenerationRequest.session_id,
@@ -506,9 +655,16 @@ async def _request_identity_exists(
                     SimulationSession.owner_user_id == owner_id,
                 )
             )
-    except SQLAlchemyError as error:
+    except (SQLAlchemyError, ValueError) as error:
         raise AiRuntimePersistenceError("Generation request lookup failed.") from error
-    return request_id is not None
+    if metadata is None:
+        return None
+    try:
+        return parse_generation_request_metadata(metadata)
+    except ValueError as error:
+        raise AiRuntimePersistenceError(
+            "Generation request metadata is invalid."
+        ) from error
 
 
 async def _fail_generation(
@@ -565,21 +721,29 @@ async def generate_ai_utterance(
     executor: GenerationExecutor,
 ) -> GenerateAiUtteranceResult:
     generation_input: RuntimeGenerationInput | None = None
+    effective_metadata: GenerationRequestMetadataAny = command.request_metadata
     try:
-        request_exists = await _request_identity_exists(
+        stored_metadata = await _load_request_identity_metadata(
             session_factory,
             owner_id=owner_id,
             command=command,
         )
     except AiRuntimePersistenceError:
         return _result(command, RuntimeGenerationOutcome.INTERNAL_ERROR)
+    request_exists = stored_metadata is not None
+    if stored_metadata is not None:
+        effective_metadata = stored_metadata
 
     if not request_exists:
         try:
-            generation_input = await _assemble_generation_input(
+            compaction_failed = await _maintain_for_generation(
+                session_factory, command=command, executor=executor
+            )
+            generation_input, effective_metadata = await _assemble_generation_input(
                 session_factory,
                 owner_id=owner_id,
                 command=command,
+                compaction_failed=compaction_failed,
             )
         except GenerationContextError, PromptRenderError, ValueError:
             return _result(command, RuntimeGenerationOutcome.CONTEXT_REJECTED)
@@ -591,7 +755,7 @@ async def generate_ai_utterance(
             request = await create_generation_request(
                 session,
                 owner_id=owner_id,
-                command=command.request_command(),
+                command=command.request_command(effective_metadata),
             )
     except GenerationRequestConflictError:
         return _result(command, RuntimeGenerationOutcome.REQUEST_CONFLICT)
@@ -606,10 +770,15 @@ async def generate_ai_utterance(
 
     if generation_input is None:
         try:
-            generation_input = await _assemble_generation_input(
+            generation_input, _ = await _assemble_generation_input(
                 session_factory,
                 owner_id=owner_id,
                 command=command,
+                persisted_metadata=(
+                    effective_metadata
+                    if isinstance(effective_metadata, GenerationRequestMetadataV2)
+                    else None
+                ),
             )
         except GenerationContextError:
             failed = await _fail_generation(

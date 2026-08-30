@@ -5,6 +5,8 @@ import httpx
 from group_interview_arena_api.core.config import ZhipuProviderSettings
 from group_interview_arena_api.modules.ai_runtime.domain import GenerationFailureCode
 from group_interview_arena_api.modules.ai_runtime.generation import (
+    ModelInvocationInput,
+    ModelOutputExpectation,
     RawGenerationFailure,
     RawGenerationResult,
     RawGenerationSuccess,
@@ -80,10 +82,13 @@ class ZhipuGenerationProvider:
         self,
         generation_input: RuntimeGenerationInput,
     ) -> RawGenerationResult:
+        return await self.invoke(generation_input.to_model_invocation())
+
+    async def invoke(self, invocation: ModelInvocationInput) -> RawGenerationResult:
         if (
-            generation_input.provider_identifier != ZHIPU_PROVIDER_IDENTIFIER
-            or generation_input.model_identifier != self._settings.model
-            or generation_input.configuration_version != ZHIPU_CONFIGURATION_VERSION
+            invocation.provider_identifier != ZHIPU_PROVIDER_IDENTIFIER
+            or invocation.model_identifier != self._settings.model
+            or invocation.configuration_version != ZHIPU_CONFIGURATION_VERSION
         ):
             return _failure(GenerationFailureCode.INTERNAL_ERROR)
 
@@ -105,13 +110,19 @@ class ZhipuGenerationProvider:
                         "messages": [
                             {
                                 "role": "user",
-                                "content": generation_input.rendered_prompt,
+                                "content": invocation.rendered_prompt,
                             }
                         ],
                         "thinking": {"type": "disabled"},
                         "stream": False,
-                        "max_tokens": 512,
-                        "temperature": 0.7,
+                        "max_tokens": invocation.max_output_tokens,
+                        "temperature": invocation.temperature,
+                        **(
+                            {"response_format": {"type": "json_object"}}
+                            if invocation.output_expectation
+                            is ModelOutputExpectation.JSON_OBJECT
+                            else {}
+                        ),
                     },
                 )
         except httpx.TimeoutException:

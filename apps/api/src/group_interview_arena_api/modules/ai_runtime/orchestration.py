@@ -22,7 +22,9 @@ from group_interview_arena_api.modules.ai_runtime.domain import (
     ClosedDomainModel,
     GenerationFailureCode,
     GenerationRequestMetadata,
+    GenerationRequestMetadataAny,
     GenerationRequestStatus,
+    parse_generation_request_metadata,
 )
 from group_interview_arena_api.modules.ai_runtime.generation import GenerationProvider
 from group_interview_arena_api.modules.ai_runtime.runtime import (
@@ -569,6 +571,9 @@ async def drive_single_ai_turn(
             identities.generation_request_id,
         )
         prompt_version_id: UUID
+        request_metadata: GenerationRequestMetadataAny = GenerationRequestMetadata(
+            configuration_version=configuration_version
+        )
         requested_at = grant.granted_at
         if existing_request is None:
             prompt = await _select_effective_prompt_version(
@@ -599,6 +604,14 @@ async def drive_single_ai_turn(
                     processed_floor_grant_id=grant.id,
                     generation_request_id=identities.generation_request_id,
                 )
+            try:
+                request_metadata = parse_generation_request_metadata(metadata)
+            except ValueError:
+                return SingleAiTurnResult(
+                    outcome=SingleAiTurnOutcome.RECONCILIATION_REQUIRED,
+                    processed_floor_grant_id=grant.id,
+                    generation_request_id=identities.generation_request_id,
+                )
             prompt_version_id = existing_request.prompt_version_id
             requested_at = existing_request.requested_at
 
@@ -614,9 +627,7 @@ async def drive_single_ai_turn(
             prompt_version_id=prompt_version_id,
             provider_identifier=provider_identifier,
             model_identifier=model_identifier,
-            request_metadata=GenerationRequestMetadata(
-                configuration_version=configuration_version
-            ),
+            request_metadata=request_metadata,
             occurred_at=requested_at,
         ),
         executor=provider,

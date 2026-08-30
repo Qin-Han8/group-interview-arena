@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 from enum import StrEnum
 from typing import Protocol, Self
 
-from pydantic import UUID4, TypeAdapter, ValidationError, model_validator
+from pydantic import UUID4, Field, TypeAdapter, ValidationError, model_validator
 
 from group_interview_arena_api.modules.ai_runtime.domain import (
     ClosedDomainModel,
@@ -11,6 +13,27 @@ from group_interview_arena_api.modules.ai_runtime.domain import (
     PromptText,
     UtteranceText,
 )
+
+
+class ModelOutputExpectation(StrEnum):
+    TEXT = "TEXT"
+    JSON_OBJECT = "JSON_OBJECT"
+
+
+class ModelInvocationInput(ClosedDomainModel):
+    rendered_prompt: PromptText
+    provider_identifier: Identifier
+    model_identifier: Identifier
+    configuration_version: Code
+    temperature: float = Field(ge=0, le=2)
+    max_output_tokens: int = Field(ge=1, le=16_384)
+    output_expectation: ModelOutputExpectation
+
+
+class ModelInvoker(Protocol):
+    async def invoke(
+        self, invocation: ModelInvocationInput, /
+    ) -> RawGenerationResult: ...
 
 
 class RuntimeGenerationInput(ClosedDomainModel):
@@ -26,6 +49,17 @@ class RuntimeGenerationInput(ClosedDomainModel):
     provider_identifier: Identifier
     model_identifier: Identifier
     configuration_version: Code
+
+    def to_model_invocation(self) -> ModelInvocationInput:
+        return ModelInvocationInput(
+            rendered_prompt=self.rendered_prompt,
+            provider_identifier=self.provider_identifier,
+            model_identifier=self.model_identifier,
+            configuration_version=self.configuration_version,
+            temperature=0.7,
+            max_output_tokens=512,
+            output_expectation=ModelOutputExpectation.TEXT,
+        )
 
 
 class RawGenerationSuccess(ClosedDomainModel):

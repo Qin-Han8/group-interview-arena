@@ -22,7 +22,6 @@ from group_interview_arena_api.modules.ai_runtime.domain import (
     GenerationContextError,
     GenerationFailureCode,
     GenerationRequestConflictError,
-    GenerationRequestMetadata,
     GenerationRequestSnapshot,
     GenerationRequestStatus,
     GenerationStartClaim,
@@ -32,6 +31,7 @@ from group_interview_arena_api.modules.ai_runtime.domain import (
     PromptVersionMutationError,
     RequestGenerationCommand,
     StartGenerationCommand,
+    parse_generation_request_metadata,
 )
 from group_interview_arena_api.modules.discussion_sessions.domain import (
     ACTIVE_PHASES,
@@ -213,7 +213,7 @@ def _to_snapshot(
     *,
     utterance_id: UUID | None = None,
 ) -> GenerationRequestSnapshot:
-    metadata = GenerationRequestMetadata.model_validate(request.request_metadata)
+    metadata = parse_generation_request_metadata(request.request_metadata)
     return GenerationRequestSnapshot(
         request_id=request.id,
         session_id=request.session_id,

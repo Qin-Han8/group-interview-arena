@@ -8,8 +8,13 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
+    TypeAdapter,
     field_validator,
     model_validator,
+)
+
+from group_interview_arena_api.modules.discussion_memory.domain import (
+    DiscussionContextMode,
 )
 
 
@@ -92,6 +97,44 @@ class GenerationRequestMetadata(ClosedDomainModel):
     configuration_version: Code
 
 
+class GenerationRequestMetadataV2(ClosedDomainModel):
+    schema_version: Literal[2] = 2
+    configuration_version: Code
+    working_context_version: Code
+    context_mode: DiscussionContextMode
+    memory_revision: int = Field(ge=0)
+    memory_source_through_sequence: int = Field(ge=0)
+    context_source_through_sequence: int = Field(ge=0)
+
+    @field_validator("context_mode", mode="before")
+    @classmethod
+    def parse_context_mode(cls, value: object) -> DiscussionContextMode:
+        if isinstance(value, DiscussionContextMode):
+            return value
+        if isinstance(value, str):
+            return DiscussionContextMode(value)
+        raise ValueError("context mode is invalid")
+
+    @model_validator(mode="after")
+    def validate_cursor_boundary(self) -> Self:
+        if self.context_source_through_sequence < self.memory_source_through_sequence:
+            raise ValueError("visible context cannot precede memory cursor")
+        return self
+
+
+GenerationRequestMetadataAny = Annotated[
+    GenerationRequestMetadata | GenerationRequestMetadataV2,
+    Field(discriminator="schema_version"),
+]
+_GENERATION_METADATA_ADAPTER: TypeAdapter[GenerationRequestMetadataAny] = TypeAdapter(
+    GenerationRequestMetadataAny
+)
+
+
+def parse_generation_request_metadata(value: object) -> GenerationRequestMetadataAny:
+    return _GENERATION_METADATA_ADAPTER.validate_python(value)
+
+
 class RequestGenerationCommand(ClosedDomainModel):
     request_id: UUID4
     session_id: UUID4
@@ -100,7 +143,7 @@ class RequestGenerationCommand(ClosedDomainModel):
     prompt_version_id: UUID4
     provider_identifier: Identifier
     model_identifier: Identifier
-    request_metadata: GenerationRequestMetadata
+    request_metadata: GenerationRequestMetadataAny
     requested_at: datetime
 
     @field_validator("requested_at")
@@ -153,7 +196,7 @@ class GenerationRequestSnapshot(ClosedDomainModel):
     prompt_version_id: UUID4
     provider_identifier: Identifier
     model_identifier: Identifier
-    request_metadata: GenerationRequestMetadata
+    request_metadata: GenerationRequestMetadataAny
     status: GenerationRequestStatus
     requested_at: datetime
     started_at: datetime | None

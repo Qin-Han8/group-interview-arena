@@ -803,14 +803,29 @@ class LlmGenerationRequest(Base):
             "octet_length(request_digest) = 32", name="request_digest_sha256"
         ),
         CheckConstraint(
-            "jsonb_typeof(request_metadata) = 'object' AND "
-            "request_metadata ?& ARRAY['schema_version', 'configuration_version'] "
-            "AND request_metadata - ARRAY['schema_version', 'configuration_version'] "
-            "= '{}'::jsonb AND "
-            "jsonb_typeof(request_metadata->'schema_version') = 'number' AND "
+            "jsonb_typeof(request_metadata) = 'object' AND (("
+            "request_metadata ?& ARRAY['schema_version', 'configuration_version'] AND "
+            "request_metadata - ARRAY['schema_version', 'configuration_version'] = '{}'::jsonb AND "
             "request_metadata->>'schema_version' = '1' AND "
             "jsonb_typeof(request_metadata->'configuration_version') = 'string' AND "
-            "length(request_metadata->>'configuration_version') > 0",
+            "length(request_metadata->>'configuration_version') > 0) OR ("
+            "request_metadata ?& ARRAY['schema_version', 'configuration_version', "
+            "'working_context_version', 'context_mode', 'memory_revision', "
+            "'memory_source_through_sequence', 'context_source_through_sequence'] AND "
+            "request_metadata - ARRAY['schema_version', 'configuration_version', "
+            "'working_context_version', 'context_mode', 'memory_revision', "
+            "'memory_source_through_sequence', 'context_source_through_sequence'] = '{}'::jsonb AND "
+            "request_metadata->>'schema_version' = '2' AND "
+            "jsonb_typeof(request_metadata->'configuration_version') = 'string' AND "
+            "length(request_metadata->>'configuration_version') > 0 AND "
+            "jsonb_typeof(request_metadata->'working_context_version') = 'string' AND "
+            "length(request_metadata->>'working_context_version') > 0 AND "
+            "request_metadata->>'context_mode' IN ('MEMORY_WITH_RAW_TAIL', 'SAFE_RAW_FALLBACK') AND "
+            "request_metadata->>'memory_revision' ~ '^[0-9]+$' AND "
+            "request_metadata->>'memory_source_through_sequence' ~ '^[0-9]+$' AND "
+            "request_metadata->>'context_source_through_sequence' ~ '^[0-9]+$' AND "
+            "(request_metadata->>'context_source_through_sequence')::bigint >= "
+            "(request_metadata->>'memory_source_through_sequence')::bigint))",
             name="request_metadata_safe_shape",
         ),
         CheckConstraint(
@@ -1056,4 +1071,111 @@ class DiscussionEvent(Base):
         DateTime(timezone=True),
         default=_utc_now,
         nullable=False,
+    )
+
+
+class DiscussionMemoryState(Base):
+    __tablename__ = "discussion_memory_states"
+    __table_args__ = (
+        CheckConstraint("revision >= 0", name="revision_non_negative"),
+        CheckConstraint(
+            "source_through_sequence >= 0", name="source_through_sequence_non_negative"
+        ),
+        CheckConstraint("schema_version > 0", name="schema_version_positive"),
+        CheckConstraint(
+            "length(derivation_version) > 0 AND length(projection_version) > 0",
+            name="version_identifiers_non_empty",
+        ),
+        CheckConstraint(
+            "jsonb_typeof(structured_state) = 'object'",
+            name="structured_state_object",
+        ),
+    )
+
+    session_id: Mapped[UUID] = mapped_column(
+        Uuid,
+        ForeignKey("simulation_sessions.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    revision: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    source_through_sequence: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    schema_version: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    derivation_version: Mapped[str] = mapped_column(String(128), nullable=False)
+    projection_version: Mapped[str] = mapped_column(String(128), nullable=False)
+    structured_state: Mapped[dict[str, object]] = mapped_column(JSONB, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+
+
+class DiscussionMemoryRevision(Base):
+    __tablename__ = "discussion_memory_revisions"
+    __table_args__ = (
+        UniqueConstraint(
+            "session_id",
+            "revision",
+            name="uq_discussion_memory_revisions_session_revision",
+        ),
+        CheckConstraint("revision > 0", name="revision_positive"),
+        CheckConstraint("base_revision >= 0", name="base_revision_non_negative"),
+        CheckConstraint("revision = base_revision + 1", name="revision_advances_once"),
+        CheckConstraint(
+            "source_from_sequence > 0 AND source_through_sequence >= source_from_sequence",
+            name="source_range_valid",
+        ),
+        CheckConstraint("jsonb_typeof(patches) = 'array'", name="patches_array"),
+        CheckConstraint("schema_version > 0", name="schema_version_positive"),
+        CheckConstraint(
+            "length(derivation_version) > 0 AND length(projection_version) > 0",
+            name="version_identifiers_non_empty",
+        ),
+        CheckConstraint(
+            "octet_length(derivation_input_digest) = 32",
+            name="derivation_input_digest_sha256",
+        ),
+        CheckConstraint(
+            "(prompt_version_id IS NULL AND provider_identifier IS NULL AND model_identifier IS NULL "
+            "AND configuration_version IS NULL) OR "
+            "(prompt_version_id IS NOT NULL AND provider_identifier IS NOT NULL AND model_identifier IS NOT NULL "
+            "AND configuration_version IS NOT NULL AND length(provider_identifier) > 0 "
+            "AND length(model_identifier) > 0 AND length(configuration_version) > 0)",
+            name="semantic_provenance_group_complete",
+        ),
+        Index(
+            "ix_discussion_memory_revisions_session_source",
+            "session_id",
+            "source_through_sequence",
+            "revision",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    session_id: Mapped[UUID] = mapped_column(
+        Uuid,
+        ForeignKey("simulation_sessions.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    revision: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    base_revision: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    source_from_sequence: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    source_through_sequence: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    patches: Mapped[list[dict[str, object]]] = mapped_column(JSONB, nullable=False)
+    schema_version: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    derivation_version: Mapped[str] = mapped_column(String(128), nullable=False)
+    projection_version: Mapped[str] = mapped_column(String(128), nullable=False)
+    derivation_input_digest: Mapped[bytes] = mapped_column(
+        LargeBinary(32), nullable=False
+    )
+    prompt_version_id: Mapped[UUID | None] = mapped_column(
+        Uuid,
+        ForeignKey("prompt_versions.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
+    provider_identifier: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    model_identifier: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    configuration_version: Mapped[str | None] = mapped_column(
+        String(128), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
     )
