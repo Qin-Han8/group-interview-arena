@@ -1,8 +1,13 @@
 # P1-6 Complete Text Simulation Execution Plan
 
 - Status: `P1-6 IN_PROGRESS`
-- Previous checkpoint: `P1-6A DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`
-- Current checkpoint: `P1-6B DONE / DESIGN_SCOPE_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PASS`
+- Previous checkpoint: `P1-6B DONE / DESIGN_SCOPE_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PASS`
+- Current checkpoint: `P1-6C DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`
+- P1-6C production implementation: `NOT_STARTED`
+- P1-6C external actual-source review verdict: `PASS`
+- P1-6C reviewed bundle: `group-interview-arena-review-20260830-170659.zip`
+- P1-6C reviewed bundle SHA-256: `D4364CA666D715EA7932B3FC525D6D154EC18F8F4AC3D3989F40C19AE683B398`
+- P1-6C design-review findings: `NONE`; new findings `NONE`; open findings `NONE`
 - P1-6A finding-only external actual-source re-review verdict: `PASS`
 - P1-6A reviewed bundle: `group-interview-arena-review-20260830-044406.zip`
 - P1-6A reviewed bundle SHA-256: `6137E75B1E671A561D6280901680A7445C66F5EDBB34D456142F092492473E4D`
@@ -15,7 +20,7 @@
 - P1-6B implementation reviewed bundle: `group-interview-arena-review-20260830-150847.zip`
 - P1-6B implementation reviewed bundle SHA-256: `0EAA4B3FEE82F4D8A82D5098CECFDA1BF04F9161B7A63E7F7779B2512D9347F6`
 - P1-6B implementation findings: `P16B-IMP-001 CLOSED`; `P16B-IMP-002 CLOSED`; `P16B-IMP-003 CLOSED`; `P16B-IMP-004 CLOSED`; `P16B-IMP-005 CLOSED`; `P16B-IMP-006 CLOSED`; `P16B-IMP-007 CLOSED`; new findings `NONE`; open findings `NONE`
-- Remaining checkpoints: `P1-6C NOT_STARTED`; `P1-6D NOT_STARTED`; `P1-6E NOT_STARTED`
+- Remaining checkpoints: `P1-6D NOT_STARTED`; `P1-6E NOT_STARTED`
 - Parent phase: `P1 IN_PROGRESS`
 - Product target: `V0.1 Internal Validation`
 - Authority: [`PROJECT_MASTER_PLAN.md`](../PROJECT_MASTER_PLAN.md) > Accepted [`DECISIONS.md`](../DECISIONS.md) > [`ROADMAP.md`](../ROADMAP.md) > [`TASKS.md`](../TASKS.md) > this plan > domain docs > code
@@ -271,7 +276,7 @@ P1-6A closeout satisfies the following frozen gate:
 
 ### 10.1 Checkpoint and actual-source calibration
 
-P1-6B Design Freeze is `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`. The finding-only external actual-source re-review verdict is `PASS` against `group-interview-arena-review-20260830-062133.zip` / SHA-256 `C10F2A9362EB6102C6C3F23D7BA66234FECC098BDE2A394D5A2738EBB97E701D`; `P16B-REV-001 CLOSED`; `P16B-REV-002 CLOSED`; `P16B-REV-003 CLOSED`; new findings `NONE`; open findings `NONE`. The separately approved production implementation is now `DONE / DESIGN_SCOPE_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PASS`; implementation finding-only actual-source re-review verdict is `PASS` against `group-interview-arena-review-20260830-150847.zip` / SHA-256 `0EAA4B3FEE82F4D8A82D5098CECFDA1BF04F9161B7A63E7F7779B2512D9347F6`; `P16B-IMP-001`, `P16B-IMP-002`, `P16B-IMP-003`, `P16B-IMP-004`, `P16B-IMP-005`, `P16B-IMP-006`, `P16B-IMP-007` are `CLOSED`; new findings `NONE`; open findings `NONE`; P1-6C～P1-6E remain `NOT_STARTED`. No independent review was run.
+P1-6B Design Freeze is `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`. The finding-only external actual-source re-review verdict is `PASS` against `group-interview-arena-review-20260830-062133.zip` / SHA-256 `C10F2A9362EB6102C6C3F23D7BA66234FECC098BDE2A394D5A2738EBB97E701D`; `P16B-REV-001 CLOSED`; `P16B-REV-002 CLOSED`; `P16B-REV-003 CLOSED`; new findings `NONE`; open findings `NONE`. The separately approved production implementation is now `DONE / DESIGN_SCOPE_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PASS`; implementation finding-only actual-source re-review verdict is `PASS` against `group-interview-arena-review-20260830-150847.zip` / SHA-256 `0EAA4B3FEE82F4D8A82D5098CECFDA1BF04F9161B7A63E7F7779B2512D9347F6`; `P16B-IMP-001`, `P16B-IMP-002`, `P16B-IMP-003`, `P16B-IMP-004`, `P16B-IMP-005`, `P16B-IMP-006`, `P16B-IMP-007` are `CLOSED`; new findings `NONE`; open findings `NONE`. At that P1-6B closeout checkpoint, P1-6C～P1-6E were `NOT_STARTED`. No independent review was run.
 
 The approved architecture is **Evidence Ledger + Materialized Memory + Patch Journal + Lazy Semantic Compaction**. Current source calibrates it as follows:
 
@@ -503,4 +508,102 @@ P1-6B Design Freeze and implementation exclude public Memory REST/WS/Web, Report
 
 Stop before implementation or scope expansion if actual source later proves that: (1) the two-table shape cannot migrate additively; (2) public evidence cannot replay safely; (3) a public REST/WS change is required; (4) shared memory cannot isolate Private Stance; (5) optimistic CAS is unsafe in the current transaction model; (6) `PromptVersion` cannot support the semantic prompt without a new product decision; (7) transport refinement breaks accepted P1-5 contracts; (8) the master plan must change; (9) a new Accepted ADR/product decision is required; or (10) a 10× domain blocker cannot be addressed by replaceable infrastructure.
 
-Design-time STOP-condition result: `NONE`. The initial external actual-source review verdict was `BLOCKED` on exactly `P16B-REV-001`, `P16B-REV-002` and `P16B-REV-003` against `group-interview-arena-review-20260830-060509.zip` / SHA-256 `C0C7A7A589B1795DD917C11CF13B36FBCE245DFFD36CD20D5C96BAD80AC6EF26`. Finding-only remediation froze projection identity, persisted candidate Working Context provenance and explicit public question allowlisting. The finding-only external actual-source re-review verdict is `PASS` against `group-interview-arena-review-20260830-062133.zip` / SHA-256 `C10F2A9362EB6102C6C3F23D7BA66234FECC098BDE2A394D5A2738EBB97E701D`; `P16B-REV-001 CLOSED`; `P16B-REV-002 CLOSED`; `P16B-REV-003 CLOSED`; new findings `NONE`; open findings `NONE`. The approved production implementation is now `DONE / DESIGN_SCOPE_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PASS`. Implementation finding-only actual-source re-review verdict is `PASS` against `group-interview-arena-review-20260830-150847.zip` / SHA-256 `0EAA4B3FEE82F4D8A82D5098CECFDA1BF04F9161B7A63E7F7779B2512D9347F6`; `P16B-IMP-001`, `P16B-IMP-002`, `P16B-IMP-003`, `P16B-IMP-004`, `P16B-IMP-005`, `P16B-IMP-006`, `P16B-IMP-007` are `CLOSED`; new findings `NONE`; open findings `NONE`. P1-6C～P1-6E and P1-7/P1-8 remain `NOT_STARTED`; P1-6/P1 remain `IN_PROGRESS`.
+Design-time STOP-condition result: `NONE`. The initial external actual-source review verdict was `BLOCKED` on exactly `P16B-REV-001`, `P16B-REV-002` and `P16B-REV-003` against `group-interview-arena-review-20260830-060509.zip` / SHA-256 `C0C7A7A589B1795DD917C11CF13B36FBCE245DFFD36CD20D5C96BAD80AC6EF26`. Finding-only remediation froze projection identity, persisted candidate Working Context provenance and explicit public question allowlisting. The finding-only external actual-source re-review verdict is `PASS` against `group-interview-arena-review-20260830-062133.zip` / SHA-256 `C10F2A9362EB6102C6C3F23D7BA66234FECC098BDE2A394D5A2738EBB97E701D`; `P16B-REV-001 CLOSED`; `P16B-REV-002 CLOSED`; `P16B-REV-003 CLOSED`; new findings `NONE`; open findings `NONE`. The approved production implementation is now `DONE / DESIGN_SCOPE_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PASS`. Implementation finding-only actual-source re-review verdict is `PASS` against `group-interview-arena-review-20260830-150847.zip` / SHA-256 `0EAA4B3FEE82F4D8A82D5098CECFDA1BF04F9161B7A63E7F7779B2512D9347F6`; `P16B-IMP-001`, `P16B-IMP-002`, `P16B-IMP-003`, `P16B-IMP-004`, `P16B-IMP-005`, `P16B-IMP-006`, `P16B-IMP-007` are `CLOSED`; new findings `NONE`; open findings `NONE`. P1-6C Design Freeze is now `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-6C production implementation and P1-6D/P1-6E plus P1-7/P1-8 remain `NOT_STARTED`; P1-6/P1 remain `IN_PROGRESS`.
+
+## 11. P1-6C Design Freeze
+
+P1-6C is an integration/composition checkpoint only. At committed baseline `3b9d4cf9a33f3d20a0b43a9f04d0483316728fa5`, P1-6B and its post-commit CI are green. Scoped actual-source calibration found no production wiring gap and no STOP condition. The preferred future implementation outcome is therefore `production changes = 0`, with focused tests proving the existing composition. The Design Freeze is `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; production implementation remains `NOT_STARTED`.
+
+### 11.1 Actual-source composition map and approved root
+
+The approved composition root is the existing discussion progression:
+
+```text
+Web / WS command or lifecycle reconciliation
+  -> resume_discussion_progression()
+  -> existing P1-4 scheduler
+  -> AI floor grant
+  -> drive_configured_ai_session()
+  -> drive_continuous_ai()
+  -> generate_ai_utterance()
+  -> P1-6B lazy memory maintenance
+  -> DiscussionWorkingContext
+  -> AI_CANDIDATE_TURN V3
+  -> provider
+  -> AiUtterance + authoritative public DiscussionEvent
+  -> existing floor release / scheduler continuation
+```
+
+Current source confirms that `discussion_sessions/progression.py` delegates configured AI work rather than owning generation or Memory; `ai_runtime/composition.py`, `continuous.py` and `orchestration.py` reuse the accepted provider/runtime/floor path and already support AI-to-AI continuation; `ai_runtime/runtime.py` naturally maintains P1-6B Memory while assembling the candidate V3 Working Context and persists exact `GenerationRequestMetadata` V2 context provenance; `discussion_sessions/realtime.py` already resumes progression after connect/reconciliation and Human contribution. P1-6C must not invoke Memory separately from this path.
+
+### 11.2 Authority boundaries
+
+| Authority | Frozen owner |
+|---|---|
+| Session lifecycle and phase transitions | P1-3 |
+| Speaker, floor and scheduling | P1-4 |
+| AI candidate content | P1-5/P1-6B AI Runtime |
+| Structured public discussion memory | P1-6B |
+| Composition trigger | Existing discussion progression/realtime seams |
+| Presentation | Existing REST/WS/Web contracts |
+
+P1-6C owns none of these authorities. It adds no `TextSimulationCoordinator`, `SimulationOrchestrator`, second scheduler/lifecycle engine, Memory-driven speaker selection or Web-driven Memory orchestration. The rule is **composition, not orchestration reinvention**.
+
+### 11.3 Production-change-only-if-RED rule
+
+Future P1-6C implementation is composition-proof first. Production code must remain unchanged when targeted integration tests prove the existing caller chain. A production change is allowed only after a P1-6C RED test exposes a concrete wiring defect, and must be the smallest correction in an existing caller/composition seam such as progression, configured AI composition or its directly required existing dependency. No new subsystem, schema, migration, public contract, Web code or dependency is authorized.
+
+### 11.4 Dual-workload network-free provider proof
+
+The focused test harness must supply one deterministic, network-free project-owned provider seam for both workloads: candidate `__call__` returns a deterministic utterance, while generic `invoke` returns closed, valid `MemoryPatch` JSON. This proves semantic derivation and subsequent candidate generation through the configured production path without adding a production provider, registry, router, fallback or real provider call.
+
+### 11.5 Happy-path composition scenario
+
+Starting from a valid Human + 3 AI session whose existing scheduler can reach an AI floor and whose authoritative public evidence crosses the P1-6B compaction threshold, the test drives `resume_discussion_progression()` through the real configured path. It must prove: a semantic Memory revision is durably accepted; its source cursor/provenance is valid; candidate V3 consumes that exact revision plus the correct raw tail; `GenerationRequestMetadata` V2 records the exact Memory revision and visible public cursor; no other seat's Private Stance enters shared Memory/context; exactly one `AiUtterance` and one public `participant.utterance.created` fact result for the grant; release is not duplicated; and Memory performs no phase/floor mutation.
+
+### 11.6 Failure and fallback scenarios
+
+- Safe fallback: when semantic derivation fails but complete public history fits the bounded raw fallback, candidate generation continues with `GenerationRequestMetadata` V2 `context_mode = SAFE_RAW_FALLBACK`, while existing candidate, release and scheduler semantics remain authoritative.
+- Unsafe context: when derivation fails and complete necessary context cannot fit, the existing context-rejection/recovery path emits no fabricated AI utterance, unauthorized phase/floor mutation or invented Memory revision.
+
+These are focused backend integration proofs, not a second failure engine or a P1-6D restart/reload/cancellation scenario.
+
+### 11.7 Evidence, provenance and privacy invariants
+
+Authoritative public truth remains ordered `DiscussionEvent` evidence. The composed direction is `DiscussionEvent -> Memory projection -> Working Context -> AI output`; Memory never becomes a transcript authority and no event is rewritten or deleted. Candidate metadata must identify the exact consumed Memory revision and visible raw-tail cursor. Shared derivation/Memory/Working Context remain public-only and must not receive another participant's Private Stance or other private/evaluator/provider-secret material; P1-6B owns the detailed Memory invariants referenced by this section.
+
+### 11.8 Public-contract compatibility
+
+P1-6C adds or changes no public REST schema, public WebSocket command/event, Memory REST/WS surface, Web Memory state/API or transcript semantics. Web continues to consume existing snapshot, transcript and realtime contracts. If composition requires any public-contract change or Web knowledge of Memory internals, implementation must stop.
+
+### 11.9 P1-6C/P1-6D boundary
+
+P1-6C proves backend/application composition correctness through one focused production-caller integration path. It does not run a complete browser journey across all phases and all three AI seats. P1-6D separately owns the complete network-free Human + 3 distinct AI path through `FINAL_SUMMARY -> COMPLETED`, including reload/reconnect, API restart, generation failure/cancellation, duplicate-work prevention and memory-enabled composition.
+
+### 11.10 Frozen future implementation scope and acceptance
+
+Expected implementation is one focused progression/composition integration module or the closest existing integration extension, a deterministic dual-workload test fixture and targeted normal/fallback/context-rejection cases. Production changes default to `NONE`.
+
+| Area | Required proof |
+|---|---|
+| Composition root | `resume_discussion_progression` drives the configured AI path; no new coordinator. |
+| Memory | Real composition creates and consumes P1-6B Memory through existing interfaces. |
+| Candidate context | V3 consumes the exact Memory revision plus raw tail. |
+| Provenance | `GenerationRequestMetadata` V2 matches the actual consumed context. |
+| Evidence | Human/AI `DiscussionEvent` remains authoritative. |
+| Scheduler | Next-speaker/floor ownership remains P1-4. |
+| Lifecycle | P1-3 remains sole phase authority. |
+| Safe fallback | Memory failure plus bounded complete raw history continues as `SAFE_RAW_FALLBACK`. |
+| Unsafe context | Context failure produces no fabricated utterance or unauthorized state mutation. |
+| Privacy | No cross-seat Private Stance leakage. |
+| Idempotency | No duplicate utterance or release for the composed grant. |
+| Contracts | REST/WS/Web remain unchanged. |
+| Scope | No P1-6D, report, voice or deferred infrastructure. |
+
+### 11.11 STOP conditions and design result
+
+Stop future implementation if actual source proves that: (1) Memory is not naturally consumed by normal AI generation; (2) composition requires a new business coordinator/authority; (3) existing progression needs structural redesign to drive memory-backed AI; (4) REST/WS must change; (5) Web must know Memory internals; (6) lifecycle/scheduler ownership must move; (7) P1-6C necessarily duplicates P1-6D full E2E; (8) schema/migration must change; (9) a new ADR/product decision is required; or (10) [`PROJECT_MASTER_PLAN.md`](../PROJECT_MASTER_PLAN.md) must change.
+
+Design-time result: `NONE`. The only identified gap is proof coverage: existing focused progression tests stub configured AI composition, while the current broad browser provider fixture does not exercise the dual candidate/semantic workload through the real configured chain. That is a future test gap, not a production wiring defect.
+
+External actual-source review verdict: `PASS` against `group-interview-arena-review-20260830-170659.zip` / SHA-256 `D4364CA666D715EA7932B3FC525D6D154EC18F8F4AC3D3989F40C19AE683B398`; design-review findings `NONE`; new findings `NONE`; open findings `NONE`. The P1-6C Design Freeze is therefore `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-6C production implementation remains `NOT_STARTED`.

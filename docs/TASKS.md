@@ -1,13 +1,13 @@
 # 当前任务清单
 
-- Status: P1 in progress; P1-1 through P1-5 completed; P1-6 is `IN_PROGRESS`; P1-6A is `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-6B is `DONE / DESIGN_SCOPE_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PASS`; P1-6C～P1-6E are `NOT_STARTED`; P1-7/P1-8 are `NOT_STARTED`; open findings `NONE`
-- Managed scope: approved P1-6B Structured Discussion Memory Gap Closure production implementation；four frozen implementation batches only；no public API/WebSocket/Web, P1-6C, real-provider call or deferred infrastructure
-- Current design checkpoint: P1-6B Design Freeze — `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-6B production implementation — `DONE / DESIGN_SCOPE_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PASS`; P1-6 — `IN_PROGRESS`; P1-5 — `DONE`; open findings — `NONE`
+- Status: P1 in progress; P1-1 through P1-5 completed; P1-6 is `IN_PROGRESS`; P1-6A is `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-6B is `DONE / DESIGN_SCOPE_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PASS`; P1-6C Design Freeze is `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-6C production implementation and P1-6D/P1-6E are `NOT_STARTED`; P1-7/P1-8 are `NOT_STARTED`; open findings `NONE`
+- Managed scope: P1-6C Design Freeze external-review closeout complete; production implementation remains `NOT_STARTED` and requires separate approval; no production code, public contract, Web, schema/migration, dependency, real-provider call or P1-6D work
+- Current design checkpoint: P1-6C Design Freeze — `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-6C production implementation — `NOT_STARTED`; P1-6B — `DONE / DESIGN_SCOPE_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PASS`; P1-6 — `IN_PROGRESS`; P1-5 — `DONE`; open findings — `NONE`
 - P0-7 final outcome: initial verdict `BLOCKED` with two documentation findings; remediation completed; finding-only independent recheck `PASS`; new blockers none; P1 readiness `READY`
 - Current phase: P1 — `IN_PROGRESS`
-- Current governance checkpoint: P1-6B finding-only external actual-source re-review — `PASS`; reviewed bundle `group-interview-arena-review-20260830-062133.zip`; SHA-256 `C10F2A9362EB6102C6C3F23D7BA66234FECC098BDE2A394D5A2738EBB97E701D`; `P16B-REV-001`, `P16B-REV-002` and `P16B-REV-003` are `CLOSED`; new findings `NONE`; open findings `NONE`; P1-6A accepted evidence remains unchanged
+- Current governance checkpoint: P1-6C Design Freeze external actual-source review — `PASS`; reviewed bundle `group-interview-arena-review-20260830-170659.zip`; SHA-256 `D4364CA666D715EA7932B3FC525D6D154EC18F8F4AC3D3989F40C19AE683B398`; design-review findings `NONE`; new findings `NONE`; open findings `NONE`; P1-6A/P1-6B accepted evidence remains unchanged
 - Current implementation review: `PASS`; reviewed bundle `group-interview-arena-review-20260830-150847.zip`; SHA-256 `0EAA4B3FEE82F4D8A82D5098CECFDA1BF04F9161B7A63E7F7779B2512D9347F6`; `P16B-IMP-001`, `P16B-IMP-002`, `P16B-IMP-003`, `P16B-IMP-004`, `P16B-IMP-005`, `P16B-IMP-006`, `P16B-IMP-007` are `CLOSED`; new findings `NONE`; open findings `NONE`
-- Current task gate: P1-5 — `DONE`; P1-6 — `IN_PROGRESS`; P1-6A — `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-6B Design Freeze — `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-6B production implementation — `DONE / DESIGN_SCOPE_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PASS`; P1-6C～P1-6E — `NOT_STARTED`; P1-7/P1-8 — `NOT_STARTED`; `P16A-REV-001` — `CLOSED`; `P16A-REV-002` — `CLOSED`; `P16B-REV-001` — `CLOSED`; `P16B-REV-002` — `CLOSED`; `P16B-REV-003` — `CLOSED`; `P16B-IMP-001`, `P16B-IMP-002`, `P16B-IMP-003`, `P16B-IMP-004`, `P16B-IMP-005`, `P16B-IMP-006`, `P16B-IMP-007` — `CLOSED`; open findings — `NONE`; P1 remains `IN_PROGRESS`
+- Current task gate: P1-5 — `DONE`; P1-6 — `IN_PROGRESS`; P1-6A — `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-6B Design Freeze — `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-6B production implementation — `DONE / DESIGN_SCOPE_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PASS`; P1-6C Design Freeze — `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-6C production implementation — `NOT_STARTED`; P1-6D/P1-6E — `NOT_STARTED`; P1-7/P1-8 — `NOT_STARTED`; `P16A-REV-001` — `CLOSED`; `P16A-REV-002` — `CLOSED`; `P16B-REV-001` — `CLOSED`; `P16B-REV-002` — `CLOSED`; `P16B-REV-003` — `CLOSED`; `P16B-IMP-001`, `P16B-IMP-002`, `P16B-IMP-003`, `P16B-IMP-004`, `P16B-IMP-005`, `P16B-IMP-006`, `P16B-IMP-007` — `CLOSED`; open findings — `NONE`; P1 remains `IN_PROGRESS`
 - P0 status: `DONE`; P0-1 through P0-7 completed
 - Allowed status values: `TODO` / `IN_PROGRESS` / `BLOCKED` / `DONE`
 - Related roadmap: [`ROADMAP.md`](ROADMAP.md)
@@ -748,7 +748,7 @@
 - ID: `P1-6`
 - 名称：完整文字模拟
 - Status: `IN_PROGRESS`
-- Approval state: P1-6A and the P1-6B Design Freeze are `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-6B production implementation is `DONE / DESIGN_SCOPE_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PASS`; P1-6C～P1-6E remain `NOT_STARTED`.
+- Approval state: P1-6A and P1-6B are `DONE` with their recorded review-pass states; P1-6C Design Freeze is `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-6C production implementation and P1-6D/P1-6E remain `NOT_STARTED`.
 - Dependencies: P1-5 `DONE`; P1-5R/P1-5R-POST tracks `CLOSED` with their historical open findings `NONE`; P1-6A `P16A-REV-001` and `P16A-REV-002` are `CLOSED`; P1-6B `P16B-REV-001`, `P16B-REV-002` and `P16B-REV-003` are `CLOSED`; open findings `NONE`.
 - Goal: close the structured discussion-memory gap and compose/validate existing lifecycle, floor, AI runtime, public transport and Web capabilities as one complete Human + 3 AI text simulation.
 - Out of scope: P1-7 report/V0.1 content; P1-8 full-P1 acceptance; voice/ASR/TTS; billing/payment; provider routing/fallback; Redis/queue/RAG/microservices and deferred infrastructure.
@@ -758,7 +758,7 @@
 
 - `P1-6A — Scope Reconciliation + Commercial-Readiness Architecture Freeze`: `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; docs-only; finding-only external actual-source re-review `PASS`; open findings `NONE`;
 - `P1-6B — Structured Discussion Memory Gap Closure / Production Implementation`: `DONE / DESIGN_SCOPE_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PASS`; implementation finding-only re-review `PASS`; four frozen batches only; `P16B-IMP-001`, `P16B-IMP-002`, `P16B-IMP-003`, `P16B-IMP-004`, `P16B-IMP-005`, `P16B-IMP-006`, `P16B-IMP-007` closed; new findings `NONE`; open findings `NONE`;
-- `P1-6C — Full Text Simulation Composition`: `NOT_STARTED`;
+- `P1-6C — Full Text Simulation Composition`: Design Freeze `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; production implementation `NOT_STARTED`;
 - `P1-6D — Recovery + Three-AI End-to-End Validation`: `NOT_STARTED`;
 - `P1-6E — P1-6 Independent Acceptance + Closeout`: `NOT_STARTED`.
 
@@ -779,6 +779,14 @@
 - Memory-backed candidate generation freezes additive closed `GenerationRequestMetadata` V2 provenance for Working Context version/mode, exact memory revision/cursor and visible raw-tail boundary while preserving historical V1 rows; Batch 3 and acceptance cover normal and safe-fallback modes.
 - `MemoryDerivationInput` now accepts only explicit `PublicMemoryQuestionContext`, equal to or narrower than the existing public candidate subset; ORM/generic dumps plus hidden/evaluator/reference-answer question fields are forbidden and covered by privacy sentinels.
 - Initial external actual-source review verdict was `BLOCKED` against `group-interview-arena-review-20260830-060509.zip` / SHA-256 `C0C7A7A589B1795DD917C11CF13B36FBCE245DFFD36CD20D5C96BAD80AC6EF26` on exactly `P16B-REV-001`, `P16B-REV-002`, `P16B-REV-003`. After finding-only remediation, the finding-only external actual-source re-review verdict is `PASS` against `group-interview-arena-review-20260830-062133.zip` / SHA-256 `C10F2A9362EB6102C6C3F23D7BA66234FECC098BDE2A394D5A2738EBB97E701D`; `P16B-REV-001 CLOSED`; `P16B-REV-002 CLOSED`; `P16B-REV-003 CLOSED`; new findings `NONE`; open findings `NONE`. P1-6B is `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`. Design-time STOP conditions remain `NONE`; no tables/code were created, no independent review was run and production implementation still requires separate approval.
+
+### P1-6C Design Freeze note
+
+- Baseline `3b9d4cf9a33f3d20a0b43a9f04d0483316728fa5` actual-source calibration confirms the existing production root is `resume_discussion_progression -> configured AI composition -> continuous drive -> candidate runtime -> P1-6B Memory/Working Context -> candidate V3 -> existing utterance/event/release path`; no production wiring gap or STOP condition was found.
+- P1-6C owns composition proof only. P1-3 retains lifecycle, P1-4 floor/scheduling, P1-5/P1-6B candidate content, P1-6B Memory and existing REST/WS/Web presentation. Future implementation defaults to production changes `NONE`; only a focused RED test may justify the smallest existing caller-seam correction.
+- Future proof is a focused network-free backend integration through the real progression caller with one deterministic dual-workload provider fixture. It covers accepted Memory revision/V3/V2 provenance/evidence/privacy/idempotency, `SAFE_RAW_FALLBACK` and unsafe-context rejection without duplicating P1-6D's full Human + 3 AI browser/recovery scope.
+- External actual-source review verdict is `PASS` against `group-interview-arena-review-20260830-170659.zip` / SHA-256 `D4364CA666D715EA7932B3FC525D6D154EC18F8F4AC3D3989F40C19AE683B398`; design-review findings `NONE`; new findings `NONE`; open findings `NONE`.
+- Design Freeze status is `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; production implementation has not started and remains `NOT_STARTED`. P1-6D/P1-6E remain `NOT_STARTED`.
 
 ## P1-7 — Basic Report + V0.1 Content
 
