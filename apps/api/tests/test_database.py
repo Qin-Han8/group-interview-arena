@@ -45,6 +45,8 @@ def test_base_metadata_has_exact_product_tables() -> None:
         "ai_utterances",
         "auth_sessions",
         "discussion_events",
+        "discussion_memory_revisions",
+        "discussion_memory_states",
         "floor_decisions",
         "floor_grants",
         "floor_interventions",
