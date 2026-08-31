@@ -98,7 +98,9 @@ test("P1-6D completes Human plus three AI with memory, restart and cancellation 
   }
 
   const lifecycleEvents: string[] = [];
+  let sessionWebSocketGeneration = 0;
   await page.routeWebSocket(/\/ws\/sessions\//, (socket) => {
+    sessionWebSocketGeneration += 1;
     const server = socket.connectToServer();
     socket.onMessage((message) => server.send(message));
     server.onMessage((message) => {
@@ -283,11 +285,15 @@ test("P1-6D completes Human plus three AI with memory, restart and cancellation 
   await expect
     .poll(async () => (await fetchTranscript()).length)
     .toBeGreaterThanOrEqual(beforeReload.length);
+  const preRestartWebSocketGeneration = sessionWebSocketGeneration;
   await writeFile(API_RESTART_REQUEST!, "restart", "utf8");
   await restartTriggerPage.close();
   await expect
     .poll(() => fileExists(API_RESTART_READY!), { timeout: 20_000 })
     .toBe(true);
+  await expect
+    .poll(() => sessionWebSocketGeneration, { timeout: 20_000 })
+    .toBeGreaterThan(preRestartWebSocketGeneration);
   await expect(page.getByText("连接正常").first()).toBeVisible({
     timeout: 20_000,
   });
