@@ -960,6 +960,7 @@ def _run_browser_flow(temporary_database: TemporaryDatabase) -> None:
                     _run_dedicated_playwright(
                         {
                             "GIA_P16D_API_ORIGIN": API_ORIGIN,
+                            "GIA_P16D_API_LOG": str(api_log),
                             "GIA_P16D_API_RESTART_REQUEST": str(restart_request),
                             "GIA_P16D_API_RESTART_READY": str(restart_ready),
                             "GIA_P16D_PRE_RESTART_ARM": str(pre_restart_arm),

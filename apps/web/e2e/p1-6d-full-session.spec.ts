@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { access, readFile, writeFile } from "node:fs/promises";
 
 const API_BASE_URL = process.env.GIA_P16D_API_ORIGIN ?? "http://localhost:8000";
+const API_LOG = process.env.GIA_P16D_API_LOG;
 const API_RESTART_REQUEST = process.env.GIA_P16D_API_RESTART_REQUEST;
 const API_RESTART_READY = process.env.GIA_P16D_API_RESTART_READY;
 const PRE_RESTART_ARM = process.env.GIA_P16D_PRE_RESTART_ARM;
@@ -83,6 +84,7 @@ test("P1-6D completes Human plus three AI with memory, restart and cancellation 
   page,
 }) => {
   for (const requiredPath of [
+    API_LOG,
     API_RESTART_REQUEST,
     API_RESTART_READY,
     PRE_RESTART_ARM,
@@ -98,9 +100,7 @@ test("P1-6D completes Human plus three AI with memory, restart and cancellation 
   }
 
   const lifecycleEvents: string[] = [];
-  let sessionWebSocketGeneration = 0;
   await page.routeWebSocket(/\/ws\/sessions\//, (socket) => {
-    sessionWebSocketGeneration += 1;
     const server = socket.connectToServer();
     socket.onMessage((message) => server.send(message));
     server.onMessage((message) => {
@@ -141,6 +141,29 @@ test("P1-6D completes Human plus three AI with memory, restart and cancellation 
   expect(createResponse.status()).toBe(201);
   const created = (await createResponse.json()) as SessionSnapshot;
   const sessionId = created.id;
+  const countAcceptedSessionConnections = async () => {
+    try {
+      return (await readFile(API_LOG!, "utf8"))
+        .split(/\r?\n/u)
+        .filter(Boolean)
+        .reduce((count, line) => {
+          try {
+            const record = JSON.parse(line) as {
+              event?: string;
+              session_id?: string;
+            };
+            return record.event === "realtime.connection.accepted" &&
+              record.session_id === sessionId
+              ? count + 1
+              : count;
+          } catch {
+            return count;
+          }
+        }, 0);
+    } catch {
+      return 0;
+    }
+  };
 
   const fetchSnapshot = () =>
     page.evaluate(
@@ -285,15 +308,18 @@ test("P1-6D completes Human plus three AI with memory, restart and cancellation 
   await expect
     .poll(async () => (await fetchTranscript()).length)
     .toBeGreaterThanOrEqual(beforeReload.length);
-  const preRestartWebSocketGeneration = sessionWebSocketGeneration;
-  await writeFile(API_RESTART_REQUEST!, "restart", "utf8");
   await restartTriggerPage.close();
+
+  const acceptedBeforeRestart = await countAcceptedSessionConnections();
+  expect(acceptedBeforeRestart).toBeGreaterThan(0);
+
+  await writeFile(API_RESTART_REQUEST!, "restart", "utf8");
   await expect
     .poll(() => fileExists(API_RESTART_READY!), { timeout: 20_000 })
     .toBe(true);
   await expect
-    .poll(() => sessionWebSocketGeneration, { timeout: 20_000 })
-    .toBeGreaterThan(preRestartWebSocketGeneration);
+    .poll(countAcceptedSessionConnections, { timeout: 20_000 })
+    .toBeGreaterThan(acceptedBeforeRestart);
   await expect(page.getByText("连接正常").first()).toBeVisible({
     timeout: 20_000,
   });
