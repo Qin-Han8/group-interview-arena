@@ -165,7 +165,7 @@ jobs:
           residual = [
               database_name
               for (database_name,) in database_rows
-              if database_name.startswith(("gia_p04e_", "gia_p05d_"))
+              if database_name.startswith(("gia_p04e_", "gia_p05d_", "gia_p16d_"))
           ]
           print(f"temporary database residual={len(residual)}")
           if residual:
@@ -352,7 +352,7 @@ jobs:
           residual = [
               database_name
               for (database_name,) in database_rows
-              if database_name.startswith(("gia_p04e_", "gia_p05d_"))
+              if database_name.startswith(("gia_p04e_", "gia_p05d_", "gia_p16d_"))
           ]
 
           listeners = []
