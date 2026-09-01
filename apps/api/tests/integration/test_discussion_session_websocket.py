@@ -1461,6 +1461,143 @@ def test_websocket_external_reconciliation_drains_state_change_before_floor_kick
             assert current_grant_id == UUID(str(granted_payload["grant_id"]))
 
 
+def test_websocket_coalesces_multiple_lifecycle_kicks_while_progression_runs(
+    migrated_database: TemporaryDatabaseContext,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    allow_first_progression_to_finish = Event()
+    allow_second_progression_to_finish = Event()
+    first_progression_started = Event()
+    busy_kicks_processed = Event()
+    second_progression_started = Event()
+    second_progression_finished = Event()
+    post_rerun_catchup_completed = Event()
+    unexpected_third_progression = Event()
+    progression_calls = 0
+    active_progressions = 0
+    peak_active_progressions = 0
+    catchup_calls = 0
+    post_rerun_catchups = 0
+    real_reconcile = realtime.reconcile_session_deadline
+
+    class NoWorkOutcome:
+        value = "no_work"
+
+    class NoWorkResult:
+        outcome = NoWorkOutcome()
+
+    async def controlled_progression(
+        *_args: object,
+        **_kwargs: object,
+    ) -> NoWorkResult:
+        nonlocal active_progressions
+        nonlocal peak_active_progressions
+        nonlocal progression_calls
+        progression_calls += 1
+        call_number = progression_calls
+        active_progressions += 1
+        peak_active_progressions = max(
+            peak_active_progressions,
+            active_progressions,
+        )
+        try:
+            if call_number == 1:
+                first_progression_started.set()
+                while not allow_first_progression_to_finish.is_set():
+                    await asyncio.sleep(0.01)
+            elif call_number == 2:
+                second_progression_started.set()
+                while not allow_second_progression_to_finish.is_set():
+                    await asyncio.sleep(0.01)
+            else:
+                unexpected_third_progression.set()
+        finally:
+            active_progressions -= 1
+            if call_number == 2:
+                second_progression_finished.set()
+        return NoWorkResult()
+
+    async def emit_busy_lifecycle_kicks(
+        session: AsyncSession,
+        *,
+        owner_id: UUID,
+        session_id: UUID,
+        now: datetime | None = None,
+    ) -> list[StoredEvent]:
+        nonlocal catchup_calls
+        nonlocal post_rerun_catchups
+        task = asyncio.current_task()
+        coroutine_name = task.get_coro().__qualname__ if task is not None else ""
+        if not coroutine_name.endswith("catchup_committed_events"):
+            return await real_reconcile(
+                session,
+                owner_id=owner_id,
+                session_id=session_id,
+                now=now,
+            )
+
+        catchup_calls += 1
+        if catchup_calls in (1, 2):
+            return [
+                StoredEvent(
+                    event_version=2,
+                    event_type="session.state_changed",
+                    session_id=session_id,
+                    sequence=catchup_calls,
+                    occurred_at=datetime.now(UTC),
+                    causation_action_id=None,
+                    payload={},
+                )
+            ]
+        if catchup_calls == 3:
+            busy_kicks_processed.set()
+        if second_progression_finished.is_set():
+            post_rerun_catchups += 1
+            if post_rerun_catchups == 2:
+                post_rerun_catchup_completed.set()
+        return []
+
+    monkeypatch.setattr(
+        realtime,
+        "resume_discussion_progression",
+        controlled_progression,
+    )
+    monkeypatch.setattr(
+        realtime,
+        "reconcile_session_deadline",
+        emit_busy_lifecycle_kicks,
+    )
+    application = _application(migrated_database)
+    with _client(application) as client:
+        _register(client, "ws_coalesced_progression_kicks")
+        created = _create_session(client)
+        session_id = str(created["id"])
+
+        with client.websocket_connect(
+            _ws_path(session_id),
+            headers={"Origin": TRUSTED_ORIGIN},
+        ):
+            assert first_progression_started.wait(timeout=2.0)
+            assert busy_kicks_processed.wait(timeout=2.0)
+            assert progression_calls == 1
+            assert peak_active_progressions == 1
+
+            allow_first_progression_to_finish.set()
+
+            assert second_progression_started.wait(timeout=2.0)
+            assert progression_calls == 2
+            assert peak_active_progressions == 1
+            assert unexpected_third_progression.is_set() is False
+
+            allow_second_progression_to_finish.set()
+
+            assert second_progression_finished.wait(timeout=2.0)
+            assert post_rerun_catchup_completed.wait(timeout=2.0)
+            assert progression_calls == 2
+            assert peak_active_progressions == 1
+            assert unexpected_third_progression.is_set() is False
+
+
 def test_websocket_catchup_without_reconciliation_does_not_kick_progression(
     migrated_database: TemporaryDatabaseContext,
     monkeypatch: pytest.MonkeyPatch,

@@ -12,7 +12,7 @@ import time
 from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, BinaryIO
+from typing import Any, BinaryIO, cast
 from urllib.error import HTTPError, URLError
 from urllib.request import urlopen
 from uuid import UUID
@@ -1062,12 +1062,14 @@ def _run_browser_flow(temporary_database: TemporaryDatabase) -> None:
                     encoding="utf-8", errors="replace"
                 ).splitlines():
                     try:
-                        record = json.loads(line)
+                        raw_record = json.loads(line)
                     except json.JSONDecodeError:
                         continue
+                    if not isinstance(raw_record, dict):
+                        continue
+                    record = cast(dict[str, object], raw_record)
                     if (
-                        isinstance(record, dict)
-                        and record.get("session_id") == diagnostic_session_id
+                        record.get("session_id") == diagnostic_session_id
                         and record.get("event") in realtime_events
                     ):
                         realtime_lines.append(line)
@@ -1113,6 +1115,7 @@ def _run_browser_flow(temporary_database: TemporaryDatabase) -> None:
                 provider_calls,
                 provider_running,
                 provider_cancelled,
+                restarted_process,
                 restart_ready,
                 pre_restart_quiescent,
                 post_restart_success,
@@ -1136,9 +1139,7 @@ def _run_browser_flow(temporary_database: TemporaryDatabase) -> None:
                 cancellation_reload.read_text(encoding="utf-8")
             ),
             cancellation=json.loads(provider_cancelled.read_text(encoding="utf-8")),
-            restart_timestamp=json.loads(restart_ready.read_text(encoding="utf-8"))[
-                "occurred_at"
-            ],
+            restart_timestamp=float(restarted_process.read_text(encoding="utf-8")),
             event_prefix=json.loads(event_prefix_path.read_text(encoding="utf-8")),
         )
 
