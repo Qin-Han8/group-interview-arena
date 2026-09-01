@@ -1010,6 +1010,31 @@ def _run_browser_flow(temporary_database: TemporaryDatabase) -> None:
                     print("P1-6D API diagnostics:", file=sys.stderr)
                     print("\n".join(diagnostic_lines[-80:]), file=sys.stderr)
             with _database_connection(temporary_database) as diagnostic_connection:
+                diagnostic_session = diagnostic_connection.execute(
+                    "SELECT id, status, last_sequence, current_floor_grant_id, "
+                    "phase_started_at, phase_deadline_at "
+                    "FROM simulation_sessions ORDER BY created_at LIMIT 1"
+                ).fetchone()
+                diagnostic_lifecycle_tail = diagnostic_connection.execute(
+                    "SELECT sequence, occurred_at, previous_status, status, trigger "
+                    "FROM ("
+                    "SELECT sequence, occurred_at, "
+                    "payload->>'previous_status' AS previous_status, "
+                    "payload->>'status' AS status, "
+                    "payload->>'trigger' AS trigger "
+                    "FROM discussion_events "
+                    "WHERE event_type = 'session.state_changed' "
+                    "ORDER BY sequence DESC LIMIT 10"
+                    ") AS recent_lifecycle ORDER BY sequence"
+                ).fetchall()
+                diagnostic_floor_tail = diagnostic_connection.execute(
+                    "SELECT sequence, event_type, payload FROM ("
+                    "SELECT sequence, event_type, payload "
+                    "FROM discussion_events "
+                    "WHERE event_type IN ('floor.granted', 'floor.released') "
+                    "ORDER BY sequence DESC LIMIT 10"
+                    ") AS recent_floor ORDER BY sequence"
+                ).fetchall()
                 diagnostic_events = diagnostic_connection.execute(
                     "SELECT sequence, event_type, length(payload->>'content') "
                     "FROM discussion_events ORDER BY sequence"
@@ -1022,6 +1047,50 @@ def _run_browser_flow(temporary_database: TemporaryDatabase) -> None:
                     "SELECT revision, source_through_sequence "
                     "FROM discussion_memory_states"
                 ).fetchall()
+            diagnostic_session_id = (
+                str(diagnostic_session[0]) if diagnostic_session is not None else None
+            )
+            realtime_events = {
+                "realtime.connection.accepted",
+                "realtime.progression.stopped",
+                "realtime.progression.failed",
+                "realtime.catchup.failed",
+            }
+            realtime_lines: list[str] = []
+            if api_log.exists() and diagnostic_session_id is not None:
+                for line in api_log.read_text(
+                    encoding="utf-8", errors="replace"
+                ).splitlines():
+                    try:
+                        record = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    if (
+                        isinstance(record, dict)
+                        and record.get("session_id") == diagnostic_session_id
+                        and record.get("event") in realtime_events
+                    ):
+                        realtime_lines.append(line)
+            print(
+                "P1-6D realtime structured diagnostics:",
+                file=sys.stderr,
+            )
+            print(
+                "\n".join(realtime_lines) if realtime_lines else "NONE",
+                file=sys.stderr,
+            )
+            print(
+                f"P1-6D final session durable state={diagnostic_session!r}",
+                file=sys.stderr,
+            )
+            print(
+                f"P1-6D lifecycle tail={diagnostic_lifecycle_tail!r}",
+                file=sys.stderr,
+            )
+            print(
+                f"P1-6D floor tail={diagnostic_floor_tail!r}",
+                file=sys.stderr,
+            )
             print(
                 f"P1-6D durable diagnostics events={diagnostic_events!r} "
                 f"requests={diagnostic_requests!r} memory={diagnostic_memory!r}",
