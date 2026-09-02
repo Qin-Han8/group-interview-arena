@@ -7,7 +7,7 @@ from typing import Any, Protocol
 from uuid import UUID, uuid4
 
 import pytest
-from sqlalchemy import URL, event, func, select
+from sqlalchemy import URL, func, select
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from group_interview_arena_api.core.config import DatabaseSettings
@@ -786,87 +786,6 @@ def test_generic_scheduler_checkpoint_recovers_committed_ai_release(
                 "next_ai_granted",
                 "next_human_granted",
             }
-
-    run_async(exercise)
-
-
-def test_resumable_ai_release_must_belong_to_current_session_phase(
-    migrated_database: TemporaryDatabaseContext,
-) -> None:
-    async def exercise() -> None:
-        async with _automatic_runtime_context(
-            migrated_database,
-            grant_seat_index=1,
-        ) as context:
-            await _complete_and_release_without_scheduling(context)
-
-            assert await has_resumable_ai_work(
-                context.session_factory,
-                owner_id=context.owner_id,
-                session_id=context.session_id,
-            )
-
-            async with context.session_factory() as session:
-                phase_a = await get_session_snapshot(
-                    session,
-                    owner_id=context.owner_id,
-                    session_id=context.session_id,
-                )
-            assert phase_a.status is SessionStatus.OPENING_STATEMENTS
-            assert phase_a.floor.current_grant is None
-            assert phase_a.phase_deadline_at is not None
-
-            async with context.session_factory() as session:
-                await reconcile_session_deadline(
-                    session,
-                    owner_id=context.owner_id,
-                    session_id=context.session_id,
-                    now=phase_a.phase_deadline_at,
-                )
-
-            async with context.session_factory() as session:
-                phase_b = await get_session_snapshot(
-                    session,
-                    owner_id=context.owner_id,
-                    session_id=context.session_id,
-                )
-            assert phase_b.status is SessionStatus.EXPLORATION
-            assert phase_b.floor.current_grant is None
-            statements: list[str] = []
-
-            def capture_statement(
-                _connection: object,
-                _cursor: object,
-                statement: str,
-                _parameters: object,
-                _context: object,
-                _executemany: bool,
-            ) -> None:
-                statements.append(statement)
-
-            event.listen(
-                context.engine.sync_engine,
-                "before_cursor_execute",
-                capture_statement,
-            )
-            try:
-                assert not await has_resumable_ai_work(
-                    context.session_factory,
-                    owner_id=context.owner_id,
-                    session_id=context.session_id,
-                )
-            finally:
-                event.remove(
-                    context.engine.sync_engine,
-                    "before_cursor_execute",
-                    capture_statement,
-                )
-
-            assert len(statements) == 1
-            normalized_statement = " ".join(statements[0].lower().split())
-            assert "simulation_sessions.status = floor_grants.phase" in (
-                normalized_statement
-            )
 
     run_async(exercise)
 

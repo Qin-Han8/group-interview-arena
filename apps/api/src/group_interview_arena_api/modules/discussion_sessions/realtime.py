@@ -257,7 +257,6 @@ def create_realtime_router(settings: Settings) -> APIRouter:
         send_lock = asyncio.Lock()
         catchup_task: asyncio.Task[None] | None = None
         progression_task: asyncio.Task[None] | None = None
-        progression_rerun_pending = False
         progression_lock = asyncio.Lock()
 
         async def drain_committed_events() -> tuple[StoredEvent, ...]:
@@ -288,70 +287,55 @@ def create_realtime_router(settings: Settings) -> APIRouter:
                     sent_sequence = max(sent_sequence, event.sequence)
 
         async def run_progression_best_effort() -> None:
-            nonlocal progression_rerun_pending
-            nonlocal progression_task
-            while True:
-                completed_normally = False
-                try:
-                    result = await resume_discussion_progression(
-                        session_factory,
-                        owner_id=user.user_id,
-                        session_id=session_id,
-                    )
-                except asyncio.CancelledError:
-                    log_event(
-                        logger,
-                        logging.INFO,
-                        "realtime.progression.stopped",
-                        session_id=str(session_id),
-                        connection_id=str(connection_id),
-                        exception_category="progression_cancelled",
-                    )
-                    raise
-                except AiDriveCompositionError:
-                    log_event(
-                        logger,
-                        logging.INFO,
-                        "realtime.progression.stopped",
-                        session_id=str(session_id),
-                        connection_id=str(connection_id),
-                        exception_category="provider_configuration_unavailable",
-                    )
-                except Exception:
-                    log_event(
-                        logger,
-                        logging.ERROR,
-                        "realtime.progression.failed",
-                        session_id=str(session_id),
-                        connection_id=str(connection_id),
-                        exception_category="internal_error",
-                    )
-                else:
-                    completed_normally = True
-                    log_event(
-                        logger,
-                        logging.INFO,
-                        "realtime.progression.stopped",
-                        session_id=str(session_id),
-                        connection_id=str(connection_id),
-                        exception_category=f"progression_{result.outcome.value}",
-                    )
-
-                async with progression_lock:
-                    if completed_normally and progression_rerun_pending:
-                        progression_rerun_pending = False
-                        continue
-                    progression_rerun_pending = False
-                    progression_task = None
-                    return
+            try:
+                result = await resume_discussion_progression(
+                    session_factory,
+                    owner_id=user.user_id,
+                    session_id=session_id,
+                )
+            except asyncio.CancelledError:
+                log_event(
+                    logger,
+                    logging.INFO,
+                    "realtime.progression.stopped",
+                    session_id=str(session_id),
+                    connection_id=str(connection_id),
+                    exception_category="progression_cancelled",
+                )
+                raise
+            except AiDriveCompositionError:
+                log_event(
+                    logger,
+                    logging.INFO,
+                    "realtime.progression.stopped",
+                    session_id=str(session_id),
+                    connection_id=str(connection_id),
+                    exception_category="provider_configuration_unavailable",
+                )
+            except Exception:
+                log_event(
+                    logger,
+                    logging.ERROR,
+                    "realtime.progression.failed",
+                    session_id=str(session_id),
+                    connection_id=str(connection_id),
+                    exception_category="internal_error",
+                )
+            else:
+                log_event(
+                    logger,
+                    logging.INFO,
+                    "realtime.progression.stopped",
+                    session_id=str(session_id),
+                    connection_id=str(connection_id),
+                    exception_category=f"progression_{result.outcome.value}",
+                )
 
         async def kick_progression_best_effort() -> None:
-            nonlocal progression_rerun_pending
             nonlocal progression_task
             async with progression_lock:
                 if progression_task is not None:
                     if not progression_task.done():
-                        progression_rerun_pending = True
                         return
                     await progression_task
                 progression_task = asyncio.create_task(run_progression_best_effort())
