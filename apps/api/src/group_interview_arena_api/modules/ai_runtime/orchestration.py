@@ -370,14 +370,6 @@ async def _find_resumable_release(
     session_id: UUID,
 ) -> tuple[UUID, AutomaticTurnIdentities] | None:
     async with session_factory() as session:
-        owns_session = await session.scalar(
-            select(SimulationSession.id).where(
-                SimulationSession.id == session_id,
-                SimulationSession.owner_user_id == owner_id,
-            )
-        )
-        if owns_session is None:
-            return None
         row = (
             await session.execute(
                 select(FloorRelease, FloorGrant)
@@ -386,6 +378,14 @@ async def _find_resumable_release(
                     and_(
                         FloorGrant.id == FloorRelease.grant_id,
                         FloorGrant.session_id == FloorRelease.session_id,
+                    ),
+                )
+                .join(
+                    SimulationSession,
+                    and_(
+                        SimulationSession.id == FloorRelease.session_id,
+                        SimulationSession.owner_user_id == owner_id,
+                        SimulationSession.status == FloorGrant.phase,
                     ),
                 )
                 .where(FloorRelease.session_id == session_id)
