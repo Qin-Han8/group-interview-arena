@@ -90,6 +90,7 @@ from group_interview_arena_api.modules.discussion_memory.derivation import (
 from group_interview_arena_api.modules.discussion_memory.domain import (
     AcceptedMemoryRevision,
     DiscussionContextMode,
+    DiscussionMemoryProjection,
     MemoryItemKind,
     MemoryItemStatus,
     MemoryPatch,
@@ -99,6 +100,7 @@ from group_interview_arena_api.modules.discussion_memory.domain import (
     replay_memory_revisions,
 )
 from group_interview_arena_api.modules.discussion_memory.working_context import (
+    DiscussionWorkingContextUnavailable,
     build_discussion_working_context,
 )
 from group_interview_arena_api.modules.discussion_sessions.domain import (
@@ -1507,6 +1509,100 @@ def test_failure_persistence_failure_never_claims_durable_failed(
             monkeypatch,
         )
     )
+
+
+@pytest.mark.parametrize(
+    "raw_tail_case",
+    ("count", "codepoints", "within_limits"),
+)
+def test_memory_maintenance_keeps_raw_tail_within_working_context_limits(
+    migrated_database: TemporaryDatabaseContext,
+    raw_tail_case: str,
+) -> None:
+    async def exercise() -> None:
+        async with _runtime_context(migrated_database) as context:
+            if raw_tail_case == "count":
+                contents = tuple(f"COUNT_BOUND_{index}" for index in range(7))
+                compaction_expected = True
+            elif raw_tail_case == "codepoints":
+                contents = ("A" * 2_100, "B" * 2_100)
+                compaction_expected = True
+            else:
+                contents = tuple(f"LAZY_BOUND_{index}" for index in range(6))
+                compaction_expected = False
+            policy = MemoryPolicy()
+            for index, content in enumerate(contents):
+                participant = context.participants[index % len(context.participants)]
+                await _append_public_utterance(
+                    context,
+                    participant=participant,
+                    actor_kind=(
+                        ParticipantActorKind.HUMAN
+                        if participant.seat_order == 1
+                        else ParticipantActorKind.AI
+                    ),
+                    content=content,
+                )
+
+            async with context.session_factory() as session:
+                history = await load_public_memory_utterances(
+                    session,
+                    session_id=context.session_id,
+                )
+            if compaction_expected:
+                with pytest.raises(DiscussionWorkingContextUnavailable):
+                    build_discussion_working_context(
+                        projection=DiscussionMemoryProjection.empty(),
+                        complete_public_history=history,
+                        phase=SessionStatus.OPENING_STATEMENTS.value,
+                        now=NOW,
+                        phase_deadline_at=None,
+                        policy=policy,
+                    )
+
+            class EmptyPatchDeriver:
+                def derive(
+                    self,
+                    _value: MemoryDerivationInput,
+                ) -> MemoryDerivationResult:
+                    return MemoryDerivationResult(patches=())
+
+            result = await maintain_discussion_memory(
+                context.session_factory,
+                session_id=context.session_id,
+                deriver=EmptyPatchDeriver(),
+                provenance=MemorySemanticProvenance(),
+                policy=policy,
+                now=NOW,
+            )
+            assert result.outcome is (
+                MemoryMaintenanceOutcome.UPDATED
+                if compaction_expected
+                else MemoryMaintenanceOutcome.NOOP_BELOW_HIGH_WATERMARK
+            )
+            assert result.compaction_triggered is compaction_expected
+
+            working_context = build_discussion_working_context(
+                projection=result.projection,
+                complete_public_history=history,
+                phase=SessionStatus.OPENING_STATEMENTS.value,
+                now=NOW,
+                phase_deadline_at=None,
+                policy=policy,
+            )
+            assert (
+                len(working_context.recent_public_utterances)
+                <= policy.recent_raw_max_utterances
+            )
+            assert (
+                sum(
+                    len(item.content)
+                    for item in working_context.recent_public_utterances
+                )
+                <= policy.recent_raw_max_codepoints
+            )
+
+    run_async(exercise)
 
 
 async def _memory_replay_rebuild_and_privacy_proof(

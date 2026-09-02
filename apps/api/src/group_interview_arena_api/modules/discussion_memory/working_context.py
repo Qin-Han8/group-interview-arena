@@ -58,6 +58,8 @@ def select_compaction_episode(
         not force_toward_working_context
         and len(utterances) < policy.high_watermark_utterances
         and codepoints < policy.high_watermark_codepoints
+        and len(utterances) <= policy.recent_raw_max_utterances
+        and codepoints <= policy.recent_raw_max_codepoints
     ):
         return ()
     target_utterances = min(
