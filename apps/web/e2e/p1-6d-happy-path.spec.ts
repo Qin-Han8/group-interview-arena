@@ -47,6 +47,11 @@ type ProviderCall = {
   request_metadata?: { schema_version: number; memory_revision: number };
 };
 
+test.skip(
+  !PROVIDER_CALLS,
+  "P1-6D D2-D1 requires its dedicated API/provider/PostgreSQL harness.",
+);
+
 test("P1-6D D2-D1 proves the Human plus three-AI memory happy path", async ({
   page,
 }) => {
@@ -76,9 +81,7 @@ test("P1-6D D2-D1 proves the Human plus three-AI memory happy path", async ({
 
   await page.goto("/");
   await page.getByRole("button", { name: "注册" }).click();
-  await page
-    .getByLabel("用户名")
-    .fill(`P16D_D2D1_${Date.now().toString(36)}`);
+  await page.getByLabel("用户名").fill(`P16D_D2D1_${Date.now().toString(36)}`);
   await page
     .getByLabel("密码")
     .fill(`P1-6D D2-D1 ${crypto.randomUUID()} phrase`);
@@ -101,7 +104,8 @@ test("P1-6D D2-D1 proves the Human plus three-AI memory happy path", async ({
         const response = await fetch(`${apiBaseUrl}/sessions/${session}`, {
           credentials: "include",
         });
-        if (!response.ok) throw new Error(`snapshot failed: ${response.status}`);
+        if (!response.ok)
+          throw new Error(`snapshot failed: ${response.status}`);
         return (await response.json()) as SessionSnapshot;
       },
       { apiBaseUrl: API_BASE_URL, session: sessionId },
@@ -137,11 +141,15 @@ test("P1-6D D2-D1 proves the Human plus three-AI memory happy path", async ({
   const humans = candidates.filter(
     (participant) => participant.actor_kind === "HUMAN",
   );
-  const ais = candidates.filter((participant) => participant.actor_kind === "AI");
+  const ais = candidates.filter(
+    (participant) => participant.actor_kind === "AI",
+  );
   expect(candidates).toHaveLength(4);
   expect(humans).toHaveLength(1);
   expect(ais).toHaveLength(3);
-  expect(new Set(ais.map((participant) => participant.participant_id)).size).toBe(3);
+  expect(
+    new Set(ais.map((participant) => participant.participant_id)).size,
+  ).toBe(3);
   await expect(page.getByText("连接正常").first()).toBeVisible();
   await page.getByRole("button", { name: "开始讨论" }).click();
 
