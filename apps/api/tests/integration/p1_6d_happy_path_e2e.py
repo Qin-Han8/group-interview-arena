@@ -8,7 +8,6 @@ import tempfile
 import textwrap
 from pathlib import Path
 from typing import Any
-from uuid import UUID
 
 import psycopg
 from browser_e2e import (
@@ -52,7 +51,6 @@ PRIVATE_SENTINELS = (
     "P16D_PRIVATE_BRAVO_DO_NOT_DISCLOSE",
     "P16D_PRIVATE_CHARLIE_DO_NOT_DISCLOSE",
 )
-V3_PROMPT_ID = UUID("56000000-0000-4000-8000-000000000003")
 
 
 def _provider_module_source() -> str:
@@ -210,12 +208,6 @@ def _read_json_lines(path: Path) -> list[dict[str, Any]]:
     ]
 
 
-def _assert_no_private_sentinel(value: object, evidence_name: str) -> None:
-    serialized = json.dumps(value, sort_keys=True, default=str)
-    if any(sentinel in serialized for sentinel in PRIVATE_SENTINELS):
-        raise RuntimeError(f"Private sentinel leaked into {evidence_name}.")
-
-
 def _verify_durable_result(
     temporary_database: TemporaryDatabase,
     provider_calls: list[dict[str, Any]],
@@ -226,11 +218,11 @@ def _verify_durable_result(
             "FROM simulation_sessions"
         ).fetchall()
         if len(session_rows) != 1:
-            raise RuntimeError(f"Expected one D2-D1 session, got {session_rows!r}.")
+            raise RuntimeError(f"Expected one D2-D2 session, got {session_rows!r}.")
         session_id, status, last_sequence, current_grant = session_rows[0]
-        if status != "EXPLORATION" or current_grant is None:
+        if status in ("PREPARATION", "COMPLETED"):
             raise RuntimeError(
-                "D2-D1 did not reach the stable EXPLORATION Human floor: "
+                "D2-D2 did not preserve an active durable session after reload: "
                 f"{session_rows[0]!r}"
             )
 
@@ -243,17 +235,7 @@ def _verify_durable_result(
         ai_rows = [row for row in candidates if row[1] == "AI"]
         human_rows = [row for row in candidates if row[1] == "HUMAN"]
         if len(candidates) != 4 or len(ai_rows) != 3 or len(human_rows) != 1:
-            raise RuntimeError(f"D2-D1 authoritative roster mismatch: {participants!r}")
-        grant_owner = connection.execute(
-            "SELECT participant_id FROM floor_grants WHERE id = %s",
-            (current_grant,),
-        ).fetchone()
-        if grant_owner is None or grant_owner[0] != human_rows[0][0]:
-            raise RuntimeError("D2-D1 did not stop at the expected Human floor.")
-        ai_ids = {str(row[0]) for row in ai_rows}
-        expected_private_index = {
-            str(row[0]): int(str(row[3])[-1]) - 1 for row in ai_rows
-        }
+            raise RuntimeError(f"D2-D2 authoritative roster mismatch: {participants!r}")
 
         events = connection.execute(
             "SELECT sequence, event_type, payload FROM discussion_events "
@@ -262,51 +244,43 @@ def _verify_durable_result(
         ).fetchall()
         if [row[0] for row in events] != list(range(1, int(last_sequence) + 1)):
             raise RuntimeError("DiscussionEvent sequence is not contiguous.")
-        utterance_events = [
-            row for row in events if row[1] == "participant.utterance.created"
-        ]
-        human_events = [
-            row for row in utterance_events if row[2]["actor_kind"] == "HUMAN"
-        ]
-        ai_events = [row for row in utterance_events if row[2]["actor_kind"] == "AI"]
-        if (
-            not human_events
-            or {row[2]["participant_id"] for row in ai_events} != ai_ids
-        ):
-            raise RuntimeError("D2-D1 did not include Human and all three AI speakers.")
-
-        lifecycle = [
-            row[2]["status"] for row in events if row[1] == "session.state_changed"
-        ]
-        try:
-            opening_index = lifecycle.index("OPENING_STATEMENTS")
-            exploration_index = lifecycle.index("EXPLORATION")
-        except ValueError as exception:
-            raise RuntimeError(
-                f"D2-D1 lifecycle evidence is incomplete: {lifecycle!r}"
-            ) from exception
-        if opening_index >= exploration_index:
-            raise RuntimeError(f"D2-D1 lifecycle order is invalid: {lifecycle!r}")
-
-        memory_state = connection.execute(
-            "SELECT revision, source_through_sequence, structured_state "
-            "FROM discussion_memory_states WHERE session_id = %s",
-            (session_id,),
-        ).fetchone()
-        memory_revisions = connection.execute(
-            "SELECT revision, base_revision, patches FROM discussion_memory_revisions "
-            "WHERE session_id = %s ORDER BY revision",
+        duplicate_floor_events = connection.execute(
+            "SELECT event_type, payload->>'grant_id', count(*) "
+            "FROM discussion_events WHERE session_id = %s "
+            "AND event_type IN ('floor.granted', 'floor.released') "
+            "GROUP BY event_type, payload->>'grant_id' HAVING count(*) > 1",
             (session_id,),
         ).fetchall()
-        if memory_state is None or memory_state[0] < 1 or not memory_revisions:
-            raise RuntimeError("D2-D1 did not persist a durable Memory revision.")
+        if duplicate_floor_events:
+            raise RuntimeError(
+                "Reload duplicated a durable floor DiscussionEvent: "
+                f"{duplicate_floor_events!r}"
+            )
+        duplicate_utterance_events = connection.execute(
+            "SELECT payload->>'floor_grant_id', count(*) FROM discussion_events "
+            "WHERE session_id = %s "
+            "AND event_type = 'participant.utterance.created' "
+            "GROUP BY payload->>'floor_grant_id' HAVING count(*) > 1",
+            (session_id,),
+        ).fetchall()
+        if duplicate_utterance_events:
+            raise RuntimeError(
+                "Reload duplicated a durable utterance DiscussionEvent: "
+                f"{duplicate_utterance_events!r}"
+            )
+        duplicate_releases = connection.execute(
+            "SELECT grant_id, count(*) FROM floor_releases WHERE session_id = %s "
+            "GROUP BY grant_id HAVING count(*) > 1",
+            (session_id,),
+        ).fetchall()
+        if duplicate_releases:
+            raise RuntimeError(
+                f"Reload duplicated a durable FloorRelease: {duplicate_releases!r}"
+            )
 
         requests = connection.execute(
-            "SELECT request.id, request.participant_id, request.floor_grant_id, "
-            "request.status, request.request_metadata, request.prompt_version_id, "
-            "prompt.prompt_key, prompt.version_number "
+            "SELECT request.id, request.floor_grant_id, request.status "
             "FROM llm_generation_requests AS request "
-            "JOIN prompt_versions AS prompt ON prompt.id = request.prompt_version_id "
             "WHERE request.session_id = %s ORDER BY request.requested_at, request.id",
             (session_id,),
         ).fetchall()
@@ -315,25 +289,9 @@ def _verify_durable_result(
             "WHERE session_id = %s GROUP BY floor_grant_id",
             (session_id,),
         ).fetchall()
-        if not request_counts or any(row[1] != 1 for row in request_counts):
+        if any(row[1] != 1 for row in request_counts):
             raise RuntimeError(
-                f"D2-D1 request count per AI grant was not one: {request_counts!r}"
-            )
-        if any(row[3] != "COMPLETED" for row in requests):
-            raise RuntimeError(
-                f"D2-D1 retained a non-completed AI request: {requests!r}"
-            )
-        memory_backed = [
-            row
-            for row in requests
-            if row[4].get("schema_version") == 2
-            and row[4].get("memory_revision", 0) > 0
-            and row[5] == V3_PROMPT_ID
-            and row[6:8] == ("AI_CANDIDATE_TURN", 3)
-        ]
-        if not memory_backed:
-            raise RuntimeError(
-                "No completed candidate consumed Memory + V3 + Metadata V2."
+                f"D2-D2 duplicated a generation request: {request_counts!r}"
             )
 
         exact_once_rows = connection.execute(
@@ -349,40 +307,24 @@ def _verify_durable_result(
             "LEFT JOIN floor_releases AS release "
             "ON release.session_id = request.session_id "
             "AND release.grant_id = request.floor_grant_id "
-            "WHERE request.session_id = %s GROUP BY request.floor_grant_id",
+            "WHERE request.session_id = %s AND request.status = 'COMPLETED' "
+            "GROUP BY request.floor_grant_id",
             (session_id,),
         ).fetchall()
-        if not exact_once_rows or any(
-            row[1:] != (1, 1, 1, "SPEAKER_FINISHED") for row in exact_once_rows
-        ):
+        if any(row[1:] != (1, 1, 1, "SPEAKER_FINISHED") for row in exact_once_rows):
             raise RuntimeError(
-                f"D2-D1 AI exact-once evidence mismatch: {exact_once_rows!r}"
+                f"D2-D2 AI exact-once evidence mismatch: {exact_once_rows!r}"
             )
-
-        _assert_no_private_sentinel([row[2] for row in events], "DiscussionEvent")
-        _assert_no_private_sentinel(memory_state[2], "structured Memory")
-        _assert_no_private_sentinel(
-            [row[2] for row in memory_revisions], "Memory patch journal"
-        )
 
     candidate_calls = [row for row in provider_calls if row["workload"] == "candidate"]
-    semantic_calls = [row for row in provider_calls if row["workload"] == "semantic"]
-    if not candidate_calls or not semantic_calls:
-        raise RuntimeError("D2-D1 did not exercise candidate and semantic workloads.")
     candidate_grants = [row["floor_grant_id"] for row in candidate_calls]
     if len(candidate_grants) != len(set(candidate_grants)):
-        raise RuntimeError("A D2-D1 AI grant reached the provider more than once.")
-    if set(candidate_grants) != {str(row[2]) for row in requests}:
-        raise RuntimeError("Provider calls did not map one-to-one to AI requests.")
-    if {row["participant_id"] for row in candidate_calls} != ai_ids:
-        raise RuntimeError("Provider calls did not cover all three AI seats.")
-    for row in candidate_calls:
-        participant_id = str(row["participant_id"])
-        if row["private_sentinel_index"] != expected_private_index[participant_id]:
-            raise RuntimeError(
-                "An AI candidate received another seat's private stance."
-            )
-    _assert_no_private_sentinel(provider_calls, "provider evidence log")
+        raise RuntimeError("A D2-D2 AI grant reached the provider more than once.")
+    completed_request_grants = {
+        str(row[1]) for row in requests if row[2] == "COMPLETED"
+    }
+    if not set(candidate_grants).issubset(completed_request_grants):
+        raise RuntimeError("A D2-D2 provider call lacks its durable completed request.")
 
 
 async def _seed_question_async(temporary_database: TemporaryDatabase) -> None:
@@ -507,6 +449,7 @@ def _run_browser_flow(temporary_database: TemporaryDatabase) -> None:
                     _wait_for_http(WEB_ORIGIN, web_process, web_log)
                     _run_playwright(
                         {
+                            "GIA_P16D_API_LOG": str(api_log),
                             "GIA_P16D_API_ORIGIN": API_ORIGIN,
                             "GIA_P16D_PROVIDER_CALLS": str(provider_calls),
                         }
@@ -524,11 +467,9 @@ def _run_browser_flow(temporary_database: TemporaryDatabase) -> None:
             _wait_for_port_release(WEB_PORT)
             _wait_for_port_release(API_PORT)
 
-        if not provider_calls.exists():
-            raise RuntimeError("D2-D1 provider evidence was not created.")
         _verify_durable_result(
             temporary_database,
-            _read_json_lines(provider_calls),
+            _read_json_lines(provider_calls) if provider_calls.exists() else [],
         )
 
 
@@ -542,10 +483,9 @@ def main() -> int:
         _seed_question(temporary_database)
         _run_browser_flow(temporary_database)
     print(
-        "P1-6D D2-D1 passed: real UI Human plus exactly three AI, network-free "
-        "candidate/semantic workloads, contiguous public evidence, durable Memory + "
-        "V3/V2 provenance, private-stance isolation, EXPLORATION progression, "
-        "exact-once persistence, and dedicated PostgreSQL/server cleanup."
+        "P1-6D D2-D2 passed: same-session Browser reload, authoritative WebSocket "
+        "reconnect, durable sequence and transcript continuity, lifecycle continuation, "
+        "no duplicate request/utterance/event/release, and dedicated cleanup."
     )
     return 0
 

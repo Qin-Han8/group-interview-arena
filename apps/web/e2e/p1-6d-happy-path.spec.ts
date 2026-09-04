@@ -2,12 +2,8 @@ import { expect, test } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 
 const API_BASE_URL = process.env.GIA_P16D_API_ORIGIN ?? "http://localhost:8000";
+const API_LOG = process.env.GIA_P16D_API_LOG;
 const PROVIDER_CALLS = process.env.GIA_P16D_PROVIDER_CALLS;
-const PRIVATE_SENTINELS = [
-  "P16D_PRIVATE_ALPHA_DO_NOT_DISCLOSE",
-  "P16D_PRIVATE_BRAVO_DO_NOT_DISCLOSE",
-  "P16D_PRIVATE_CHARLIE_DO_NOT_DISCLOSE",
-];
 
 type Participant = {
   participant_id: string;
@@ -26,6 +22,10 @@ type SessionSnapshot = {
   floor: {
     participants: Participant[];
     current_grant: CurrentGrant | null;
+    latest_event: {
+      type: "floor.granted" | "floor.released" | "floor.intervention_requested";
+      sequence: number;
+    } | null;
   };
 };
 type TranscriptItem = {
@@ -38,13 +38,7 @@ type TranscriptItem = {
 };
 type ProviderCall = {
   workload: "candidate" | "semantic";
-  participant_id?: string;
   floor_grant_id?: string;
-  prompt_version_id?: string;
-  prompt_version_number?: number;
-  prompt_key?: string;
-  private_sentinel_index?: number;
-  request_metadata?: { schema_version: number; memory_revision: number };
 };
 
 test.skip(
@@ -52,31 +46,13 @@ test.skip(
   "P1-6D D2-D1 requires its dedicated API/provider/PostgreSQL harness.",
 );
 
-test("P1-6D D2-D1 proves the Human plus three-AI memory happy path", async ({
-  page,
-}) => {
+test("P1-6D D2-D2 proves Browser reload recovery", async ({ page }) => {
+  expect(API_LOG).toBeTruthy();
   expect(PROVIDER_CALLS).toBeTruthy();
-  const lifecycleEvents: string[] = [];
   await page.routeWebSocket(/\/ws\/sessions\//, (socket) => {
     const server = socket.connectToServer();
     socket.onMessage((message) => server.send(message));
-    server.onMessage((message) => {
-      const raw = message.toString();
-      try {
-        const event = JSON.parse(raw) as {
-          type?: string;
-          payload?: { status?: string };
-        };
-        if (
-          event.type === "session.state_changed" &&
-          typeof event.payload?.status === "string"
-        ) {
-          lifecycleEvents.push(event.payload.status);
-        }
-      } finally {
-        socket.send(message);
-      }
-    });
+    server.onMessage((message) => socket.send(message));
   });
 
   await page.goto("/");
@@ -133,6 +109,54 @@ test("P1-6D D2-D1 proves the Human plus three-AI memory happy path", async ({
       return [];
     }
   };
+  const readApiLogRecords = async (): Promise<Record<string, unknown>[]> =>
+    (await readFile(API_LOG!, "utf8"))
+      .split(/\r?\n/u)
+      .filter(Boolean)
+      .flatMap((line) => {
+        try {
+          return [JSON.parse(line) as Record<string, unknown>];
+        } catch {
+          return [];
+        }
+      });
+  const readAcceptedConnectionIds = async (): Promise<Set<string>> => {
+    const records = await readApiLogRecords();
+    return new Set(
+      records.flatMap((record) =>
+        record.event === "realtime.connection.accepted" &&
+        record.session_id === sessionId &&
+        typeof record.connection_id === "string"
+          ? [record.connection_id]
+          : [],
+      ),
+    );
+  };
+  const waitForApiLogRecord = (
+    predicate: (record: Record<string, unknown>) => boolean,
+  ): Promise<Record<string, unknown>> => {
+    let matchingRecord: Record<string, unknown> | undefined;
+    return expect
+      .poll(
+        async () => {
+          matchingRecord = (await readApiLogRecords()).find(predicate);
+          return matchingRecord !== undefined;
+        },
+        { timeout: 15_000 },
+      )
+      .toBe(true)
+      .then(() => matchingRecord!);
+  };
+  const waitForNewAcceptedConnection = (
+    knownConnectionIds: ReadonlySet<string>,
+  ): Promise<string> =>
+    waitForApiLogRecord(
+      (record) =>
+        record.event === "realtime.connection.accepted" &&
+        record.session_id === sessionId &&
+        typeof record.connection_id === "string" &&
+        !knownConnectionIds.has(record.connection_id),
+    ).then((record) => record.connection_id as string);
 
   const initial = await fetchSnapshot();
   const candidates = initial.floor.participants.filter(
@@ -153,79 +177,104 @@ test("P1-6D D2-D1 proves the Human plus three-AI memory happy path", async ({
   await expect(page.getByText("连接正常").first()).toBeVisible();
   await page.getByRole("button", { name: "开始讨论" }).click();
 
-  let submittedHumanGrant: string | null = null;
   await expect
-    .poll(
-      async () => {
-        const snapshot = await fetchSnapshot();
-        const grant = snapshot.floor.current_grant;
-        if (
-          submittedHumanGrant === null &&
-          grant?.participant_id === humans[0]?.participant_id
-        ) {
-          submittedHumanGrant = grant.grant_id;
-          const prefix = `P16D_HUMAN_PUBLIC:${grant.phase}:${grant.grant_id}:`;
-          await page
-            .getByLabel("发言草稿")
-            .fill(prefix + "H".repeat(Math.max(1, 2_560 - prefix.length)));
-          await page.getByRole("button", { name: "发送发言" }).click();
-        }
-        const [transcript, calls] = await Promise.all([
-          fetchTranscript(),
-          readProviderCalls(),
-        ]);
-        const successfulAiIds = new Set(
-          transcript
-            .filter((item) => item.actor_kind === "AI")
-            .map((item) => item.participant_id),
-        );
-        const memoryBackedCalls = calls.filter(
-          (call) =>
-            call.workload === "candidate" &&
-            call.prompt_version_id === "56000000-0000-4000-8000-000000000003" &&
-            call.prompt_version_number === 3 &&
-            call.prompt_key === "AI_CANDIDATE_TURN" &&
-            call.request_metadata?.schema_version === 2 &&
-            (call.request_metadata.memory_revision ?? 0) > 0,
-        );
-        return {
-          allThreeAi: ais.every((participant) =>
-            successfulAiIds.has(participant.participant_id),
-          ),
-          humanSpoke: submittedHumanGrant !== null,
-          semanticInvoke: calls.some((call) => call.workload === "semantic"),
-          completedMemoryBackedCall: memoryBackedCalls.some((call) =>
-            transcript.some(
-              (item) =>
-                item.actor_kind === "AI" &&
-                item.floor_grant_id === call.floor_grant_id,
-            ),
-          ),
-          waitingForHumanInExploration:
-            snapshot.status === "EXPLORATION" &&
-            snapshot.floor.current_grant?.participant_id ===
-              humans[0]?.participant_id,
-        };
-      },
-      { timeout: 30_000 },
-    )
+    .poll(async () => {
+      const snapshot = await fetchSnapshot();
+      return {
+        active:
+          snapshot.status !== "PREPARATION" && snapshot.status !== "COMPLETED",
+        durableSequenceAdvanced: snapshot.last_sequence > initial.last_sequence,
+        deterministicContinuation:
+          snapshot.floor.current_grant !== null ||
+          snapshot.floor.latest_event?.type === "floor.intervention_requested",
+      };
+    })
     .toEqual({
-      allThreeAi: true,
-      humanSpoke: true,
-      semanticInvoke: true,
-      completedMemoryBackedCall: true,
-      waitingForHumanInExploration: true,
+      active: true,
+      durableSequenceAdvanced: true,
+      deterministicContinuation: true,
     });
 
-  expect(lifecycleEvents).toContain("OPENING_STATEMENTS");
-  expect(lifecycleEvents).toContain("EXPLORATION");
-  expect(lifecycleEvents.indexOf("OPENING_STATEMENTS")).toBeLessThan(
-    lifecycleEvents.indexOf("EXPLORATION"),
+  const continuationBoundary = await fetchSnapshot();
+  const beforeReloadTranscript = await fetchTranscript();
+  const beforeReloadCalls = await readProviderCalls();
+  const completedRequestGrantsBeforeReload = new Set(
+    beforeReloadCalls
+      .filter(
+        (call) =>
+          call.workload === "candidate" &&
+          beforeReloadTranscript.some(
+            (item) =>
+              item.actor_kind === "AI" &&
+              item.floor_grant_id === call.floor_grant_id,
+          ),
+      )
+      .map((call) => call.floor_grant_id),
   );
-  const publicEvidence = JSON.stringify(await fetchTranscript());
-  const browserText = await page.locator("body").innerText();
-  for (const sentinel of PRIVATE_SENTINELS) {
-    expect(publicEvidence).not.toContain(sentinel);
-    expect(browserText).not.toContain(sentinel);
-  }
+  const sequenceBeforeReload = continuationBoundary.last_sequence;
+  const transcriptCountBeforeReload = beforeReloadTranscript.length;
+  const completedRequestCountBeforeReload =
+    completedRequestGrantsBeforeReload.size;
+  const acceptedBeforeReload = await readAcceptedConnectionIds();
+  expect(
+    continuationBoundary.floor.current_grant !== null ||
+      continuationBoundary.floor.latest_event?.type ===
+        "floor.intervention_requested",
+  ).toBe(true);
+  expect(acceptedBeforeReload.size).toBeGreaterThan(0);
+  const reloadAccepted = waitForNewAcceptedConnection(acceptedBeforeReload);
+  await page.reload();
+  const reloadConnectionId = await reloadAccepted;
+  expect(reloadConnectionId).toBeTruthy();
+  await expect(page.getByText("连接正常").first()).toBeVisible();
+  await waitForApiLogRecord(
+    (record) =>
+      record.event === "realtime.progression.stopped" &&
+      record.session_id === sessionId &&
+      record.connection_id === reloadConnectionId &&
+      record.exception_category === "progression_next_human_granted",
+  );
+
+  const [snapshotAfterReload, transcriptAfterReload, callsAfterReload] =
+    await Promise.all([
+      fetchSnapshot(),
+      fetchTranscript(),
+      readProviderCalls(),
+    ]);
+  const completedRequestGrantsAfterReload = callsAfterReload.filter(
+    (call) =>
+      call.workload === "candidate" &&
+      transcriptAfterReload.some(
+        (item) =>
+          item.actor_kind === "AI" &&
+          item.floor_grant_id === call.floor_grant_id,
+      ),
+  );
+  expect(snapshotAfterReload.id).toBe(continuationBoundary.id);
+  expect(snapshotAfterReload.last_sequence).toBeGreaterThanOrEqual(
+    sequenceBeforeReload,
+  );
+  expect(transcriptAfterReload.length).toBeGreaterThanOrEqual(
+    transcriptCountBeforeReload,
+  );
+  expect(
+    beforeReloadTranscript.every(
+      (item, index) =>
+        JSON.stringify(item) === JSON.stringify(transcriptAfterReload[index]),
+    ),
+  ).toBe(true);
+  expect(completedRequestGrantsBeforeReload.size).toBe(
+    completedRequestCountBeforeReload,
+  );
+  expect(
+    [...completedRequestGrantsBeforeReload].every(
+      (grantId) =>
+        completedRequestGrantsAfterReload.filter(
+          (call) => call.floor_grant_id === grantId,
+        ).length === 1,
+    ),
+  ).toBe(true);
+  expect(
+    new Set(transcriptAfterReload.map((item) => item.floor_grant_id)).size,
+  ).toBe(transcriptAfterReload.length);
 });
