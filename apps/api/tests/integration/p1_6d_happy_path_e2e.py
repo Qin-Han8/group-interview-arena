@@ -214,12 +214,11 @@ def _verify_durable_result(
 ) -> None:
     with _database_connection(temporary_database) as connection:
         session_rows = connection.execute(
-            "SELECT id, status, last_sequence, current_floor_grant_id "
-            "FROM simulation_sessions"
+            "SELECT id, status, last_sequence FROM simulation_sessions"
         ).fetchall()
         if len(session_rows) != 1:
             raise RuntimeError(f"Expected one D2-D2 session, got {session_rows!r}.")
-        session_id, status, last_sequence, current_grant = session_rows[0]
+        session_id, status, last_sequence = session_rows[0]
         if status in ("PREPARATION", "COMPLETED"):
             raise RuntimeError(
                 "D2-D2 did not preserve an active durable session after reload: "
