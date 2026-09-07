@@ -6,20 +6,25 @@ import subprocess
 import sys
 import tempfile
 import textwrap
+import threading
 from pathlib import Path
-from typing import Any
+from typing import Any, BinaryIO
 
 import psycopg
 from browser_e2e import (
     API_ORIGIN,
     API_PORT,
+    API_RESTART_DOWNTIME_SECONDS,
     API_ROOT,
+    SHUTDOWN_TIMEOUT_SECONDS,
     WEB_ORIGIN,
     WEB_PORT,
     WEB_ROOT,
     _log_tail,  # pyright: ignore[reportPrivateUsage]
     _require_available_port,  # pyright: ignore[reportPrivateUsage]
     _server_process,  # pyright: ignore[reportPrivateUsage]
+    _start_server_process,  # pyright: ignore[reportPrivateUsage]
+    _stop_server_process,  # pyright: ignore[reportPrivateUsage]
     _wait_for_http,  # pyright: ignore[reportPrivateUsage]
     _wait_for_port_release,  # pyright: ignore[reportPrivateUsage]
 )
@@ -393,6 +398,8 @@ def _run_browser_flow(temporary_database: TemporaryDatabase) -> None:
         temporary_path = Path(directory)
         api_log = temporary_path / "api.log"
         web_log = temporary_path / "web.log"
+        restart_request = temporary_path / "restart-api.request"
+        restart_ready = temporary_path / "restart-api.ready"
         provider_calls = temporary_path / "provider-calls.jsonl"
         fake_app_module = temporary_path / "gia_p16d_d2d1_fake_provider_app.py"
         fake_app_module.write_text(_provider_module_source(), encoding="utf-8")
@@ -430,28 +437,82 @@ def _run_browser_flow(temporary_database: TemporaryDatabase) -> None:
             "--loop",
             "group_interview_arena_api.core.event_loop:create_runtime_event_loop",
         ]
-
-        try:
-            with _server_process(
+        current_api: list[tuple[subprocess.Popen[bytes], BinaryIO] | None] = [
+            _start_server_process(
                 api_command,
                 cwd=API_ROOT,
                 environment=api_environment,
                 log_path=api_log,
-            ) as api_process:
-                _wait_for_http(f"{API_ORIGIN}/health", api_process, api_log)
-                with _server_process(
-                    [node, str(next_cli), "dev"],
-                    cwd=WEB_ROOT,
-                    environment={"NEXT_PUBLIC_API_BASE_URL": API_ORIGIN},
-                    log_path=web_log,
-                ) as web_process:
-                    _wait_for_http(WEB_ORIGIN, web_process, web_log)
+            )
+        ]
+        coordinator_errors: list[BaseException] = []
+        coordinator_stop = threading.Event()
+
+        def coordinate_api_restart() -> None:
+            try:
+                while not coordinator_stop.is_set():
+                    if not restart_request.exists():
+                        coordinator_stop.wait(0.05)
+                        continue
+
+                    running = current_api[0]
+                    if running is None:
+                        raise RuntimeError(
+                            "API restart requested without a running API."
+                        )
+                    _stop_server_process(*running)
+                    current_api[0] = None
+                    _wait_for_port_release(API_PORT)
+                    if coordinator_stop.wait(API_RESTART_DOWNTIME_SECONDS):
+                        return
+
+                    restarted = _start_server_process(
+                        api_command,
+                        cwd=API_ROOT,
+                        environment=api_environment,
+                        log_path=api_log,
+                    )
+                    current_api[0] = restarted
+                    _wait_for_http(f"{API_ORIGIN}/health", restarted[0], api_log)
+                    restart_ready.write_text("ready", encoding="utf-8")
+                    return
+            except BaseException as exception:
+                coordinator_errors.append(exception)
+
+        try:
+            initial_api = current_api[0]
+            assert initial_api is not None
+            _wait_for_http(f"{API_ORIGIN}/health", initial_api[0], api_log)
+            with _server_process(
+                [node, str(next_cli), "dev"],
+                cwd=WEB_ROOT,
+                environment={"NEXT_PUBLIC_API_BASE_URL": API_ORIGIN},
+                log_path=web_log,
+            ) as web_process:
+                _wait_for_http(WEB_ORIGIN, web_process, web_log)
+                coordinator = threading.Thread(
+                    target=coordinate_api_restart,
+                    name="gia-p16d-d2d2b-api-restart",
+                )
+                coordinator.start()
+                try:
                     _run_playwright(
                         {
                             "GIA_P16D_API_LOG": str(api_log),
                             "GIA_P16D_API_ORIGIN": API_ORIGIN,
+                            "GIA_P16D_API_RESTART_READY": str(restart_ready),
+                            "GIA_P16D_API_RESTART_REQUEST": str(restart_request),
                             "GIA_P16D_PROVIDER_CALLS": str(provider_calls),
                         }
+                    )
+                finally:
+                    coordinator_stop.set()
+                    coordinator.join(timeout=SHUTDOWN_TIMEOUT_SECONDS)
+                if coordinator.is_alive():
+                    raise RuntimeError("D2-D2B API restart coordinator did not stop.")
+                if coordinator_errors:
+                    raise RuntimeError("D2-D2B API restart coordinator failed.") from (
+                        coordinator_errors[0]
                     )
         except Exception:
             print("D2-D1 API server log tail:", file=sys.stderr)
@@ -463,6 +524,10 @@ def _run_browser_flow(temporary_database: TemporaryDatabase) -> None:
                 print(provider_calls.read_text(encoding="utf-8"), file=sys.stderr)
             raise
         finally:
+            running = current_api[0]
+            if running is not None:
+                _stop_server_process(*running)
+                current_api[0] = None
             _wait_for_port_release(WEB_PORT)
             _wait_for_port_release(API_PORT)
 
@@ -482,9 +547,9 @@ def main() -> int:
         _seed_question(temporary_database)
         _run_browser_flow(temporary_database)
     print(
-        "P1-6D D2-D2 passed: same-session Browser reload, authoritative WebSocket "
-        "reconnect, durable sequence and transcript continuity, lifecycle continuation, "
-        "no duplicate request/utterance/event/release, and dedicated cleanup."
+        "P1-6D D2-D2B passed: Browser reload plus real API process restart, "
+        "same-session authoritative WebSocket recovery, durable sequence/transcript "
+        "continuity, lifecycle continuation, exact-once evidence, and cleanup."
     )
     return 0
 

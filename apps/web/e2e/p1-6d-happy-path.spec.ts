@@ -1,8 +1,10 @@
 import { expect, test } from "@playwright/test";
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 
 const API_BASE_URL = process.env.GIA_P16D_API_ORIGIN ?? "http://localhost:8000";
 const API_LOG = process.env.GIA_P16D_API_LOG;
+const API_RESTART_READY = process.env.GIA_P16D_API_RESTART_READY;
+const API_RESTART_REQUEST = process.env.GIA_P16D_API_RESTART_REQUEST;
 const PROVIDER_CALLS = process.env.GIA_P16D_PROVIDER_CALLS;
 
 type Participant = {
@@ -46,8 +48,12 @@ test.skip(
   "P1-6D D2-D1 requires its dedicated API/provider/PostgreSQL harness.",
 );
 
-test("P1-6D D2-D2 proves Browser reload recovery", async ({ page }) => {
+test("P1-6D D2-D2B proves Browser reload and API restart recovery", async ({
+  page,
+}) => {
   expect(API_LOG).toBeTruthy();
+  expect(API_RESTART_READY).toBeTruthy();
+  expect(API_RESTART_REQUEST).toBeTruthy();
   expect(PROVIDER_CALLS).toBeTruthy();
   await page.routeWebSocket(/\/ws\/sessions\//, (socket) => {
     const server = socket.connectToServer();
@@ -157,6 +163,21 @@ test("P1-6D D2-D2 proves Browser reload recovery", async ({ page }) => {
         typeof record.connection_id === "string" &&
         !knownConnectionIds.has(record.connection_id),
     ).then((record) => record.connection_id as string);
+  const waitForEvidenceFile = async (path: string): Promise<void> => {
+    await expect
+      .poll(
+        async () => {
+          try {
+            await readFile(path, "utf8");
+            return true;
+          } catch {
+            return false;
+          }
+        },
+        { timeout: 15_000 },
+      )
+      .toBe(true);
+  };
 
   const initial = await fetchSnapshot();
   const candidates = initial.floor.participants.filter(
@@ -277,4 +298,150 @@ test("P1-6D D2-D2 proves Browser reload recovery", async ({ page }) => {
   expect(
     new Set(transcriptAfterReload.map((item) => item.floor_grant_id)).size,
   ).toBe(transcriptAfterReload.length);
+
+  const humanParticipantId = humans[0]!.participant_id;
+  const submitHumanTurn = async (
+    snapshot: SessionSnapshot,
+    evidenceLabel: string,
+  ): Promise<string> => {
+    const grant = snapshot.floor.current_grant;
+    expect(grant?.participant_id).toBe(humanParticipantId);
+    expect(grant).not.toBeNull();
+    const prefix = `${evidenceLabel}:${grant!.phase}:${grant!.grant_id}:`;
+    await page
+      .getByLabel("发言草稿")
+      .fill(prefix + "H".repeat(Math.max(1, 1_200 - prefix.length)));
+    await page.getByRole("button", { name: "发送发言" }).click();
+    return grant!.grant_id;
+  };
+
+  await submitHumanTurn(snapshotAfterReload, "P16D_D2D2B_PRE_RESTART");
+  await expect
+    .poll(async () => {
+      const [snapshot, transcript, calls] = await Promise.all([
+        fetchSnapshot(),
+        fetchTranscript(),
+        readProviderCalls(),
+      ]);
+      const completedAiGrants = new Set(
+        calls
+          .filter(
+            (call) =>
+              call.workload === "candidate" &&
+              transcript.some(
+                (item) =>
+                  item.actor_kind === "AI" &&
+                  item.floor_grant_id === call.floor_grant_id,
+              ),
+          )
+          .map((call) => call.floor_grant_id),
+      );
+      return {
+        completedAi: completedAiGrants.size > 0,
+        stableHumanBoundary:
+          snapshot.floor.current_grant?.participant_id === humanParticipantId,
+      };
+    })
+    .toEqual({ completedAi: true, stableHumanBoundary: true });
+
+  const beforeRestartSnapshot = await fetchSnapshot();
+  const beforeRestartTranscript = await fetchTranscript();
+  const beforeRestartCalls = await readProviderCalls();
+  const completedAiGrantsBeforeRestart = new Set(
+    beforeRestartCalls
+      .filter(
+        (call) =>
+          call.workload === "candidate" &&
+          beforeRestartTranscript.some(
+            (item) =>
+              item.actor_kind === "AI" &&
+              item.floor_grant_id === call.floor_grant_id,
+          ),
+      )
+      .map((call) => call.floor_grant_id),
+  );
+  expect(completedAiGrantsBeforeRestart.size).toBeGreaterThan(0);
+  const acceptedBeforeRestart = await readAcceptedConnectionIds();
+  await writeFile(
+    API_RESTART_REQUEST!,
+    JSON.stringify({
+      session_id: sessionId,
+      last_sequence: beforeRestartSnapshot.last_sequence,
+    }),
+    "utf8",
+  );
+  await waitForEvidenceFile(API_RESTART_READY!);
+  const restartedConnectionId = await waitForNewAcceptedConnection(
+    acceptedBeforeRestart,
+  );
+  expect(restartedConnectionId).toBeTruthy();
+  await expect(page.getByText("连接正常").first()).toBeVisible();
+
+  const [snapshotAfterRestart, transcriptAfterRestart, callsAfterRestart] =
+    await Promise.all([
+      fetchSnapshot(),
+      fetchTranscript(),
+      readProviderCalls(),
+    ]);
+  expect(snapshotAfterRestart.id).toBe(sessionId);
+  expect(new URL(page.url()).searchParams.get("session_id")).toBe(sessionId);
+  expect(snapshotAfterRestart.last_sequence).toBeGreaterThanOrEqual(
+    beforeRestartSnapshot.last_sequence,
+  );
+  expect(
+    beforeRestartTranscript.every(
+      (item, index) =>
+        JSON.stringify(item) === JSON.stringify(transcriptAfterRestart[index]),
+    ),
+  ).toBe(true);
+  expect(
+    [...completedAiGrantsBeforeRestart].every(
+      (grantId) =>
+        callsAfterRestart.filter(
+          (call) =>
+            call.workload === "candidate" && call.floor_grant_id === grantId,
+        ).length === 1,
+    ),
+  ).toBe(true);
+  expect(
+    new Set(transcriptAfterRestart.map((item) => item.floor_grant_id)).size,
+  ).toBe(transcriptAfterRestart.length);
+
+  const progressionStopsBeforeContinuation = (await readApiLogRecords()).filter(
+    (record) =>
+      record.event === "realtime.progression.stopped" &&
+      record.session_id === sessionId &&
+      record.connection_id === restartedConnectionId,
+  ).length;
+  const postRestartHumanGrant = await submitHumanTurn(
+    snapshotAfterRestart,
+    "P16D_D2D2B_POST_RESTART",
+  );
+  await expect
+    .poll(async () => {
+      const [snapshot, transcript, records] = await Promise.all([
+        fetchSnapshot(),
+        fetchTranscript(),
+        readApiLogRecords(),
+      ]);
+      return {
+        durableSequenceAdvanced:
+          snapshot.last_sequence > snapshotAfterRestart.last_sequence,
+        humanTurnDurable: transcript.some(
+          (item) => item.floor_grant_id === postRestartHumanGrant,
+        ),
+        progressionContinued:
+          records.filter(
+            (record) =>
+              record.event === "realtime.progression.stopped" &&
+              record.session_id === sessionId &&
+              record.connection_id === restartedConnectionId,
+          ).length > progressionStopsBeforeContinuation,
+      };
+    })
+    .toEqual({
+      durableSequenceAdvanced: true,
+      humanTurnDurable: true,
+      progressionContinued: true,
+    });
 });
