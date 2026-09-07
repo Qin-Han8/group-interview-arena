@@ -1,16 +1,17 @@
 # P1-6 Complete Text Simulation Execution Plan
 
 - Status: `P1-6 IN_PROGRESS`
-- Previous checkpoint: `P1-6C DONE / DESIGN_SCOPE_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PASS`
-- Current checkpoint: `P1-6D Design Freeze DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`
+- Previous checkpoint: `P1-6D D2-D4 final integration PASS`
+- Current checkpoint: `P1-6D DONE / DESIGN_SCOPE_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PASS`
 - P1-6D initial external actual-source review verdict: `BLOCKED`
 - P1-6D initial reviewed bundle: `group-interview-arena-review-20260831-004302.zip`
 - P1-6D initial reviewed bundle SHA-256: `7CE39C1EB4DE8314DCE7DB1CDE9809EB386E0E0CADDED8620D11B47FDB1791D0`
 - P1-6D finding-only external actual-source re-review verdict: `PASS`
 - P1-6D finding-only reviewed bundle: `group-interview-arena-review-20260831-005931.zip`
 - P1-6D finding-only reviewed bundle SHA-256: `502D21B84410EDD606C806C188FFFF1FAF6C8E8ACE3F08381B86E9FA13E29A66`
-- P1-6D findings: `P16D-REV-001 CLOSED`; `P16D-REV-002 CLOSED`; new findings `NONE`; open findings `NONE`
-- P1-6D production implementation: `NOT_STARTED`
+- P1-6D findings: `P16D-REV-001 CLOSED`; `P16D-REV-002 CLOSED`; `P16D-D2D4-REV-001 CLOSED`; new findings `NONE`; open findings `NONE`
+- P1-6D production implementation: `DONE / DESIGN_SCOPE_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PASS`
+- P1-6D final acceptance: D2-D1/D2-D2A/D2-D2B/D2-D3/D2-D4 `PASS`; accepted commit `6dcce5e961d6aa7b460243dbd6407e17c2478aa2`; CI `GREEN`
 - P1-6C production implementation: `DONE / DESIGN_SCOPE_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PASS`
 - P1-6C Design Freeze external actual-source review verdict: `PASS`
 - P1-6C Design Freeze reviewed bundle: `group-interview-arena-review-20260830-170659.zip`
@@ -633,7 +634,7 @@ Fresh gates: focused composition proof `3 passed`; affected PostgreSQL progressi
 
 P1-6D is a dedicated network-free Browser Acceptance Scenario, separate from the existing layout-heavy session Browser proof. It composes the already accepted P1-3 lifecycle, P1-4 floor/scheduler, P1-5 recovery/runtime, P1-6B Memory and P1-6C production caller chain; it creates no second lifecycle, scheduler, recovery engine, provider router or Memory authority. Actual-source calibration at baseline `6204bb030299671dcd22b5bb5c765c5c1262dd58` found proof gaps only: production wiring gap `NONE`, production source changes default to `NONE`, and design-time STOP conditions `NONE`.
 
-P1-6D Design Freeze is `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; production implementation is `NOT_STARTED`. This closeout accepts the frozen design and scope only; it does not authorize implementation, enter P1-6E, or run independent acceptance.
+At the Design Freeze closeout checkpoint, P1-6D was `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS` and production implementation was `NOT_STARTED`. That historical review gate did not itself authorize implementation, enter P1-6E, or run independent acceptance; the later final implementation status is recorded in §12.13.
 
 ### 12.1 Actual-source calibration and pre-existing coverage
 
@@ -756,4 +757,26 @@ Implementation begins test-first and production changes remain `NONE` unless a f
 
 The initial external actual-source review of `group-interview-arena-review-20260831-004302.zip` / SHA-256 `7CE39C1EB4DE8314DCE7DB1CDE9809EB386E0E0CADDED8620D11B47FDB1791D0` returned `BLOCKED` on exactly `P16D-REV-001` and `P16D-REV-002`. Finding-only remediation froze explicit legacy/dedicated Browser selector isolation plus required `gia_p16d_` cleanup recognition, and restored fallback/unsafe-context ownership to P1-6C.
 
-External finding-only actual-source re-review returned `PASS` against `group-interview-arena-review-20260831-005931.zip` / SHA-256 `502D21B84410EDD606C806C188FFFF1FAF6C8E8ACE3F08381B86E9FA13E29A66`; `P16D-REV-001 CLOSED`; `P16D-REV-002 CLOSED`; new findings `NONE`; open findings `NONE`. P1-6D Design Freeze is therefore `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; production implementation remains `NOT_STARTED`. No independent review occurred, P1-6E remains `NOT_STARTED`, and implementation still requires separate explicit user approval.
+External finding-only actual-source re-review returned `PASS` against `group-interview-arena-review-20260831-005931.zip` / SHA-256 `502D21B84410EDD606C806C188FFFF1FAF6C8E8ACE3F08381B86E9FA13E29A66`; `P16D-REV-001 CLOSED`; `P16D-REV-002 CLOSED`; new findings `NONE`; open findings `NONE`. At that checkpoint, P1-6D Design Freeze was therefore `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS` and production implementation remained `NOT_STARTED`. No independent review occurred and P1-6E remained `NOT_STARTED`; the later production implementation and final closeout are recorded below.
+
+### 12.13 Production implementation final acceptance closeout
+
+P1-6D production implementation is `DONE / DESIGN_SCOPE_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PASS`. D2-D1 happy path, D2-D2A Browser reload recovery, D2-D2B API restart recovery, D2-D3 cancellation recovery and D2-D4 final integration all `PASS`; accepted commit `6dcce5e961d6aa7b460243dbd6407e17c2478aa2`; CI `GREEN`.
+
+Final acceptance ledger:
+
+| Acceptance | Final evidence |
+|---|---|
+| Human + exactly three AI | Exactly one Human and three authoritative AI participants; Human contributes through the real UI and all three AI seats contribute publicly. |
+| Semantic Memory | A durable Semantic Memory revision is created and later consumed without replacing authoritative public evidence. |
+| V3 + metadata V2 | A later candidate uses `AI_CANDIDATE_TURN` V3 with `GenerationRequestMetadata` V2 Memory provenance. |
+| Privacy isolation | Three distinct private sentinels remain candidate-local and absent from public transcript/events, shared Memory/context, Browser output and cancellation evidence. |
+| Exact-once | Generation request, AI utterance, public utterance event and floor release relations satisfy the durable exact-once contract. |
+| Browser reload recovery | The same durable session reconnects, transcript/sequence converge and progression continues without duplicate side effects. |
+| API restart recovery | A new API process reconnects to the same session/database; sequence, transcript and Memory remain durable and progression continues. |
+| Cancellation recovery | One eligible candidate is cancelled through the deterministic gate, reaches the accepted durable terminal/release shape and repeated recovery creates no second side effect. |
+| Final lifecycle | Authoritative `session.state_changed` records `FINAL_SUMMARY -> COMPLETED` with trigger `PHASE_DEADLINE`; terminal session status is `COMPLETED` with no current floor. |
+
+D2-D4 actual-source review initially opened `P16D-D2D4-REV-001` because the Human continuation action was inside a polling predicate. Finding-only remediation moved that action outside polling and retained an observation-only durable-completion predicate without a timeout/retry/sleep workaround. Final review verdict is `PASS`; `P16D-D2D4-REV-001 CLOSED`; new findings `NONE`; open findings `NONE`.
+
+This final closeout changes only `docs/ROADMAP.md`, `docs/TASKS.md` and this plan. It adds no feature or acceptance, changes no production code, tests or CI logic, does not run independent review, and leaves P1-6E `NOT_STARTED`; P1-6 and P1 remain `IN_PROGRESS`.
