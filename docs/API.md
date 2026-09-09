@@ -1,6 +1,6 @@
 # API 与事件技术基线
 
-- Status: P0 API Architecture Baseline + P1-1～P1-4 and P1-5A～P1-5F historically completed + P1-5R `IN_PROGRESS / DESIGN_FROZEN`
+- Status: P0 API Architecture Baseline + P1-1～P1-5 completed + P1-6A～P1-6D implemented and independently reviewed; P1-6E `IN_PROGRESS`
 - Current phase: P1 — IN_PROGRESS
 - API architecture baseline established by: P0-2 — DONE
 - Target version: V0.1 Internal Validation
@@ -11,7 +11,8 @@
 - P1-2 contract: P1-2A/B/C completed; safe question reads and immutable version-bound session creation implemented
 - P1-3 contract: P1-3A～D completed; independent verdict `PASS`; P1-3 `DONE`
 - P1-4 contract: P1-4A～E completed; final independent verdict `PASS`; deterministic scheduler remains server-owned and safe floor snapshot/WS/Web projection is implemented
-- P1-5 contract: P1-5A～P1-5F historical runtime、transport、Web and acceptance remain `DONE`; P1-5R contracts remain frozen；R1 internal progression implementation is complete awaiting actual-source review with no REST/OpenAPI/public-event/public-WS/schema change
+- P1-5 contract: P1-5A～P1-5R and its post-closeout remediation are `DONE`; runtime、transport、Web and recovery contracts remain accepted
+- P1-6 contract: structured public Discussion Memory and bounded Working Context are internal application/persistence concerns; P1-6 adds no REST/OpenAPI/public-event/public-WS contract
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -440,7 +441,8 @@ P0-3D 已完成最小 API、OpenAPI authority、typed config、request correlati
 - P1-2B persistence/domain/seed、P1-2C safe API/session/Web vertical slice 与 P1-2D independent acceptance 均已完成；P1-2 `DONE`。
 - P1-3A～D 已完成；state/timing/command/event/snapshot、backend durable foundation 与 realtime/Web complete phase flow 已独立验收 `PASS`；P1-3 `DONE`，P1 保持 `IN_PROGRESS`。
 - P1-4A～E 已完成；P1-4 `DONE`，final independent verdict `PASS`。Safe snapshot/WS/Web floor projection 已实现且无 public floor command。
-- P1-5A～P1-5F retain historical `DONE` and their evidence。Parent P1-5 is `IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN` only for `P1-5R IN_PROGRESS / DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN`；R1 is `IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PENDING` and F1 is `OPEN / IMPLEMENTATION_COMPLETE_AWAITING_REVIEW`；R2-A is `NOT_STARTED / BLOCKED_BY_R1`，and R2-B/R3 remain dependency-blocked and `NOT_STARTED`。R1 changes no public API contract。
+- P1-5A～P1-5R and the network-free post-closeout remediation are `DONE`; their accepted runtime、public transport and recovery contracts remain unchanged.
+- P1-6A～P1-6D are implemented and independently reviewed; P1-6E closeout is `IN_PROGRESS` and P1 remains `IN_PROGRESS`. Structured Memory consumes authoritative public evidence and supplies bounded Working Context internally; no Memory field or command is added to REST、OpenAPI、public events or WebSocket payloads. P1-7/P1-8 remain `NOT_STARTED`.
 
 ### P2 and later
 

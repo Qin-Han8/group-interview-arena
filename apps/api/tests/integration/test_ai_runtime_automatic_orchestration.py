@@ -92,6 +92,7 @@ from group_interview_arena_api.modules.floor_control.domain import (
 )
 from group_interview_arena_api.modules.floor_control.scheduler import (
     V0_1_SCHEDULER_POLICY,
+    SchedulerPolicy,
 )
 from group_interview_arena_api.modules.floor_control.service import apply_floor_command
 from group_interview_arena_api.modules.question_personas.seed import (
@@ -1170,15 +1171,44 @@ def test_scheduler_checkpoint_rechecks_winner_after_recovery_miss(
                 "next_human_granted",
             }
 
-            original_recover = floor_progression_module._recover_scheduler_result
+            class RecoverSchedulerResult(Protocol):
+                async def __call__(
+                    self,
+                    session_factory: async_sessionmaker[AsyncSession],
+                    *,
+                    owner_id: UUID,
+                    session_id: UUID,
+                    released_floor: floor_progression_module.ReleasedFloorProof,
+                    identities: floor_progression_module.SchedulerCheckpointIdentities,
+                    scheduling_policy: SchedulerPolicy,
+                ) -> floor_progression_module.SchedulerCheckpointResult | None: ...
+
+            original_recover: RecoverSchedulerResult = (
+                floor_progression_module.__dict__["_recover_scheduler_result"]
+            )
             recover_calls = 0
 
-            async def miss_once(*args: object, **kwargs: object):
+            async def miss_once(
+                session_factory: async_sessionmaker[AsyncSession],
+                *,
+                owner_id: UUID,
+                session_id: UUID,
+                released_floor: floor_progression_module.ReleasedFloorProof,
+                identities: floor_progression_module.SchedulerCheckpointIdentities,
+                scheduling_policy: SchedulerPolicy,
+            ) -> floor_progression_module.SchedulerCheckpointResult | None:
                 nonlocal recover_calls
                 recover_calls += 1
                 if recover_calls == 1:
                     return None
-                return await original_recover(*args, **kwargs)
+                return await original_recover(
+                    session_factory,
+                    owner_id=owner_id,
+                    session_id=session_id,
+                    released_floor=released_floor,
+                    identities=identities,
+                    scheduling_policy=scheduling_policy,
+                )
 
             monkeypatch.setattr(
                 floor_progression_module,
