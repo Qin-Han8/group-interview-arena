@@ -1,14 +1,14 @@
 # AI 候选人与讨论编排骨架
 
-- Status: P1-2/P1-3/P1-4 and P1-5A～P1-5F historically completed; P1-5R is `IN_PROGRESS / DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN`; R1 is `IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PENDING`; F1 is `OPEN / IMPLEMENTATION_COMPLETE_AWAITING_REVIEW`; R2-A is `NOT_STARTED / BLOCKED_BY_R1`; R2-B/R3 are `NOT_STARTED`
+- Status: P1-2～P1-6 completed; P1-6E/P1-6 `DONE / CLOSED`; P1-7/P1-8 `NOT_STARTED`
 - Current phase: P1 — IN_PROGRESS
 - Target version: V0.1 Internal Validation
-- Detailed orchestrator/agent design: P1-3A～D and P1-4A～E completed; P1-5A～P1-5F historical implementation/acceptance remains complete; P1-5R contracts remain frozen；R1 deterministic progression recovery is implemented and awaits actual-source review；R2-A/R2-B/R3 remain unimplemented
+- Detailed orchestrator/agent design: P1-3 lifecycle、P1-4 floor、P1-5 runtime/public transport and P1-6 structured Memory/full text composition are implemented；P1-7 report/content and P1-8 full-P1 acceptance remain unimplemented
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
 
-本文件记录已确认的 AI 候选人/私有立场基础、P1-3 已实现的讨论状态机、P1-4 floor-control，以及 P1-5A～P1-5F 已完成能力。P1-5R design and implementation plan remain frozen；R1 remediation implementation is complete awaiting actual-source review，while R2-A/R2-B/R3、streaming and 结构化记忆 have not started。
+本文件记录已确认的 AI 候选人/私有立场基础、P1-3 讨论状态机、P1-4 floor-control、P1-5 runtime/public transport，以及 P1-6 structured Discussion Memory 和完整文字模拟行为。P1-7 report/content、P1-8 full-P1 acceptance and streaming remain future work。
 
 ## Confirmed by PROJECT_MASTER_PLAN
 
@@ -296,7 +296,7 @@ Generation Request 与 final Utterance 是不同 identity。一个 logical reque
 
 - Automatic drive is state-driven from the exact durable current grant；`floor.granted` may trigger invocation but missed/duplicate delivery cannot change correctness。The orchestrator is an application coordinator，not a participant、speaker selector、lifecycle authority or floor authority。
 - HUMAN current owner is a successful stop boundary。The drive never generates for、releases、schedules over or fabricates an utterance for a human；P1-5F-2 now enforces the Human transport behavior below in the backend。
-- Eligible AI current owner resolves exact `AI_CANDIDATE_TURN` version `1` plus `zhipu` / server-configured model / `ZHIPU_CHAT_DEV_V1` for a new request。One floor grant deterministically owns one generation request and utterance identity；existing request provenance/timestamp wins on re-entry。
+- P1-5E originally resolved its historical immutable candidate Prompt；the current P1-6 candidate path resolves `AI_CANDIDATE_TURN` version `3` plus Working Context metadata V2 and `zhipu` / server-configured model / `ZHIPU_CHAT_DEV_V1` for a new request。One floor grant deterministically owns one generation request and utterance identity；existing request provenance/timestamp wins on re-entry。
 - Confirmed exact completed utterance ends the still-current AI turn as `SPEAKER_FINISHED`。Confirmed durable failure ends it as `INTERRUPTED` while the Generation Request retains the real typed `failure_code`。`INTERRUPTED` is only the current V0.1 floor vocabulary for an AI turn ending without formal content；it is not the generation failure taxonomy。
 - `RUNNING`/`RECONCILIATION_REQUIRED`、request conflict、internal uncertainty and unproved winner stop automatic progression without provider retry、release or scheduling。`CONTEXT_REJECTED`/`STALE_RESULT` first re-read exact session/current-grant truth：a changed grant/lifecycle is `STATE_CHANGED`，while the same exact current grant is `RECONCILIATION_REQUIRED`；neither path mutates the grant。
 - `SUPERSEDED` first proves the unique durable utterance winner for the same grant。Only if that grant remains exact current may the winning content justify `SPEAKER_FINISHED` release；otherwise no stale mutation occurs。
@@ -325,10 +325,19 @@ Generation Request 与 final Utterance 是不同 identity。一个 logical reque
 - Transcript merge uses stable `utterance_id` and authoritative event sequence。Transcript sequence is filtered/non-contiguous；full WS events alone use gap detection。Conflicting fields for one ID stop local inference and reload authoritative session+transcript without deliberately clearing confirmed content first。
 - Crash boundaries before Human commit、after Human release、after AI grant、during `RUNNING`、after AI public completion、after AI release and after any commit/before WS send all converge without duplicate content or control mutation。The exact matrix and F2～F4 acceptance live in [`exec-plans/P1-5_ai-runtime-foundation.md`](exec-plans/P1-5_ai-runtime-foundation.md)。
 
+### P1-6 structured Memory and complete-text behavior — implemented through P1-6D
+
+- Structured Memory consumes only the allowlisted public Question context and authoritative public utterance projection。Other candidates' Private Stance、hidden evaluator/reference fields、provider secrets/raw responses and Browser-local pending text never enter Memory derivation input。
+- Semantic derivation proposes closed typed patches only；project code validates source visibility and bounded policy before a deterministic reducer applies them。Revision、source cursor、schema、derivation and projection versions remain explicit, and current state is recoverable from the append-only journal without another model call。
+- Historical Memory replay reconstructs each exact prior projection plus authoritative source episode/question, verifies its canonical input digest and supported schema/projection, and validates deterministic all-null or semantic all-present provenance。Semantic provenance must resolve an immutable active-at-revision `DISCUSSION_MEMORY_UPDATE` / `DISCUSSION_MEMORY_DERIVATION` Prompt whose digest and `${memory_derivation_input}` variable contract are intact；failure stops before request claim/provider/state mutation。
+- Candidate V3 consumes a bounded Working Context：accepted structured Memory followed by the complete uncompacted public raw tail。Persisted request metadata V2 pins mode、Memory revision/source cursor and context cursor so restart recovery cannot silently substitute latest Memory。Safe raw fallback is bounded；uncoverable gaps reject the turn without provider or durable request mutation。
+- WHO/lifecycle authority does not move into Memory。P1-4 still selects the floor owner, P1-3 still owns phases/deadlines, and the existing P1-5 completion/release/schedule chain owns accepted utterance effects。Memory compaction model I/O remains outside database transactions and optimistic CAS handles concurrent proposals。
+- P1-6D's network-free final scenario proves one Human and three authoritative AI participants, phase-aware Human contribution, all three AI contributions, durable Memory/V3/V2 provenance, private-sentinel isolation, reload、API restart、eligible-candidate cancellation recovery、exact-once effects and `FINAL_SUMMARY -> COMPLETED` closure。
+
 ## Implementation guidance
 
 - 大模型负责自然语言和受约束的局部语义决策；项目代码负责状态、时间、发言权、私有信息隔离、记忆和恢复。
-- 关键模型输出未来应采用结构化 Schema 验证，但具体 Schema 尚未决定。
+- Memory patch and candidate utterance outputs use their implemented closed validation boundaries；future output types require their own approved schemas rather than weakening these contracts。
 - 角色决策与发言生成建议分离，以提高可控性和成本可观测性。
 - 发言默认保持简短、回应上下文并避免重复；具体阈值需要后续验证。
 
@@ -340,15 +349,15 @@ Generation Request 与 final Utterance 是不同 identity。一个 logical reque
 - Confirmed for P1-3：V0.1 状态转换条件、abort 来源、deadline concurrency/recovery 语义；
 - Confirmed and implemented through P1-4D：V0.1 deterministic lexicographic floor policy、single-owner/participant/event/explanation/persistence boundary、pure ranking、locked transactional orchestration and display-only authoritative Web recovery；
 - TBD after real discussion evidence：policy parameter calibration values and conflict-loop content semantics；P1-4 does not use semantic conflict ranking；
-- Implemented through P1-5F-2 backend：Prompt/request/AI runtime plus Human submit、unified utterance publication、post-Human durable progression、ordered WS delivery and transcript read model；P1-5F-3/F4 and provider routing/fallback remain Deferred；
-- TBD：结构化记忆和模型输出 validation 的正式 Schema；
+- Implemented through P1-5F：Prompt/request/AI runtime plus Human submit、unified utterance publication、post-Human durable progression、ordered WS delivery and transcript read model；P1-5F-3 Web Discussion Experience and P1-5F-4 Composition E2E/Independent Acceptance are `DONE`；provider routing/fallback remain Deferred；
+- Implemented in P1-6：structured public Memory schema、typed patch validation、versioned replay and bounded Working Context；
 - TBD：角色盲测样本及通过标准的执行细节。
 
 除特别注明的总纲问题外，其余是派生 TBD，不是新的 D-xxx。
 
 ## Future work
 
-- P1：`IN_PROGRESS`；P1-1～P1-4 and P1-5A～P1-5F retain historical `DONE`；P1-5 is `IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN` only for `P1-5R IN_PROGRESS / DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN`；R1 is `IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PENDING`；F1 is `OPEN / IMPLEMENTATION_COMPLETE_AWAITING_REVIEW`；R2-A is `NOT_STARTED / BLOCKED_BY_R1`；R2-B/R3 are `NOT_STARTED`，and memory remains Deferred。
+- P1：`IN_PROGRESS`；P1-1～P1-6 are `DONE`；P1-6E/P1-6 are `CLOSED`；P1-7 basic report/V0.1 content and P1-8 full-P1 acceptance are `NOT_STARTED`。
 - P2：加入语音、打断、播放停止和恢复语义。
 - P3：建立角色行为与评分证据之间的校准边界。
 - P6/V1.0：扩展到 6～8 种角色和压力模式。

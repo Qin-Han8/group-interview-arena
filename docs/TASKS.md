@@ -1,13 +1,13 @@
 # 当前任务清单
 
-- Status: P1 in progress; P1-1 through P1-5 completed; P1-6 is `IN_PROGRESS`; P1-6A is `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-6B/P1-6C/P1-6D are `DONE / DESIGN_SCOPE_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PASS`; P1-6E and P1-7/P1-8 are `NOT_STARTED`; open findings `NONE`
-- Managed scope: P1-6D final acceptance closeout after D2-D1 through D2-D4 `PASS`, actual-source review `PASS` and CI `GREEN`; docs-only status/evidence update; no P1-6E work
-- Current design checkpoint: P1-6D — `DONE / DESIGN_SCOPE_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PASS`; P1-6C — `DONE / DESIGN_SCOPE_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PASS`; P1-6 — `IN_PROGRESS`; P1-5 — `DONE`
+- Status: P1 in progress; P1-1 through P1-6 completed; P1-6 is `DONE / CLOSED`; P1-6A～P1-6E are complete; P1-7/P1-8 are `NOT_STARTED`; open findings `NONE`
+- Managed scope: P1-6E independent acceptance, bounded remediation, independent actual-source/finding-only review, exact-head CI and P1-6 governance closeout; no P1-7/P1-8 work and no real-provider call
+- Current design checkpoint: P1-6E — `DONE / POST_STOP_CLOSEOUT_REMEDIATION_PASS`; P1-6 — `DONE / CLOSED`; P1-5 — `DONE`
 - P0-7 final outcome: initial verdict `BLOCKED` with two documentation findings; remediation completed; finding-only independent recheck `PASS`; new blockers none; P1 readiness `READY`
 - Current phase: P1 — `IN_PROGRESS`
-- Current governance checkpoint: P1-6D final acceptance and actual-source review `PASS`; `P16D-REV-001 CLOSED`; `P16D-REV-002 CLOSED`; `P16D-D2D4-REV-001 CLOSED`; new findings `NONE`; open findings `NONE`; accepted commit `6dcce5e961d6aa7b460243dbd6407e17c2478aa2`; CI `GREEN`
-- Current implementation review: P1-6D D2-D1 happy path, D2-D2A Browser reload, D2-D2B API restart, D2-D3 cancellation recovery and D2-D4 final integration all `PASS`; final status `DONE / DESIGN_SCOPE_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PASS`
-- Current task gate: P1-5 — `DONE`; P1-6 — `IN_PROGRESS`; P1-6A — `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-6B/P1-6C/P1-6D — `DONE / DESIGN_SCOPE_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PASS`; all P1-6D findings — `CLOSED`; new findings/open findings — `NONE`; P1-6E — `NOT_STARTED`; P1-7/P1-8 — `NOT_STARTED`; P1 remains `IN_PROGRESS`
+- Current governance checkpoint: P1-6E post-stop finding-only review `PASS`; `P16E-001`～`P16E-004`, `P16E-SR1-001`, `P16E-RA-001`, `P16E-RA-002`, `P16E-RA2-001` and `P16E-RA2-002` are `CLOSED`; new findings/open findings `NONE`; accepted remediation commit `3aa1a049728314f1fbec65367b57b8442bb49670`; exact CI run `34336016724` `GREEN`
+- Current implementation review: P1-6E source review 2/source review 3 and post-stop finding-only review are `PASS`; required Memory、metadata、privacy、recovery、API/Web/PostgreSQL/migration/Chromium evidence is complete under the accepted post-incident baseline
+- Current task gate: P1-5 — `DONE`; P1-6 — `DONE / CLOSED`; P1-6A～P1-6E — `DONE`; new findings/open findings — `NONE`; P1-7/P1-8 — `NOT_STARTED`; P1 remains `IN_PROGRESS`
 - P0 status: `DONE`; P0-1 through P0-7 completed
 - Allowed status values: `TODO` / `IN_PROGRESS` / `BLOCKED` / `DONE`
 - Related roadmap: [`ROADMAP.md`](ROADMAP.md)
@@ -747,8 +747,8 @@
 
 - ID: `P1-6`
 - 名称：完整文字模拟
-- Status: `IN_PROGRESS`
-- Approval state: P1-6A/P1-6B/P1-6C/P1-6D are `DONE` with their recorded review-pass states; P1-6D production implementation is `DONE / DESIGN_SCOPE_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PASS`; P1-6E remains `NOT_STARTED`.
+- Status: `DONE / CLOSED`
+- Approval state: P1-6A～P1-6D retain their recorded review-pass states; P1-6E is `DONE / POST_STOP_CLOSEOUT_REMEDIATION_PASS`; all P1-6 findings are closed.
 - Dependencies: P1-5 `DONE`; P1-5R/P1-5R-POST tracks `CLOSED` with their historical open findings `NONE`; P1-6A `P16A-REV-001` and `P16A-REV-002` are `CLOSED`; P1-6B `P16B-REV-001`, `P16B-REV-002` and `P16B-REV-003` are `CLOSED`; P1-6D `P16D-REV-001`, `P16D-REV-002` and `P16D-D2D4-REV-001` are `CLOSED`; open findings `NONE`.
 - Goal: close the structured discussion-memory gap and compose/validate existing lifecycle, floor, AI runtime, public transport and Web capabilities as one complete Human + 3 AI text simulation.
 - Out of scope: P1-7 report/V0.1 content; P1-8 full-P1 acceptance; voice/ASR/TTS; billing/payment; provider routing/fallback; Redis/queue/RAG/microservices and deferred infrastructure.
@@ -760,7 +760,7 @@
 - `P1-6B — Structured Discussion Memory Gap Closure / Production Implementation`: `DONE / DESIGN_SCOPE_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PASS`; implementation finding-only re-review `PASS`; four frozen batches only; `P16B-IMP-001`, `P16B-IMP-002`, `P16B-IMP-003`, `P16B-IMP-004`, `P16B-IMP-005`, `P16B-IMP-006`, `P16B-IMP-007` closed; new findings `NONE`; open findings `NONE`;
 - `P1-6C — Full Text Simulation Composition`: Design Freeze `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; production implementation `DONE / DESIGN_SCOPE_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PASS`; implementation findings `NONE`; production source changes `NONE`;
 - `P1-6D — Recovery + Three-AI End-to-End Validation`: `DONE / DESIGN_SCOPE_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PASS`; D2-D1 through D2-D4 `PASS`; `P16D-REV-001 CLOSED`; `P16D-REV-002 CLOSED`; `P16D-D2D4-REV-001 CLOSED`; new findings `NONE`; open findings `NONE`; accepted commit `6dcce5e961d6aa7b460243dbd6407e17c2478aa2`; CI `GREEN`;
-- `P1-6E — P1-6 Independent Acceptance + Closeout`: `NOT_STARTED`.
+- `P1-6E — P1-6 Independent Acceptance + Closeout`: `DONE / POST_STOP_CLOSEOUT_REMEDIATION_PASS`; full re-acceptance 2 was `REPAIRABLE` on two Medium findings, and the user-authorized post-stop remediation plus independent finding-only review closed both without a third full re-acceptance; exact accepted-remediation CI is green.
 
 ### P1-6A finding-only review closeout note
 
@@ -805,6 +805,15 @@
 - D2-D1 happy path, D2-D2A Browser reload, D2-D2B API restart, D2-D3 cancellation recovery and D2-D4 final integration all `PASS`; accepted commit `6dcce5e961d6aa7b460243dbd6407e17c2478aa2`; CI `GREEN`.
 - D2-D4 finding-only remediation moved the Human continuation action outside polling and retained an observation-only durable completion predicate. Actual-source review verdict is `PASS`; `P16D-D2D4-REV-001 CLOSED`; new findings `NONE`; open findings `NONE`.
 - P1-6D is `DONE / DESIGN_SCOPE_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PASS`. This closeout changes governance documents only, adds no feature or acceptance, changes no production/test/CI behavior, does not enter P1-6E and does not run independent review.
+
+### P1-6E independent acceptance and post-stop closeout
+
+- Initial independent acceptance at `df144f7605d435970a82871bd6f424dbd60722ee` returned `REPAIRABLE` on `P16E-001`～`P16E-004`. Repair/source-review cycles closed those findings and `P16E-SR1-001`; source review 2 passed before clean commit `2e91b623393c7ec3ef0b1b575a10f33eb175ee17`.
+- The first committed re-acceptance found the pre-existing Web realtime-effect and Crash-E returned-state races. Repair 3 and source review 3 closed `P16E-RA-001`/`P16E-RA-002` in clean commit `822b024156396e079f51df7489c3ac166c3bc566`.
+- Re-acceptance 2 proved the full required API/Web、real PostgreSQL/migration、Memory/private-stance/recovery and serial Chromium gates, including legacy `2 passed / 0 skipped` plus P1-6D final `2 passed / 0 skipped`, but returned `REPAIRABLE` on strict-Pyright finding `P16E-RA2-001` and API/privacy current-state finding `P16E-RA2-002`.
+- After the three-repair stop condition, the user explicitly authorized one post-stop closeout remediation rather than `repair 4`. It changed only the typed Crash-E regression and `API.md`/`PRIVACY_AND_SAFETY.md`; independent finding-only review `PASS` closed both findings with no production/schema/workflow/dependency drift or new blocker. Accepted remediation commit `3aa1a049728314f1fbec65367b57b8442bb49670` has exact CI run `34336016724` green across all four jobs.
+- During repair 1 cleanup, one acceptance-preexisting temporary database `gia_p04e_dcaf6d0303de` and the acceptance-preexisting Playwright `.last-run.json` marker were mistakenly deleted and could not be restored identically. The user accepted a new post-incident baseline; no later evidence claims restoration, and all later cleanup was ownership-only. Development-database identity/revision/table count/size/deterministic dump remained identical across the later independent validation.
+- P1-6E and parent P1-6 are now `DONE / CLOSED`; P1 remains `IN_PROGRESS`; P1-7/P1-8 remain `NOT_STARTED`; no real provider was called in P1-6E.
 
 ## P1-7 — Basic Report + V0.1 Content
 

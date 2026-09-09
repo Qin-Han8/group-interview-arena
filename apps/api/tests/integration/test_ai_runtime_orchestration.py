@@ -10,7 +10,7 @@ from uuid import UUID, uuid4
 import httpx
 import pytest
 from pydantic import SecretStr
-from sqlalchemy import URL, func, select
+from sqlalchemy import URL, func, select, text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from group_interview_arena_api.core.config import (
@@ -77,6 +77,7 @@ from group_interview_arena_api.modules.discussion_memory.application import (
     MemoryMaintenanceOutcome,
     MemorySemanticProvenance,
     load_discussion_memory_projection,
+    load_discussion_memory_projection_at_revision,
     load_public_memory_utterances,
     maintain_discussion_memory,
     rebuild_discussion_memory,
@@ -2218,6 +2219,219 @@ def test_stale_memory_plus_complete_raw_tail_continues_without_semantic_call(
     migrated_database: TemporaryDatabaseContext,
 ) -> None:
     run_async(lambda: _stale_memory_complete_tail_continues_normally(migrated_database))
+
+
+async def _historical_memory_integrity_tampering_fails_closed(
+    temporary_database: TemporaryDatabaseContext,
+    *,
+    tamper_kind: str,
+) -> None:
+    async with _runtime_context(temporary_database) as context:
+        integrity_time = DISCUSSION_MEMORY_UPDATE_V2.published_at + timedelta(seconds=1)
+        async with context.session_factory() as session:
+            await publish_prompt_version(session, AI_CANDIDATE_TURN_V3)
+            await publish_prompt_version(session, DISCUSSION_MEMORY_UPDATE_V2)
+
+        for index in range(3):
+            await _append_public_utterance(
+                context,
+                participant=context.participants[1],
+                actor_kind=ParticipantActorKind.AI,
+                content=f"P1_6E_REPLAY_EVIDENCE_{index}",
+            )
+        maintained = await maintain_discussion_memory(
+            context.session_factory,
+            session_id=context.session_id,
+            deriver=DeterministicFakeMemoryDeriver(),
+            provenance=MemorySemanticProvenance(
+                prompt_version_id=DISCUSSION_MEMORY_UPDATE_V2.id,
+                provider_identifier="p1-6e-memory-provider",
+                model_identifier="p1-6e-memory-model",
+                configuration_version="P1_6E_MEMORY",
+            ),
+            policy=MemoryPolicy(
+                high_watermark_utterances=3,
+                low_watermark_utterances=1,
+            ),
+            now=integrity_time,
+        )
+        assert maintained.outcome is MemoryMaintenanceOutcome.UPDATED
+
+        metadata = GenerationRequestMetadataV2(
+            configuration_version="P1_5C_DETERMINISTIC",
+            working_context_version="DISCUSSION_WORKING_CONTEXT_V1",
+            context_mode=DiscussionContextMode.MEMORY_WITH_RAW_TAIL,
+            memory_revision=maintained.projection.revision,
+            memory_source_through_sequence=(
+                maintained.projection.source_through_sequence
+            ),
+            context_source_through_sequence=(
+                maintained.projection.source_through_sequence
+            ),
+        )
+        command = _command(context).model_copy(
+            update={
+                "prompt_version_id": AI_CANDIDATE_TURN_V3.id,
+                "occurred_at": integrity_time,
+            }
+        )
+        async with context.session_factory() as session:
+            await create_generation_request(
+                session,
+                owner_id=context.owner_id,
+                command=command.request_command(metadata),
+            )
+
+        async with context.session_factory() as session:
+            async with session.begin():
+                journal = await session.scalar(
+                    select(DiscussionMemoryRevision).where(
+                        DiscussionMemoryRevision.session_id == context.session_id,
+                        DiscussionMemoryRevision.revision
+                        == maintained.projection.revision,
+                    )
+                )
+                assert journal is not None
+                if tamper_kind == "digest":
+                    digest = bytearray(journal.derivation_input_digest)
+                    digest[0] ^= 1
+                    journal.derivation_input_digest = bytes(digest)
+                elif tamper_kind == "schema":
+                    journal.schema_version = 2
+                elif tamper_kind == "wrong_semantic_prompt":
+                    journal.prompt_version_id = AI_CANDIDATE_TURN_V3.id
+                elif tamper_kind == "partial_semantic_provenance":
+                    await session.execute(
+                        text(
+                            "ALTER TABLE discussion_memory_revisions DROP CONSTRAINT "
+                            "ck_discussion_memory_revisions_semantic_provenance_grou_2d56"
+                        )
+                    )
+                    journal.provider_identifier = None
+                else:
+                    raise AssertionError(f"unexpected tamper kind: {tamper_kind}")
+
+        async def snapshot_runtime_state() -> tuple[object, ...]:
+            async with context.session_factory() as session:
+                aggregate = await session.get(SimulationSession, context.session_id)
+                request = await session.get(
+                    LlmGenerationRequest,
+                    command.generation_request_id,
+                )
+                state = await session.get(DiscussionMemoryState, context.session_id)
+                journal = await session.scalar(
+                    select(DiscussionMemoryRevision).where(
+                        DiscussionMemoryRevision.session_id == context.session_id,
+                        DiscussionMemoryRevision.revision
+                        == maintained.projection.revision,
+                    )
+                )
+                event_count = await session.scalar(
+                    select(func.count())
+                    .select_from(DiscussionEvent)
+                    .where(DiscussionEvent.session_id == context.session_id)
+                )
+                utterance_count = await session.scalar(
+                    select(func.count())
+                    .select_from(AiUtterance)
+                    .where(AiUtterance.session_id == context.session_id)
+                )
+                journal_count = await session.scalar(
+                    select(func.count())
+                    .select_from(DiscussionMemoryRevision)
+                    .where(DiscussionMemoryRevision.session_id == context.session_id)
+                )
+            assert aggregate is not None
+            assert request is not None
+            assert state is not None
+            assert journal is not None
+            return (
+                aggregate.status,
+                aggregate.phase_started_at,
+                aggregate.phase_deadline_at,
+                aggregate.current_floor_grant_id,
+                aggregate.last_sequence,
+                request.status,
+                request.requested_at,
+                request.started_at,
+                request.completed_at,
+                request.failed_at,
+                request.failure_code,
+                json.dumps(request.request_metadata, sort_keys=True),
+                state.revision,
+                state.source_through_sequence,
+                state.schema_version,
+                state.derivation_version,
+                state.projection_version,
+                json.dumps(state.structured_state, sort_keys=True),
+                journal.revision,
+                journal.base_revision,
+                journal.schema_version,
+                journal.derivation_version,
+                journal.projection_version,
+                journal.derivation_input_digest,
+                journal.prompt_version_id,
+                journal.provider_identifier,
+                journal.model_identifier,
+                journal.configuration_version,
+                journal_count,
+                event_count,
+                utterance_count,
+            )
+
+        before_recovery = await snapshot_runtime_state()
+        direct_replay_error: DiscussionMemoryPersistenceError | None = None
+        async with context.session_factory() as session:
+            try:
+                await load_discussion_memory_projection_at_revision(
+                    session,
+                    session_id=context.session_id,
+                    revision=maintained.projection.revision,
+                )
+            except DiscussionMemoryPersistenceError as error:
+                direct_replay_error = error
+
+        provider_calls: list[RuntimeGenerationInput] = []
+
+        async def must_not_run(
+            generation_input: RuntimeGenerationInput,
+        ) -> RawGenerationSuccess:
+            provider_calls.append(generation_input)
+            return RawGenerationSuccess(content="historical integrity was bypassed")
+
+        result = await generate_ai_utterance(
+            context.session_factory,
+            owner_id=context.owner_id,
+            command=command,
+            executor=must_not_run,
+        )
+        after_recovery = await snapshot_runtime_state()
+
+        assert direct_replay_error is not None
+        assert result.outcome is RuntimeGenerationOutcome.INTERNAL_ERROR
+        assert provider_calls == []
+        assert after_recovery == before_recovery
+
+
+@pytest.mark.parametrize(
+    "tamper_kind",
+    (
+        "digest",
+        "schema",
+        "wrong_semantic_prompt",
+        "partial_semantic_provenance",
+    ),
+)
+def test_historical_memory_integrity_tampering_rejects_direct_and_recovery_use(
+    migrated_database: TemporaryDatabaseContext,
+    tamper_kind: str,
+) -> None:
+    run_async(
+        lambda: _historical_memory_integrity_tampering_fails_closed(
+            migrated_database,
+            tamper_kind=tamper_kind,
+        )
+    )
 
 
 async def _durable_v2_requested_memory_context_is_recovered_exactly(

@@ -1,4 +1,5 @@
 import asyncio
+import json
 from collections.abc import Callable, Coroutine
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
@@ -6,8 +7,9 @@ from typing import Any, Protocol
 from uuid import UUID, uuid4
 
 import pytest
-from sqlalchemy import URL, func, select
+from sqlalchemy import URL, func, select, text
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from group_interview_arena_api.core.config import DatabaseSettings
 from group_interview_arena_api.db import (
@@ -235,6 +237,150 @@ def _request(
         request_metadata=GenerationRequestMetadata(configuration_version="V01_DEFAULT"),
         requested_at=NOW,
     )
+
+
+_RAW_GENERATION_REQUEST_INSERT = text(
+    """
+    INSERT INTO llm_generation_requests (
+        id,
+        session_id,
+        participant_id,
+        floor_grant_id,
+        prompt_version_id,
+        provider_identifier,
+        model_identifier,
+        request_metadata,
+        request_digest,
+        status,
+        requested_at,
+        started_at,
+        completed_at,
+        failed_at,
+        failure_code
+    ) VALUES (
+        :request_id,
+        :session_id,
+        :participant_id,
+        :floor_grant_id,
+        :prompt_version_id,
+        'p1-6e-metadata-probe',
+        'p1-6e-metadata-probe',
+        CAST(:request_metadata AS jsonb),
+        :request_digest,
+        'REQUESTED',
+        :requested_at,
+        NULL,
+        NULL,
+        NULL,
+        NULL
+    )
+    """
+)
+
+
+async def _raw_insert_generation_request_metadata(
+    session_factory: async_sessionmaker[AsyncSession],
+    *,
+    session_id: UUID,
+    participant_id: UUID,
+    floor_grant_id: UUID,
+    request_metadata: dict[str, object],
+) -> None:
+    async with session_factory() as session:
+        async with session.begin():
+            await session.execute(
+                _RAW_GENERATION_REQUEST_INSERT,
+                {
+                    "request_id": uuid4(),
+                    "session_id": session_id,
+                    "participant_id": participant_id,
+                    "floor_grant_id": floor_grant_id,
+                    "prompt_version_id": PROMPT_ID,
+                    "request_metadata": json.dumps(
+                        request_metadata,
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                        sort_keys=True,
+                    ),
+                    "request_digest": bytes(32),
+                    "requested_at": NOW,
+                },
+            )
+
+
+async def _request_metadata_json_types_are_closed_by_postgresql(
+    temporary_database: TemporaryDatabaseContext,
+) -> None:
+    async with _runtime_context(temporary_database) as context:
+        session_factory, _, session_id, participants, grant_id = context
+        v1: dict[str, object] = {
+            "schema_version": 1,
+            "configuration_version": "P1_6E_METADATA",
+        }
+        v2: dict[str, object] = {
+            "schema_version": 2,
+            "configuration_version": "P1_6E_METADATA",
+            "working_context_version": "DISCUSSION_WORKING_CONTEXT_V1",
+            "context_mode": "SAFE_RAW_FALLBACK",
+            "memory_revision": 0,
+            "memory_source_through_sequence": 0,
+            "context_source_through_sequence": 0,
+        }
+        for valid_metadata in (v1, v2):
+            await _raw_insert_generation_request_metadata(
+                session_factory,
+                session_id=session_id,
+                participant_id=participants[1].id,
+                floor_grant_id=grant_id,
+                request_metadata=valid_metadata,
+            )
+
+        invalid_metadata: tuple[dict[str, object], ...] = (
+            {**v1, "schema_version": "1"},
+            {**v1, "schema_version": None},
+            {**v1, "schema_version": 1.5},
+            {**v1, "schema_version": []},
+            {**v2, "schema_version": "2"},
+            {**v2, "schema_version": None},
+            {**v2, "schema_version": 2.5},
+            {**v2, "schema_version": {}},
+            {**v2, "context_mode": None},
+            {**v2, "context_mode": 2},
+            {**v2, "memory_revision": "0"},
+            {**v2, "memory_source_through_sequence": "0"},
+            {**v2, "context_source_through_sequence": "0"},
+            {**v2, "memory_revision": None},
+            {**v2, "memory_source_through_sequence": None},
+            {**v2, "context_source_through_sequence": None},
+            {**v2, "memory_revision": 0.5},
+            {**v2, "memory_source_through_sequence": 0.5},
+            {**v2, "context_source_through_sequence": 0.5},
+            {**v2, "memory_revision": []},
+            {**v2, "memory_source_through_sequence": []},
+            {**v2, "context_source_through_sequence": []},
+        )
+        for rejected_metadata in invalid_metadata:
+            with pytest.raises(IntegrityError) as caught:
+                await _raw_insert_generation_request_metadata(
+                    session_factory,
+                    session_id=session_id,
+                    participant_id=participants[1].id,
+                    floor_grant_id=grant_id,
+                    request_metadata=rejected_metadata,
+                )
+            assert "ck_llm_generation_requests_request_metadata_safe_shape" in str(
+                caught.value
+            )
+
+        async with session_factory() as session:
+            inserted = await session.scalar(
+                select(func.count())
+                .select_from(LlmGenerationRequest)
+                .where(
+                    LlmGenerationRequest.provider_identifier == "p1-6e-metadata-probe"
+                )
+            )
+        assert inserted == 2
 
 
 async def _verify_ai_runtime_persistence(
@@ -478,6 +624,14 @@ def test_ai_runtime_provenance_lifecycle_failure_and_constraints_are_durable(
     migrated_database: TemporaryDatabaseContext,
 ) -> None:
     run_async(lambda: _verify_ai_runtime_persistence(migrated_database))
+
+
+def test_request_metadata_constraint_is_type_closed_for_raw_postgresql_inserts(
+    migrated_database: TemporaryDatabaseContext,
+) -> None:
+    run_async(
+        lambda: _request_metadata_json_types_are_closed_by_postgresql(migrated_database)
+    )
 
 
 def test_every_completed_return_path_requires_the_same_public_event_proof(

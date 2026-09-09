@@ -92,6 +92,7 @@ from group_interview_arena_api.modules.floor_control.domain import (
 )
 from group_interview_arena_api.modules.floor_control.scheduler import (
     V0_1_SCHEDULER_POLICY,
+    SchedulerPolicy,
 )
 from group_interview_arena_api.modules.floor_control.service import apply_floor_command
 from group_interview_arena_api.modules.question_personas.seed import (
@@ -1121,6 +1122,126 @@ def test_crash_e_concurrent_scheduler_recovery_has_one_durable_winner(
             assert all(
                 result.schedule_action_id == identities.schedule_action_id
                 for result in results
+            )
+
+    run_async(exercise)
+
+
+def test_scheduler_checkpoint_rechecks_winner_after_recovery_miss(
+    migrated_database: TemporaryDatabaseContext,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def exercise() -> None:
+        async with _automatic_runtime_context(
+            migrated_database,
+            grant_seat_index=1,
+        ) as context:
+            assert context.grant_id is not None
+            identities = derive_automatic_turn_identities(
+                session_id=context.session_id,
+                floor_grant_id=context.grant_id,
+            )
+            await _complete_and_release_without_scheduling(context)
+
+            winner = await floor_progression_module.drive_scheduler_checkpoint(
+                context.session_factory,
+                owner_id=context.owner_id,
+                session_id=context.session_id,
+                released_floor=floor_progression_module.ReleasedFloorProof(
+                    floor_grant_id=context.grant_id,
+                    release_action_id=identities.release_action_id,
+                    release_command_type="floor.release",
+                    allowed_reasons=frozenset(
+                        {
+                            FloorReleaseReason.SPEAKER_FINISHED,
+                            FloorReleaseReason.INTERRUPTED,
+                        }
+                    ),
+                ),
+                identities=floor_progression_module.SchedulerCheckpointIdentities(
+                    schedule_action_id=identities.schedule_action_id,
+                    decision_id=identities.decision_id,
+                    next_floor_grant_id=identities.next_floor_grant_id,
+                    intervention_id=identities.intervention_id,
+                ),
+                scheduling_policy=V0_1_SCHEDULER_POLICY,
+            )
+            assert winner.outcome.value in {
+                "next_ai_granted",
+                "next_human_granted",
+            }
+
+            class RecoverSchedulerResult(Protocol):
+                async def __call__(
+                    self,
+                    session_factory: async_sessionmaker[AsyncSession],
+                    *,
+                    owner_id: UUID,
+                    session_id: UUID,
+                    released_floor: floor_progression_module.ReleasedFloorProof,
+                    identities: floor_progression_module.SchedulerCheckpointIdentities,
+                    scheduling_policy: SchedulerPolicy,
+                ) -> floor_progression_module.SchedulerCheckpointResult | None: ...
+
+            original_recover: RecoverSchedulerResult = (
+                floor_progression_module.__dict__["_recover_scheduler_result"]
+            )
+            recover_calls = 0
+
+            async def miss_once(
+                session_factory: async_sessionmaker[AsyncSession],
+                *,
+                owner_id: UUID,
+                session_id: UUID,
+                released_floor: floor_progression_module.ReleasedFloorProof,
+                identities: floor_progression_module.SchedulerCheckpointIdentities,
+                scheduling_policy: SchedulerPolicy,
+            ) -> floor_progression_module.SchedulerCheckpointResult | None:
+                nonlocal recover_calls
+                recover_calls += 1
+                if recover_calls == 1:
+                    return None
+                return await original_recover(
+                    session_factory,
+                    owner_id=owner_id,
+                    session_id=session_id,
+                    released_floor=released_floor,
+                    identities=identities,
+                    scheduling_policy=scheduling_policy,
+                )
+
+            monkeypatch.setattr(
+                floor_progression_module,
+                "_recover_scheduler_result",
+                miss_once,
+            )
+            recovered = await floor_progression_module.drive_scheduler_checkpoint(
+                context.session_factory,
+                owner_id=context.owner_id,
+                session_id=context.session_id,
+                released_floor=floor_progression_module.ReleasedFloorProof(
+                    floor_grant_id=context.grant_id,
+                    release_action_id=identities.release_action_id,
+                    release_command_type="floor.release",
+                    allowed_reasons=frozenset(
+                        {
+                            FloorReleaseReason.SPEAKER_FINISHED,
+                            FloorReleaseReason.INTERRUPTED,
+                        }
+                    ),
+                ),
+                identities=floor_progression_module.SchedulerCheckpointIdentities(
+                    schedule_action_id=identities.schedule_action_id,
+                    decision_id=identities.decision_id,
+                    next_floor_grant_id=identities.next_floor_grant_id,
+                    intervention_id=identities.intervention_id,
+                ),
+                scheduling_policy=V0_1_SCHEDULER_POLICY,
+            )
+            assert recover_calls == 2
+            assert recovered.outcome is winner.outcome
+            assert (
+                recovered.identities.schedule_action_id == identities.schedule_action_id
             )
 
     run_async(exercise)

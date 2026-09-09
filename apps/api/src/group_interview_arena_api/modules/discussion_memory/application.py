@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
 import inspect
 import json
 from collections.abc import Awaitable
 from datetime import UTC, datetime
 from enum import StrEnum
+from string import Template
 from typing import Any, Literal, Protocol, Self, cast
 from uuid import UUID, uuid4
 
@@ -19,6 +21,7 @@ from group_interview_arena_api.db.models import (
     DiscussionEvent,
     DiscussionMemoryRevision,
     DiscussionMemoryState,
+    PromptVersion,
     QuestionVersion,
     SessionParticipant,
     SimulationSession,
@@ -35,6 +38,7 @@ from group_interview_arena_api.modules.discussion_memory.domain import (
     DEFAULT_MEMORY_POLICY,
     MEMORY_DERIVATION_V1,
     MEMORY_PROJECTION_V1,
+    MEMORY_PROJECTION_V1_POLICY,
     MEMORY_SCHEMA_V1,
     AcceptedMemoryRevision,
     DiscussionMemoryProjection,
@@ -43,7 +47,6 @@ from group_interview_arena_api.modules.discussion_memory.domain import (
     MemoryPolicy,
     StructuredDiscussionMemory,
     apply_memory_revision,
-    replay_memory_revisions,
 )
 from group_interview_arena_api.modules.discussion_memory.working_context import (
     select_compaction_episode,
@@ -225,8 +228,25 @@ async def load_discussion_memory_projection_at_revision(
             "historical memory revision is unavailable"
         )
     try:
-        accepted = tuple(
-            AcceptedMemoryRevision(
+        question = await session.scalar(
+            select(QuestionVersion)
+            .join(
+                SimulationSession,
+                SimulationSession.question_version_id == QuestionVersion.id,
+            )
+            .where(SimulationSession.id == session_id)
+        )
+        if question is None:
+            raise ValueError("memory question context is unavailable")
+        history = await load_public_memory_utterances(session, session_id=session_id)
+        question_context = project_public_memory_question_context(question)
+        projection = DiscussionMemoryProjection.empty()
+        for row in rows:
+            if row.schema_version != MEMORY_SCHEMA_V1:
+                raise ValueError("unsupported historical memory schema")
+            if row.projection_version != MEMORY_PROJECTION_V1:
+                raise ValueError("unsupported historical memory projection")
+            accepted = AcceptedMemoryRevision(
                 revision=row.revision,
                 base_revision=row.base_revision,
                 source_from_sequence=row.source_from_sequence,
@@ -238,9 +258,76 @@ async def load_discussion_memory_projection_at_revision(
                     MemoryPatch.model_validate(patch) for patch in row.patches
                 ),
             )
-            for row in rows
-        )
-        return replay_memory_revisions(session_id=session_id, revisions=accepted)
+            episode = tuple(
+                item
+                for item in history
+                if accepted.source_from_sequence
+                <= item.sequence
+                <= accepted.source_through_sequence
+            )
+            if (
+                not episode
+                or episode[0].sequence != accepted.source_from_sequence
+                or episode[-1].sequence != accepted.source_through_sequence
+            ):
+                raise ValueError("historical memory evidence is unavailable")
+            derivation_input = MemoryDerivationInput(
+                session_id=session_id,
+                previous_memory=projection,
+                utterances=episode,
+                question_context=question_context,
+            )
+            if not hmac.compare_digest(
+                _digest(derivation_input), row.derivation_input_digest
+            ):
+                raise ValueError("historical memory derivation digest mismatch")
+            validate_memory_derivation_result(
+                derivation_input,
+                MemoryDerivationResult(patches=accepted.patches),
+                policy=MEMORY_PROJECTION_V1_POLICY,
+            )
+            provenance = MemorySemanticProvenance(
+                prompt_version_id=row.prompt_version_id,
+                provider_identifier=row.provider_identifier,
+                model_identifier=row.model_identifier,
+                configuration_version=row.configuration_version,
+            )
+            if provenance.prompt_version_id is not None:
+                prompt = await session.get(PromptVersion, provenance.prompt_version_id)
+                if prompt is None:
+                    raise ValueError("historical semantic prompt is unavailable")
+                template = Template(prompt.template_text)
+                if (
+                    prompt.prompt_key != "DISCUSSION_MEMORY_UPDATE"
+                    or prompt.purpose_code != "DISCUSSION_MEMORY_DERIVATION"
+                    or prompt.version_number <= 0
+                    or not hmac.compare_digest(
+                        hashlib.sha256(prompt.template_text.encode()).digest(),
+                        prompt.content_digest,
+                    )
+                    or not template.is_valid()
+                    or frozenset(template.get_identifiers())
+                    != frozenset({"memory_derivation_input"})
+                    or prompt.published_at > row.created_at
+                    or (
+                        prompt.retired_at is not None
+                        and row.created_at >= prompt.retired_at
+                    )
+                ):
+                    raise ValueError("historical semantic prompt contract is invalid")
+            projection = apply_memory_revision(
+                session_id=session_id,
+                base=projection,
+                patches=accepted.patches,
+                revision=accepted.revision,
+                source_from_sequence=accepted.source_from_sequence,
+                source_through_sequence=accepted.source_through_sequence,
+                schema_version=accepted.schema_version,
+                derivation_version=accepted.derivation_version,
+                projection_version=accepted.projection_version,
+                policy=MEMORY_PROJECTION_V1_POLICY,
+            )
+        return projection
     except ValueError as error:
         raise DiscussionMemoryPersistenceError(
             "historical memory journal replay failed"

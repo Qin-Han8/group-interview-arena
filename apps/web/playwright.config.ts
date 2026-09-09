@@ -5,7 +5,7 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   retries: 0,
-  reporter: "line",
+  reporter: [["line"], ["./e2e/no-skipped-tests-reporter.ts"]],
   outputDir: "test-results",
   use: {
     baseURL: "http://localhost:3000",

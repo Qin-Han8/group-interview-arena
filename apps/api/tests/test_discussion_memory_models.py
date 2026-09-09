@@ -69,5 +69,10 @@ def test_generation_metadata_constraint_accepts_additive_v2_shape() -> None:
             "working_context_version",
             "memory_revision",
             "context_source_through_sequence",
+            "jsonb_typeof(request_metadata->'schema_version') = 'number'",
+            "jsonb_typeof(request_metadata->'context_mode') = 'string'",
+            "jsonb_typeof(request_metadata->'memory_revision') = 'number'",
+            "jsonb_typeof(request_metadata->'memory_source_through_sequence') = 'number'",
+            "jsonb_typeof(request_metadata->'context_source_through_sequence') = 'number'",
         )
     )

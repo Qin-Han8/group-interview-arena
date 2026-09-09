@@ -1,8 +1,8 @@
 # P1-6 Complete Text Simulation Execution Plan
 
-- Status: `P1-6 IN_PROGRESS`
-- Previous checkpoint: `P1-6D D2-D4 final integration PASS`
-- Current checkpoint: `P1-6D DONE / DESIGN_SCOPE_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PASS`
+- Status: `P1-6 DONE / CLOSED`
+- Previous checkpoint: `P1-6E post-stop closeout remediation finding-only review PASS`
+- Current checkpoint: `P1-6E DONE / POST_STOP_CLOSEOUT_REMEDIATION_PASS`; P1 remains `IN_PROGRESS`
 - P1-6D initial external actual-source review verdict: `BLOCKED`
 - P1-6D initial reviewed bundle: `group-interview-arena-review-20260831-004302.zip`
 - P1-6D initial reviewed bundle SHA-256: `7CE39C1EB4DE8314DCE7DB1CDE9809EB386E0E0CADDED8620D11B47FDB1791D0`
@@ -34,7 +34,7 @@
 - P1-6B implementation reviewed bundle SHA-256: `0EAA4B3FEE82F4D8A82D5098CECFDA1BF04F9161B7A63E7F7779B2512D9347F6`
 - P1-6B implementation findings: `P16B-IMP-001 CLOSED`; `P16B-IMP-002 CLOSED`; `P16B-IMP-003 CLOSED`; `P16B-IMP-004 CLOSED`; `P16B-IMP-005 CLOSED`; `P16B-IMP-006 CLOSED`; `P16B-IMP-007 CLOSED`; new findings `NONE`; open findings `NONE`
 - P1-6D design-time production wiring gap: `NONE`; design-time STOP conditions: `NONE`; production source changes: `NONE`
-- Remaining checkpoint: `P1-6E NOT_STARTED`
+- Remaining checkpoint: `NONE`; P1-7/P1-8 remain `NOT_STARTED`
 - Parent phase: `P1 IN_PROGRESS`
 - Product target: `V0.1 Internal Validation`
 - Authority: [`PROJECT_MASTER_PLAN.md`](../PROJECT_MASTER_PLAN.md) > Accepted [`DECISIONS.md`](../DECISIONS.md) > [`ROADMAP.md`](../ROADMAP.md) > [`TASKS.md`](../TASKS.md) > this plan > domain docs > code
@@ -780,3 +780,15 @@ Final acceptance ledger:
 D2-D4 actual-source review initially opened `P16D-D2D4-REV-001` because the Human continuation action was inside a polling predicate. Finding-only remediation moved that action outside polling and retained an observation-only durable-completion predicate without a timeout/retry/sleep workaround. Final review verdict is `PASS`; `P16D-D2D4-REV-001 CLOSED`; new findings `NONE`; open findings `NONE`.
 
 This final closeout changes only `docs/ROADMAP.md`, `docs/TASKS.md` and this plan. It adds no feature or acceptance, changes no production code, tests or CI logic, does not run independent review, and leaves P1-6E `NOT_STARTED`; P1-6 and P1 remain `IN_PROGRESS`.
+
+## 13. P1-6E independent acceptance and final P1-6 closeout
+
+P1-6E started from `df144f7605d435970a82871bd6f424dbd60722ee`. Initial independent acceptance returned `REPAIRABLE` on four findings: the top-level Chromium entry skipped required P1-6D coverage; historical Memory replay did not close digest/schema/provenance integrity; PostgreSQL metadata typing was weaker than the strict domain parser; and three domain documents described a pre-P1-6 current state. Repair 1/source review 1 left one P1-5F current-state sentence; repair 2 closed it and source review 2 passed. Clean commit `2e91b623393c7ec3ef0b1b575a10f33eb175ee17` entered independent re-acceptance.
+
+The first re-acceptance retained its mandatory first failures and returned `REPAIRABLE` on two pre-existing races: Web realtime-effect synchronization and Crash-E scheduler returned-state convergence. Repair 3 added explicit effect synchronization in tests and a bounded exact durable-winner re-check in the scheduler path; source review 3 passed and clean commit `822b024156396e079f51df7489c3ac166c3bc566` entered re-acceptance 2. That run closed both races and freshly passed the required API/Web、real PostgreSQL/migration、Memory/private-stance/recovery and Chromium gates, including legacy `2 passed / 0 skipped` plus P1-6D final `2 passed / 0 skipped`. It nevertheless returned `REPAIRABLE` on `P16E-RA2-001` (two strict Pyright errors in the new regression) and `P16E-RA2-002` (`API.md`/`PRIVACY_AND_SAFETY.md` current-state drift).
+
+The three-repair automatic stop condition was honored. The user then explicitly authorized one `P1-6E post-stop closeout remediation`, not a fourth repair round and not a third full re-acceptance. The remediation changed only the Crash-E regression typing and the two named current-state documents; production runtime、schema、workflow and dependencies were unchanged. Fresh strict Pyright reported `0 errors, 0 warnings, 0 informations`; the exact Crash-E regression passed `1/1`; the affected orchestration module passed `26/26`; Ruff/format and `git diff --check` passed. Independent finding-only review against bundle SHA-256 `D02D2842CB6360FD1ADA3EE09D91677E5322A535D1355A8C00C0349C29543BFA` returned `PASS`, closed `P16E-RA2-001`/`P16E-RA2-002`, and found no new blocker or scope drift. Accepted remediation commit `3aa1a049728314f1fbec65367b57b8442bb49670` has exact GitHub CI run `34336016724` green across API quality、PostgreSQL integration/migration、Web quality/OpenAPI and Chromium E2E.
+
+The repair-1 cleanup incident remains part of the final record. One temporary database (`gia_p04e_dcaf6d0303de`) and one Playwright `.last-run.json` marker that predated P1-6E acceptance were mistakenly deleted and could not be restored identically. The user explicitly accepted a new post-incident baseline; neither resource was recreated as historical evidence. Later acceptance used run-unique ownership manifests and ownership-only cleanup, and proved the development database unchanged across the accepted post-incident baseline.
+
+Final state: `P16E-001`～`P16E-004`, `P16E-SR1-001`, `P16E-RA-001`, `P16E-RA-002`, `P16E-RA2-001` and `P16E-RA2-002` are `CLOSED`; new findings/open findings are `NONE`; P1-6E and parent P1-6 are `DONE / CLOSED`; P1 remains `IN_PROGRESS`; P1-7/P1-8 remain `NOT_STARTED`; no real provider was called in P1-6E.

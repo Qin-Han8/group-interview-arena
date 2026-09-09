@@ -1,10 +1,13 @@
 import ast
 from pathlib import Path
+from typing import cast
 
 from alembic.config import Config
 from alembic.script import ScriptDirectory
+from sqlalchemy import CheckConstraint, Table
 
 from group_interview_arena_api.db.base import Base
+from group_interview_arena_api.db.models import LlmGenerationRequest
 
 API_ROOT = Path(__file__).resolve().parents[1]
 ALEMBIC_CONFIG_PATH = API_ROOT / "alembic.ini"
@@ -16,6 +19,7 @@ SESSION_PHASE_TIMING_REVISION = "f1a13b15c003"
 FLOOR_CONTROL_FOUNDATION_REVISION = "f1a14b15c004"
 AI_RUNTIME_PERSISTENCE_REVISION = "f1a15b15c005"
 DISCUSSION_MEMORY_REVISION = "f1a16b16c006"
+METADATA_TYPE_CLOSURE_REVISION = "f1a16e16c007"
 
 
 def _alembic_config() -> Config:
@@ -32,7 +36,11 @@ def test_alembic_config_uses_project_migration_directory_without_url() -> None:
     assert config.get_main_option("sqlalchemy.url") is None
 
 
-def test_migration_history_is_linear_with_single_discussion_memory_head() -> None:
+def _normalize_sql(value: str) -> str:
+    return " ".join(value.split())
+
+
+def test_migration_history_is_linear_with_single_metadata_type_closure_head() -> None:
     script = ScriptDirectory.from_config(_alembic_config())
     baseline = script.get_revision(BASELINE_REVISION)
     identity = script.get_revision(IDENTITY_REVISION)
@@ -43,8 +51,10 @@ def test_migration_history_is_linear_with_single_discussion_memory_head() -> Non
     ai_runtime = script.get_revision(AI_RUNTIME_PERSISTENCE_REVISION)
     discussion_memory = script.get_revision(DISCUSSION_MEMORY_REVISION)
 
-    assert script.get_heads() == [DISCUSSION_MEMORY_REVISION]
+    assert script.get_heads() == [METADATA_TYPE_CLOSURE_REVISION]
+    metadata_type_closure = script.get_revision(METADATA_TYPE_CLOSURE_REVISION)
     assert [revision.revision for revision in script.walk_revisions()] == [
+        METADATA_TYPE_CLOSURE_REVISION,
         DISCUSSION_MEMORY_REVISION,
         AI_RUNTIME_PERSISTENCE_REVISION,
         FLOOR_CONTROL_FOUNDATION_REVISION,
@@ -86,6 +96,28 @@ def test_migration_history_is_linear_with_single_discussion_memory_head() -> Non
     assert discussion_memory.down_revision == AI_RUNTIME_PERSISTENCE_REVISION
     assert discussion_memory.branch_labels == set()
     assert discussion_memory.dependencies is None
+    assert metadata_type_closure.revision == METADATA_TYPE_CLOSURE_REVISION
+    assert metadata_type_closure.down_revision == DISCUSSION_MEMORY_REVISION
+    assert metadata_type_closure.branch_labels == set()
+    assert metadata_type_closure.dependencies is None
+
+    strict_migration_sql = getattr(
+        metadata_type_closure.module,
+        "_STRICT_V1_OR_V2_METADATA",
+        None,
+    )
+    assert isinstance(strict_migration_sql, str)
+    table = cast(Table, LlmGenerationRequest.__table__)
+    metadata_constraints = [
+        item
+        for item in table.constraints
+        if isinstance(item, CheckConstraint)
+        and item.name == "ck_llm_generation_requests_request_metadata_safe_shape"
+    ]
+    assert len(metadata_constraints) == 1
+    assert _normalize_sql(str(metadata_constraints[0].sqltext)) == _normalize_sql(
+        strict_migration_sql
+    )
 
 
 def test_baseline_upgrade_and_downgrade_are_zero_op() -> None:
