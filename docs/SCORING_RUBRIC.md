@@ -1,14 +1,14 @@
 # 评分与证据体系骨架
 
-- Status: Skeleton / Baseline
-- Current phase: P0
+- Status: Baseline + P1-7A basic evidence report design freeze
+- Current phase: P1 — IN_PROGRESS
 - Target version: V0.1 Internal Validation
-- Detailed design: Not started
+- Detailed design: P1-7A V0.1 basic evidence report boundary frozen; formal scoring remains P3
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
 
-本文件未来定义评分维度、可观察行为、证据、置信度、聚合与人工校准。当前只记录总纲基线，不构成冻结的评分公式。
+本文件记录正式评分的总纲基线，并承载 P1-7A 简版证据报告边界；它不构成冻结的正式评分公式。
 
 ## Confirmed by PROJECT_MASTER_PLAN
 
@@ -60,11 +60,20 @@
 - 争议评价可进入人工校准样本；
 - 样本和标准化不足时不输出全国排名式结论。
 
+## P1-7A V0.1 basic evidence report freeze
+
+- P1-7 report is a durable, versioned resource derived only after an authoritative `COMPLETED` text session. Raw public utterance/DiscussionEvent history remains evidence authority; P1-6 Memory is auxiliary context only.
+- The basic report shows session overview, zero-to-three evidence-backed strongest behaviors, zero-to-three evidence-backed improvement opportunities, exactly one next-session priority and evidence cards with source participant/phase/utterance/event sequence/exact quote/interpretation/confidence.
+- Semantic evaluation proposes behavior, interpretation, priority and confidence. Project-owned deterministic code validates eligibility, source watermark/order, session/participant/utterance/phase, exact quote provenance, Human-source identity, completeness, versions and idempotent re-entry. Invalid evidence is rejected rather than repaired.
+- P1 `EvidenceItem` needs only `STRENGTH`/`IMPROVEMENT` kind and source provenance. Dimension, score, score effect, metric and rubric aggregation remain P3-additive concerns.
+- P1-7 outputs no six-dimension/overall score, radar, percentile/ranking, hiring probability, job fit or personality type. The master-plan TBD on score versus level + evidence remains unresolved.
+- Text V0.1 evidence uses event/utterance identity and sequence; it must not fabricate audio timestamps.
+
 ## 当前版本范围
 
 - V0.1：只需要简版证据报告，用于验证证据链路，不要求完成正式六维聚合体系。
 - V0.5：必须具备六维评分、时间戳证据和历史报告。
-- 当前 P0-1 不实现评分、证据提取或报告代码。
+- P1-7A freezes the basic report/evidence boundary docs-only; persistence, extraction/generation and REST/Web remain P1-7B～D `NOT_STARTED`.
 
 ## Implementation guidance
 
@@ -79,15 +88,15 @@
 - TBD：报告展示数字分数还是等级加证据（总纲第 37 节）；
 - TBD：人工群面教练校准支持来源（总纲第 37 节）；
 - TBD：建议权重经过何种样本和指标校准；
-- TBD：V0.1 简版证据报告的精确字段与最低证据数量；
+- Frozen conceptually for P1-7 V0.1：report/evidence responsibilities, item caps and exactly one priority improvement；physical schema/API field names remain for P1-7B/D source-grounded design；
 - TBD：用户争议评价的复核和申诉流程；
 - TBD：不同题型的权重调整方式。
 
-后四项是派生 TBD，不是总纲原始 D-xxx。
+除前两项注明来自总纲外，其余未解决项是派生 TBD，不是总纲原始 D-xxx；P1-7 已冻结的概念责任不是新的 Accepted scoring decision。
 
 ## Future work
 
-- P1：定义 V0.1 基础记录和简版证据报告边界。
+- P1：P1-7A has frozen the V0.1 basic evidence report boundary；P1-7B～E remain pending.
 - P3：完成客观指标、证据提取、六维评分、报告和专项训练设计。
 - P5：通过专家标注和公开测试校准可信度与用户认可率。
 
