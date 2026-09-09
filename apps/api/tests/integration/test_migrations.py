@@ -39,6 +39,8 @@ SESSION_FOUNDATION_REVISION = "f1a11d15c001"
 QUESTION_PERSONA_REVISION = "f1a12b15c002"
 SESSION_PHASE_TIMING_REVISION = "f1a13b15c003"
 FLOOR_CONTROL_FOUNDATION_REVISION = "f1a14b15c004"
+DISCUSSION_MEMORY_REVISION = "f1a16b16c006"
+METADATA_TYPE_CLOSURE_REVISION = "f1a16e16c007"
 P1_2_PRODUCT_TABLES = frozenset(
     {
         "auth_sessions",
@@ -322,6 +324,34 @@ def test_database_downgrades_to_p1_4_and_reupgrades_to_head(
 
         assert _migration_state(temporary_database) == MigrationState(
             revision=head,
+            version_table_exists=True,
+            product_tables=EXPECTED_PRODUCT_TABLES,
+        )
+
+
+def test_database_downgrades_to_p1_6_memory_and_reupgrades_to_head(
+    temporary_database: TemporaryDatabaseContext,
+) -> None:
+    config = _alembic_config()
+    head = ScriptDirectory.from_config(config).get_current_head()
+    assert head == METADATA_TYPE_CLOSURE_REVISION
+
+    with _temporary_migration_environment(temporary_database):
+        command.upgrade(config, "head")
+        command.downgrade(config, DISCUSSION_MEMORY_REVISION)
+
+        assert _migration_state(temporary_database) == MigrationState(
+            revision=DISCUSSION_MEMORY_REVISION,
+            version_table_exists=True,
+            product_tables=EXPECTED_PRODUCT_TABLES,
+        )
+
+        command.upgrade(config, "head")
+        command.current(config, check_heads=True)
+        command.check(config)
+
+        assert _migration_state(temporary_database) == MigrationState(
+            revision=METADATA_TYPE_CLOSURE_REVISION,
             version_table_exists=True,
             product_tables=EXPECTED_PRODUCT_TABLES,
         )

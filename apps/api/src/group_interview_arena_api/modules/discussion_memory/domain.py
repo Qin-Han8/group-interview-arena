@@ -219,6 +219,10 @@ class UnknownProjectionVersionError(ValueError):
     pass
 
 
+class UnknownMemorySchemaVersionError(ValueError):
+    pass
+
+
 def _validate_sequences(sequences: tuple[int, ...]) -> None:
     if not sequences or sequences[0] <= 0 or tuple(sorted(set(sequences))) != sequences:
         raise ValueError(
@@ -276,6 +280,10 @@ def apply_memory_revision(
     projection_version: str,
     policy: MemoryPolicy = DEFAULT_MEMORY_POLICY,
 ) -> DiscussionMemoryProjection:
+    if schema_version != MEMORY_SCHEMA_V1:
+        raise UnknownMemorySchemaVersionError(
+            f"unsupported memory schema version: {schema_version}"
+        )
     policy = _projection_policy(projection_version)
     if revision != base.revision + 1:
         raise ValueError("revision must advance exactly once")

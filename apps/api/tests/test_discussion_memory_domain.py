@@ -172,6 +172,12 @@ def test_exact_replay_dispatches_historical_projection_version() -> None:
     )
     with pytest.raises(UnknownProjectionVersionError):
         replay_memory_revisions(session_id=SESSION_ID, revisions=(unknown,))
+    unsupported_schema = accepted.model_copy(update={"schema_version": 2})
+    with pytest.raises(ValueError, match="schema"):
+        replay_memory_revisions(
+            session_id=SESSION_ID,
+            revisions=(unsupported_schema,),
+        )
 
 
 def test_v1_replay_uses_frozen_projection_policy_not_current_default(

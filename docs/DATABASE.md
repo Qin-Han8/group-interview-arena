@@ -1,6 +1,6 @@
 # 数据库技术基线
 
-- Status: P0 Data Architecture Baseline + P1-1～P1-4 schema implemented + P1-5A～P1-5F historically completed + P1-5R `IN_PROGRESS / DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN`; R1 implementation complete awaiting review with no schema change
+- Status: P0 Data Architecture Baseline + P1-1～P1-5 schema implemented + P1-6 structured Memory persistence implemented; P1-6E `IN_PROGRESS`
 - Current phase: P1 — IN_PROGRESS
 - Data architecture baseline established by: P0-2 — DONE
 - Local PostgreSQL infrastructure: P0-4B — completed
@@ -13,14 +13,14 @@
 - P0-5B identity persistence: completed
 - P0-5C backend auth runtime: completed
 - Target version: V0.1 Internal Validation
-- Business schema: identity, session, question/persona, durable phase timing, participant/floor audit, and AI Runtime persistence foundation (nineteen product tables)
+- Business schema: identity, session, question/persona, durable phase timing, participant/floor audit, AI Runtime, and structured Discussion Memory persistence (twenty-one product tables)
 - P1-1 status: P1-1A～E completed; independent final verdict PASS; P1-1 DONE
-- P1-2/P1-3/P1-4 status: DONE; P1-5A～P1-5F retain historical DONE; P1-5 is `IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN` only for `P1-5R IN_PROGRESS / DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN`; R1 is `IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PENDING`; F1 is `OPEN / IMPLEMENTATION_COMPLETE_AWAITING_REVIEW`; R2-A is `NOT_STARTED / BLOCKED_BY_R1`; R2-B/R3 are `NOT_STARTED`; the schema remains nineteen product tables at linear revision `f1a15b15c005`
+- P1-2～P1-5 status: DONE; P1-6A～P1-6D DONE; P1-6E IN_PROGRESS; P1-7/P1-8 NOT_STARTED; the schema is twenty-one product tables at linear revision `f1a16e16c007`
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
 
-本文件记录 P0-2 已批准的数据技术基线、P0-4 完成状态、P0-5 identity persistence、P1-1 session persistence/transaction callers、P1-2B question/persona persistence foundation、P1-3B durable phase/timing fields、P1-4B participant/floor persistence，以及 P1-5B AI Runtime persistence。迁移目标 product tables 精确为十九张，Alembic single head 为 `f1a15b15c005`。
+本文件记录 P0-2 已批准的数据技术基线、P0-4 完成状态、P0-5 identity persistence、P1-1 session persistence/transaction callers、P1-2B question/persona persistence foundation、P1-3B durable phase/timing fields、P1-4B participant/floor persistence、P1-5B AI Runtime persistence，以及 P1-6B structured Discussion Memory persistence。迁移目标 product tables 精确为二十一张，Alembic single head 为 `f1a16e16c007`。
 
 正式决策见 [`DECISIONS.md`](DECISIONS.md) `ADR-005`、`ADR-010`、`ADR-013`、`ADR-015`。
 
@@ -384,7 +384,7 @@ P1-5E-1 is docs-only and leaves the current nineteen-table schema and Alembic he
 - `llm_generation_requests` / `ai_utterances` prove deterministic request lifecycle、typed failure or the unique formal content winner for that grant；
 - `session_actions` plus semantic digest provide exact release/schedule replay/conflict，with causal `discussion_events` for emitted floor facts；
 - `floor_decisions` plus existing grant/intervention children record deterministic scheduler `GRANT` / `NO_GRANT` / `REQUEST_INTERVENTION` outcomes after restart；
-- `prompt_versions` resolves stable `AI_CANDIDATE_TURN` version `1` to immutable identity without a hardcoded UUID or latest pointer。
+- `prompt_versions` retains the historical P1-5 immutable candidate Prompt and now resolves the P1-6 `AI_CANDIDATE_TURN` path to immutable version `3` for Working Context V2, without a hardcoded UUID or latest pointer。
 
 The deterministic UUID mappings are application identities，not new rows beyond their existing target facts。One AI grant maps to one generation request、one possible utterance、one release action and one next-schedule action；scheduler decision/grant/intervention child IDs are deterministic under that scheduling action。Existing uniqueness、aggregate lock、current-grant pointer and sequence/precondition checks prevent duplicate utterances、releases or next-floor winners。
 
@@ -419,13 +419,26 @@ Future retention safety is mandatory：before discussion-event compaction、rete
 
 P1-5F-2 actual-source implementation confirms no schema stop condition：the Human participant supplies exact `user_id` ownership，the floor lifecycle helper releases inside the same transaction，the event store owns ordered sequence/transcript reads，and generation completion owns the aggregate-locked public-event boundary。
 
+## P1-6 structured Discussion Memory persistence — implemented
+
+Linear revision `f1a16b16c006` preserves the existing nineteen tables and additively creates two session-local tables:
+
+- `discussion_memory_states`：one materialized current projection per session with revision、source cursor、schema/derivation/projection versions、bounded structured JSON and update time；
+- `discussion_memory_revisions`：append-only accepted patch journal with contiguous base/revision、exact public source range、typed patch array、derivation-input SHA-256 digest、all-null deterministic or all-present semantic Prompt/provider/model/configuration provenance and immutable creation time。
+
+Raw `discussion_events` remain authoritative evidence。Memory is a reconstructable public-only projection；historical replay resolves the session-bound Question Version and eligible public utterances, verifies each persisted digest/schema/projection/patch source and semantic Prompt contract, then applies the historical deterministic reducer。Integrity failure is read-only and fail-closed；it neither invokes a provider nor rewrites materialized state/journal/request/session facts。
+
+The same revision extends `llm_generation_requests.request_metadata` with exact-key V2 Working Context provenance while preserving V1 rows。Successor revision `f1a16e16c007` replaces only its named check constraint so PostgreSQL requires JSON-number schema/cursors, JSON-string context mode, non-negative integral cursors and `context_source_through_sequence >= memory_source_through_sequence`；the ORM predicate is text-parity checked against this migration。Downgrade restores the historical `f1a16b16c006` V1/V2 predicate without deleting or rewriting rows。
+
+The current Alembic graph is a single linear head at `f1a16e16c007` and the exact product-table count is twenty-one。The successor revision is necessary because `f1a16b16c006` was already published/applied；rewriting that historical migration would leave existing databases unfixed。
+
 ## Future business schema
 
 总纲提到 `users`、题目版本、角色模板、会话、参与者、阶段、发言、讨论事件、结构化记忆、报告、证据、训练、反馈、模型调用和审计等未来领域概念。
 
 除上述已实现 identity/session/question/persona/phase/floor schema 外，其余仍只是长期领域导航：
 
-- P1-5B implements Prompt Version、Generation Request and final AI Utterance persistence；provider attempts beyond the current one-request/one-attempt identity and detailed retention/deletion policy remain Deferred；memory、report、evidence、training and feedback schema also remain Deferred；
+- P1-5B implements Prompt Version、Generation Request and final AI Utterance persistence；P1-6B implements structured Discussion Memory state/journal；provider attempts beyond the current one-request/one-attempt identity and detailed retention/deletion policy remain Deferred；report、evidence、training and feedback schema remain Deferred；
 - V0.1 最小实体集合仍需在 P1 业务设计中确认；
 - 支付、权益、语音和成长数据不得提前进入 V0.1 Schema；
 - P0/V0.1 initial identity boundary 已由 `ADR-015` 确认；公开身份扩展与 recovery 仍 Deferred。
@@ -435,20 +448,21 @@ P1-5F-2 actual-source implementation confirms no schema stop condition：the Hum
 - Implemented：P1-2 question/persona 五表与 nullable session version reference；
 - Implemented：P1-4B generalized participant、opportunity、decision、grant、release 与 intervention schema；
 - Implemented in P1-5B：Prompt Version、closed configuration-version provenance、Generation Request lifecycle and successful final AI Utterance relation；
-- Deferred：participant runtime/presence、memory、report 等后续最小实体和正式 Schema；
+- Implemented in P1-6B/P1-6E repair：structured Discussion Memory state/journal、closed Working Context V2 request metadata and strict PostgreSQL JSON-type enforcement；
+- Deferred：participant runtime/presence、report 等后续最小实体和正式 Schema；
 - TBD：未来 phone/WeChat identity mapping 的具体 Schema；
 - TBD：verified recovery identity、account recovery 与账号删除的完整数据语义；
 - TBD：原始音频是否默认完全不保存（总纲第 37 节）；
 - TBD：各类数据的精确保留期限；
 - TBD：删除、匿名化和审计的具体规则；
-- TBD：结构化记忆、证据和模型调用日志 Schema；
+- TBD：future report evidence and additional model-call audit/retention schema；
 - TBD：未来多租户或机构隔离模型。
 
 ## Future work
 
 - P0-5C：FastAPI lifespan/request dependency 已成为现有 async DB runtime 的第一个 application caller；真实 PostgreSQL auth integration 只使用迁移到 head 的隔离临时数据库，development DB 保持 head `4fe43b42641b` 且两张表均为 0 rows；
 - P0-5D：completed；browser closure 已实现，existing Cookie/CORS/CSRF/shared trusted-origin boundary 已生效；P1 不得创建第二套 trusted-origin config；
-- P1：`IN_PROGRESS`；P1-1～P1-4 and P1-5A～P1-5F retain historical `DONE`；P1-5 is `IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN` for `P1-5R IN_PROGRESS / DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN`；current migration head `f1a15b15c005` and exact nineteen product tables remain unchanged；R1 is `IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PENDING`；F1 is `OPEN / IMPLEMENTATION_COMPLETE_AWAITING_REVIEW`；R2-A is `NOT_STARTED / BLOCKED_BY_R1`；R2-B/R3 are `NOT_STARTED`，and memory/report remain Deferred；
+- P1：`IN_PROGRESS`；P1-1～P1-5 and P1-6A～P1-6D are `DONE`；P1-6E is `IN_PROGRESS`；current migration head is `f1a16e16c007` with exactly twenty-one product tables；P1-7 report/content and P1-8 full-P1 acceptance are `NOT_STARTED`；
 - P2～P4：仅随获批范围增加音频、评分训练和商业化数据。
 
 ## 与其他文档关系

@@ -1,21 +1,21 @@
 # P0 技术架构基线
 
-- Status: P0 Architecture Baseline + P1-1～P1-4 and P1-5A～P1-5F historically completed + P1-5R `IN_PROGRESS / DESIGN_FROZEN`
+- Status: P0 Architecture Baseline + P1-1～P1-5 completed + P1-6A～P1-6D completed; P1-6E `IN_PROGRESS`
 - Current phase: P1 — IN_PROGRESS
 - Architecture baseline established by: P0-2 — DONE
 - P0-3 foundation status: DONE
 - P0-4 database foundation status: DONE
 - P0-5 identity boundary status: DONE
-- Most recently completed historical subphase: P1-5F-4 Composition E2E + Independent Acceptance — `DONE`
+- Most recently completed subphase: P1-6D Recovery + Three-AI End-to-End Validation — `DONE`
 - P0 status: DONE; P0-1 through P0-7 completed
-- P1 status: IN_PROGRESS; P1-1～P1-4 and P1-5A～P1-5F historical DONE; P1-5 IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN; P1-5R IN_PROGRESS / DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN; R1 IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PENDING; F1 OPEN / IMPLEMENTATION_COMPLETE_AWAITING_REVIEW; R2-A NOT_STARTED / BLOCKED_BY_R1; R2-B/R3 NOT_STARTED
+- P1 status: IN_PROGRESS; P1-1～P1-5 DONE; P1-6A～P1-6D DONE; P1-6E IN_PROGRESS; P1-7/P1-8 NOT_STARTED
 - Target version: V0.1 Internal Validation
-- Business architecture detail: P1-1～P1-4 completed; P1-5A～P1-5F historical runtime、transport、Web and acceptance remain complete; P1-5R contracts remain frozen；R1 internal progression implementation is complete awaiting review without changing scheduler、realtime or public-contract authority
+- Business architecture detail: P1-1～P1-5 runtime、transport、Web and recovery are complete；P1-6 adds structured public discussion memory、bounded memory-backed context and the completed Human + three-AI text-simulation proof without changing lifecycle、scheduler or evidence authority
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
 
-本文件记录 P0-2 已批准的技术架构基线、系统边界、规划目录、开发拓扑和演进约束。它不是完整业务架构；P1 以后的题目、角色、会话、编排和评分模块仍须在进入对应任务时逐步设计。
+本文件记录 P0-2 已批准的技术架构基线、系统边界、规划目录、开发拓扑和演进约束，并同步已实现的 P1-1～P1-6 架构事实。尚未获批的 P1-7 报告/内容和 P1-8 全 P1 验收不得提前实现。
 
 正式技术决策及其上下文以 [`DECISIONS.md`](DECISIONS.md) 中 `ADR-001`～`ADR-015` 为准。本文件只整理这些决策对实现的直接约束。
 
@@ -332,7 +332,7 @@ P1-3 lifecycle authority: phase / deadline
 - Correctness is recovered from durable session/current-grant、FloorGrant/Release、GenerationRequest/AiUtterance、SessionAction/scheduler children and ordered discussion-event state。`floor.granted` may wake the drive，but no exactly-once event listener、Redis、queue、distributed lock or in-memory mutex is authoritative。
 - Exact existing calls are `generate_ai_utterance(...)`，then `apply_floor_command(...ReleaseFloorCommand...)` after confirmed terminal truth，then `apply_scheduler_command(...ScheduleFloorCommand...)` after release commit。Provider I/O remains outside all transactions/row locks。
 - One exact AI grant maps to deterministic generation request、utterance、release action、next-schedule action and scheduler child UUID identities。An existing request reuses its durable timestamp/prompt/provider/model/configuration；an existing action/decision is consumed through current `SessionAction` replay/conflict semantics rather than replaced by a random identity。
-- New runtime configuration resolves stable `AI_CANDIDATE_TURN` version `1` to an exact immutable Prompt Version ID；provider is `zhipu`，model comes from lazy server-side `GIA_API_ZHIPU_MODEL`，and configuration is `ZHIPU_CHAT_DEV_V1`。No DB UUID or implicit latest prompt is hardcoded。
+- P1-5E originally resolved its historical immutable candidate Prompt；the current P1-6 candidate path resolves `AI_CANDIDATE_TURN` version `3` so bounded Working Context V2 provenance is explicit。Provider remains `zhipu`，model comes from lazy server-side `GIA_API_ZHIPU_MODEL`，and configuration is `ZHIPU_CHAT_DEV_V1`。No DB UUID or implicit latest prompt is hardcoded。
 - `COMPLETED`/replay with an exact durable utterance releases the still-current grant as `SPEAKER_FINISHED`。`FAILED`/replay releases the still-current grant as `INTERRUPTED` while retaining the typed generation failure as authoritative。`RUNNING`/reconciliation、conflict、internal or otherwise uncertain truth stops without release/scheduling/provider re-call。
 - `CONTEXT_REJECTED` and `STALE_RESULT` force authoritative re-read：a no-longer-current grant or changed lifecycle is `STATE_CHANGED`，while the same exact current grant is `RECONCILIATION_REQUIRED`；neither justifies release or scheduling。`SUPERSEDED` may release only after proving the unique winning utterance for the same still-current grant；otherwise it stops/re-enters safely。
 - P1-3 overdue reconciliation wins before generation/release/schedule mutation。If it releases or changes phase，the orchestrator consumes those committed facts and never overwrites lifecycle reason、deadline or sequence。
@@ -356,6 +356,15 @@ P1-3 lifecycle authority: phase / deadline
 - Every WebSocket send follows commit。Disconnect cannot roll back、regenerate、duplicate or replace action identity；snapshot、transcript and full ordered catch-up recover durable truth。
 - Browser transcript merges by `utterance_id` and orders by event sequence。Transcript-only sequences are intentionally non-contiguous，while full WS gap detection remains strict。Pending content stays memory-only and is not a transcript bubble before durable confirmation。
 - Existing source is sufficient without schema or authority change：session aggregate lock、Human participant user link、FloorRelease helper、DiscussionEvent sequence and AI completion transaction cover the frozen atomic/recovery boundaries。Exact command/event/REST fields、crash matrix、privacy and F2～F4 acceptance are authoritative in [`exec-plans/P1-5_ai-runtime-foundation.md`](exec-plans/P1-5_ai-runtime-foundation.md)。
+
+### P1-6 structured memory and complete text simulation — implemented through P1-6D
+
+- Authoritative raw public `DiscussionEvent` history remains the only evidence authority。P1-6B derives a bounded, session-local `DiscussionMemoryProjection` through public-only typed patches、strict validation and a deterministic projection-versioned reducer；semantic memory never replaces or edits raw evidence。
+- One materialized `discussion_memory_states` row and an append-only `discussion_memory_revisions` journal separate current read performance from replay evidence。Each revision records the exact source range、schema/derivation/projection versions、canonical derivation-input digest and all-null deterministic or all-present semantic prompt/provider/model/configuration provenance。
+- Historical replay is fail-closed：it reconstructs the exact public question/utterance input for every revision, verifies the persisted digest、supported schema/projection and patch visibility, validates all-or-none semantic provenance and the referenced immutable Memory prompt contract, and only then applies the historical reducer。Failure does not rebuild, call a provider or mutate request/session/Memory state。
+- Candidate Working Context V2 records closed mode、memory revision/source cursor and visible context cursor。Normal invocation consumes accepted Memory plus the uncompacted public raw tail；only the bounded safe raw fallback is allowed when Memory is unavailable, and uncoverable context is rejected before provider or request mutation。
+- P1-6C composes the real progression/runtime caller chain with a network-free dual-workload provider fixture。P1-6D proves the full Human + three distinct AI Browser journey, reload、API restart、cancellation recovery、exact-once durable effects and `FINAL_SUMMARY -> COMPLETED` closure without changing P1-3 lifecycle or P1-4 scheduling authority。
+- The root/CI Chromium entry runs the explicit legacy selectors and then the dedicated P1-6D final integrated harness serially with one Playwright worker。Any skipped test makes the run fail, and test-only `gia_p16d_*` databases、ports and artifacts are cleanup-owned。
 
 ## Configuration, secrets and error boundaries
 
@@ -384,6 +393,7 @@ P1-3 lifecycle authority: phase / deadline
 - P1-5A：docs-only links/state/scope/hash/diff checks；fake provider、runtime unit/integration 和真实 LLM tests 均未运行且未进入实现；
 - P1-5C：closed prompt/context unit tests、deterministic harness cases、real PostgreSQL success/failure/replay/concurrency/stale-result integration and full backend regression；真实 LLM tests remain absent；
 - P1-5D：HTTPX MockTransport exact-request/error/privacy/no-retry tests plus real PostgreSQL mocked-provider provenance/replay integration；all automated tests are network-free and the final user-run sanitized real-provider acceptance smoke is `PASS`；
+- P1-6：pure Memory reducer/schema tests、real PostgreSQL journal/CAS/replay/privacy/context recovery tests and a dedicated serial network-free Chromium Human + three-AI acceptance；mandatory browser skips fail the run；
 - P0-5D 已因真实跨应用 auth flow 加入 `@playwright/test 1.62.1`，只运行 Chromium，并由 test-only 编排器使用迁移后的隔离 `gia_p05d_*` PostgreSQL database；
 - 真实 LLM tests 必须显式执行，不进入默认 CI。
 
@@ -434,7 +444,7 @@ Redis 只在多 API workers、横向扩容、跨进程 WebSocket broadcast、dis
 - P0-5D：completed；真实 browser Cookie/CORS/CSRF 闭环已通过 Chromium 验证；
 - P0-5E：completed；final outcome `PASS after findings remediation and independent recheck`；
 - P0：`DONE`；P0-1～P0-7 completed；P0-7 finding-only independent recheck `PASS`，P1 readiness `READY`；其后用户已明确批准进入 P1；
-- P1：`IN_PROGRESS`；P1-1～P1-4 and P1-5A～P1-5F retain historical `DONE`；P1-5 is `IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN` for `P1-5R IN_PROGRESS / DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN`；R1 is `IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PENDING`；F1 is `OPEN / IMPLEMENTATION_COMPLETE_AWAITING_REVIEW`；R2-A is `NOT_STARTED / BLOCKED_BY_R1`；R2-B/R3 are `NOT_STARTED`，and 记忆/基础报告 remain Deferred；
+- P1：`IN_PROGRESS`；P1-1～P1-5 and P1-6A～P1-6D are `DONE`；P1-6E is `IN_PROGRESS`；P1-7 basic report/V0.1 content and P1-8 full-P1 acceptance are `NOT_STARTED`；
 - P2 以后：只在对应阶段获批后增加语音、评分训练和商业化能力。
 
 ## 与其他文档关系
