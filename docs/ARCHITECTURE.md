@@ -1,14 +1,14 @@
 # P0 技术架构基线
 
-- Status: P0 Architecture Baseline + P1-1～P1-5 completed + P1-6A～P1-6D completed; P1-6E `IN_PROGRESS`
+- Status: P0 Architecture Baseline + P1-1～P1-6 completed; P1-6E/P1-6 `DONE / CLOSED`
 - Current phase: P1 — IN_PROGRESS
 - Architecture baseline established by: P0-2 — DONE
 - P0-3 foundation status: DONE
 - P0-4 database foundation status: DONE
 - P0-5 identity boundary status: DONE
-- Most recently completed subphase: P1-6D Recovery + Three-AI End-to-End Validation — `DONE`
+- Most recently completed subphase: P1-6E P1-6 Independent Acceptance + Closeout — `DONE`
 - P0 status: DONE; P0-1 through P0-7 completed
-- P1 status: IN_PROGRESS; P1-1～P1-5 DONE; P1-6A～P1-6D DONE; P1-6E IN_PROGRESS; P1-7/P1-8 NOT_STARTED
+- P1 status: IN_PROGRESS; P1-1～P1-6 DONE; P1-6E/P1-6 CLOSED; P1-7/P1-8 NOT_STARTED
 - Target version: V0.1 Internal Validation
 - Business architecture detail: P1-1～P1-5 runtime、transport、Web and recovery are complete；P1-6 adds structured public discussion memory、bounded memory-backed context and the completed Human + three-AI text-simulation proof without changing lifecycle、scheduler or evidence authority
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
@@ -444,7 +444,7 @@ Redis 只在多 API workers、横向扩容、跨进程 WebSocket broadcast、dis
 - P0-5D：completed；真实 browser Cookie/CORS/CSRF 闭环已通过 Chromium 验证；
 - P0-5E：completed；final outcome `PASS after findings remediation and independent recheck`；
 - P0：`DONE`；P0-1～P0-7 completed；P0-7 finding-only independent recheck `PASS`，P1 readiness `READY`；其后用户已明确批准进入 P1；
-- P1：`IN_PROGRESS`；P1-1～P1-5 and P1-6A～P1-6D are `DONE`；P1-6E is `IN_PROGRESS`；P1-7 basic report/V0.1 content and P1-8 full-P1 acceptance are `NOT_STARTED`；
+- P1：`IN_PROGRESS`；P1-1～P1-6 are `DONE`；P1-6E/P1-6 are `CLOSED`；P1-7 basic report/V0.1 content and P1-8 full-P1 acceptance are `NOT_STARTED`；
 - P2 以后：只在对应阶段获批后增加语音、评分训练和商业化能力。
 
 ## 与其他文档关系

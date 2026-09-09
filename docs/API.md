@@ -1,6 +1,6 @@
 # API 与事件技术基线
 
-- Status: P0 API Architecture Baseline + P1-1～P1-5 completed + P1-6A～P1-6D implemented and independently reviewed; P1-6E `IN_PROGRESS`
+- Status: P0 API Architecture Baseline + P1-1～P1-6 completed; P1-6E/P1-6 `DONE / CLOSED`
 - Current phase: P1 — IN_PROGRESS
 - API architecture baseline established by: P0-2 — DONE
 - Target version: V0.1 Internal Validation
@@ -442,7 +442,7 @@ P0-3D 已完成最小 API、OpenAPI authority、typed config、request correlati
 - P1-3A～D 已完成；state/timing/command/event/snapshot、backend durable foundation 与 realtime/Web complete phase flow 已独立验收 `PASS`；P1-3 `DONE`，P1 保持 `IN_PROGRESS`。
 - P1-4A～E 已完成；P1-4 `DONE`，final independent verdict `PASS`。Safe snapshot/WS/Web floor projection 已实现且无 public floor command。
 - P1-5A～P1-5R and the network-free post-closeout remediation are `DONE`; their accepted runtime、public transport and recovery contracts remain unchanged.
-- P1-6A～P1-6D are implemented and independently reviewed; P1-6E closeout is `IN_PROGRESS` and P1 remains `IN_PROGRESS`. Structured Memory consumes authoritative public evidence and supplies bounded Working Context internally; no Memory field or command is added to REST、OpenAPI、public events or WebSocket payloads. P1-7/P1-8 remain `NOT_STARTED`.
+- P1-6A～P1-6E and parent P1-6 are `DONE / CLOSED`; P1 remains `IN_PROGRESS`. Structured Memory consumes authoritative public evidence and supplies bounded Working Context internally; no Memory field or command is added to REST、OpenAPI、public events or WebSocket payloads. P1-7/P1-8 remain `NOT_STARTED`.
 
 ### P2 and later
 

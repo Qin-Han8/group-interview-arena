@@ -1,6 +1,6 @@
 # 隐私、安全、合规与反作弊基线
 
-- Status: Active baseline through completed P1-5 and implemented P1-6A～P1-6D; P1-6E `IN_PROGRESS`
+- Status: Active baseline through completed P1-6; P1-6E/P1-6 `DONE / CLOSED`
 - Current phase: P1 — IN_PROGRESS
 - Target version: V0.1 Internal Validation
 - Detailed design: P1-5 runtime/recovery privacy boundaries are complete；P1-6 implements public-only structured Memory and bounded Working Context while preserving candidate-private isolation；P1-7/P1-8 and full production/privacy design remain incomplete
@@ -177,7 +177,7 @@ The exact public fields、atomicity/recovery matrix and later acceptance are in 
 
 - P0-2：在架构决策中记录基础信任边界；完整威胁建模随实际接口、数据和 Provider 逐步细化。
 - P0-5C～P0-5E：backend/browser authentication、Cookie/CORS/CSRF 与最小日志边界已实现；P0-5E final outcome 为 `PASS after findings remediation and independent recheck`，P0-5 已转为 `DONE`。
-- P0 and P1-1～P1-5 are `DONE`; P1-6A～P1-6D are implemented and independently reviewed, P1-6E is `IN_PROGRESS`, and parent P1 remains `IN_PROGRESS`. P1-7/P1-8 are `NOT_STARTED`; this checkpoint made no real-model call and recorded no provider secret/raw response.
+- P0 and P1-1～P1-6 are `DONE`; P1-6E/P1-6 are `CLOSED`, and parent P1 remains `IN_PROGRESS`. P1-7/P1-8 are `NOT_STARTED`; this checkpoint made no real-model call and recorded no provider secret/raw response.
 - P2：完成语音同意、上传、保存和删除设计。
 - P4/P5：完成支付审计、公开隐私设置、投诉和发布合规检查。
 

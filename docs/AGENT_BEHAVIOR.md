@@ -1,6 +1,6 @@
 # AI 候选人与讨论编排骨架
 
-- Status: P1-2～P1-5 completed; P1-6A～P1-6D completed; P1-6E `IN_PROGRESS`; P1-7/P1-8 `NOT_STARTED`
+- Status: P1-2～P1-6 completed; P1-6E/P1-6 `DONE / CLOSED`; P1-7/P1-8 `NOT_STARTED`
 - Current phase: P1 — IN_PROGRESS
 - Target version: V0.1 Internal Validation
 - Detailed orchestrator/agent design: P1-3 lifecycle、P1-4 floor、P1-5 runtime/public transport and P1-6 structured Memory/full text composition are implemented；P1-7 report/content and P1-8 full-P1 acceptance remain unimplemented
@@ -357,7 +357,7 @@ Generation Request 与 final Utterance 是不同 identity。一个 logical reque
 
 ## Future work
 
-- P1：`IN_PROGRESS`；P1-1～P1-5 and P1-6A～P1-6D are `DONE`；P1-6E is `IN_PROGRESS`；P1-7 basic report/V0.1 content and P1-8 full-P1 acceptance are `NOT_STARTED`。
+- P1：`IN_PROGRESS`；P1-1～P1-6 are `DONE`；P1-6E/P1-6 are `CLOSED`；P1-7 basic report/V0.1 content and P1-8 full-P1 acceptance are `NOT_STARTED`。
 - P2：加入语音、打断、播放停止和恢复语义。
 - P3：建立角色行为与评分证据之间的校准边界。
 - P6/V1.0：扩展到 6～8 种角色和压力模式。

@@ -1,6 +1,6 @@
 # 数据库技术基线
 
-- Status: P0 Data Architecture Baseline + P1-1～P1-5 schema implemented + P1-6 structured Memory persistence implemented; P1-6E `IN_PROGRESS`
+- Status: P0 Data Architecture Baseline + P1-1～P1-6 persistence implemented; P1-6E/P1-6 `DONE / CLOSED`
 - Current phase: P1 — IN_PROGRESS
 - Data architecture baseline established by: P0-2 — DONE
 - Local PostgreSQL infrastructure: P0-4B — completed
@@ -15,7 +15,7 @@
 - Target version: V0.1 Internal Validation
 - Business schema: identity, session, question/persona, durable phase timing, participant/floor audit, AI Runtime, and structured Discussion Memory persistence (twenty-one product tables)
 - P1-1 status: P1-1A～E completed; independent final verdict PASS; P1-1 DONE
-- P1-2～P1-5 status: DONE; P1-6A～P1-6D DONE; P1-6E IN_PROGRESS; P1-7/P1-8 NOT_STARTED; the schema is twenty-one product tables at linear revision `f1a16e16c007`
+- P1-2～P1-6 status: DONE; P1-6E/P1-6 CLOSED; P1-7/P1-8 NOT_STARTED; the schema is twenty-one product tables at linear revision `f1a16e16c007`
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -462,7 +462,7 @@ The current Alembic graph is a single linear head at `f1a16e16c007` and the exac
 
 - P0-5C：FastAPI lifespan/request dependency 已成为现有 async DB runtime 的第一个 application caller；真实 PostgreSQL auth integration 只使用迁移到 head 的隔离临时数据库，development DB 保持 head `4fe43b42641b` 且两张表均为 0 rows；
 - P0-5D：completed；browser closure 已实现，existing Cookie/CORS/CSRF/shared trusted-origin boundary 已生效；P1 不得创建第二套 trusted-origin config；
-- P1：`IN_PROGRESS`；P1-1～P1-5 and P1-6A～P1-6D are `DONE`；P1-6E is `IN_PROGRESS`；current migration head is `f1a16e16c007` with exactly twenty-one product tables；P1-7 report/content and P1-8 full-P1 acceptance are `NOT_STARTED`；
+- P1：`IN_PROGRESS`；P1-1～P1-6 are `DONE`；P1-6E/P1-6 are `CLOSED`；current migration head is `f1a16e16c007` with exactly twenty-one product tables；P1-7 report/content and P1-8 full-P1 acceptance are `NOT_STARTED`；
 - P2～P4：仅随获批范围增加音频、评分训练和商业化数据。
 
 ## 与其他文档关系
