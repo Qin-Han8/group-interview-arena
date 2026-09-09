@@ -383,6 +383,17 @@ async def drive_scheduler_checkpoint(
             or SessionStatus(aggregate.status) not in FLOOR_ENABLED_PHASES
             or aggregate.current_floor_grant_id is not None
         ):
+            if aggregate is not None and aggregate.current_floor_grant_id is not None:
+                recovered = await _recover_scheduler_result(
+                    session_factory,
+                    owner_id=owner_id,
+                    session_id=session_id,
+                    released_floor=released_floor,
+                    identities=identities,
+                    scheduling_policy=scheduling_policy,
+                )
+                if recovered is not None:
+                    return recovered
             return _result(
                 SchedulerCheckpointOutcome.STATE_CHANGED,
                 released_floor=released_floor,

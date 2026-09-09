@@ -1155,8 +1155,10 @@ describe("SessionPanel", () => {
       API_CLIENT,
       SESSION_ID,
     );
-    expect(mockedCreateRealtime).toHaveBeenCalledWith(
-      expect.objectContaining({ snapshot: ABORTED }),
+    await waitFor(() =>
+      expect(mockedCreateRealtime).toHaveBeenCalledWith(
+        expect.objectContaining({ snapshot: ABORTED }),
+      ),
     );
     expect(realtime.start).toHaveBeenCalledOnce();
     expect(mockedGetQuestion).toHaveBeenCalledWith(
@@ -1189,6 +1191,8 @@ describe("SessionPanel", () => {
       <SessionPanel apiClient={API_CLIENT} baseUrl="http://localhost:8000" />,
     );
     expect(await screen.findByText("正在安排下一位发言者")).toBeInTheDocument();
+
+    await waitFor(() => expect(mockedCreateRealtime).toHaveBeenCalledOnce());
 
     realtime.options().onEvent({
       schema_version: 1,

@@ -1126,6 +1126,97 @@ def test_crash_e_concurrent_scheduler_recovery_has_one_durable_winner(
     run_async(exercise)
 
 
+def test_scheduler_checkpoint_rechecks_winner_after_recovery_miss(
+    migrated_database: TemporaryDatabaseContext,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def exercise() -> None:
+        async with _automatic_runtime_context(
+            migrated_database,
+            grant_seat_index=1,
+        ) as context:
+            assert context.grant_id is not None
+            identities = derive_automatic_turn_identities(
+                session_id=context.session_id,
+                floor_grant_id=context.grant_id,
+            )
+            await _complete_and_release_without_scheduling(context)
+
+            winner = await floor_progression_module.drive_scheduler_checkpoint(
+                context.session_factory,
+                owner_id=context.owner_id,
+                session_id=context.session_id,
+                released_floor=floor_progression_module.ReleasedFloorProof(
+                    floor_grant_id=context.grant_id,
+                    release_action_id=identities.release_action_id,
+                    release_command_type="floor.release",
+                    allowed_reasons=frozenset(
+                        {
+                            FloorReleaseReason.SPEAKER_FINISHED,
+                            FloorReleaseReason.INTERRUPTED,
+                        }
+                    ),
+                ),
+                identities=floor_progression_module.SchedulerCheckpointIdentities(
+                    schedule_action_id=identities.schedule_action_id,
+                    decision_id=identities.decision_id,
+                    next_floor_grant_id=identities.next_floor_grant_id,
+                    intervention_id=identities.intervention_id,
+                ),
+                scheduling_policy=V0_1_SCHEDULER_POLICY,
+            )
+            assert winner.outcome.value in {
+                "next_ai_granted",
+                "next_human_granted",
+            }
+
+            original_recover = floor_progression_module._recover_scheduler_result
+            recover_calls = 0
+
+            async def miss_once(*args: object, **kwargs: object):
+                nonlocal recover_calls
+                recover_calls += 1
+                if recover_calls == 1:
+                    return None
+                return await original_recover(*args, **kwargs)
+
+            monkeypatch.setattr(
+                floor_progression_module,
+                "_recover_scheduler_result",
+                miss_once,
+            )
+            recovered = await floor_progression_module.drive_scheduler_checkpoint(
+                context.session_factory,
+                owner_id=context.owner_id,
+                session_id=context.session_id,
+                released_floor=floor_progression_module.ReleasedFloorProof(
+                    floor_grant_id=context.grant_id,
+                    release_action_id=identities.release_action_id,
+                    release_command_type="floor.release",
+                    allowed_reasons=frozenset(
+                        {
+                            FloorReleaseReason.SPEAKER_FINISHED,
+                            FloorReleaseReason.INTERRUPTED,
+                        }
+                    ),
+                ),
+                identities=floor_progression_module.SchedulerCheckpointIdentities(
+                    schedule_action_id=identities.schedule_action_id,
+                    decision_id=identities.decision_id,
+                    next_floor_grant_id=identities.next_floor_grant_id,
+                    intervention_id=identities.intervention_id,
+                ),
+                scheduling_policy=V0_1_SCHEDULER_POLICY,
+            )
+            assert recover_calls == 2
+            assert recovered.outcome is winner.outcome
+            assert (
+                recovered.identities.schedule_action_id == identities.schedule_action_id
+            )
+
+    run_async(exercise)
+
+
 def test_release_persistence_uncertainty_before_durable_release_requires_reconciliation(
     migrated_database: TemporaryDatabaseContext,
     monkeypatch: pytest.MonkeyPatch,
