@@ -1,6 +1,6 @@
 # 数据库技术基线
 
-- Status: P0 Data Architecture Baseline + P1-1～P1-6 persistence implemented; P1-6E/P1-6 `DONE / CLOSED`
+- Status: P0 Data Architecture Baseline + P1-1～P1-6 persistence implemented; P1-7A conceptual report/evidence data boundary frozen docs-only
 - Current phase: P1 — IN_PROGRESS
 - Data architecture baseline established by: P0-2 — DONE
 - Local PostgreSQL infrastructure: P0-4B — completed
@@ -15,7 +15,7 @@
 - Target version: V0.1 Internal Validation
 - Business schema: identity, session, question/persona, durable phase timing, participant/floor audit, AI Runtime, and structured Discussion Memory persistence (twenty-one product tables)
 - P1-1 status: P1-1A～E completed; independent final verdict PASS; P1-1 DONE
-- P1-2～P1-6 status: DONE; P1-6E/P1-6 CLOSED; P1-7/P1-8 NOT_STARTED; the schema is twenty-one product tables at linear revision `f1a16e16c007`
+- P1-2～P1-6 status: DONE; P1-6E/P1-6 CLOSED; P1-7 IN_PROGRESS; P1-7A `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS` with open findings `NONE`; P1-7B～E/P1-8 NOT_STARTED; the schema remains twenty-one product tables at linear revision `f1a16e16c007`
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -432,13 +432,23 @@ The same revision extends `llm_generation_requests.request_metadata` with exact-
 
 The current Alembic graph is a single linear head at `f1a16e16c007` and the exact product-table count is twenty-one。The successor revision is necessary because `f1a16b16c006` was already published/applied；rewriting that historical migration would leave existing databases unfixed。
 
+## P1-7A conceptual report/evidence data boundary — no schema or migration
+
+Current source has no `evaluation_reports` or `evidence_items` table/model. P1-7A intentionally leaves the linear head `f1a16e16c007` and exact twenty-one-table product schema unchanged.
+
+The future `EvaluationReport` persistence responsibility must represent stable report/session identity, report schema version, evaluator/derivation version, authoritative source watermark, report-owned generation status, overall summary, exactly one priority improvement when complete, created/completed timestamps and reproducibility provenance. It is an independent session-derived resource; it does not add report states to `simulation_sessions`.
+
+The future `EvidenceItem` responsibility must represent stable evidence/report identity, closed `STRENGTH`/`IMPROVEMENT` kind, source participant and utterance identities, source event sequence, authoritative phase, exact source-derived quote, interpretation and confidence. P1 does not require dimension, score, score effect, metric or rubric aggregation; P3 must be able to add those relations without replacing P1 identities/provenance.
+
+Future P1-7B persistence must evolve additively from authoritative `simulation_sessions`/`session_participants`/`discussion_events`, preserve historical source and report versions, enforce same-session provenance and support deterministic eligibility/idempotent re-entry. Physical tables, columns, constraints, cardinality and retry status are P1-7B implementation decisions against actual source, not prematurely frozen by P1-7A.
+
 ## Future business schema
 
 总纲提到 `users`、题目版本、角色模板、会话、参与者、阶段、发言、讨论事件、结构化记忆、报告、证据、训练、反馈、模型调用和审计等未来领域概念。
 
 除上述已实现 identity/session/question/persona/phase/floor schema 外，其余仍只是长期领域导航：
 
-- P1-5B implements Prompt Version、Generation Request and final AI Utterance persistence；P1-6B implements structured Discussion Memory state/journal；provider attempts beyond the current one-request/one-attempt identity and detailed retention/deletion policy remain Deferred；report、evidence、training and feedback schema remain Deferred；
+- P1-5B implements Prompt Version、Generation Request and final AI Utterance persistence；P1-6B implements structured Discussion Memory state/journal；P1-7A freezes report/evidence conceptual responsibilities only；provider attempts beyond the current one-request/one-attempt identity and detailed retention/deletion policy remain Deferred；physical report/evidence、training and feedback schema remain Deferred to their approved implementation phases；
 - V0.1 最小实体集合仍需在 P1 业务设计中确认；
 - 支付、权益、语音和成长数据不得提前进入 V0.1 Schema；
 - P0/V0.1 initial identity boundary 已由 `ADR-015` 确认；公开身份扩展与 recovery 仍 Deferred。
@@ -449,7 +459,7 @@ The current Alembic graph is a single linear head at `f1a16e16c007` and the exac
 - Implemented：P1-4B generalized participant、opportunity、decision、grant、release 与 intervention schema；
 - Implemented in P1-5B：Prompt Version、closed configuration-version provenance、Generation Request lifecycle and successful final AI Utterance relation；
 - Implemented in P1-6B/P1-6E repair：structured Discussion Memory state/journal、closed Working Context V2 request metadata and strict PostgreSQL JSON-type enforcement；
-- Deferred：participant runtime/presence、report 等后续最小实体和正式 Schema；
+- Frozen conceptually in P1-7A but not implemented：Evaluation Report and Evidence Item responsibilities；physical schema remains P1-7B `NOT_STARTED`；
 - TBD：未来 phone/WeChat identity mapping 的具体 Schema；
 - TBD：verified recovery identity、account recovery 与账号删除的完整数据语义；
 - TBD：原始音频是否默认完全不保存（总纲第 37 节）；
@@ -462,7 +472,7 @@ The current Alembic graph is a single linear head at `f1a16e16c007` and the exac
 
 - P0-5C：FastAPI lifespan/request dependency 已成为现有 async DB runtime 的第一个 application caller；真实 PostgreSQL auth integration 只使用迁移到 head 的隔离临时数据库，development DB 保持 head `4fe43b42641b` 且两张表均为 0 rows；
 - P0-5D：completed；browser closure 已实现，existing Cookie/CORS/CSRF/shared trusted-origin boundary 已生效；P1 不得创建第二套 trusted-origin config；
-- P1：`IN_PROGRESS`；P1-1～P1-6 are `DONE`；P1-6E/P1-6 are `CLOSED`；current migration head is `f1a16e16c007` with exactly twenty-one product tables；P1-7 report/content and P1-8 full-P1 acceptance are `NOT_STARTED`；
+- P1：`IN_PROGRESS`；P1-1～P1-6 are `DONE`；P1-6E/P1-6 are `CLOSED`；current migration head is `f1a16e16c007` with exactly twenty-one product tables；P1-7 is `IN_PROGRESS` with P1-7A `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`, open findings `NONE`, and P1-7B～E/P1-8 `NOT_STARTED`；
 - P2～P4：仅随获批范围增加音频、评分训练和商业化数据。
 
 ## 与其他文档关系

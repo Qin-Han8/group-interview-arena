@@ -1,9 +1,9 @@
 # 产品需求文档骨架
 
-- Status: Baseline + P1-3 session-flow design freeze
+- Status: Baseline + P1-3 session-flow + P1-7A basic evidence report/content design freeze
 - Current phase: P1 — IN_PROGRESS
 - Target version: V0.1 Internal Validation
-- Detailed design: P1-3A session state/timing flow frozen; broader PRD remains incremental
+- Detailed design: P1-3A session state/timing flow and P1-7A basic evidence report/V0.1 content boundaries frozen; broader PRD remains incremental
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -45,7 +45,7 @@ V0.1 的目标是验证多角色讨论和状态机，不公开收费。
 - 压力事件；
 - 行业题包。
 
-当前 P1 已实现 P1-1 session foundation 与 P1-2 question/persona foundation；P1-3A 只冻结 session phase/timing design，尚未实现完整 V0.1 讨论闭环。
+当前 P1-1～P1-6 已完成，P1-6 `DONE / CLOSED`。P1-7 现为 `IN_PROGRESS`；P1-7A 为 `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`，open findings `NONE`；P1-7B～E/P1-8 尚未开始。
 
 ## P1-3A confirmed session-flow boundary
 
@@ -55,6 +55,16 @@ V0.1 的目标是验证多角色讨论和状态机，不公开收费。
 - Browser displays server-authoritative phase/timing/sequence and a display-only countdown；it does not own the state machine。
 - Long-term pause、service-failure、partial-completion and report lifecycle states remain Deferred；P1-3 does not invent placeholder user flows for them。
 - P1-4 floor scheduling、AI/participant/utterance、memory、report/scoring and voice remain separate future work。
+
+## P1-7A confirmed basic-report and content boundary
+
+- Formal V0.1 report eligibility is exactly an authoritative `SimulationSession.status == COMPLETED`. `COMPLETED` stays the discussion lifecycle endpoint; report status belongs to an independent durable resource.
+- User flow after completion is stable report generation/read → report Web experience. A report is not generated on each GET and does not receive a new activity WebSocket lifecycle.
+- The report presents completion/question/deterministic participation/covered-phase facts, a concise summary, up to 3 evidence-backed strengths, up to 3 evidence-backed improvement opportunities, exactly 1 next-session priority and verifiable evidence cards.
+- Evidence cards expose source participant, authoritative phase, source utterance identity, source event sequence, exact quote, interpretation and confidence. Text V0.1 does not claim audio timestamps.
+- The report evaluates observable behavior using public discussion facts. It does not show six 0–100 scores, an overall score, radar, percentile/rank, hiring probability, job fit or personality type; the score-versus-level TBD remains open.
+- V0.1 content closure is exactly 4 ordering-selection, 4 resource-allocation and 4 plan-design human-reviewed immutable Question Versions, plus the existing 4 basic Persona Templates. Current committed seed is 0/1/0 questions, so P1-7D later owns 11 additional reviewed questions; P1-7A authors none.
+- P1-7B owns persistence, P1-7C owns validated extraction/generation, P1-7D owns REST/Web/content closure and P1-7E owns P1-7 composition/independent acceptance. P1-8 remains separate full-P1 acceptance.
 
 ## Implementation guidance
 
@@ -91,7 +101,7 @@ V0.1 的目标是验证多角色讨论和状态机，不公开收费。
 
 ## Future work
 
-- P1：细化文字讨论闭环的用户故事、状态和验收标准。
+- P1：P1-1～P1-6 are complete；P1-7A has frozen the basic evidence report and V0.1 content architecture；P1-7B～E/P1-8 remain pending.
 - P2：细化语音交互、打断、降级和音频生命周期。
 - P3：细化报告和专项训练体验。
 - P4：细化商品、权益、支付和故障补偿。

@@ -1,9 +1,9 @@
 # 隐私、安全、合规与反作弊基线
 
-- Status: Active baseline through completed P1-6; P1-6E/P1-6 `DONE / CLOSED`
+- Status: Active baseline through completed P1-6 + P1-7A evaluator/report privacy design freeze
 - Current phase: P1 — IN_PROGRESS
 - Target version: V0.1 Internal Validation
-- Detailed design: P1-5 runtime/recovery privacy boundaries are complete；P1-6 implements public-only structured Memory and bounded Working Context while preserving candidate-private isolation；P1-7/P1-8 and full production/privacy design remain incomplete
+- Detailed design: P1-5 runtime/recovery privacy boundaries are complete；P1-6 implements public-only structured Memory and bounded Working Context while preserving candidate-private isolation；P1-7A freezes public-only evaluator/report/evidence validation boundaries docs-only；P1-7B～E/P1-8 and full production/privacy design remain incomplete
 - Security boundaries: Active from project start
 - P0-5A identity security boundary: completed / approved
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
@@ -151,6 +151,15 @@ The exact public fields、atomicity/recovery matrix and later acceptance are in 
 - Candidate generation combines public Working Context only with the currently granted AI participant's own authorized Persona/Private Stance. Cross-seat private context remains forbidden and no Memory data is exposed through a new REST、OpenAPI、public-event or WebSocket contract.
 - Historical Memory replay verifies the persisted input digest、supported schema/projection and complete semantic provenance before replay. A failure stops before provider invocation or request/session/Memory mutation.
 
+## P1-7A evaluator, evidence and report privacy boundary — frozen docs-only
+
+- Evaluator input is an explicit public allowlist: exact public Question Version identity/title/scenario/objective/hard-soft constraints/stakeholders/options/material needed for interpretation; authoritative completion/phase facts; ordered public Human/AI utterance events and public participant identity; bounded public-only Memory as auxiliary context.
+- Forbidden input/output includes Persona Private Stance, private candidate information, persona behavior/calibration parameters, hidden conflicts/acceptable outcomes/reference-answer/evaluator fields, scoring secrets, candidate-private/system prompts, provider credentials, raw provider request/response/error body, hidden reasoning, user-private notes and other non-public internal fields.
+- Semantic evaluator output is untrusted proposal data. Project-owned deterministic validation must resolve source session/participant/utterance/event sequence/phase, prove quote is an exact contiguous source substring, enforce source watermark and reject Human-evaluation evidence that points to AI speech. Invalid evidence is rejected rather than model-repaired.
+- Report language evaluates observable training behavior only. It must not produce hiring probability, job fit, personality label, percentile/ranking or unsupported precision; V0.1 also omits formal six-dimension scores/radar and fabricated audio timestamps.
+- Report/evidence retention and user deletion must follow the source training record deliberately. Ordinary logs/traces/errors may retain safe identities, versions, counts, status, typed failure and latency only; they must not copy transcript quotes, report narrative, prompts or forbidden input into a shadow record.
+- All P1-7 automated acceptance uses deterministic/fake evaluator input and privacy sentinels without a real-provider call. P1-7A creates no evaluator, prompt, persistence, public API or Web output.
+
 ## Implementation guidance
 
 - 每个新数据字段都应说明目的、保留、删除、访问和日志处理。
@@ -177,7 +186,7 @@ The exact public fields、atomicity/recovery matrix and later acceptance are in 
 
 - P0-2：在架构决策中记录基础信任边界；完整威胁建模随实际接口、数据和 Provider 逐步细化。
 - P0-5C～P0-5E：backend/browser authentication、Cookie/CORS/CSRF 与最小日志边界已实现；P0-5E final outcome 为 `PASS after findings remediation and independent recheck`，P0-5 已转为 `DONE`。
-- P0 and P1-1～P1-6 are `DONE`; P1-6E/P1-6 are `CLOSED`, and parent P1 remains `IN_PROGRESS`. P1-7/P1-8 are `NOT_STARTED`; this checkpoint made no real-model call and recorded no provider secret/raw response.
+- P0 and P1-1～P1-6 are `DONE`; P1-6E/P1-6 are `CLOSED`, and parent P1 remains `IN_PROGRESS`. P1-7 is `IN_PROGRESS`; P1-7A is `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS` with open findings `NONE`；P1-7B～E/P1-8 are `NOT_STARTED`; this checkpoint made no real-model call and recorded no provider secret/raw response.
 - P2：完成语音同意、上传、保存和删除设计。
 - P4/P5：完成支付审计、公开隐私设置、投诉和发布合规检查。
 

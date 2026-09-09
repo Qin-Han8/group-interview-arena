@@ -1,13 +1,13 @@
 # 当前任务清单
 
-- Status: P1 in progress; P1-1 through P1-6 completed; P1-6 is `DONE / CLOSED`; P1-6A～P1-6E are complete; P1-7/P1-8 are `NOT_STARTED`; open findings `NONE`
-- Managed scope: P1-6E independent acceptance, bounded remediation, independent actual-source/finding-only review, exact-head CI and P1-6 governance closeout; no P1-7/P1-8 work and no real-provider call
-- Current design checkpoint: P1-6E — `DONE / POST_STOP_CLOSEOUT_REMEDIATION_PASS`; P1-6 — `DONE / CLOSED`; P1-5 — `DONE`
+- Status: P1 in progress; P1-1 through P1-6 completed; P1-6 is `DONE / CLOSED`; P1-7 is `IN_PROGRESS`; P1-7A is `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-7B～P1-7E/P1-8 are `NOT_STARTED`; open findings `NONE`
+- Managed scope: P1-7A strict docs-only Basic Evidence Report and V0.1 content architecture freeze; no P1-7B implementation, real-provider call, schema/runtime/public-contract change or P1-8 work
+- Current design checkpoint: P1-7A — `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-7 — `IN_PROGRESS`; P1-6 — `DONE / CLOSED`
 - P0-7 final outcome: initial verdict `BLOCKED` with two documentation findings; remediation completed; finding-only independent recheck `PASS`; new blockers none; P1 readiness `READY`
 - Current phase: P1 — `IN_PROGRESS`
-- Current governance checkpoint: P1-6E post-stop finding-only review `PASS`; `P16E-001`～`P16E-004`, `P16E-SR1-001`, `P16E-RA-001`, `P16E-RA-002`, `P16E-RA2-001` and `P16E-RA2-002` are `CLOSED`; new findings/open findings `NONE`; accepted remediation commit `3aa1a049728314f1fbec65367b57b8442bb49670`; exact CI run `34336016724` `GREEN`
-- Current implementation review: P1-6E source review 2/source review 3 and post-stop finding-only review are `PASS`; required Memory、metadata、privacy、recovery、API/Web/PostgreSQL/migration/Chromium evidence is complete under the accepted post-incident baseline
-- Current task gate: P1-5 — `DONE`; P1-6 — `DONE / CLOSED`; P1-6A～P1-6E — `DONE`; new findings/open findings — `NONE`; P1-7/P1-8 — `NOT_STARTED`; P1 remains `IN_PROGRESS`
+- Current governance checkpoint: P1-7A docs-only design scope is frozen and its external actual-source review is `PASS`; P1-6E findings/closeout evidence remain accepted and `CLOSED`
+- Latest completed implementation review: P1-6E source review 2/source review 3 and post-stop finding-only review are `PASS`; required Memory、metadata、privacy、recovery、API/Web/PostgreSQL/migration/Chromium evidence is complete under the accepted post-incident baseline
+- Current task gate: P1-6 — `DONE / CLOSED`; P1-7 — `IN_PROGRESS`; P1-7A — `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-7B～P1-7E/P1-8 — `NOT_STARTED`; new findings/open findings — `NONE`; P1 remains `IN_PROGRESS`
 - P0 status: `DONE`; P0-1 through P0-7 completed
 - Allowed status values: `TODO` / `IN_PROGRESS` / `BLOCKED` / `DONE`
 - Related roadmap: [`ROADMAP.md`](ROADMAP.md)
@@ -813,13 +813,39 @@
 - Re-acceptance 2 proved the full required API/Web、real PostgreSQL/migration、Memory/private-stance/recovery and serial Chromium gates, including legacy `2 passed / 0 skipped` plus P1-6D final `2 passed / 0 skipped`, but returned `REPAIRABLE` on strict-Pyright finding `P16E-RA2-001` and API/privacy current-state finding `P16E-RA2-002`.
 - After the three-repair stop condition, the user explicitly authorized one post-stop closeout remediation rather than `repair 4`. It changed only the typed Crash-E regression and `API.md`/`PRIVACY_AND_SAFETY.md`; independent finding-only review `PASS` closed both findings with no production/schema/workflow/dependency drift or new blocker. Accepted remediation commit `3aa1a049728314f1fbec65367b57b8442bb49670` has exact CI run `34336016724` green across all four jobs.
 - During repair 1 cleanup, one acceptance-preexisting temporary database `gia_p04e_dcaf6d0303de` and the acceptance-preexisting Playwright `.last-run.json` marker were mistakenly deleted and could not be restored identically. The user accepted a new post-incident baseline; no later evidence claims restoration, and all later cleanup was ownership-only. Development-database identity/revision/table count/size/deterministic dump remained identical across the later independent validation.
-- P1-6E and parent P1-6 are now `DONE / CLOSED`; P1 remains `IN_PROGRESS`; P1-7/P1-8 remain `NOT_STARTED`; no real provider was called in P1-6E.
+- At the P1-6E closeout checkpoint, P1-6E and parent P1-6 became `DONE / CLOSED`, P1 remained `IN_PROGRESS`, and P1-7/P1-8 were `NOT_STARTED`; no real provider was called in P1-6E. Current P1-7 status is recorded below.
 
-## P1-7 — Basic Report + V0.1 Content
+## P1-7 — Basic Evidence Report + V0.1 Content Closure
 
 - ID: `P1-7`
-- Status: `NOT_STARTED`
-- Boundary: future basic evidence report and V0.1 content work; not authorized by P1-6A.
+- Status: `IN_PROGRESS`
+- Goal: generate a durable V0.1 basic training report from validated authoritative public discussion evidence after `SimulationSession.COMPLETED`, and close the exact 3-type/12-human-reviewed-question V0.1 content target without importing P3 formal scoring.
+- Source plan: [`exec-plans/P1-7_basic-evidence-report-and-content.md`](exec-plans/P1-7_basic-evidence-report-and-content.md)
+- Current source: exactly 4 Persona seeds; exactly 1 published internal-validation Question Version (`RESOURCE_ALLOCATION`); registered question types are `ORDERING_SELECTION`, `RESOURCE_ALLOCATION`, `PLAN_DESIGN`; report/evidence persistence and public report surfaces are absent.
+- Out of scope: six-dimension scores/overall score/radar/ranking/hiring or fit claims/personality labels; session report lifecycle states; aborted/partial/failed-session reports; voice/audio timestamps; real-provider requirement; P3 drills; V0.5 content; Redis/queue/deferred infrastructure.
+
+### P1-7 substep progress
+
+- `P1-7A — Basic Evidence Report & V0.1 Content Architecture Freeze`: `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; strict docs-only; external actual-source review verdict `PASS`; material findings/new blockers/open findings `NONE`;
+- `P1-7B — Evidence / Report Persistence Foundation`: `NOT_STARTED`;
+- `P1-7C — Evidence Extraction + Basic Report Generation`: `NOT_STARTED`;
+- `P1-7D — Report REST/Web + V0.1 Content Closure`: `NOT_STARTED`;
+- `P1-7E — Composition Acceptance + Independent Acceptance`: `NOT_STARTED`.
+
+P1-7A review closeout uses `group-interview-arena-review-20260909-234536.zip` / SHA-256 `4EA3FE5DD23775106C2602CAA2EC6DC68AC8DDA6D9895C5D74465F90390798F3`. The reviewed checkout `bc8cb40148598230bd64feeeaebb498d05137fbe` is a direct parent of current GitHub `main` `f6f105ed2fcc334f6c9dd83c00d934428e1b689b`; their tree identities are equal and their file-content diff is empty. This is review baseline equivalence, not commit-SHA equality and not a claim that the bundle was generated from the later `main` working tree. No real provider was called and no P1-7B implementation occurred.
+
+### P1-7A frozen boundary
+
+- Architecture is Independent Report Resource + Evidence Records. `COMPLETED` remains the session lifecycle endpoint; report generation status is report-owned; GET reads a durable report and never regenerates it; no report activity WebSocket lifecycle is added.
+- Raw public utterance/`DiscussionEvent` history is evidence authority. P1-6 Memory is bounded public-only auxiliary context and is never transcript, evidence or report truth.
+- V0.1 report contains completion/question/deterministic participation/covered-phase overview, concise summary, at most 3 evidence-backed strengths, at most 3 evidence-backed improvement opportunities, exactly 1 next-session priority and evidence cards with participant/phase/utterance/sequence/quote/interpretation/confidence. Text V0.1 does not invent audio timestamps.
+- Semantic evaluation proposes behavior/interpretation/priority/confidence; project-owned code owns eligibility, source ordering/watermark, source lookup, exact-quote and session/participant/phase/Human-source validation, completeness, versioning/provenance and idempotent re-entry. Invalid evidence is rejected, not repaired approximately.
+- Evaluator input is explicit public Question/session/participant/transcript/Memory context only. Private Stance, persona calibration, hidden conflicts/acceptable outcomes/reference-answer fields, prompts, credentials, raw provider I/O/reasoning and private notes are forbidden.
+- P1-7A freezes conceptual `EvaluationReport`/`EvidenceItem` responsibilities only and creates no schema/migration. P3 may later add dimension/metric/rubric/scoring versions additively.
+- Eligibility is exactly `SimulationSession.status == COMPLETED`; aborted/partial/service-failure reports remain Deferred.
+- Content target is 4 ordering + 4 resource-allocation + 4 plan-design = 12 human-reviewed immutable Question Versions. Current source has 0/1/0 respectively, so P1-7D closure gap is 11; P1-7A writes no question content.
+- The master-plan “score versus level + evidence” question remains TBD. P1-7 outputs no formal score, radar, percentile, ranking, hiring probability, job fit or personality type.
+- P1-7E later owns one network-free select → session → 1 Human + 3 AI → all text phases → `COMPLETED` → report → Web/evidence resolution → Browser reload → API restart/durable recovery proof. P1-8 remains separate.
 
 ## P1-8 — Independent P1 Acceptance
 

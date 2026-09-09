@@ -1,6 +1,6 @@
 # API 与事件技术基线
 
-- Status: P0 API Architecture Baseline + P1-1～P1-6 completed; P1-6E/P1-6 `DONE / CLOSED`
+- Status: P0 API Architecture Baseline + P1-1～P1-6 completed; P1-7A report API boundary frozen conceptually docs-only
 - Current phase: P1 — IN_PROGRESS
 - API architecture baseline established by: P0-2 — DONE
 - Target version: V0.1 Internal Validation
@@ -13,6 +13,7 @@
 - P1-4 contract: P1-4A～E completed; final independent verdict `PASS`; deterministic scheduler remains server-owned and safe floor snapshot/WS/Web projection is implemented
 - P1-5 contract: P1-5A～P1-5R and its post-closeout remediation are `DONE`; runtime、transport、Web and recovery contracts remain accepted
 - P1-6 contract: structured public Discussion Memory and bounded Working Context are internal application/persistence concerns; P1-6 adds no REST/OpenAPI/public-event/public-WS contract
+- P1-7A contract: independent durable report resource uses a future owner-only REST resource/read path; no runtime route/OpenAPI artifact/report WebSocket exists yet
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -412,6 +413,16 @@ P0-6C application request logs 为单行 JSON。每条记录有 UTC `timestamp`�
 
 P0-6D 在不改变 REST/OpenAPI/error envelope 的前提下，为现有 request middleware 增加 provider-neutral server tracing。启用时从 request headers 白名单复制并仅提取标准 W3C `traceparent`，明确不接受 `tracestate` 或 baggage，创建 `METHOD route-template` `SpanKind.SERVER` span；unmatched/404 使用固定 `METHOD <unmatched>` 且不保存 raw path。span allowlist 仅为 method、route template、status、固定 error category 与 project-owned resource `service.name`；resource 不运行 ambient detector，也不吸收 `OTEL_RESOURCE_ATTRIBUTES`/`OTEL_SERVICE_NAME`。application log 从 active valid span context 增加固定宽度 `trace_id`/`span_id`，客户端 contract 仍只暴露既有 `X-Request-ID` 与 error `request_id`，不新增 trace response header。
 
+## P1-7A independent report REST boundary — conceptual only
+
+P1-7 follows Accepted ADR-006: report is a resource served through REST, not an activity-session WebSocket lifecycle. `SimulationSession.COMPLETED` remains the terminal session state. Report generation status belongs to the independent report resource and is not projected as `REPORT_GENERATING`/`REPORTED` session states.
+
+The future owner-only report path is resource/read oriented (consistent with the master-plan `GET /sessions/{id}/report` example). A read returns persisted versioned report state and accepted evidence; it never invokes the evaluator or regenerates the report on GET. Exact create/generate/idempotency endpoint shape, response DTOs and error codes remain P1-7C/D source-grounded design and must preserve FastAPI OpenAPI as REST authority.
+
+Evidence projection may expose only stable report/evidence identity, report/source versions and watermark, completion/summary/priority, deterministic overview facts, capped strengths/improvements and evidence-card participant/phase/utterance/sequence/quote/interpretation/confidence. It exposes no private Persona/evaluator fields, generation prompt/provider raw data, hidden reasoning or fabricated audio timestamps.
+
+P1-7A adds no route, OpenAPI field/generated client, WebSocket command/event or Web implementation. P1-7D owns the future REST/Web surface after persistence and validated generation exist.
+
 ## Security and authority boundaries
 
 - FastAPI 是领域、会话状态和持久化的业务权威；
@@ -442,7 +453,8 @@ P0-3D 已完成最小 API、OpenAPI authority、typed config、request correlati
 - P1-3A～D 已完成；state/timing/command/event/snapshot、backend durable foundation 与 realtime/Web complete phase flow 已独立验收 `PASS`；P1-3 `DONE`，P1 保持 `IN_PROGRESS`。
 - P1-4A～E 已完成；P1-4 `DONE`，final independent verdict `PASS`。Safe snapshot/WS/Web floor projection 已实现且无 public floor command。
 - P1-5A～P1-5R and the network-free post-closeout remediation are `DONE`; their accepted runtime、public transport and recovery contracts remain unchanged.
-- P1-6A～P1-6E and parent P1-6 are `DONE / CLOSED`; P1 remains `IN_PROGRESS`. Structured Memory consumes authoritative public evidence and supplies bounded Working Context internally; no Memory field or command is added to REST、OpenAPI、public events or WebSocket payloads. P1-7/P1-8 remain `NOT_STARTED`.
+- P1-6A～P1-6E and parent P1-6 are `DONE / CLOSED`; P1 remains `IN_PROGRESS`. Structured Memory consumes authoritative public evidence and supplies bounded Working Context internally; no Memory field or command is added to REST、OpenAPI、public events or WebSocket payloads.
+- P1-7 is `IN_PROGRESS`; P1-7A freezes an independent durable/versioned report REST resource concept and explicitly adds no runtime contract. P1-7B～E/P1-8 remain `NOT_STARTED`.
 
 ### P2 and later
 
