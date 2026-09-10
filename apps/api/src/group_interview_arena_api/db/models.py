@@ -1085,6 +1085,176 @@ class DiscussionEvent(Base):
     )
 
 
+class EvaluationReport(Base):
+    __tablename__ = "evaluation_reports"
+    __table_args__ = (
+        UniqueConstraint("session_id", "id", name="uq_evaluation_reports_session_id"),
+        UniqueConstraint(
+            "session_id",
+            "report_schema_version",
+            "derivation_version",
+            "source_through_sequence",
+            name="uq_evaluation_reports_generation_identity",
+        ),
+        CheckConstraint(
+            "report_schema_version > 0",
+            name="report_schema_version_positive",
+        ),
+        CheckConstraint(
+            "length(btrim(derivation_version)) > 0",
+            name="derivation_version_non_empty",
+        ),
+        CheckConstraint(
+            "source_through_sequence >= 0",
+            name="source_through_sequence_non_negative",
+        ),
+        CheckConstraint(
+            "status IN ('REQUESTED', 'RUNNING', 'COMPLETED', 'FAILED')",
+            name="status_allowed",
+        ),
+        CheckConstraint(
+            "(status = 'REQUESTED' AND started_at IS NULL "
+            "AND completed_at IS NULL AND failed_at IS NULL) OR "
+            "(status = 'RUNNING' AND started_at IS NOT NULL "
+            "AND completed_at IS NULL AND failed_at IS NULL) OR "
+            "(status = 'COMPLETED' AND started_at IS NOT NULL "
+            "AND completed_at IS NOT NULL AND failed_at IS NULL "
+            "AND overall_summary IS NOT NULL "
+            "AND length(btrim(overall_summary)) > 0 "
+            "AND priority_improvement IS NOT NULL "
+            "AND length(btrim(priority_improvement)) > 0) OR "
+            "(status = 'FAILED' AND completed_at IS NULL "
+            "AND failed_at IS NOT NULL)",
+            name="status_timing_consistent",
+        ),
+        CheckConstraint(
+            "started_at IS NULL OR started_at >= created_at",
+            name="started_after_creation",
+        ),
+        CheckConstraint(
+            "completed_at IS NULL OR completed_at >= started_at",
+            name="completed_after_started",
+        ),
+        CheckConstraint(
+            "failed_at IS NULL OR failed_at >= created_at",
+            name="failed_after_creation",
+        ),
+        Index(
+            "ix_evaluation_reports_session_created",
+            "session_id",
+            "created_at",
+            "id",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    session_id: Mapped[UUID] = mapped_column(
+        Uuid,
+        ForeignKey("simulation_sessions.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    report_schema_version: Mapped[int] = mapped_column(
+        SmallInteger,
+        nullable=False,
+    )
+    derivation_version: Mapped[str] = mapped_column(String(128), nullable=False)
+    source_through_sequence: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    overall_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    priority_improvement: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=_utc_now,
+        nullable=False,
+    )
+    started_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    failed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+
+class EvidenceItem(Base):
+    __tablename__ = "evidence_items"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["session_id", "report_id"],
+            ["evaluation_reports.session_id", "evaluation_reports.id"],
+            name="fk_evidence_items_session_report",
+            ondelete="CASCADE",
+            deferrable=True,
+            initially="DEFERRED",
+        ),
+        ForeignKeyConstraint(
+            ["session_id", "source_participant_id"],
+            ["session_participants.session_id", "session_participants.id"],
+            name="fk_evidence_items_session_participant",
+            deferrable=True,
+            initially="DEFERRED",
+        ),
+        ForeignKeyConstraint(
+            ["session_id", "source_event_sequence"],
+            ["discussion_events.session_id", "discussion_events.sequence"],
+            name="fk_evidence_items_session_event",
+            deferrable=True,
+            initially="DEFERRED",
+        ),
+        CheckConstraint(
+            "kind IN ('STRENGTH', 'IMPROVEMENT')",
+            name="kind_allowed",
+        ),
+        CheckConstraint(
+            "source_event_sequence > 0",
+            name="source_event_sequence_positive",
+        ),
+        CheckConstraint(
+            "phase IN ('OPENING_STATEMENTS', 'EXPLORATION', "
+            "'CONFLICT_AND_EVALUATION', 'CONVERGENCE', 'FINAL_SUMMARY')",
+            name="phase_allowed",
+        ),
+        CheckConstraint("length(btrim(quote)) > 0", name="quote_non_empty"),
+        CheckConstraint(
+            "length(btrim(interpretation)) > 0",
+            name="interpretation_non_empty",
+        ),
+        CheckConstraint(
+            "confidence >= 0 AND confidence <= 1",
+            name="confidence_range",
+        ),
+        Index(
+            "ix_evidence_items_report_created",
+            "report_id",
+            "created_at",
+            "id",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    session_id: Mapped[UUID] = mapped_column(
+        Uuid,
+        ForeignKey("simulation_sessions.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    report_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    source_participant_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
+    source_utterance_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
+    source_event_sequence: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    phase: Mapped[str] = mapped_column(String(32), nullable=False)
+    quote: Mapped[str] = mapped_column(Text, nullable=False)
+    interpretation: Mapped[str] = mapped_column(Text, nullable=False)
+    confidence: Mapped[Decimal] = mapped_column(Numeric(4, 3), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=_utc_now,
+        nullable=False,
+    )
+
+
 class DiscussionMemoryState(Base):
     __tablename__ = "discussion_memory_states"
     __table_args__ = (

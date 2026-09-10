@@ -2,12 +2,12 @@
 
 - Status: Active baseline
 - Most recently completed development phase: P0 — `DONE`
-- Current design checkpoint: P1-7A — `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-7 — `IN_PROGRESS`; P1-6 — `DONE / CLOSED`; open findings — `NONE`
+- Current completed checkpoint: P1-7B — `DONE / ACTUAL_SOURCE_REVIEW_PASS`; P1-7A — `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-7 — `IN_PROGRESS`; P1-6 — `DONE / CLOSED`; open findings — `NONE`
 - P0-7 final outcome: initial `BLOCKED`; two documentation findings remediated; finding-only independent recheck `PASS`; P1 readiness `READY`
 - Current phase: P1 — `IN_PROGRESS`
-- Current governance checkpoint: P1-7A docs-only design scope is frozen and its external actual-source review is `PASS`; P1-6E closeout evidence remains accepted
-- Latest completed implementation review: P1-6A～P1-6D implementation/reviews retain `PASS`; P1-6E source review 2/source review 3/finding-only review are `PASS`; open findings `NONE`
-- Current task gate: P1-6 — `DONE / CLOSED`; P1-7 — `IN_PROGRESS`; P1-7A — `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-7B～P1-7E/P1-8 — `NOT_STARTED`; P1 remains `IN_PROGRESS`
+- Current governance checkpoint: P1-7B is `DONE / ACTUAL_SOURCE_REVIEW_PASS`; `P1-7B-F001 CLOSED`; open findings `NONE`
+- Latest completed implementation review: P1-7B initial review and finding-only re-review are `PASS`; material findings/new blockers/open findings `NONE`
+- Current task gate: P1-6 — `DONE / CLOSED`; P1-7 — `IN_PROGRESS`; P1-7A — `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-7B — `DONE / ACTUAL_SOURCE_REVIEW_PASS`; P1-7C～P1-7E/P1-8 — `NOT_STARTED`; P1 remains `IN_PROGRESS`
 - P0 status: `DONE`; P0-1 through P0-7 completed
 - Target product version: V0.1 — Internal Validation
 - Source: [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) §30–31
@@ -141,12 +141,12 @@ P1-6E independently exercised the committed P1-6 boundary. Initial acceptance an
 `P1-7 — Basic Evidence Report + V0.1 Content Closure` is now `IN_PROGRESS` with this frozen split:
 
 - `P1-7A — Basic Evidence Report & V0.1 Content Architecture Freeze`: `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; strict docs-only; external review findings `NONE`;
-- `P1-7B — Evidence / Report Persistence Foundation`: `NOT_STARTED`;
+- `P1-7B — Evidence / Report Persistence Foundation`: `DONE / ACTUAL_SOURCE_REVIEW_PASS`; `P1-7B-F001 CLOSED`; open findings `NONE`;
 - `P1-7C — Evidence Extraction + Basic Report Generation`: `NOT_STARTED`;
 - `P1-7D — Report REST/Web + V0.1 Content Closure`: `NOT_STARTED`;
 - `P1-7E — Composition Acceptance + Independent Acceptance`: `NOT_STARTED`.
 
-P1-7 freezes an independent durable/versioned report resource over project-validated authoritative public evidence after session `COMPLETED`; it adds no session report states or activity WebSocket lifecycle and does not import P3 formal six-dimension scoring. V0.1 content closure remains exactly 4 ordering + 4 resource-allocation + 4 plan-design human-reviewed questions and the existing 4 basic Persona Templates. Current committed seed source contains one resource-allocation question, so P1-7D later owns the remaining 11 questions. P1-7A creates no schema/runtime/content and required no real provider. Its external actual-source review passed against `group-interview-arena-review-20260909-234536.zip` / SHA-256 `4EA3FE5DD23775106C2602CAA2EC6DC68AC8DDA6D9895C5D74465F90390798F3`, with material findings/new blockers/open findings `NONE`. The reviewed `bc8cb40148598230bd64feeeaebb498d05137fbe` checkout is a direct parent of current GitHub `main` `f6f105ed2fcc334f6c9dd83c00d934428e1b689b` and has an identical tree/empty file diff; this is baseline equivalence, not commit-SHA equality or a claim that the bundle came from the later `main` working tree. P1-7B remains `NOT_STARTED`, and P1-8 remains the separate full-P1 independent acceptance. Exact boundaries are frozen in [`exec-plans/P1-7_basic-evidence-report-and-content.md`](exec-plans/P1-7_basic-evidence-report-and-content.md).
+P1-7 freezes an independent durable/versioned report resource over project-validated authoritative public evidence after session `COMPLETED`; it adds no session report states or activity WebSocket lifecycle and does not import P3 formal six-dimension scoring. V0.1 content closure remains exactly 4 ordering + 4 resource-allocation + 4 plan-design human-reviewed questions and the existing 4 basic Persona Templates. Current committed seed source contains one resource-allocation question, so P1-7D later owns the remaining 11 questions. P1-7A creates no schema/runtime/content and required no real provider. Its external actual-source review passed against `group-interview-arena-review-20260909-234536.zip` / SHA-256 `4EA3FE5DD23775106C2602CAA2EC6DC68AC8DDA6D9895C5D74465F90390798F3`, with material findings/new blockers/open findings `NONE`. The reviewed `bc8cb40148598230bd64feeeaebb498d05137fbe` checkout is a direct parent of current GitHub `main` `f6f105ed2fcc334f6c9dd83c00d934428e1b689b` and has an identical tree/empty file diff; this is baseline equivalence, not commit-SHA equality or a claim that the bundle came from the later `main` working tree. P1-7B now provides the reviewed 23-table report/evidence persistence foundation at `f1a17b17c008`; its initial bundle `gia-p1-7b-report-persistence-review-20260910-113955.zip` / SHA-256 `9FB2E9CF3E2BD3E865295F11C15764670E216BC0FED4CD9E1CD59DDE5F12AD9E` and finding-only bundle `gia-p1-7b-f001-finding-only-review-20260910-120420.zip` / SHA-256 `CCA43286017D97133755285F8D5EFC6EFAF15F38DDD54D3DD07327C936AFE4B0` both passed external actual-source review, `P1-7B-F001` is `CLOSED`, and open findings are `NONE`. P1-7C～E and P1-8 remain `NOT_STARTED`. Exact boundaries are frozen in [`exec-plans/P1-7_basic-evidence-report-and-content.md`](exec-plans/P1-7_basic-evidence-report-and-content.md).
 
 ## 5. 产品版本
 

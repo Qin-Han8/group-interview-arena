@@ -20,6 +20,7 @@ FLOOR_CONTROL_FOUNDATION_REVISION = "f1a14b15c004"
 AI_RUNTIME_PERSISTENCE_REVISION = "f1a15b15c005"
 DISCUSSION_MEMORY_REVISION = "f1a16b16c006"
 METADATA_TYPE_CLOSURE_REVISION = "f1a16e16c007"
+REPORT_PERSISTENCE_REVISION = "f1a17b17c008"
 
 
 def _alembic_config() -> Config:
@@ -40,7 +41,7 @@ def _normalize_sql(value: str) -> str:
     return " ".join(value.split())
 
 
-def test_migration_history_is_linear_with_single_metadata_type_closure_head() -> None:
+def test_migration_history_is_linear_with_single_report_persistence_head() -> None:
     script = ScriptDirectory.from_config(_alembic_config())
     baseline = script.get_revision(BASELINE_REVISION)
     identity = script.get_revision(IDENTITY_REVISION)
@@ -51,9 +52,11 @@ def test_migration_history_is_linear_with_single_metadata_type_closure_head() ->
     ai_runtime = script.get_revision(AI_RUNTIME_PERSISTENCE_REVISION)
     discussion_memory = script.get_revision(DISCUSSION_MEMORY_REVISION)
 
-    assert script.get_heads() == [METADATA_TYPE_CLOSURE_REVISION]
+    assert script.get_heads() == [REPORT_PERSISTENCE_REVISION]
     metadata_type_closure = script.get_revision(METADATA_TYPE_CLOSURE_REVISION)
+    report_persistence = script.get_revision(REPORT_PERSISTENCE_REVISION)
     assert [revision.revision for revision in script.walk_revisions()] == [
+        REPORT_PERSISTENCE_REVISION,
         METADATA_TYPE_CLOSURE_REVISION,
         DISCUSSION_MEMORY_REVISION,
         AI_RUNTIME_PERSISTENCE_REVISION,
@@ -100,6 +103,10 @@ def test_migration_history_is_linear_with_single_metadata_type_closure_head() ->
     assert metadata_type_closure.down_revision == DISCUSSION_MEMORY_REVISION
     assert metadata_type_closure.branch_labels == set()
     assert metadata_type_closure.dependencies is None
+    assert report_persistence.revision == REPORT_PERSISTENCE_REVISION
+    assert report_persistence.down_revision == METADATA_TYPE_CLOSURE_REVISION
+    assert report_persistence.branch_labels == set()
+    assert report_persistence.dependencies is None
 
     strict_migration_sql = getattr(
         metadata_type_closure.module,
@@ -146,6 +153,8 @@ def test_migration_target_metadata_has_exact_product_tables() -> None:
         "discussion_events",
         "discussion_memory_revisions",
         "discussion_memory_states",
+        "evaluation_reports",
+        "evidence_items",
         "floor_decisions",
         "floor_grants",
         "floor_interventions",

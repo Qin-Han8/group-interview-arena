@@ -13,14 +13,14 @@
 - P0-5B identity persistence: completed
 - P0-5C backend auth runtime: completed
 - Target version: V0.1 Internal Validation
-- Business schema: identity, session, question/persona, durable phase timing, participant/floor audit, AI Runtime, and structured Discussion Memory persistence (twenty-one product tables)
+- Business schema: identity, session, question/persona, durable phase timing, participant/floor audit, AI Runtime, structured Discussion Memory, and Evaluation Report/Evidence persistence (twenty-three product tables)
 - P1-1 status: P1-1A～E completed; independent final verdict PASS; P1-1 DONE
-- P1-2～P1-6 status: DONE; P1-6E/P1-6 CLOSED; P1-7 IN_PROGRESS; P1-7A `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS` with open findings `NONE`; P1-7B～E/P1-8 NOT_STARTED; the schema remains twenty-one product tables at linear revision `f1a16e16c007`
+- P1-2～P1-6 status: DONE; P1-6E/P1-6 CLOSED; P1-7 IN_PROGRESS; P1-7A `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-7B `DONE / ACTUAL_SOURCE_REVIEW_PASS` with `P1-7B-F001 CLOSED` and open findings `NONE`; P1-7C～E/P1-8 NOT_STARTED; the schema is twenty-three product tables at linear revision `f1a17b17c008`
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
 
-本文件记录 P0-2 已批准的数据技术基线、P0-4 完成状态、P0-5 identity persistence、P1-1 session persistence/transaction callers、P1-2B question/persona persistence foundation、P1-3B durable phase/timing fields、P1-4B participant/floor persistence、P1-5B AI Runtime persistence，以及 P1-6B structured Discussion Memory persistence。迁移目标 product tables 精确为二十一张，Alembic single head 为 `f1a16e16c007`。
+本文件记录 P0-2 已批准的数据技术基线、P0-4 完成状态、P0-5 identity persistence、P1-1 session persistence/transaction callers、P1-2B question/persona persistence foundation、P1-3B durable phase/timing fields、P1-4B participant/floor persistence、P1-5B AI Runtime persistence、P1-6B structured Discussion Memory persistence，以及 P1-7B Evaluation Report/Evidence persistence。迁移目标 product tables 精确为二十三张，Alembic single head 为 `f1a17b17c008`。
 
 正式决策见 [`DECISIONS.md`](DECISIONS.md) `ADR-005`、`ADR-010`、`ADR-013`、`ADR-015`。
 
@@ -430,17 +430,21 @@ Raw `discussion_events` remain authoritative evidence。Memory is a reconstructa
 
 The same revision extends `llm_generation_requests.request_metadata` with exact-key V2 Working Context provenance while preserving V1 rows。Successor revision `f1a16e16c007` replaces only its named check constraint so PostgreSQL requires JSON-number schema/cursors, JSON-string context mode, non-negative integral cursors and `context_source_through_sequence >= memory_source_through_sequence`；the ORM predicate is text-parity checked against this migration。Downgrade restores the historical `f1a16b16c006` V1/V2 predicate without deleting or rewriting rows。
 
-The current Alembic graph is a single linear head at `f1a16e16c007` and the exact product-table count is twenty-one。The successor revision is necessary because `f1a16b16c006` was already published/applied；rewriting that historical migration would leave existing databases unfixed。
+At the P1-6 closeout checkpoint the Alembic graph had a single linear head at `f1a16e16c007` and exactly twenty-one product tables。P1-7B extends that immutable history with one successor revision rather than rewriting it。
 
 ## P1-7A conceptual report/evidence data boundary — no schema or migration
 
-Current source has no `evaluation_reports` or `evidence_items` table/model. P1-7A intentionally leaves the linear head `f1a16e16c007` and exact twenty-one-table product schema unchanged.
+P1-7A intentionally left the linear head `f1a16e16c007` and exact twenty-one-table product schema unchanged. P1-7B now adds `evaluation_reports` and `evidence_items` in successor `f1a17b17c008`.
 
 The future `EvaluationReport` persistence responsibility must represent stable report/session identity, report schema version, evaluator/derivation version, authoritative source watermark, report-owned generation status, overall summary, exactly one priority improvement when complete, created/completed timestamps and reproducibility provenance. It is an independent session-derived resource; it does not add report states to `simulation_sessions`.
 
 The future `EvidenceItem` responsibility must represent stable evidence/report identity, closed `STRENGTH`/`IMPROVEMENT` kind, source participant and utterance identities, source event sequence, authoritative phase, exact source-derived quote, interpretation and confidence. P1 does not require dimension, score, score effect, metric or rubric aggregation; P3 must be able to add those relations without replacing P1 identities/provenance.
 
-Future P1-7B persistence must evolve additively from authoritative `simulation_sessions`/`session_participants`/`discussion_events`, preserve historical source and report versions, enforce same-session provenance and support deterministic eligibility/idempotent re-entry. Physical tables, columns, constraints, cardinality and retry status are P1-7B implementation decisions against actual source, not prematurely frozen by P1-7A.
+`evaluation_reports` persists stable report/session identity, positive report schema version, non-empty derivation version, non-negative authoritative source watermark, closed `REQUESTED/RUNNING/COMPLETED/FAILED` lifecycle, nullable pre-completion narrative and lifecycle timestamps. The unique generation identity is `(session_id, report_schema_version, derivation_version, source_through_sequence)`; `COMPLETED` requires started/completed timestamps and non-empty summary/priority improvement.
+
+`evidence_items` persists stable report/session/source participant/source utterance/source event identity, closed `STRENGTH/IMPROVEMENT` kind, five authoritative discussion phases, non-empty quote/interpretation, `NUMERIC(4,3)` confidence constrained to `0..1`, and creation time. Composite foreign keys enforce same-session report, participant and `DiscussionEvent(session_id, sequence)` provenance. `source_utterance_id` is intentionally not linked to `ai_utterances`, because Human utterances have no generic relational utterance row; event payload/type/actor/quote semantics remain P1-7C validation work.
+
+The application service accepts only owner-scoped `SimulationSession.status == COMPLETED`, freezes `last_sequence` under a PostgreSQL share lock and uses the named generation-identity unique constraint plus `ON CONFLICT DO NOTHING` as concurrent re-entry authority. It creates no Evidence rows and invokes no evaluator/provider.
 
 ## Future business schema
 
@@ -459,7 +463,7 @@ Future P1-7B persistence must evolve additively from authoritative `simulation_s
 - Implemented：P1-4B generalized participant、opportunity、decision、grant、release 与 intervention schema；
 - Implemented in P1-5B：Prompt Version、closed configuration-version provenance、Generation Request lifecycle and successful final AI Utterance relation；
 - Implemented in P1-6B/P1-6E repair：structured Discussion Memory state/journal、closed Working Context V2 request metadata and strict PostgreSQL JSON-type enforcement；
-- Frozen conceptually in P1-7A but not implemented：Evaluation Report and Evidence Item responsibilities；physical schema remains P1-7B `NOT_STARTED`；
+- Implemented in P1-7B：Evaluation Report and Evidence Item physical persistence, generation lifecycle/version/watermark identity, same-session relational provenance and idempotent COMPLETED-only allocation；semantic extraction/generation remains P1-7C `NOT_STARTED`；
 - TBD：未来 phone/WeChat identity mapping 的具体 Schema；
 - TBD：verified recovery identity、account recovery 与账号删除的完整数据语义；
 - TBD：原始音频是否默认完全不保存（总纲第 37 节）；
@@ -472,7 +476,7 @@ Future P1-7B persistence must evolve additively from authoritative `simulation_s
 
 - P0-5C：FastAPI lifespan/request dependency 已成为现有 async DB runtime 的第一个 application caller；真实 PostgreSQL auth integration 只使用迁移到 head 的隔离临时数据库，development DB 保持 head `4fe43b42641b` 且两张表均为 0 rows；
 - P0-5D：completed；browser closure 已实现，existing Cookie/CORS/CSRF/shared trusted-origin boundary 已生效；P1 不得创建第二套 trusted-origin config；
-- P1：`IN_PROGRESS`；P1-1～P1-6 are `DONE`；P1-6E/P1-6 are `CLOSED`；current migration head is `f1a16e16c007` with exactly twenty-one product tables；P1-7 is `IN_PROGRESS` with P1-7A `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`, open findings `NONE`, and P1-7B～E/P1-8 `NOT_STARTED`；
+- P1：`IN_PROGRESS`；P1-1～P1-6 are `DONE`；P1-6E/P1-6 are `CLOSED`；current migration head is `f1a17b17c008` with exactly twenty-three product tables；P1-7 is `IN_PROGRESS` with P1-7A `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`, P1-7B `DONE / ACTUAL_SOURCE_REVIEW_PASS`, `P1-7B-F001 CLOSED`, open findings `NONE`, and P1-7C～E/P1-8 `NOT_STARTED`；
 - P2～P4：仅随获批范围增加音频、评分训练和商业化数据。
 
 ## 与其他文档关系

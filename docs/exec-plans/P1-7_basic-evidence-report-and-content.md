@@ -1,11 +1,12 @@
 # P1-7 Basic Evidence Report & V0.1 Content Closure Execution Plan
 
 - Status: `P1-7 IN_PROGRESS`
-- Current checkpoint: `P1-7A DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`
-- Remaining checkpoints: `P1-7B`～`P1-7E NOT_STARTED`
+- Current checkpoint: `P1-7B DONE / ACTUAL_SOURCE_REVIEW_PASS`
+- Remaining checkpoints: `P1-7C`～`P1-7E NOT_STARTED`
 - Parent phase: `P1 IN_PROGRESS`
 - Product target: `V0.1 Internal Validation`
-- Baseline checkout: `codex/p1-6e-closeout` at `bc8cb40148598230bd64feeeaebb498d05137fbe`
+- P1-7A reviewed baseline: `codex/p1-6e-closeout` at `bc8cb40148598230bd64feeeaebb498d05137fbe`
+- P1-7B implementation baseline: `dcd9c0670fb239e4ad2b1f77b867ea68636df245`
 - Git `main` / `origin/main` observed during P1-7A preflight: `df144f7605d435970a82871bd6f424dbd60722ee`
 - GitHub `main` confirmed during governance closeout: `f6f105ed2fcc334f6c9dd83c00d934428e1b689b`
 - External actual-source review: `PASS`; material findings/new blockers/open findings: `NONE`
@@ -33,7 +34,7 @@ P1-7A inspected the committed checkout `bc8cb40148598230bd64feeeaebb498d05137fbe
 | Memory | P1-6 implements public-only, versioned structured Memory and bounded Working Context over raw events. | Memory may provide bounded auxiliary context, but is never transcript, evidence or report truth. |
 | Question model | The closed registry supports `ORDERING_SELECTION`, `RESOURCE_ALLOCATION` and `PLAN_DESIGN`. Public Question Version fields are separated from hidden/reference/evaluator fields. | These are the exact V0.1 content categories; evaluator input uses an explicit public allowlist. |
 | Current content | Seed source contains exactly 4 V0.1 Persona Templates and 1 published internal-validation `RESOURCE_ALLOCATION` Question Version. | Content closure gap is 11 reviewed questions: ordering 4, resource allocation 3 additional, plan design 4. P1-7A writes none of them. |
-| Persistence | Current ORM/Alembic product schema has 21 tables through `f1a16e16c007`; no report/evidence table exists. | P1-7B owns the additive persistence foundation; P1-7A creates no schema/migration. |
+| Persistence | P1-7B adds `evaluation_reports` and `evidence_items` as linear revision `f1a17b17c008`, extending 21 to 23 product tables. | The foundation owns durable identity/lifecycle/version/watermark and same-session relational provenance only; semantic evidence validation/generation remains P1-7C. |
 | Public report surface | No report module, report route, OpenAPI report contract, report Web UI or report WS event exists. | P1-7D owns REST/Web. No existing public contract is overwritten. |
 
 No actual-source conflict requires an ADR or master-plan change. During governance closeout, current GitHub `main` resolved to merge commit `f6f105ed2fcc334f6c9dd83c00d934428e1b689b`: the reviewed checkout `bc8cb40148598230bd64feeeaebb498d05137fbe` is one of its direct parents, and both commits have the same tree identity with an empty file-content diff. This is a review baseline-equivalence fact. It does not mean their commit SHAs are equal, that the review bundle was generated directly from the later `main` working tree, or that the historical branch deviation did not exist.
@@ -183,11 +184,11 @@ P1-7 excludes dilemma-decision/V0.5 expansion, industry packs and unconstrained 
 
 ### P1-7A — Basic Evidence Report & V0.1 Content Architecture Freeze
 
-Current docs-only checkpoint. It freezes architecture, evidence/privacy/validation responsibilities, content targets, decomposition and acceptance. Exit state is `DESIGN_SCOPE_FROZEN / AWAITING_ACTUAL_SOURCE_REVIEW`, not review pass or done.
+Completed docs-only checkpoint. Its external actual-source review is `PASS`; status is `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`.
 
 ### P1-7B — Evidence / Report Persistence Foundation
 
-After separate approval and P1-7A review pass, add the smallest additive report/evidence persistence and domain foundation. It owns report/evidence identities, generation status, version/source watermark/provenance, constraints and idempotent eligibility/re-entry. It does not implement semantic generation, REST/Web or content closure.
+Implemented and awaiting external actual-source review. Revision `f1a17b17c008` adds the smallest report/evidence persistence and domain foundation, including report/evidence identities, closed report-owned generation status, version/source-watermark provenance, same-session constraints and concurrency-safe idempotent eligibility/re-entry. `get_or_create_eligible_report` accepts only owner-scoped `COMPLETED` sessions and uses the database generation-identity unique constraint as final authority. It does not implement semantic generation, Evidence creation, REST/Web or content closure.
 
 ### P1-7C — Evidence Extraction + Basic Report Generation
 
@@ -233,6 +234,14 @@ P1-7A STOP-condition result: `NONE`.
 
 P1-7A requires the changed set to remain this plan plus approved minimal `TASKS`, `ROADMAP`, `SCORING_RUBRIC`, `PRODUCT_REQUIREMENTS`, `DATABASE`, `API` and `PRIVACY_AND_SAFETY` synchronization; the master plan to remain byte-identical; no production/test/schema/migration/runtime API/OpenAPI/WebSocket/Web/provider/prompt/dependency/CI/infrastructure diff; resolving links and consistent state/TBD/source claims; `git diff --check`; and a `$gia-review-bundle` artifact.
 
-After closeout, governance is exactly P1 `IN_PROGRESS`; P1-6 `DONE / CLOSED`; P1-7 `IN_PROGRESS`; P1-7A `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-7B～P1-7E `NOT_STARTED`; and P1-8 `NOT_STARTED`.
+At the P1-7A closeout checkpoint, governance was P1 `IN_PROGRESS`; P1-6 `DONE / CLOSED`; P1-7 `IN_PROGRESS`; P1-7A `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; and the later P1-7 subphases plus P1-8 had not begun. The current P1-7B status is recorded below.
 
 The external actual-source review verdict is `PASS` against `group-interview-arena-review-20260909-234536.zip` / SHA-256 `4EA3FE5DD23775106C2602CAA2EC6DC68AC8DDA6D9895C5D74465F90390798F3`; material findings, new blockers and open findings are `NONE`. The reviewed bundle contained exactly the eight approved P1-7A docs-only changed files and no production/schema/migration/API runtime/Web/provider/dependency/CI/infrastructure drift. No real-provider call and no P1-7B implementation occurred.
+
+## 16. P1-7B implementation checkpoint
+
+P1-7B is `DONE / ACTUAL_SOURCE_REVIEW_PASS`. The accepted P1-7A boundary remains unchanged. The physical schema uses `REQUESTED/RUNNING/COMPLETED/FAILED`, the current project generation-lifecycle convention; generation identity is `(session_id, report_schema_version, derivation_version, source_through_sequence)`. Evidence uses same-session report/participant/event composite foreign keys, while `source_utterance_id` intentionally has no AI-only FK because Human utterances are authoritative event payload facts.
+
+Fresh validation passes domain/model/migration tests, all API unit tests, all PostgreSQL integration tests, two-session concurrency, previous-head upgrade, downgrade/re-upgrade, exact 23-table catalog, Ruff, format and strict Pyright. Temporary database residue is zero, master-plan SHA-256 remains `2388A9660320406CB35D5354126AD71C6849A98DB7C4A356796CA951BF372F26`, implementation findings/open findings are `NONE`, and no real provider, REST/Web/OpenAPI, question content or P1-7C work occurred.
+
+Finding-only remediation `P1-7B-F001` separates authoritative quote validation from whitespace-stripping semantic text validation: `EvidenceItemDraft.quote` now rejects empty/whitespace-only input while returning every accepted caller string byte-for-byte at the Python string level, including leading/trailing spaces, tabs and newlines. The required RED reproduced as `2 failed / 11 passed`; GREEN is `13 passed`; fresh full API unit validation is `536 passed / 228 deselected`; focused real-PostgreSQL report persistence is `17 passed`; Ruff, format and strict Pyright pass; residual test databases are zero. Migration `f1a17b17c008` and ORM persistence schema remain byte-identical to the initial P1-7B review bundle, so migration tests were not rerun for this domain-only remediation. External actual-source review final verdict is `PASS`; `P1-7B-F001` is `CLOSED`; material findings/new blockers/open findings are `NONE`. Accepted bundles are `gia-p1-7b-report-persistence-review-20260910-113955.zip` / SHA-256 `9FB2E9CF3E2BD3E865295F11C15764670E216BC0FED4CD9E1CD59DDE5F12AD9E` and `gia-p1-7b-f001-finding-only-review-20260910-120420.zip` / SHA-256 `CCA43286017D97133755285F8D5EFC6EFAF15F38DDD54D3DD07327C936AFE4B0`. P1-7B is `DONE / ACTUAL_SOURCE_REVIEW_PASS`; P1-7C～P1-7E and P1-8 remain `NOT_STARTED`.
