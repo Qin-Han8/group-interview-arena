@@ -454,7 +454,7 @@ P0-3D 已完成最小 API、OpenAPI authority、typed config、request correlati
 - P1-4A～E 已完成；P1-4 `DONE`，final independent verdict `PASS`。Safe snapshot/WS/Web floor projection 已实现且无 public floor command。
 - P1-5A～P1-5R and the network-free post-closeout remediation are `DONE`; their accepted runtime、public transport and recovery contracts remain unchanged.
 - P1-6A～P1-6E and parent P1-6 are `DONE / CLOSED`; P1 remains `IN_PROGRESS`. Structured Memory consumes authoritative public evidence and supplies bounded Working Context internally; no Memory field or command is added to REST、OpenAPI、public events or WebSocket payloads.
-- P1-7 is `IN_PROGRESS`; P1-7A freezes an independent durable/versioned report REST resource concept and explicitly adds no runtime contract. P1-7B～E/P1-8 remain `NOT_STARTED`.
+- P1-7 is `IN_PROGRESS`; P1-7A freezes an independent durable/versioned report REST resource concept and P1-7B implements only internal persistence/application allocation. P1-7B adds no REST/OpenAPI/WebSocket contract; P1-7C～E/P1-8 remain `NOT_STARTED`.
 
 ### P2 and later
 

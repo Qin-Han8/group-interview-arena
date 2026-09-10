@@ -45,7 +45,7 @@ V0.1 的目标是验证多角色讨论和状态机，不公开收费。
 - 压力事件；
 - 行业题包。
 
-当前 P1-1～P1-6 已完成，P1-6 `DONE / CLOSED`。P1-7 现为 `IN_PROGRESS`；P1-7A 为 `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`，open findings `NONE`；P1-7B～E/P1-8 尚未开始。
+当前 P1-1～P1-6 已完成，P1-6 `DONE / CLOSED`。P1-7 现为 `IN_PROGRESS`；P1-7A 为 `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`；P1-7B 为 `DONE / ACTUAL_SOURCE_REVIEW_PASS`，`P1-7B-F001 CLOSED`，open findings `NONE`；P1-7C～E/P1-8 尚未开始。
 
 ## P1-3A confirmed session-flow boundary
 
@@ -101,7 +101,7 @@ V0.1 的目标是验证多角色讨论和状态机，不公开收费。
 
 ## Future work
 
-- P1：P1-1～P1-6 are complete；P1-7A has frozen the basic evidence report and V0.1 content architecture；P1-7B～E/P1-8 remain pending.
+- P1：P1-1～P1-6 are complete；P1-7A has frozen the basic evidence report and V0.1 content architecture；P1-7B persistence awaits external review；P1-7C～E/P1-8 remain pending.
 - P2：细化语音交互、打断、降级和音频生命周期。
 - P3：细化报告和专项训练体验。
 - P4：细化商品、权益、支付和故障补偿。

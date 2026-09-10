@@ -1,13 +1,13 @@
 # 当前任务清单
 
-- Status: P1 in progress; P1-1 through P1-6 completed; P1-6 is `DONE / CLOSED`; P1-7 is `IN_PROGRESS`; P1-7A is `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-7B～P1-7E/P1-8 are `NOT_STARTED`; open findings `NONE`
-- Managed scope: P1-7A strict docs-only Basic Evidence Report and V0.1 content architecture freeze; no P1-7B implementation, real-provider call, schema/runtime/public-contract change or P1-8 work
-- Current design checkpoint: P1-7A — `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-7 — `IN_PROGRESS`; P1-6 — `DONE / CLOSED`
+- Status: P1 in progress; P1-1 through P1-6 completed; P1-6 is `DONE / CLOSED`; P1-7 is `IN_PROGRESS`; P1-7A is `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-7B is `DONE / ACTUAL_SOURCE_REVIEW_PASS`; P1-7C～P1-7E/P1-8 are `NOT_STARTED`; open findings `NONE`
+- Managed scope: P1-7B minimal Evaluation Report/Evidence Item persistence, migration, COMPLETED-only eligibility and idempotent generation identity; no evaluator/provider, evidence extraction, REST/Web, content authoring or P1-7C work
+- Current implementation checkpoint: P1-7B — `DONE / ACTUAL_SOURCE_REVIEW_PASS`; P1-7 — `IN_PROGRESS`; P1-6 — `DONE / CLOSED`
 - P0-7 final outcome: initial verdict `BLOCKED` with two documentation findings; remediation completed; finding-only independent recheck `PASS`; new blockers none; P1 readiness `READY`
 - Current phase: P1 — `IN_PROGRESS`
-- Current governance checkpoint: P1-7A docs-only design scope is frozen and its external actual-source review is `PASS`; P1-6E findings/closeout evidence remain accepted and `CLOSED`
-- Latest completed implementation review: P1-6E source review 2/source review 3 and post-stop finding-only review are `PASS`; required Memory、metadata、privacy、recovery、API/Web/PostgreSQL/migration/Chromium evidence is complete under the accepted post-incident baseline
-- Current task gate: P1-6 — `DONE / CLOSED`; P1-7 — `IN_PROGRESS`; P1-7A — `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-7B～P1-7E/P1-8 — `NOT_STARTED`; new findings/open findings — `NONE`; P1 remains `IN_PROGRESS`
+- Current governance checkpoint: P1-7B external actual-source review is `PASS`; `P1-7B-F001` is `CLOSED`; P1-7B open findings are `NONE`
+- Latest completed implementation review: P1-7B initial review plus finding-only re-review are `PASS`; material findings/new blockers/open findings are `NONE`
+- Current task gate: P1-6 — `DONE / CLOSED`; P1-7 — `IN_PROGRESS`; P1-7A — `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-7B — `DONE / ACTUAL_SOURCE_REVIEW_PASS`; P1-7C～P1-7E/P1-8 — `NOT_STARTED`; open findings — `NONE`; P1 remains `IN_PROGRESS`
 - P0 status: `DONE`; P0-1 through P0-7 completed
 - Allowed status values: `TODO` / `IN_PROGRESS` / `BLOCKED` / `DONE`
 - Related roadmap: [`ROADMAP.md`](ROADMAP.md)
@@ -821,13 +821,13 @@
 - Status: `IN_PROGRESS`
 - Goal: generate a durable V0.1 basic training report from validated authoritative public discussion evidence after `SimulationSession.COMPLETED`, and close the exact 3-type/12-human-reviewed-question V0.1 content target without importing P3 formal scoring.
 - Source plan: [`exec-plans/P1-7_basic-evidence-report-and-content.md`](exec-plans/P1-7_basic-evidence-report-and-content.md)
-- Current source: exactly 4 Persona seeds; exactly 1 published internal-validation Question Version (`RESOURCE_ALLOCATION`); registered question types are `ORDERING_SELECTION`, `RESOURCE_ALLOCATION`, `PLAN_DESIGN`; report/evidence persistence and public report surfaces are absent.
+- Current source: exactly 4 Persona seeds; exactly 1 published internal-validation Question Version (`RESOURCE_ALLOCATION`); registered question types are `ORDERING_SELECTION`, `RESOURCE_ALLOCATION`, `PLAN_DESIGN`; report/evidence persistence is implemented while semantic generation and public report surfaces are absent.
 - Out of scope: six-dimension scores/overall score/radar/ranking/hiring or fit claims/personality labels; session report lifecycle states; aborted/partial/failed-session reports; voice/audio timestamps; real-provider requirement; P3 drills; V0.5 content; Redis/queue/deferred infrastructure.
 
 ### P1-7 substep progress
 
 - `P1-7A — Basic Evidence Report & V0.1 Content Architecture Freeze`: `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; strict docs-only; external actual-source review verdict `PASS`; material findings/new blockers/open findings `NONE`;
-- `P1-7B — Evidence / Report Persistence Foundation`: `NOT_STARTED`;
+- `P1-7B — Evidence / Report Persistence Foundation`: `DONE / ACTUAL_SOURCE_REVIEW_PASS`; `P1-7B-F001 CLOSED`; open findings `NONE`;
 - `P1-7C — Evidence Extraction + Basic Report Generation`: `NOT_STARTED`;
 - `P1-7D — Report REST/Web + V0.1 Content Closure`: `NOT_STARTED`;
 - `P1-7E — Composition Acceptance + Independent Acceptance`: `NOT_STARTED`.
@@ -846,6 +846,14 @@ P1-7A review closeout uses `group-interview-arena-review-20260909-234536.zip` / 
 - Content target is 4 ordering + 4 resource-allocation + 4 plan-design = 12 human-reviewed immutable Question Versions. Current source has 0/1/0 respectively, so P1-7D closure gap is 11; P1-7A writes no question content.
 - The master-plan “score versus level + evidence” question remains TBD. P1-7 outputs no formal score, radar, percentile, ranking, hiring probability, job fit or personality type.
 - P1-7E later owns one network-free select → session → 1 Human + 3 AI → all text phases → `COMPLETED` → report → Web/evidence resolution → Browser reload → API restart/durable recovery proof. P1-8 remains separate.
+
+### P1-7B implementation checkpoint
+
+- Additive revision `f1a17b17c008` extends the linear schema from 21 to 23 product tables with `evaluation_reports` and `evidence_items`; historical migrations remain unchanged and downgrade returns exactly to `f1a16e16c007`.
+- Report generation identity is unique on session, report schema version, derivation version and frozen `SimulationSession.last_sequence`; report-owned lifecycle is closed to `REQUESTED/RUNNING/COMPLETED/FAILED` with database timing/content consistency.
+- Evidence provenance uses same-session composite foreign keys to report, participant and authoritative `DiscussionEvent(session_id, sequence)`; Human `source_utterance_id` remains a stable UUID because the actual source has no generic Human utterance table.
+- `get_or_create_eligible_report` accepts only owner-scoped `COMPLETED` sessions, freezes the watermark under a PostgreSQL share lock and resolves concurrent re-entry through the named database unique constraint. It performs no evaluator/provider call and creates no Evidence rows.
+- Fresh unit, PostgreSQL migration/catalog/downgrade/re-upgrade, constraint, idempotency and two-caller concurrency gates pass. External actual-source review final verdict is `PASS`; `P1-7B-F001` is `CLOSED`; material findings/new blockers/open findings are `NONE`. Accepted bundles are `gia-p1-7b-report-persistence-review-20260910-113955.zip` / SHA-256 `9FB2E9CF3E2BD3E865295F11C15764670E216BC0FED4CD9E1CD59DDE5F12AD9E` and `gia-p1-7b-f001-finding-only-review-20260910-120420.zip` / SHA-256 `CCA43286017D97133755285F8D5EFC6EFAF15F38DDD54D3DD07327C936AFE4B0`.
 
 ## P1-8 — Independent P1 Acceptance
 

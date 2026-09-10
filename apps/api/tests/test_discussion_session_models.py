@@ -28,6 +28,8 @@ EXPECTED_PRODUCT_TABLES = {
     "discussion_events",
     "discussion_memory_revisions",
     "discussion_memory_states",
+    "evaluation_reports",
+    "evidence_items",
     "floor_decisions",
     "floor_grants",
     "floor_interventions",

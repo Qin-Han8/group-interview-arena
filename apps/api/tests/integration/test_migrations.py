@@ -41,6 +41,7 @@ SESSION_PHASE_TIMING_REVISION = "f1a13b15c003"
 FLOOR_CONTROL_FOUNDATION_REVISION = "f1a14b15c004"
 DISCUSSION_MEMORY_REVISION = "f1a16b16c006"
 METADATA_TYPE_CLOSURE_REVISION = "f1a16e16c007"
+REPORT_PERSISTENCE_REVISION = "f1a17b17c008"
 P1_2_PRODUCT_TABLES = frozenset(
     {
         "auth_sessions",
@@ -63,6 +64,8 @@ EXPECTED_PRODUCT_TABLES = P1_2_PRODUCT_TABLES | {
     "floor_releases",
     "discussion_memory_revisions",
     "discussion_memory_states",
+    "evaluation_reports",
+    "evidence_items",
     "llm_generation_requests",
     "prompt_versions",
     "session_participants",
@@ -315,6 +318,8 @@ def test_database_downgrades_to_p1_4_and_reupgrades_to_head(
                 "prompt_versions",
                 "discussion_memory_revisions",
                 "discussion_memory_states",
+                "evaluation_reports",
+                "evidence_items",
             },
         )
 
@@ -334,7 +339,7 @@ def test_database_downgrades_to_p1_6_memory_and_reupgrades_to_head(
 ) -> None:
     config = _alembic_config()
     head = ScriptDirectory.from_config(config).get_current_head()
-    assert head == METADATA_TYPE_CLOSURE_REVISION
+    assert head == REPORT_PERSISTENCE_REVISION
 
     with _temporary_migration_environment(temporary_database):
         command.upgrade(config, "head")
@@ -343,7 +348,8 @@ def test_database_downgrades_to_p1_6_memory_and_reupgrades_to_head(
         assert _migration_state(temporary_database) == MigrationState(
             revision=DISCUSSION_MEMORY_REVISION,
             version_table_exists=True,
-            product_tables=EXPECTED_PRODUCT_TABLES,
+            product_tables=EXPECTED_PRODUCT_TABLES
+            - {"evaluation_reports", "evidence_items"},
         )
 
         command.upgrade(config, "head")
@@ -351,7 +357,7 @@ def test_database_downgrades_to_p1_6_memory_and_reupgrades_to_head(
         command.check(config)
 
         assert _migration_state(temporary_database) == MigrationState(
-            revision=METADATA_TYPE_CLOSURE_REVISION,
+            revision=REPORT_PERSISTENCE_REVISION,
             version_table_exists=True,
             product_tables=EXPECTED_PRODUCT_TABLES,
         )
@@ -578,6 +584,238 @@ def test_head_has_exact_p1_1b_columns_constraints_and_indexes(
         "pk_discussion_events",
         "pk_session_actions",
         "pk_simulation_sessions",
+    }
+
+
+async def _insert_and_load_existing_user(
+    temporary_database: TemporaryDatabaseContext,
+    *,
+    user_id: UUID,
+    insert: bool,
+) -> str | None:
+    engine = create_database_engine(temporary_database.database_settings())
+    try:
+        async with engine.begin() as connection:
+            if insert:
+                await connection.execute(
+                    text(
+                        "INSERT INTO users "
+                        "(id, username, password_hash, created_at, updated_at) "
+                        "VALUES (:id, 'p17b-existing-user', 'hash', now(), now())"
+                    ),
+                    {"id": user_id},
+                )
+            return await connection.scalar(
+                text("SELECT username FROM users WHERE id = :id"),
+                {"id": user_id},
+            )
+    finally:
+        await dispose_database_engine(engine)
+
+
+def test_report_migration_preserves_previous_head_and_existing_data(
+    temporary_database: TemporaryDatabaseContext,
+) -> None:
+    config = _alembic_config()
+    user_id = uuid4()
+
+    with _temporary_migration_environment(temporary_database):
+        command.upgrade(config, METADATA_TYPE_CLOSURE_REVISION)
+        assert _migration_state(temporary_database) == MigrationState(
+            revision=METADATA_TYPE_CLOSURE_REVISION,
+            version_table_exists=True,
+            product_tables=EXPECTED_PRODUCT_TABLES
+            - {"evaluation_reports", "evidence_items"},
+        )
+        assert (
+            asyncio.run(
+                _insert_and_load_existing_user(
+                    temporary_database,
+                    user_id=user_id,
+                    insert=True,
+                ),
+                loop_factory=asyncio.SelectorEventLoop,
+            )
+            == "p17b-existing-user"
+        )
+
+        command.upgrade(config, REPORT_PERSISTENCE_REVISION)
+        assert _migration_state(temporary_database) == MigrationState(
+            revision=REPORT_PERSISTENCE_REVISION,
+            version_table_exists=True,
+            product_tables=EXPECTED_PRODUCT_TABLES,
+        )
+
+        command.downgrade(config, METADATA_TYPE_CLOSURE_REVISION)
+        assert _migration_state(temporary_database) == MigrationState(
+            revision=METADATA_TYPE_CLOSURE_REVISION,
+            version_table_exists=True,
+            product_tables=EXPECTED_PRODUCT_TABLES
+            - {"evaluation_reports", "evidence_items"},
+        )
+        assert (
+            asyncio.run(
+                _insert_and_load_existing_user(
+                    temporary_database,
+                    user_id=user_id,
+                    insert=False,
+                ),
+                loop_factory=asyncio.SelectorEventLoop,
+            )
+            == "p17b-existing-user"
+        )
+
+        command.upgrade(config, "head")
+        command.current(config, check_heads=True)
+        command.check(config)
+        assert _migration_state(temporary_database) == MigrationState(
+            revision=REPORT_PERSISTENCE_REVISION,
+            version_table_exists=True,
+            product_tables=EXPECTED_PRODUCT_TABLES,
+        )
+
+
+async def _load_report_catalog(
+    temporary_database: TemporaryDatabaseContext,
+) -> tuple[
+    list[tuple[str, str, str, str, int | None, int | None, int | None]],
+    dict[str, tuple[str, bool, bool]],
+    set[str],
+]:
+    engine = create_database_engine(temporary_database.database_settings())
+    try:
+        async with engine.connect() as connection:
+            columns_result = await connection.execute(
+                text(
+                    "SELECT table_name, column_name, udt_name, is_nullable, "
+                    "character_maximum_length, numeric_precision, numeric_scale "
+                    "FROM information_schema.columns "
+                    "WHERE table_schema = 'public' "
+                    "AND table_name IN ('evaluation_reports', 'evidence_items') "
+                    "ORDER BY table_name, ordinal_position"
+                )
+            )
+            constraints_result = await connection.execute(
+                text(
+                    "SELECT conname, contype, condeferrable, condeferred "
+                    "FROM pg_catalog.pg_constraint "
+                    "WHERE connamespace = 'public'::regnamespace "
+                    "AND contype IN ('p', 'f', 'c', 'u') "
+                    "AND conrelid IN "
+                    "('evaluation_reports'::regclass, 'evidence_items'::regclass) "
+                    "ORDER BY conname"
+                )
+            )
+            indexes_result = await connection.execute(
+                text(
+                    "SELECT indexname FROM pg_catalog.pg_indexes "
+                    "WHERE schemaname = 'public' "
+                    "AND tablename IN ('evaluation_reports', 'evidence_items')"
+                )
+            )
+            columns = [
+                (
+                    str(row.table_name),
+                    str(row.column_name),
+                    str(row.udt_name),
+                    str(row.is_nullable),
+                    None
+                    if row.character_maximum_length is None
+                    else int(row.character_maximum_length),
+                    None
+                    if row.numeric_precision is None
+                    else int(row.numeric_precision),
+                    None if row.numeric_scale is None else int(row.numeric_scale),
+                )
+                for row in columns_result
+            ]
+            constraints = {
+                str(row.conname): (
+                    str(row.contype),
+                    bool(row.condeferrable),
+                    bool(row.condeferred),
+                )
+                for row in constraints_result
+            }
+            indexes = {str(name) for name in indexes_result.scalars()}
+    finally:
+        await dispose_database_engine(engine)
+    return columns, constraints, indexes
+
+
+def test_report_head_has_exact_columns_constraints_and_indexes(
+    temporary_database: TemporaryDatabaseContext,
+) -> None:
+    config = _alembic_config()
+    with _temporary_migration_environment(temporary_database):
+        command.upgrade(config, "head")
+
+    columns, constraints, indexes = asyncio.run(
+        _load_report_catalog(temporary_database),
+        loop_factory=asyncio.SelectorEventLoop,
+    )
+    assert columns == [
+        ("evaluation_reports", "id", "uuid", "NO", None, None, None),
+        ("evaluation_reports", "session_id", "uuid", "NO", None, None, None),
+        ("evaluation_reports", "report_schema_version", "int2", "NO", None, 16, 0),
+        ("evaluation_reports", "derivation_version", "varchar", "NO", 128, None, None),
+        ("evaluation_reports", "source_through_sequence", "int8", "NO", None, 64, 0),
+        ("evaluation_reports", "status", "varchar", "NO", 16, None, None),
+        ("evaluation_reports", "overall_summary", "text", "YES", None, None, None),
+        ("evaluation_reports", "priority_improvement", "text", "YES", None, None, None),
+        ("evaluation_reports", "created_at", "timestamptz", "NO", None, None, None),
+        ("evaluation_reports", "started_at", "timestamptz", "YES", None, None, None),
+        ("evaluation_reports", "completed_at", "timestamptz", "YES", None, None, None),
+        ("evaluation_reports", "failed_at", "timestamptz", "YES", None, None, None),
+        ("evidence_items", "id", "uuid", "NO", None, None, None),
+        ("evidence_items", "session_id", "uuid", "NO", None, None, None),
+        ("evidence_items", "report_id", "uuid", "NO", None, None, None),
+        ("evidence_items", "kind", "varchar", "NO", 16, None, None),
+        ("evidence_items", "source_participant_id", "uuid", "NO", None, None, None),
+        ("evidence_items", "source_utterance_id", "uuid", "NO", None, None, None),
+        ("evidence_items", "source_event_sequence", "int8", "NO", None, 64, 0),
+        ("evidence_items", "phase", "varchar", "NO", 32, None, None),
+        ("evidence_items", "quote", "text", "NO", None, None, None),
+        ("evidence_items", "interpretation", "text", "NO", None, None, None),
+        ("evidence_items", "confidence", "numeric", "NO", None, 4, 3),
+        ("evidence_items", "created_at", "timestamptz", "NO", None, None, None),
+    ]
+    assert constraints == {
+        "ck_evaluation_reports_completed_after_started": ("c", False, False),
+        "ck_evaluation_reports_derivation_version_non_empty": ("c", False, False),
+        "ck_evaluation_reports_failed_after_creation": ("c", False, False),
+        "ck_evaluation_reports_report_schema_version_positive": ("c", False, False),
+        "ck_evaluation_reports_source_through_sequence_non_negative": (
+            "c",
+            False,
+            False,
+        ),
+        "ck_evaluation_reports_started_after_creation": ("c", False, False),
+        "ck_evaluation_reports_status_allowed": ("c", False, False),
+        "ck_evaluation_reports_status_timing_consistent": ("c", False, False),
+        "ck_evidence_items_confidence_range": ("c", False, False),
+        "ck_evidence_items_interpretation_non_empty": ("c", False, False),
+        "ck_evidence_items_kind_allowed": ("c", False, False),
+        "ck_evidence_items_phase_allowed": ("c", False, False),
+        "ck_evidence_items_quote_non_empty": ("c", False, False),
+        "ck_evidence_items_source_event_sequence_positive": ("c", False, False),
+        "fk_evaluation_reports_session_id_simulation_sessions": ("f", False, False),
+        "fk_evidence_items_session_event": ("f", True, True),
+        "fk_evidence_items_session_id_simulation_sessions": ("f", False, False),
+        "fk_evidence_items_session_participant": ("f", True, True),
+        "fk_evidence_items_session_report": ("f", True, True),
+        "pk_evaluation_reports": ("p", False, False),
+        "pk_evidence_items": ("p", False, False),
+        "uq_evaluation_reports_generation_identity": ("u", False, False),
+        "uq_evaluation_reports_session_id": ("u", False, False),
+    }
+    assert indexes == {
+        "ix_evaluation_reports_session_created",
+        "ix_evidence_items_report_created",
+        "pk_evaluation_reports",
+        "pk_evidence_items",
+        "uq_evaluation_reports_generation_identity",
+        "uq_evaluation_reports_session_id",
     }
 
 
