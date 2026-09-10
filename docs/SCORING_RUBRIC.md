@@ -73,7 +73,7 @@
 
 - V0.1：只需要简版证据报告，用于验证证据链路，不要求完成正式六维聚合体系。
 - V0.5：必须具备六维评分、时间戳证据和历史报告。
-- P1-7A freezes the basic report/evidence boundary; P1-7B persistence is `DONE / ACTUAL_SOURCE_REVIEW_PASS` with `P1-7B-F001 CLOSED` and open findings `NONE`, while extraction/generation and REST/Web remain P1-7C/D `NOT_STARTED`.
+- P1-7A freezes the basic report/evidence boundary; P1-7B persistence is `DONE / ACTUAL_SOURCE_REVIEW_PASS` with `P1-7B-F001 CLOSED`; P1-7C extraction/generation is `IMPLEMENTED / AWAITING_ACTUAL_SOURCE_REVIEW`; REST/Web remains P1-7D `NOT_STARTED`.
 
 ## Implementation guidance
 
@@ -96,7 +96,7 @@
 
 ## Future work
 
-- P1：P1-7A has frozen the V0.1 basic evidence report boundary；P1-7B persistence is `DONE / ACTUAL_SOURCE_REVIEW_PASS` with `P1-7B-F001 CLOSED` and open findings `NONE`；P1-7C～E remain `NOT_STARTED`.
+- P1：P1-7A has frozen the V0.1 basic evidence report boundary；P1-7B persistence is `DONE / ACTUAL_SOURCE_REVIEW_PASS` with `P1-7B-F001 CLOSED`；P1-7C implements evaluator-neutral, exact-source evidence validation and basic generation without formal scores and awaits actual-source review；P1-7D/E remain `NOT_STARTED`.
 - P3：完成客观指标、证据提取、六维评分、报告和专项训练设计。
 - P5：通过专家标注和公开测试校准可信度与用户认可率。
 

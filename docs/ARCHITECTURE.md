@@ -6,9 +6,9 @@
 - P0-3 foundation status: DONE
 - P0-4 database foundation status: DONE
 - P0-5 identity boundary status: DONE
-- Current implementation checkpoint: P1-7B Evidence / Report Persistence Foundation — `DONE / ACTUAL_SOURCE_REVIEW_PASS`
+- Current implementation checkpoint: P1-7C Evidence Extraction + Basic Report Generation — `IMPLEMENTED / AWAITING_ACTUAL_SOURCE_REVIEW`
 - P0 status: DONE; P0-1 through P0-7 completed
-- P1 status: IN_PROGRESS; P1-1～P1-6 DONE; P1-6E/P1-6 CLOSED; P1-7 IN_PROGRESS; P1-7A review PASS; P1-7B DONE/review PASS with `P1-7B-F001 CLOSED` and open findings `NONE`; P1-7C～E/P1-8 NOT_STARTED
+- P1 status: IN_PROGRESS; P1-1～P1-6 DONE; P1-6E/P1-6 CLOSED; P1-7 IN_PROGRESS; P1-7A review PASS; P1-7B DONE/review PASS with `P1-7B-F001 CLOSED`; P1-7C `IMPLEMENTED / AWAITING_ACTUAL_SOURCE_REVIEW`; P1-7D/E/P1-8 NOT_STARTED
 - Target version: V0.1 Internal Validation
 - Business architecture detail: P1-1～P1-5 runtime、transport、Web and recovery are complete；P1-6 adds structured public discussion memory、bounded memory-backed context and the completed Human + three-AI text-simulation proof；P1-7B adds internal report/evidence persistence and idempotent COMPLETED-only allocation without changing lifecycle、public contracts or evidence authority
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
@@ -413,6 +413,12 @@ P1-3 lifecycle authority: phase / deadline
 
 ## Provider neutrality and orchestration
 
+### P1-7C report evaluation pipeline
+
+The V1 internal path is `ReportSourceCollector -> ReportEvaluator -> EvidenceValidator -> ReportComposer -> ReportGenerationCoordinator`. The collector projects only public Question fields, the public roster and ordered authoritative utterance events through the frozen report watermark; Memory and private Question/Persona fields are not inputs. The evaluator's proposal is untrusted, while project code owns exact Human-source identity, event, phase and quote validation plus trusted `STRENGTH`/`IMPROVEMENT` assignment.
+
+The coordinator owns report lifecycle mutation through short claim/finalization/failure transactions using `started_at` as a lease token. Evaluation runs after the source read scope closes; completion and all Evidence inserts are one atomic transaction, stale workers fail CAS without persisting output, and completed identities are immutable. P3 may add metrics, dimensions, scoring and recommendations behind these boundaries without replacing the P1 report/evidence provenance model; P4 entitlement/payment policy remains outside the evaluator. P1-7C creates no provider-specific evaluator, queue, REST/Web surface or placeholder P3/P4 types.
+
 - 业务领域不得直接绑定厂商 SDK；
 - LLM Provider、ASR Provider、TTS Provider、可选 Embedding Provider 是按需建立的概念边界；
 - LLMProvider 在 P1 首次真正调用 LLM 时建立；
@@ -444,7 +450,7 @@ Redis 只在多 API workers、横向扩容、跨进程 WebSocket broadcast、dis
 - P0-5D：completed；真实 browser Cookie/CORS/CSRF 闭环已通过 Chromium 验证；
 - P0-5E：completed；final outcome `PASS after findings remediation and independent recheck`；
 - P0：`DONE`；P0-1～P0-7 completed；P0-7 finding-only independent recheck `PASS`，P1 readiness `READY`；其后用户已明确批准进入 P1；
-- P1：`IN_PROGRESS`；P1-1～P1-6 are `DONE`；P1-6E/P1-6 are `CLOSED`；P1-7A is review-pass and P1-7B is `DONE / ACTUAL_SOURCE_REVIEW_PASS` with `P1-7B-F001 CLOSED` and open findings `NONE`；P1-7C～E and P1-8 are `NOT_STARTED`；
+- P1：`IN_PROGRESS`；P1-1～P1-6 are `DONE`；P1-6E/P1-6 are `CLOSED`；P1-7A is review-pass；P1-7B is `DONE / ACTUAL_SOURCE_REVIEW_PASS` with `P1-7B-F001 CLOSED`；P1-7C is `IMPLEMENTED / AWAITING_ACTUAL_SOURCE_REVIEW`；P1-7D/E and P1-8 are `NOT_STARTED`；
 - P2 以后：只在对应阶段获批后增加语音、评分训练和商业化能力。
 
 ## 与其他文档关系

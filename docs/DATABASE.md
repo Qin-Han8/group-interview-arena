@@ -15,7 +15,7 @@
 - Target version: V0.1 Internal Validation
 - Business schema: identity, session, question/persona, durable phase timing, participant/floor audit, AI Runtime, structured Discussion Memory, and Evaluation Report/Evidence persistence (twenty-three product tables)
 - P1-1 status: P1-1A～E completed; independent final verdict PASS; P1-1 DONE
-- P1-2～P1-6 status: DONE; P1-6E/P1-6 CLOSED; P1-7 IN_PROGRESS; P1-7A `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-7B `DONE / ACTUAL_SOURCE_REVIEW_PASS` with `P1-7B-F001 CLOSED` and open findings `NONE`; P1-7C～E/P1-8 NOT_STARTED; the schema is twenty-three product tables at linear revision `f1a17b17c008`
+- P1-2～P1-6 status: DONE; P1-6E/P1-6 CLOSED; P1-7 IN_PROGRESS; P1-7A `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-7B `DONE / ACTUAL_SOURCE_REVIEW_PASS` with `P1-7B-F001 CLOSED`; P1-7C `IMPLEMENTED / AWAITING_ACTUAL_SOURCE_REVIEW`; P1-7D/E/P1-8 NOT_STARTED; the schema remains twenty-three product tables at linear revision `f1a17b17c008`
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -442,9 +442,11 @@ The future `EvidenceItem` responsibility must represent stable evidence/report i
 
 `evaluation_reports` persists stable report/session identity, positive report schema version, non-empty derivation version, non-negative authoritative source watermark, closed `REQUESTED/RUNNING/COMPLETED/FAILED` lifecycle, nullable pre-completion narrative and lifecycle timestamps. The unique generation identity is `(session_id, report_schema_version, derivation_version, source_through_sequence)`; `COMPLETED` requires started/completed timestamps and non-empty summary/priority improvement.
 
-`evidence_items` persists stable report/session/source participant/source utterance/source event identity, closed `STRENGTH/IMPROVEMENT` kind, five authoritative discussion phases, non-empty quote/interpretation, `NUMERIC(4,3)` confidence constrained to `0..1`, and creation time. Composite foreign keys enforce same-session report, participant and `DiscussionEvent(session_id, sequence)` provenance. `source_utterance_id` is intentionally not linked to `ai_utterances`, because Human utterances have no generic relational utterance row; event payload/type/actor/quote semantics remain P1-7C validation work.
+`evidence_items` persists stable report/session/source participant/source utterance/source event identity, closed `STRENGTH/IMPROVEMENT` kind, five authoritative discussion phases, non-empty quote/interpretation, `NUMERIC(4,3)` confidence constrained to `0..1`, and creation time. Composite foreign keys enforce same-session report, participant and `DiscussionEvent(session_id, sequence)` provenance. `source_utterance_id` is intentionally not linked to `ai_utterances`, because Human utterances have no generic relational utterance row. P1-7C now validates event payload/type, Human actor, participant, utterance, phase, watermark and exact quote semantics in project code before persistence.
 
 The application service accepts only owner-scoped `SimulationSession.status == COMPLETED`, freezes `last_sequence` under a PostgreSQL share lock and uses the named generation-identity unique constraint plus `ON CONFLICT DO NOTHING` as concurrent re-entry authority. It creates no Evidence rows and invokes no evaluator/provider.
+
+P1-7C adds no migration or table. Its coordinator claims generation with the database-round-tripped `started_at` token and a positive lease, then uses token/status compare-and-set for failure or atomic completion. A successful finalization updates the report and inserts the complete validated Evidence collection in one transaction; a stale claimant or any insert failure commits no evidence or completed report state.
 
 ## Future business schema
 
@@ -463,7 +465,7 @@ The application service accepts only owner-scoped `SimulationSession.status == C
 - Implemented：P1-4B generalized participant、opportunity、decision、grant、release 与 intervention schema；
 - Implemented in P1-5B：Prompt Version、closed configuration-version provenance、Generation Request lifecycle and successful final AI Utterance relation；
 - Implemented in P1-6B/P1-6E repair：structured Discussion Memory state/journal、closed Working Context V2 request metadata and strict PostgreSQL JSON-type enforcement；
-- Implemented in P1-7B：Evaluation Report and Evidence Item physical persistence, generation lifecycle/version/watermark identity, same-session relational provenance and idempotent COMPLETED-only allocation；semantic extraction/generation remains P1-7C `NOT_STARTED`；
+- Implemented in P1-7B/P1-7C：Evaluation Report and Evidence Item physical persistence, generation lifecycle/version/watermark identity, same-session relational provenance, idempotent COMPLETED-only allocation, public-source extraction, deterministic evidence validation and lease/CAS atomic generation；
 - TBD：未来 phone/WeChat identity mapping 的具体 Schema；
 - TBD：verified recovery identity、account recovery 与账号删除的完整数据语义；
 - TBD：原始音频是否默认完全不保存（总纲第 37 节）；
@@ -476,7 +478,7 @@ The application service accepts only owner-scoped `SimulationSession.status == C
 
 - P0-5C：FastAPI lifespan/request dependency 已成为现有 async DB runtime 的第一个 application caller；真实 PostgreSQL auth integration 只使用迁移到 head 的隔离临时数据库，development DB 保持 head `4fe43b42641b` 且两张表均为 0 rows；
 - P0-5D：completed；browser closure 已实现，existing Cookie/CORS/CSRF/shared trusted-origin boundary 已生效；P1 不得创建第二套 trusted-origin config；
-- P1：`IN_PROGRESS`；P1-1～P1-6 are `DONE`；P1-6E/P1-6 are `CLOSED`；current migration head is `f1a17b17c008` with exactly twenty-three product tables；P1-7 is `IN_PROGRESS` with P1-7A `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`, P1-7B `DONE / ACTUAL_SOURCE_REVIEW_PASS`, `P1-7B-F001 CLOSED`, open findings `NONE`, and P1-7C～E/P1-8 `NOT_STARTED`；
+- P1：`IN_PROGRESS`；P1-1～P1-6 are `DONE`；P1-6E/P1-6 are `CLOSED`；current migration head is `f1a17b17c008` with exactly twenty-three product tables；P1-7 is `IN_PROGRESS` with P1-7A `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`, P1-7B `DONE / ACTUAL_SOURCE_REVIEW_PASS`, `P1-7B-F001 CLOSED`, P1-7C `IMPLEMENTED / AWAITING_ACTUAL_SOURCE_REVIEW`, and P1-7D/E/P1-8 `NOT_STARTED`；
 - P2～P4：仅随获批范围增加音频、评分训练和商业化数据。
 
 ## 与其他文档关系
