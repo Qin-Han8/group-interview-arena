@@ -1,13 +1,13 @@
 # 当前任务清单
 
-- Status: P1 in progress; P1-1 through P1-6 completed; P1-6 is `DONE / CLOSED`; P1-7 is `IN_PROGRESS`; P1-7A is `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-7B is `DONE / ACTUAL_SOURCE_REVIEW_PASS`; P1-7C～P1-7E/P1-8 are `NOT_STARTED`; open findings `NONE`
-- Managed scope: P1-7B minimal Evaluation Report/Evidence Item persistence, migration, COMPLETED-only eligibility and idempotent generation identity; no evaluator/provider, evidence extraction, REST/Web, content authoring or P1-7C work
-- Current implementation checkpoint: P1-7B — `DONE / ACTUAL_SOURCE_REVIEW_PASS`; P1-7 — `IN_PROGRESS`; P1-6 — `DONE / CLOSED`
+- Status: P1 in progress; P1-1 through P1-6 completed; P1-6 is `DONE / CLOSED`; P1-7 is `IN_PROGRESS`; P1-7A is `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-7B is `DONE / ACTUAL_SOURCE_REVIEW_PASS`; P1-7C is `IMPLEMENTED / AWAITING_ACTUAL_SOURCE_REVIEW`; P1-7D/P1-7E/P1-8 are `NOT_STARTED`; open implementation findings `NONE`
+- Managed scope: P1-7C public-only source collection, evaluator-neutral proposal contract, deterministic evidence validation/composition and lease/CAS/atomic report generation; no real provider, REST/Web, scoring, content authoring or P1-7D work
+- Current implementation checkpoint: P1-7C — `IMPLEMENTED / AWAITING_ACTUAL_SOURCE_REVIEW`; P1-7B — `DONE / ACTUAL_SOURCE_REVIEW_PASS`; P1-7D/P1-7E/P1-8 — `NOT_STARTED`
 - P0-7 final outcome: initial verdict `BLOCKED` with two documentation findings; remediation completed; finding-only independent recheck `PASS`; new blockers none; P1 readiness `READY`
 - Current phase: P1 — `IN_PROGRESS`
 - Current governance checkpoint: P1-7B external actual-source review is `PASS`; `P1-7B-F001` is `CLOSED`; P1-7B open findings are `NONE`
 - Latest completed implementation review: P1-7B initial review plus finding-only re-review are `PASS`; material findings/new blockers/open findings are `NONE`
-- Current task gate: P1-6 — `DONE / CLOSED`; P1-7 — `IN_PROGRESS`; P1-7A — `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-7B — `DONE / ACTUAL_SOURCE_REVIEW_PASS`; P1-7C～P1-7E/P1-8 — `NOT_STARTED`; open findings — `NONE`; P1 remains `IN_PROGRESS`
+- Current task gate: P1-6 — `DONE / CLOSED`; P1-7 — `IN_PROGRESS`; P1-7A — `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-7B — `DONE / ACTUAL_SOURCE_REVIEW_PASS`; P1-7C — `IMPLEMENTED / AWAITING_ACTUAL_SOURCE_REVIEW`; P1-7D/P1-7E/P1-8 — `NOT_STARTED`; open implementation findings — `NONE`; P1 remains `IN_PROGRESS`
 - P0 status: `DONE`; P0-1 through P0-7 completed
 - Allowed status values: `TODO` / `IN_PROGRESS` / `BLOCKED` / `DONE`
 - Related roadmap: [`ROADMAP.md`](ROADMAP.md)
@@ -828,7 +828,7 @@
 
 - `P1-7A — Basic Evidence Report & V0.1 Content Architecture Freeze`: `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; strict docs-only; external actual-source review verdict `PASS`; material findings/new blockers/open findings `NONE`;
 - `P1-7B — Evidence / Report Persistence Foundation`: `DONE / ACTUAL_SOURCE_REVIEW_PASS`; `P1-7B-F001 CLOSED`; open findings `NONE`;
-- `P1-7C — Evidence Extraction + Basic Report Generation`: `NOT_STARTED`;
+- `P1-7C — Evidence Extraction + Basic Report Generation`: `IMPLEMENTED / AWAITING_ACTUAL_SOURCE_REVIEW`;
 - `P1-7D — Report REST/Web + V0.1 Content Closure`: `NOT_STARTED`;
 - `P1-7E — Composition Acceptance + Independent Acceptance`: `NOT_STARTED`.
 
@@ -854,6 +854,13 @@ P1-7A review closeout uses `group-interview-arena-review-20260909-234536.zip` / 
 - Evidence provenance uses same-session composite foreign keys to report, participant and authoritative `DiscussionEvent(session_id, sequence)`; Human `source_utterance_id` remains a stable UUID because the actual source has no generic Human utterance table.
 - `get_or_create_eligible_report` accepts only owner-scoped `COMPLETED` sessions, freezes the watermark under a PostgreSQL share lock and resolves concurrent re-entry through the named database unique constraint. It performs no evaluator/provider call and creates no Evidence rows.
 - Fresh unit, PostgreSQL migration/catalog/downgrade/re-upgrade, constraint, idempotency and two-caller concurrency gates pass. External actual-source review final verdict is `PASS`; `P1-7B-F001` is `CLOSED`; material findings/new blockers/open findings are `NONE`. Accepted bundles are `gia-p1-7b-report-persistence-review-20260910-113955.zip` / SHA-256 `9FB2E9CF3E2BD3E865295F11C15764670E216BC0FED4CD9E1CD59DDE5F12AD9E` and `gia-p1-7b-f001-finding-only-review-20260910-120420.zip` / SHA-256 `CCA43286017D97133755285F8D5EFC6EFAF15F38DDD54D3DD07327C936AFE4B0`.
+
+### P1-7C implementation checkpoint
+
+- `ReportSourceCollector` projects only the exact public Question allowlist, ordered public roster and authoritative `participant.utterance.created` events through the report's frozen watermark. It excludes Memory, hidden/reference Question fields and Persona private/calibration data, and preserves source content exactly.
+- `ReportEvaluator` returns a closed evaluator-neutral proposal. `EvidenceValidator` resolves every proposed citation exactly to Human public source identity/sequence/phase/quote, and `ReportComposer` assigns trusted evidence kind and rejects the whole generation if any proposed item is invalid. `DeterministicReportEvaluator` is network-free.
+- `ReportGenerationCoordinator` uses the durable generation identity and `started_at` claim token with an explicit positive lease. Short transactions own claim/failure/finalization CAS; no DB scope is held during evaluation. Completion plus every Evidence row commits atomically, stale claimants persist nothing, FAILED retries reuse the same report, and COMPLETED re-entry does not evaluate again.
+- P1-7C changes no schema, migration, session lifecycle, public API, Web surface or dependency. It adds no P3 score/dimension/ranking behavior and makes no real-provider call. P1-7D/P1-7E and P1-8 remain `NOT_STARTED`.
 
 ## P1-8 — Independent P1 Acceptance
 
