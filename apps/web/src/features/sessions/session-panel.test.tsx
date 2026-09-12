@@ -1476,6 +1476,7 @@ describe("SessionPanel", () => {
       await screen.findByText("题目内容暂时无法加载，讨论记录仍可继续查看"),
     ).toBeInTheDocument();
     expect(mockedGetQuestion).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(realtime.start).toHaveBeenCalledOnce());
 
     act(() => {
       realtime.options().onError("temporary generic error");
