@@ -102,8 +102,8 @@ Retired published public content 仍可按 immutable version ID 为历史 sessio
 ## V0.1 scope
 
 - 3 种题型：排序选择、资源分配、方案策划；
-- 每类建议 4 道，共 12 道人工审核题；12 道正式内容生产本轮 Deferred；
-- P1-2B 可以建立一个明确标记的 `INTERNAL_VALIDATION` 人工 fixture，供 P1-2C 真实 vertical slice 使用；它不计入 12 道正式题；
+- 每类精确 4 道，共 12 道人工审核题；P1-7D 已实现候选内容，外部人工内容审核结论为 `PASS`；
+- P1-2B 建立的 `INTERNAL_VALIDATION` 资源分配题保留且作为当前 V0.1 internal-validation 12 题候选集的一题，不允许因内容闭合而静默改写；
 - 管理端只需要的“最小题目配置”不等于本轮建设完整 CMS/RBAC/审批流；
 - 质量优先于数量。
 
@@ -121,14 +121,15 @@ V0.5 扩展到排序选择、资源分配、方案策划和两难决策，共 20
 ## Current implementation status
 
 - P1-2B 已新增五张 question/persona tables、nullable session version FK、revision `f1a12b15c002`、strict closed domain validation 和 insert-or-exact-match publication writer。
-- deterministic seed 精确包含四种 V0.1 Persona Template 与一个明确标记的 internal-validation bundle；它不属于 12 道正式内容。
+- deterministic seed 精确包含四种 V0.1 Persona Template 与 12 个 immutable candidate Question Version：4 排序选择 / 4 资源分配 / 4 方案策划。新增 11 题每题绑定三个不同 Persona 及显式、题目特定的 Private Stance（初始立场、权重、让步条件、红线和偏好角色均有区分）；seed 仍是 insert-or-exact-match，既有 internal-validation bundle 未被改写。
+- Finding remediation 补足博物馆五组藏品的材质/数量/风险窗口/移动事实、三个乡镇的需求与交通事实，以及高温措施的单位成本/服务能力，确保相关排序与分配可由公开题面核算；P1-7D-F003 已由外部 re-review 确认 `CLOSED`。
+- P1-7D 自动化只证明 closed domain validation、稳定唯一身份、seed 幂等、public projection/private isolation 和正常 session binding；外部人工内容审核结论为 `PASS`，内容状态为 `4/4/4 IMPLEMENTED / HUMAN_CONTENT_REVIEW_PASS`，material content findings 为 `NONE OPEN`。审核清单见 [`V01_CONTENT_REVIEW_MANIFEST.md`](V01_CONTENT_REVIEW_MANIFEST.md)。
 - P1-2C 已新增面向普通用户的 safe question projection，用于题目发现、读取及 version-bound session creation；普通 REST/OpenAPI/Browser/WS surface 仍不暴露 persona assignment、persona behavior parameters、Private Stance、internal calibration 或其他 server-only 内部数据。
 - P1-2C 已增加 safe question read、version-bound session creation 和最小 Web caller；公开 DTO 使用显式 allowlist，历史 session 按 snapshot 中 exact version ID 解析 retired published content。
 
 ## TBD
 
 - TBD：是否允许用户上传自定义题目（总纲第 37 节）；
-- TBD：V0.1 的 12 道正式题目及审核责任人；
 - TBD：完整题目审核、发布、回滚、RBAC 和操作审计流程；
 - TBD：行业题包进入哪个具体版本；
 - TBD：未来 item-level relational query/edit caller 是否要求进一步 normalize 结构字段；

@@ -3,6 +3,8 @@ import { access, readFile, writeFile } from "node:fs/promises";
 
 const API_BASE_URL = process.env.GIA_E2E_API_ORIGIN ?? "http://localhost:8000";
 const PRIVATE_SENTINEL = "P1_2C_PRIVATE_SENTINEL_DO_NOT_DISCLOSE";
+const INTERNAL_VALIDATION_QUESTION_VERSION_ID =
+  "21000000-0000-4000-8000-000000000001";
 const HUMAN_CONTRIBUTION = [
   "  Human evidence: preserve this exact contribution.",
   ...Array.from(
@@ -306,9 +308,15 @@ test("browser session recovers durable phases across API restart and reload", as
     return { status: response.status, body: await response.json() };
   }, API_BASE_URL);
   expect(discovery.status).toBe(200);
-  expect(discovery.body).toHaveLength(1);
-  const questionVersionId = discovery.body[0].id as string;
+  expect(discovery.body).toHaveLength(12);
+  const discoveredQuestion = discovery.body.find(
+    (item: { id: string }) =>
+      item.id === INTERNAL_VALIDATION_QUESTION_VERSION_ID,
+  );
+  expect(discoveredQuestion).toBeDefined();
+  const questionVersionId = discoveredQuestion.id as string;
   expect(JSON.stringify(discovery)).not.toContain(PRIVATE_SENTINEL);
+  await page.getByRole("combobox").selectOption(questionVersionId);
 
   const createResponsePromise = page.waitForResponse(
     (response) =>

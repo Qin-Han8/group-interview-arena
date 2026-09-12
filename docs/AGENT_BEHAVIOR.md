@@ -1,9 +1,9 @@
 # AI 候选人与讨论编排骨架
 
-- Status: P1-2～P1-6 completed; P1-6E/P1-6 `DONE / CLOSED`; P1-7/P1-8 `NOT_STARTED`
+- Status: P1-2～P1-6 completed; P1-6E/P1-6 `DONE / CLOSED`; P1-7 `IN_PROGRESS`; P1-7A/P1-7B/P1-7C/P1-7D review PASS; P1-7D `DONE / ACTUAL_SOURCE_REVIEW_PASS`; P1-7E/P1-8 `NOT_STARTED`
 - Current phase: P1 — IN_PROGRESS
 - Target version: V0.1 Internal Validation
-- Detailed orchestrator/agent design: P1-3 lifecycle、P1-4 floor、P1-5 runtime/public transport and P1-6 structured Memory/full text composition are implemented；P1-7 report/content and P1-8 full-P1 acceptance remain unimplemented
+- Detailed orchestrator/agent design: P1-3 lifecycle、P1-4 floor、P1-5 runtime/public transport、P1-6 structured Memory/full text composition and P1-7A～P1-7D report/content work are implemented；P1-7E and P1-8 full-P1 acceptance remain unimplemented
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -357,7 +357,7 @@ Generation Request 与 final Utterance 是不同 identity。一个 logical reque
 
 ## Future work
 
-- P1：`IN_PROGRESS`；P1-1～P1-6 are `DONE`；P1-6E/P1-6 are `CLOSED`；P1-7 basic report/V0.1 content and P1-8 full-P1 acceptance are `NOT_STARTED`。
+- P1：`IN_PROGRESS`；P1-1～P1-6 are `DONE`；P1-6E/P1-6 are `CLOSED`；P1-7 is `IN_PROGRESS` with P1-7A/P1-7B/P1-7C/P1-7D review PASS and P1-7D `DONE / ACTUAL_SOURCE_REVIEW_PASS`；P1-7E and P1-8 are `NOT_STARTED`。
 - P2：加入语音、打断、播放停止和恢复语义。
 - P3：建立角色行为与评分证据之间的校准边界。
 - P6/V1.0：扩展到 6～8 种角色和压力模式。

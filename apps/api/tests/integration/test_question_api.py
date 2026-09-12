@@ -29,6 +29,7 @@ from group_interview_arena_api.db.dependencies import (
 )
 from group_interview_arena_api.modules.question_personas.seed import (
     INTERNAL_VALIDATION_BUNDLE,
+    V01_QUESTION_BUNDLES,
     persist_published_question_bundle,
     seed_question_persona_foundation,
 )
@@ -217,10 +218,12 @@ async def _verify_discovery_detail_and_nondisclosure(
             await _register(client, "question_reader")
             discovered = await client.get("/questions")
             assert discovered.status_code == 200
-            assert len(discovered.json()) == 1
+            assert len(discovered.json()) == 12
             summary = discovered.json()[0]
             assert set(summary) == _public_summary_keys()
-            assert summary["id"] == str(INTERNAL_VALIDATION_BUNDLE.version_id)
+            assert {item["id"] for item in discovered.json()} == {
+                str(bundle.version_id) for bundle in V01_QUESTION_BUNDLES
+            }
 
             detail = await client.get(
                 f"/questions/{INTERNAL_VALIDATION_BUNDLE.version_id}"
@@ -246,6 +249,24 @@ async def _verify_discovery_detail_and_nondisclosure(
                 "safety_tags",
             ):
                 assert private_name not in serialized
+
+            for bundle in V01_QUESTION_BUNDLES:
+                public = await client.get(f"/questions/{bundle.version_id}")
+                assert public.status_code == 200
+                assert set(public.json()) == _public_summary_keys() | {
+                    "scenario",
+                    "objective",
+                    "hard_constraints",
+                    "soft_constraints",
+                    "stakeholders",
+                    "options",
+                }
+                created = await client.post(
+                    "/sessions",
+                    headers=AUTH_HEADERS,
+                    json={"question_version_id": str(bundle.version_id)},
+                )
+                assert created.status_code == 201
 
             draft = await client.get(f"/questions/{draft_id}")
             missing = await client.get(f"/questions/{uuid4()}")
@@ -307,7 +328,18 @@ async def _verify_retired_persona_blocks_new_selection(
             await _register(client, "retired_persona_reader")
             discovered = await client.get("/questions")
             assert discovered.status_code == 200
-            assert discovered.json() == []
+            retired_persona_id = INTERNAL_VALIDATION_BUNDLE.assignments[
+                0
+            ].persona_template_id
+            expected_available = {
+                str(bundle.version_id)
+                for bundle in V01_QUESTION_BUNDLES
+                if retired_persona_id
+                not in {
+                    assignment.persona_template_id for assignment in bundle.assignments
+                }
+            }
+            assert {item["id"] for item in discovered.json()} == expected_available
             historical_read = await client.get(
                 f"/questions/{INTERNAL_VALIDATION_BUNDLE.version_id}"
             )
@@ -382,7 +414,13 @@ async def _verify_immutable_historical_binding(
                     )
 
             discovered = await client.get("/questions")
-            assert [item["id"] for item in discovered.json()] == [
+            same_template_versions = [
+                item
+                for item in discovered.json()
+                if item["question_template_id"]
+                == str(INTERNAL_VALIDATION_BUNDLE.template_id)
+            ]
+            assert [item["id"] for item in same_template_versions] == [
                 str(second_bundle.version_id)
             ]
             historical_detail = await client.get(

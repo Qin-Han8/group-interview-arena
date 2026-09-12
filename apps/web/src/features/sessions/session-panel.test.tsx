@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   createSession,
+  generateReport,
   getQuestion,
   getSessionSnapshot,
   loadSessionTranscript,
@@ -33,10 +34,15 @@ import SessionPanel from "./session-panel";
 
 vi.mock("@/lib/api/client", () => ({
   createSession: vi.fn(),
+  generateReport: vi.fn(),
   getQuestion: vi.fn(),
   getSessionSnapshot: vi.fn(),
   loadSessionTranscript: vi.fn(),
   listQuestions: vi.fn(),
+}));
+const pushRoute = vi.fn();
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: pushRoute }),
 }));
 vi.mock("@/lib/realtime/client", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/realtime/client")>();
@@ -165,6 +171,7 @@ function deferred<T>() {
 }
 
 const mockedCreateSession = vi.mocked(createSession);
+const mockedGenerateReport = vi.mocked(generateReport);
 const mockedGetQuestion = vi.mocked(getQuestion);
 const mockedGetSessionSnapshot = vi.mocked(getSessionSnapshot);
 const mockedLoadSessionTranscript = vi.mocked(loadSessionTranscript);
@@ -294,6 +301,19 @@ async function renderRestoredSession(
 describe("SessionPanel", () => {
   beforeEach(() => {
     mockedLoadSessionTranscript.mockResolvedValue([]);
+    mockedGenerateReport.mockResolvedValue({
+      data: {
+        report_id: "40000000-0000-4000-8000-000000000001",
+        session_id: SESSION_ID,
+        status: "COMPLETED",
+        report_schema_version: 1,
+        derivation_version: "basic-report/v1",
+        source_through_sequence: 4,
+        created_at: "2026-08-16T00:05:00Z",
+        completed_at: "2026-08-16T00:05:01Z",
+      },
+      response: new Response(null, { status: 200 }),
+    });
   });
 
   afterEach(() => {
@@ -1573,5 +1593,52 @@ describe("SessionPanel", () => {
       PREPARATION.phase_deadline_at,
     );
     expect(rendered.container.textContent).not.toContain(GRANT_ID);
+  });
+
+  it("offers report generation only after completion and navigates after success", async () => {
+    await renderRestoredSession(
+      discussionSnapshot(null, GRANT_ID, "COMPLETED"),
+    );
+
+    const action = screen.getByRole("button", { name: "生成 / 查看训练报告" });
+    fireEvent.click(action);
+
+    await waitFor(() =>
+      expect(mockedGenerateReport).toHaveBeenCalledWith(API_CLIENT, SESSION_ID),
+    );
+    expect(pushRoute).toHaveBeenCalledWith(`/sessions/${SESSION_ID}/report`);
+  });
+
+  it("keeps report generation errors safe and does not navigate", async () => {
+    mockedGenerateReport.mockResolvedValueOnce({
+      error: {
+        error: {
+          code: "INTERNAL_ERROR",
+          message: "private upstream detail",
+          request_id: "00000000-0000-4000-8000-000000000099",
+        },
+      },
+      response: new Response(null, { status: 500 }),
+    });
+    await renderRestoredSession(
+      discussionSnapshot(null, GRANT_ID, "COMPLETED"),
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "生成 / 查看训练报告" }),
+    );
+
+    expect(
+      await screen.findByText("无法生成训练报告，请稍后重试。"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("private upstream detail")).toBeNull();
+    expect(pushRoute).not.toHaveBeenCalled();
+  });
+
+  it("does not show the report action before completion", async () => {
+    await renderRestoredSession(PREPARATION);
+    expect(
+      screen.queryByRole("button", { name: "生成 / 查看训练报告" }),
+    ).toBeNull();
   });
 });

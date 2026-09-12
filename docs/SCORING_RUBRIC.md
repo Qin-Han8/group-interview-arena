@@ -73,7 +73,7 @@
 
 - V0.1：只需要简版证据报告，用于验证证据链路，不要求完成正式六维聚合体系。
 - V0.5：必须具备六维评分、时间戳证据和历史报告。
-- P1-7A freezes the basic report/evidence boundary; P1-7B persistence is `DONE / ACTUAL_SOURCE_REVIEW_PASS` with `P1-7B-F001 CLOSED`; P1-7C extraction/generation is `IMPLEMENTED / AWAITING_ACTUAL_SOURCE_REVIEW`; REST/Web remains P1-7D `NOT_STARTED`.
+- P1-7A freezes the basic report/evidence boundary; P1-7B/P1-7C/P1-7D are `DONE / ACTUAL_SOURCE_REVIEW_PASS`; P1-7D REST/Web continues to expose no P3 score/rank.
 
 ## Implementation guidance
 
@@ -88,7 +88,7 @@
 - TBD：报告展示数字分数还是等级加证据（总纲第 37 节）；
 - TBD：人工群面教练校准支持来源（总纲第 37 节）；
 - TBD：建议权重经过何种样本和指标校准；
-- Frozen conceptually for P1-7 V0.1：report/evidence responsibilities, item caps and exactly one priority improvement；P1-7B physical persistence is source-grounded and implemented, while public API field names remain P1-7D work；
+- Frozen and implemented for P1-7 V0.1：report/evidence responsibilities, item caps, exactly one priority improvement and the closed P1-7D public read fields；formal scores remain P3；
 - TBD：用户争议评价的复核和申诉流程；
 - TBD：不同题型的权重调整方式。
 
@@ -96,7 +96,7 @@
 
 ## Future work
 
-- P1：P1-7A has frozen the V0.1 basic evidence report boundary；P1-7B persistence is `DONE / ACTUAL_SOURCE_REVIEW_PASS` with `P1-7B-F001 CLOSED`；P1-7C implements evaluator-neutral, exact-source evidence validation and basic generation without formal scores and awaits actual-source review；P1-7D/E remain `NOT_STARTED`.
+- P1：P1-7A is frozen/reviewed；P1-7B/P1-7C/P1-7D are `DONE / ACTUAL_SOURCE_REVIEW_PASS`；P1-7D implements the report REST/Web surface without formal scores；P1-7E remains `NOT_STARTED`.
 - P3：完成客观指标、证据提取、六维评分、报告和专项训练设计。
 - P5：通过专家标注和公开测试校准可信度与用户认可率。
 

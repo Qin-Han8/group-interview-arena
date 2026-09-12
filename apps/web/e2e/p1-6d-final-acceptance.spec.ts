@@ -10,6 +10,8 @@ const PROVIDER_CALLS = process.env.GIA_P16D_FINAL_PROVIDER_CALLS;
 const CANCELLATION_ARM = process.env.GIA_P16D_FINAL_CANCELLATION_ARM;
 const PROVIDER_BLOCKED = process.env.GIA_P16D_FINAL_PROVIDER_BLOCKED;
 const PROVIDER_CANCELLED = process.env.GIA_P16D_FINAL_PROVIDER_CANCELLED;
+const INTERNAL_VALIDATION_QUESTION_VERSION_ID =
+  "21000000-0000-4000-8000-000000000001";
 const PRIVATE_SENTINELS = [
   "P16D_PRIVATE_ALPHA_DO_NOT_DISCLOSE",
   "P16D_PRIVATE_BRAVO_DO_NOT_DISCLOSE",
@@ -105,6 +107,10 @@ test.describe.serial("P1-6D final integrated acceptance", () => {
       .fill(`P1-6D final ${crypto.randomUUID()} phrase`);
     await page.getByRole("button", { name: "创建账户" }).click();
     await expect(page.getByRole("heading", { name: "讨论会话" })).toBeVisible();
+
+    await page
+      .getByRole("combobox")
+      .selectOption(INTERNAL_VALIDATION_QUESTION_VERSION_ID);
 
     const createResponsePromise = page.waitForResponse(
       (response) =>

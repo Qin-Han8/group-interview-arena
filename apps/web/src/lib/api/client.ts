@@ -16,6 +16,7 @@ export type SessionSnapshot = components["schemas"]["SessionSnapshotResponse"];
 export type TranscriptResponse = components["schemas"]["TranscriptResponse"];
 export type TranscriptUtterance =
   components["schemas"]["TranscriptUtteranceResponse"];
+export type ReportViewResponse = components["schemas"]["ReportViewResponse"];
 
 export function createApiClient(baseUrl: string) {
   return createClient<paths>({ baseUrl, credentials: "include" });
@@ -85,6 +86,21 @@ export function startSession(
 export function getSessionSnapshot(client: ApiClient, sessionId: string) {
   return client.GET("/sessions/{session_id}", {
     params: { path: { session_id: sessionId } },
+  });
+}
+
+export function getReport(client: ApiClient, sessionId: string) {
+  return client.GET("/sessions/{session_id}/report", {
+    params: { path: { session_id: sessionId } },
+  });
+}
+
+export function generateReport(client: ApiClient, sessionId: string) {
+  return client.POST("/sessions/{session_id}/report", {
+    params: {
+      path: { session_id: sessionId },
+      header: { [CSRF_HEADER_NAME]: CSRF_HEADER_VALUE },
+    },
   });
 }
 

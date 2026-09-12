@@ -45,7 +45,7 @@ V0.1 的目标是验证多角色讨论和状态机，不公开收费。
 - 压力事件；
 - 行业题包。
 
-当前 P1-1～P1-6 已完成，P1-6 `DONE / CLOSED`。P1-7 现为 `IN_PROGRESS`；P1-7A 为 `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`；P1-7B 为 `DONE / ACTUAL_SOURCE_REVIEW_PASS`，`P1-7B-F001 CLOSED`，open findings `NONE`；P1-7C～E/P1-8 尚未开始。
+当前 P1-1～P1-6 已完成，P1-6 `DONE / CLOSED`。P1-7 现为 `IN_PROGRESS`；P1-7A 为 `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`；P1-7B/P1-7C/P1-7D 为 `DONE / ACTUAL_SOURCE_REVIEW_PASS`，内容为 `4/4/4 IMPLEMENTED / HUMAN_CONTENT_REVIEW_PASS`；P1-7E/P1-8 为 `NOT_STARTED`。
 
 ## P1-3A confirmed session-flow boundary
 
@@ -63,7 +63,7 @@ V0.1 的目标是验证多角色讨论和状态机，不公开收费。
 - The report presents completion/question/deterministic participation/covered-phase facts, a concise summary, up to 3 evidence-backed strengths, up to 3 evidence-backed improvement opportunities, exactly 1 next-session priority and verifiable evidence cards.
 - Evidence cards expose source participant, authoritative phase, source utterance identity, source event sequence, exact quote, interpretation and confidence. Text V0.1 does not claim audio timestamps.
 - The report evaluates observable behavior using public discussion facts. It does not show six 0–100 scores, an overall score, radar, percentile/rank, hiring probability, job fit or personality type; the score-versus-level TBD remains open.
-- V0.1 content closure is exactly 4 ordering-selection, 4 resource-allocation and 4 plan-design human-reviewed immutable Question Versions, plus the existing 4 basic Persona Templates. Current committed seed is 0/1/0 questions, so P1-7D later owns 11 additional reviewed questions; P1-7A authors none.
+- V0.1 content closure is exactly 4 ordering-selection, 4 resource-allocation and 4 plan-design human-reviewed immutable Question Versions, plus the existing 4 basic Persona Templates. P1-7D implements the exact 4/4/4 catalog and automated structural/private-boundary gates; external human content review verdict is `PASS` with material content findings `NONE OPEN`.
 - P1-7B owns persistence, P1-7C owns validated extraction/generation, P1-7D owns REST/Web/content closure and P1-7E owns P1-7 composition/independent acceptance. P1-8 remains separate full-P1 acceptance.
 
 ## Implementation guidance
@@ -101,7 +101,7 @@ V0.1 的目标是验证多角色讨论和状态机，不公开收费。
 
 ## Future work
 
-- P1：P1-1～P1-6 are complete；P1-7A has frozen the basic evidence report and V0.1 content architecture；P1-7B persistence awaits external review；P1-7C～E/P1-8 remain pending.
+- P1：P1-1～P1-6 are complete；P1-7A is frozen/reviewed；P1-7B/P1-7C/P1-7D are `DONE / ACTUAL_SOURCE_REVIEW_PASS`；P1-7 remains `IN_PROGRESS`；P1-7E/P1-8 remain `NOT_STARTED`.
 - P2：细化语音交互、打断、降级和音频生命周期。
 - P3：细化报告和专项训练体验。
 - P4：细化商品、权益、支付和故障补偿。
