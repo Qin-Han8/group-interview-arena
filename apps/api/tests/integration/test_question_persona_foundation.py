@@ -66,7 +66,7 @@ async def _verify_repeatable_seed_and_private_relation(
         first = await seed_question_persona_foundation(session_factory)
         second = await seed_question_persona_foundation(session_factory)
         assert first.personas_inserted == 4
-        assert first.question_versions_inserted == 1
+        assert first.question_versions_inserted == 12
         assert second.personas_inserted == 0
         assert second.question_versions_inserted == 0
 
@@ -77,23 +77,23 @@ async def _verify_repeatable_seed_and_private_relation(
             )
             assert (
                 await session.scalar(select(func.count()).select_from(QuestionTemplate))
-                == 1
+                == 12
             )
             assert (
                 await session.scalar(select(func.count()).select_from(QuestionVersion))
-                == 1
+                == 12
             )
             assert (
                 await session.scalar(
                     select(func.count()).select_from(QuestionPersonaAssignment)
                 )
-                == 3
+                == 36
             )
             assert (
                 await session.scalar(
                     select(func.count()).select_from(PersonaPrivateStance)
                 )
-                == 3
+                == 36
             )
             assignment_ids = set(
                 (await session.scalars(select(QuestionPersonaAssignment.id))).all()
@@ -152,7 +152,12 @@ async def _verify_published_bundle_is_insert_only(
             versions = list(
                 (
                     await session.scalars(
-                        select(QuestionVersion).order_by(QuestionVersion.version_number)
+                        select(QuestionVersion)
+                        .where(
+                            QuestionVersion.question_template_id
+                            == INTERNAL_VALIDATION_BUNDLE.template_id
+                        )
+                        .order_by(QuestionVersion.version_number)
                     )
                 ).all()
             )
@@ -304,7 +309,14 @@ async def _verify_retired_template_blocks_only_new_versions(
 
         async with session_factory() as session:
             assert (
-                await session.scalar(select(func.count()).select_from(QuestionVersion))
+                await session.scalar(
+                    select(func.count())
+                    .select_from(QuestionVersion)
+                    .where(
+                        QuestionVersion.question_template_id
+                        == INTERNAL_VALIDATION_BUNDLE.template_id
+                    )
+                )
                 == 1
             )
     finally:
@@ -337,7 +349,14 @@ async def _verify_retired_persona_blocks_new_assignments(
 
         async with session_factory() as session:
             assert (
-                await session.scalar(select(func.count()).select_from(QuestionVersion))
+                await session.scalar(
+                    select(func.count())
+                    .select_from(QuestionVersion)
+                    .where(
+                        QuestionVersion.question_template_id
+                        == INTERNAL_VALIDATION_BUNDLE.template_id
+                    )
+                )
                 == 1
             )
     finally:

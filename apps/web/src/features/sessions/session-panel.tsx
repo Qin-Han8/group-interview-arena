@@ -1,11 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import {
   createSession,
   getQuestion,
   getSessionSnapshot,
+  generateReport,
   loadSessionTranscript,
   listQuestions,
   type ApiClient,
@@ -112,6 +114,7 @@ export default function SessionPanel({
   apiClient,
   baseUrl,
 }: SessionPanelProps) {
+  const router = useRouter();
   const [snapshot, setSnapshot] = useState<SessionSnapshot>();
   const [questions, setQuestions] = useState<QuestionSummary[]>();
   const [selectedQuestionId, setSelectedQuestionId] = useState("");
@@ -126,6 +129,7 @@ export default function SessionPanel({
   const [checkingUrl, setCheckingUrl] = useState(true);
   const [creating, setCreating] = useState(false);
   const [pendingAction, setPendingAction] = useState(false);
+  const [generatingReport, setGeneratingReport] = useState(false);
   const [humanPending, setHumanPending] = useState<PendingHumanUtterance>();
   const [rejectedDraft, setRejectedDraft] = useState<RejectedHumanUtterance>();
   const [draft, setDraft] = useState("");
@@ -481,6 +485,25 @@ export default function SessionPanel({
     }
   }
 
+  async function openReport() {
+    const current = snapshotRef.current;
+    if (!current || current.status !== "COMPLETED" || generatingReport) return;
+    setGeneratingReport(true);
+    setErrorMessage(undefined);
+    try {
+      const result = await generateReport(apiClient, current.id);
+      if (!result.data) {
+        setErrorMessage("无法生成训练报告，请稍后重试。");
+        return;
+      }
+      router.push(`/sessions/${current.id}/report`);
+    } catch {
+      setErrorMessage("无法生成训练报告，请稍后重试。");
+    } finally {
+      setGeneratingReport(false);
+    }
+  }
+
   const estimatedServerNowMs =
     clockAnchor.serverNowMs === 0
       ? undefined
@@ -716,6 +739,12 @@ export default function SessionPanel({
             setErrorMessage(undefined);
             realtimeRef.current?.abort();
           },
+        },
+        reportAction: {
+          visible: snapshot.status === "COMPLETED",
+          disabled: generatingReport,
+          label: generatingReport ? "正在生成报告…" : "生成 / 查看训练报告",
+          onActivate: () => void openReport(),
         },
       }}
       onActiveSurfaceChange={setActiveSurface}

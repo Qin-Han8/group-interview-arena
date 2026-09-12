@@ -1,8 +1,9 @@
 # P1-7 Basic Evidence Report & V0.1 Content Closure Execution Plan
 
 - Status: `P1-7 IN_PROGRESS`
-- Current checkpoint: `P1-7C IMPLEMENTED / AWAITING_ACTUAL_SOURCE_REVIEW`
-- Remaining checkpoints: `P1-7D`～`P1-7E NOT_STARTED`
+- Current completed checkpoint: `P1-7D DONE / ACTUAL_SOURCE_REVIEW_PASS`
+- Accepted checkpoints: `P1-7A / P1-7B / P1-7C / P1-7D`
+- Remaining checkpoint: `P1-7E NOT_STARTED`
 - Parent phase: `P1 IN_PROGRESS`
 - Product target: `V0.1 Internal Validation`
 - P1-7A reviewed baseline: `codex/p1-6e-closeout` at `bc8cb40148598230bd64feeeaebb498d05137fbe`
@@ -167,14 +168,14 @@ A failed or invalid generation attempt cannot publish a complete report or unval
 
 ## 11. V0.1 content architecture closure
 
-| Question category | Registered source code | Reviewed target | Current committed seed | Gap before P1-7D closure |
-|---|---|---:|---:|---:|
-| 排序选择型 | `ORDERING_SELECTION` | 4 | 0 | 4 |
-| 资源分配型 | `RESOURCE_ALLOCATION` | 4 | 1 | 3 |
-| 方案策划型 | `PLAN_DESIGN` | 4 | 0 | 4 |
-| **Total** | 3 types | **12** | **1** | **11** |
+| Question category | Registered source code | Reviewed target | P1-7D candidate implementation | Human-review state |
+|---|---|---:|---:|---|
+| 排序选择型 | `ORDERING_SELECTION` | 4 | 4 | Pass |
+| 资源分配型 | `RESOURCE_ALLOCATION` | 4 | 4 | Pass |
+| 方案策划型 | `PLAN_DESIGN` | 4 | 4 | Pass |
+| **Total** | 3 types | **12** | **12** | **Human content review PASS** |
 
-The current 4 Persona Templates are retained as the V0.1 base. P1-7A freezes only quantity, category, immutable versioning and human-review quality targets. P1-7D later authors/reviews/closes the remaining content using the existing Question Version publication model.
+The current 4 Persona Templates are retained as the V0.1 base. P1-7D authors the remaining 11 immutable candidate versions through the existing publication model without changing the retained internal-validation bundle. Automated structure is complete; external human content review is `PASS` with material content findings `NONE OPEN`.
 
 Every V0.1 question must be a versioned, structured, human-reviewed public question suitable for a complete text session and report evidence interpretation. Quality review covers clear objective, coherent public constraints/material, meaningful discussion trade-offs, valid three-seat assignments/private isolation, safety and a complete runnable session. Quantity alone is not acceptance.
 
@@ -192,11 +193,11 @@ Done with external actual-source review `PASS`. Revision `f1a17b17c008` adds the
 
 ### P1-7C — Evidence Extraction + Basic Report Generation
 
-Implemented and awaiting external actual-source review. The closed pipeline is `ReportSourceCollector -> ReportEvaluator -> EvidenceValidator -> ReportComposer -> ReportGenerationCoordinator`: it collects only the public Question/roster/authoritative utterance allowlist through the frozen watermark, validates every Human citation and exact quote without repair, and persists only complete trusted composition. A network-free deterministic evaluator supports tests. Positive-lease claims and status/`started_at` CAS protect stale workers; evaluation holds no DB scope; failure and atomic completion use short transactions; retry/re-entry reuse durable identity. It does not implement formal P3 scoring, a real provider, REST/Web or question authoring.
+Done with external actual-source review `PASS`. The closed pipeline is `ReportSourceCollector -> ReportEvaluator -> EvidenceValidator -> ReportComposer -> ReportGenerationCoordinator`: it collects only the public Question/roster/authoritative utterance allowlist through the frozen watermark, validates every Human citation and exact quote without repair, and persists only complete trusted composition. A network-free deterministic evaluator supports tests. Positive-lease claims and status/`started_at` CAS protect stale workers; evaluation holds no DB scope; failure and atomic completion use short transactions; retry/re-entry reuse durable identity. It does not implement formal P3 scoring, a real provider, REST/Web or question authoring.
 
 ### P1-7D — Report REST/Web + V0.1 Content Closure
 
-After separate approval, expose owner-only REST resource/read semantics and the Web report experience, then close the exact 4/4/4 human-reviewed content target using immutable Question Versions. It adds no report activity WebSocket lifecycle, P3 training system or V0.5 content.
+Done with external actual-source review `PASS`. The owner-only POST command invokes the accepted coordinator with server-owned V0.1 identity and the network-free deterministic evaluator; GET remains a strict independent read using `created_at DESC, id DESC` and projects completed-only content from the frozen trusted public source. A completed SessionPanel invokes the command and navigates to the reloadable report URL. The exact 4/4/4 immutable catalog is implemented; human content review passed and F001～F005 are closed.
 
 ### P1-7E — Composition Acceptance + Independent Acceptance
 
@@ -244,10 +245,26 @@ P1-7B is `DONE / ACTUAL_SOURCE_REVIEW_PASS`. The accepted P1-7A boundary remains
 
 Fresh validation passes domain/model/migration tests, all API unit tests, all PostgreSQL integration tests, two-session concurrency, previous-head upgrade, downgrade/re-upgrade, exact 23-table catalog, Ruff, format and strict Pyright. Temporary database residue is zero, master-plan SHA-256 remains `2388A9660320406CB35D5354126AD71C6849A98DB7C4A356796CA951BF372F26`, implementation findings/open findings are `NONE`, and no real provider, REST/Web/OpenAPI, question content or P1-7C work occurred.
 
-Finding-only remediation `P1-7B-F001` separates authoritative quote validation from whitespace-stripping semantic text validation: `EvidenceItemDraft.quote` now rejects empty/whitespace-only input while returning every accepted caller string byte-for-byte at the Python string level, including leading/trailing spaces, tabs and newlines. The required RED reproduced as `2 failed / 11 passed`; GREEN is `13 passed`; fresh full API unit validation is `536 passed / 228 deselected`; focused real-PostgreSQL report persistence is `17 passed`; Ruff, format and strict Pyright pass; residual test databases are zero. Migration `f1a17b17c008` and ORM persistence schema remain byte-identical to the initial P1-7B review bundle, so migration tests were not rerun for this domain-only remediation. External actual-source review final verdict is `PASS`; `P1-7B-F001` is `CLOSED`; material findings/new blockers/open findings are `NONE`. Accepted bundles are `gia-p1-7b-report-persistence-review-20260910-113955.zip` / SHA-256 `9FB2E9CF3E2BD3E865295F11C15764670E216BC0FED4CD9E1CD59DDE5F12AD9E` and `gia-p1-7b-f001-finding-only-review-20260910-120420.zip` / SHA-256 `CCA43286017D97133755285F8D5EFC6EFAF15F38DDD54D3DD07327C936AFE4B0`. P1-7B is `DONE / ACTUAL_SOURCE_REVIEW_PASS`; P1-7C is `IMPLEMENTED / AWAITING_ACTUAL_SOURCE_REVIEW`; P1-7D/P1-7E and P1-8 remain `NOT_STARTED`.
+Finding-only remediation `P1-7B-F001` separates authoritative quote validation from whitespace-stripping semantic text validation: `EvidenceItemDraft.quote` now rejects empty/whitespace-only input while returning every accepted caller string byte-for-byte at the Python string level, including leading/trailing spaces, tabs and newlines. The required RED reproduced as `2 failed / 11 passed`; GREEN is `13 passed`; fresh full API unit validation is `536 passed / 228 deselected`; focused real-PostgreSQL report persistence is `17 passed`; Ruff, format and strict Pyright pass; residual test databases are zero. Migration `f1a17b17c008` and ORM persistence schema remain byte-identical to the initial P1-7B review bundle, so migration tests were not rerun for this domain-only remediation. External actual-source review final verdict is `PASS`; `P1-7B-F001` is `CLOSED`; material findings/new blockers/open findings are `NONE`. Accepted bundles are `gia-p1-7b-report-persistence-review-20260910-113955.zip` / SHA-256 `9FB2E9CF3E2BD3E865295F11C15764670E216BC0FED4CD9E1CD59DDE5F12AD9E` and `gia-p1-7b-f001-finding-only-review-20260910-120420.zip` / SHA-256 `CCA43286017D97133755285F8D5EFC6EFAF15F38DDD54D3DD07327C936AFE4B0`. P1-7B/P1-7C/P1-7D are `DONE / ACTUAL_SOURCE_REVIEW_PASS`; P1-7E and P1-8 remain `NOT_STARTED`.
 
 ## 17. P1-7C implementation checkpoint
 
 The implementation is based on accepted main `e6c45acd89d7de0b48739113d8dad0356a91264d`. `ReportSourceSnapshot` is immutable and closed; its serialized form contains no Memory or private Question/Persona material. Evaluator proposals are closed and untrusted, item collections are capped at three without truncation, explicit zero-evidence output is valid, and any proposed invalid evidence fails the complete generation. Accepted quotes retain exact caller/source whitespace and Unicode form.
 
-The coordinator allocates the P1-7B identity, claims with a database-round-tripped `started_at` token, releases the source read scope before evaluation, and performs completion plus all Evidence inserts atomically. Fresh RUNNING and COMPLETED identities do not evaluate; FAILED and lease-expired RUNNING identities can be reclaimed with a strictly newer token; old completion/failure CAS attempts persist nothing. P1-7C changes no ORM schema or migration, and Alembic remains `f1a17b17c008` with 23 product tables.
+The coordinator allocates the P1-7B identity, claims with a database-round-tripped `started_at` token, releases the source read scope before evaluation, and performs completion plus all Evidence inserts atomically. Fresh RUNNING and COMPLETED identities do not evaluate; FAILED and lease-expired RUNNING identities can be reclaimed with a strictly newer token; old completion/failure CAS attempts persist nothing. P1-7C changes no ORM schema or migration, and Alembic remains `f1a17b17c008` with 23 product tables. External actual-source review passed; P1-7C is `DONE / ACTUAL_SOURCE_REVIEW_PASS`.
+
+## 18. P1-7D implementation checkpoint
+
+P1-7D is `DONE / ACTUAL_SOURCE_REVIEW_PASS`. `POST /sessions/{session_id}/report` supplies the real product caller for the accepted coordinator, with server-owned `1` / `basic-report/v1` identity, deterministic evaluator, existing CSRF/owner/eligibility rules and metadata-only response. `GET /sessions/{session_id}/report` performs owner-filtered selection of exactly the newest durable identity by `created_at DESC, id DESC`; a newer REQUESTED/RUNNING/FAILED row is never replaced by an older COMPLETED row. The GET path remains mutation-free and has no evaluator, coordinator, provider or generation caller.
+
+The closed response contains safe durable metadata and `content = null` unless status is `COMPLETED`. Completed content reuses `ReportSourceCollector` through the frozen watermark and exposes the public Question, factual roster/utterance/phase overview, durable summary/priority and persisted evidence provenance. Strengths and improvements are each capped at three and ordered by `source_event_sequence ASC, evidence id ASC` solely for deterministic presentation, not scoring.
+
+The completed SessionPanel invokes the typed POST and navigates to the Next.js route `/sessions/{sessionId}/report`, which consumes only the REST model and handles loading, unauthenticated, missing, REQUESTED, RUNNING, FAILED and COMPLETED states. The V0.1 catalog retains the original internal-validation bundle byte-for-byte at the model-definition level and adds exactly 11 immutable candidate bundles, producing 4/4/4 across the three registered types with four Persona Templates and three explicit question-specific AI stances per added version. Museum/rural-clinic/heatwave public facts are now decision-grade. The review manifest is [`../V01_CONTENT_REVIEW_MANIFEST.md`](../V01_CONTENT_REVIEW_MANIFEST.md). Content is `4/4/4 IMPLEMENTED / HUMAN_CONTENT_REVIEW_PASS`; P1-7E and P1-8 remain `NOT_STARTED`.
+
+External actual-source review returned `PASS`; P1-7D-F001～F005 are `CLOSED`. External human content review returned `PASS` with material content findings `NONE OPEN`.
+
+Fresh P1-7D verification is green: API unit `585 passed / 252 deselected`; PostgreSQL integration `252 passed / 585 deselected`; Web unit `195 passed`; Ruff, Ruff format, Pyright, Web lint/format/typecheck/build and OpenAPI drift all pass. The repository full Chromium entry point passes its `2 + 2` tests after selecting the retained internal-validation version explicitly from the 12-question catalog, and the dedicated report browser acceptance passes its single P1-7D test for completed-session CTA, coordinator generation, durable owner report, exact quote/provenance, reload, non-owner isolation and no-provider-call behavior. Development PostgreSQL is at the single `f1a17b17c008` head with 23 product tables; Alembic check passes; residual disposable databases and listeners on ports 3000/8000 are zero; migration, ORM schema, dependencies, lockfiles and the master plan remain unchanged.
+
+## 19. P1-7D governance closeout
+
+P1-7D external actual-source review is `PASS`; P1-7D-F001～F005 are `CLOSED`; V0.1 human content review is `PASS` for the exact 4/4/4 inventory (12 immutable Question Versions). The accepted implementation adds no schema change; Alembic remains at single head `f1a17b17c008` with 23 product tables. P1-7 remains `IN_PROGRESS`, and P1-7E remains `NOT_STARTED`.

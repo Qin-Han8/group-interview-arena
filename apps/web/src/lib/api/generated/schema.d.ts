@@ -191,10 +191,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sessions/{session_id}/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Report */
+        get: operations["report_sessions__session_id__report_get"];
+        put?: never;
+        /** Generate Report */
+        post: operations["generate_report_sessions__session_id__report_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** CompletedReportContentResponse */
+        CompletedReportContentResponse: {
+            overview: components["schemas"]["SessionOverviewResponse"];
+            /** Strengths */
+            strengths: components["schemas"]["EvidenceCardResponse"][];
+            /** Improvements */
+            improvements: components["schemas"]["EvidenceCardResponse"][];
+            /** Priority Improvement */
+            priority_improvement: string;
+        };
         /** CurrentFloorGrantResponse */
         CurrentFloorGrantResponse: {
             /**
@@ -229,7 +257,7 @@ export interface components {
          * ErrorCode
          * @enum {string}
          */
-        ErrorCode: "NOT_FOUND" | "VALIDATION_ERROR" | "INTERNAL_ERROR" | "INVALID_USERNAME" | "INVALID_PASSWORD" | "USERNAME_UNAVAILABLE" | "INVALID_CREDENTIALS" | "AUTHENTICATION_REQUIRED" | "CSRF_REJECTED" | "SESSION_NOT_FOUND" | "QUESTION_NOT_FOUND" | "INVALID_SESSION_STATE" | "ACTION_ID_CONFLICT";
+        ErrorCode: "NOT_FOUND" | "VALIDATION_ERROR" | "INTERNAL_ERROR" | "INVALID_USERNAME" | "INVALID_PASSWORD" | "USERNAME_UNAVAILABLE" | "INVALID_CREDENTIALS" | "AUTHENTICATION_REQUIRED" | "CSRF_REJECTED" | "SESSION_NOT_FOUND" | "REPORT_NOT_FOUND" | "QUESTION_NOT_FOUND" | "INVALID_SESSION_STATE" | "ACTION_ID_CONFLICT";
         /** ErrorDetail */
         ErrorDetail: {
             code: components["schemas"]["ErrorCode"];
@@ -242,6 +270,39 @@ export interface components {
         ErrorResponse: {
             error: components["schemas"]["ErrorDetail"];
         };
+        /** EvidenceCardResponse */
+        EvidenceCardResponse: {
+            kind: components["schemas"]["EvidenceKind"];
+            /**
+             * Source Participant Id
+             * Format: uuid4
+             */
+            source_participant_id: string;
+            /**
+             * Source Utterance Id
+             * Format: uuid4
+             */
+            source_utterance_id: string;
+            /** Source Event Sequence */
+            source_event_sequence: number;
+            phase: components["schemas"]["EvidencePhase"];
+            /** Quote */
+            quote: string;
+            /** Interpretation */
+            interpretation: string;
+            /** Confidence */
+            confidence: string;
+        };
+        /**
+         * EvidenceKind
+         * @enum {string}
+         */
+        EvidenceKind: "STRENGTH" | "IMPROVEMENT";
+        /**
+         * EvidencePhase
+         * @enum {string}
+         */
+        EvidencePhase: "OPENING_STATEMENTS" | "EXPLORATION" | "CONFLICT_AND_EVALUATION" | "CONVERGENCE" | "FINAL_SUMMARY";
         /**
          * FloorInterventionKind
          * @enum {string}
@@ -420,6 +481,43 @@ export interface components {
              */
             password: string;
         };
+        /**
+         * ReportGenerationStatus
+         * @enum {string}
+         */
+        ReportGenerationStatus: "REQUESTED" | "RUNNING" | "COMPLETED" | "FAILED";
+        /** ReportMetadataResponse */
+        ReportMetadataResponse: {
+            /**
+             * Report Id
+             * Format: uuid4
+             */
+            report_id: string;
+            /**
+             * Session Id
+             * Format: uuid4
+             */
+            session_id: string;
+            status: components["schemas"]["ReportGenerationStatus"];
+            /** Report Schema Version */
+            report_schema_version: number;
+            /** Derivation Version */
+            derivation_version: string;
+            /** Source Through Sequence */
+            source_through_sequence: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Completed At */
+            completed_at: string | null;
+        };
+        /** ReportViewResponse */
+        ReportViewResponse: {
+            report: components["schemas"]["ReportMetadataResponse"];
+            content: components["schemas"]["CompletedReportContentResponse"] | null;
+        };
         /** SessionCreateRequest */
         SessionCreateRequest: {
             /**
@@ -427,6 +525,27 @@ export interface components {
              * Format: uuid4
              */
             question_version_id: string;
+        };
+        /** SessionOverviewResponse */
+        SessionOverviewResponse: {
+            /**
+             * Session Status
+             * @constant
+             */
+            session_status: "COMPLETED";
+            question: components["schemas"]["QuestionDetailResponse"];
+            /** Participant Count */
+            participant_count: number;
+            /** Human Utterance Count */
+            human_utterance_count: number;
+            /** Ai Utterance Count */
+            ai_utterance_count: number;
+            /** Total Utterance Count */
+            total_utterance_count: number;
+            /** Covered Phases */
+            covered_phases: components["schemas"]["EvidencePhase"][];
+            /** Summary */
+            summary: string;
         };
         /** SessionSnapshotResponse */
         SessionSnapshotResponse: {
@@ -1033,6 +1152,143 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SessionSnapshotResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    report_sessions__session_id__report_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportViewResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    generate_report_sessions__session_id__report_post: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Required first-party browser request marker. */
+                "X-GIA-CSRF": "1";
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportMetadataResponse"];
                 };
             };
             /** @description Unauthorized */

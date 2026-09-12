@@ -1,9 +1,9 @@
 # 隐私、安全、合规与反作弊基线
 
-- Status: Active baseline through completed P1-6 + P1-7A evaluator/report privacy design freeze
+- Status: Active baseline through P1-7D implementation checkpoint
 - Current phase: P1 — IN_PROGRESS
 - Target version: V0.1 Internal Validation
-- Detailed design: P1-5 runtime/recovery privacy boundaries are complete；P1-6 implements public-only structured Memory and bounded Working Context while preserving candidate-private isolation；P1-7A freezes public-only evaluator/report/evidence validation boundaries；P1-7B implements relational persistence/provenance；P1-7C implements the public-only source/evaluator/validation/composition pipeline with no real provider or public surface；P1-7D/E/P1-8 remain incomplete
+- Detailed design: P1-5 runtime/recovery privacy boundaries are complete；P1-6 implements public-only structured Memory and bounded Working Context while preserving candidate-private isolation；P1-7A freezes public-only evaluator/report/evidence validation boundaries；P1-7B/P1-7C are accepted persistence/generation；P1-7D implements a closed public report read and private-isolated candidate content catalog；P1-7E/P1-8 remain incomplete
 - Security boundaries: Active from project start
 - P0-5A identity security boundary: completed / approved
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
@@ -70,7 +70,7 @@
 - P0：建立安全边界、密钥规则、数据隔离原则和后续检查责任。
 - V0.1：即使是内部文字版，也必须遵守 AI 标识、训练用途、数据最小化、密钥和隔离规则。
 - V0.5：公开 MVP 必须提供删除数据和隐私设置，并对语音生命周期完成明确实现。
-- P0-2 只记录了获批的信任边界、配置、错误和日志原则；P0-5B 已实现 identity persistence/security primitives，P0-5C 已实现 backend auth runtime，P0-5D 已实现 browser CORS/CSRF/Web closure；P0-6C structured logging hardening、actual-source review 与 `JsonFormatter` safe fallback remediation/re-review 已完成并 `PASS`；内容审核和其他后续安全能力仍未实现。
+- P0-2 只记录了获批的信任边界、配置、错误和日志原则；P0-5B 已实现 identity persistence/security primitives，P0-5C 已实现 backend auth runtime，P0-5D 已实现 browser CORS/CSRF/Web closure；P0-6C structured logging hardening、actual-source review 与 `JsonFormatter` safe fallback remediation/re-review 已完成并 `PASS`；P1-7D 的 V0.1 4/4/4 题目外部人工内容审核已 `PASS`，其他后续安全能力仍按对应阶段推进。
 
 ## P0-5 identity security boundary — P0-5D browser closure implemented
 
@@ -162,6 +162,8 @@ The exact public fields、atomicity/recovery matrix and later acceptance are in 
 
 P1-7C implements this boundary with a closed immutable `ReportSourceSnapshot`: it maps only the public Question projection, public roster and authoritative public utterance events through the frozen watermark. Serialized-source tests prove hidden/reference Question fields, Persona Private Stance/calibration and Memory sentinels are absent. Evaluation is network-free; exact source text is neither stripped nor normalized, and invalid untrusted proposals fail the whole generation without persisting raw proposal/error material.
 
+P1-7D exposes only the closed report DTO. Non-completed reports expose no partial content or failure detail; completed content reuses the frozen public source and persisted evidence provenance. The strict browser parser rejects extras and lifecycle/content mismatches. Public Question reads remain allowlisted while reference dimensions, hidden conflicts, acceptable outcome patterns, phase prompts, safety tags, assignments and private stances stay server-side. Browser acceptance uses a disposable database and no real provider.
+
 ## Implementation guidance
 
 - 每个新数据字段都应说明目的、保留、删除、访问和日志处理。
@@ -188,7 +190,7 @@ P1-7C implements this boundary with a closed immutable `ReportSourceSnapshot`: i
 
 - P0-2：在架构决策中记录基础信任边界；完整威胁建模随实际接口、数据和 Provider 逐步细化。
 - P0-5C～P0-5E：backend/browser authentication、Cookie/CORS/CSRF 与最小日志边界已实现；P0-5E final outcome 为 `PASS after findings remediation and independent recheck`，P0-5 已转为 `DONE`。
-- P0 and P1-1～P1-6 are `DONE`; P1-6E/P1-6 are `CLOSED`, and parent P1 remains `IN_PROGRESS`. P1-7 is `IN_PROGRESS`; P1-7A is `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-7B is `DONE / ACTUAL_SOURCE_REVIEW_PASS` with `P1-7B-F001 CLOSED`; P1-7C is `IMPLEMENTED / AWAITING_ACTUAL_SOURCE_REVIEW`; P1-7D/E/P1-8 are `NOT_STARTED`. P1-7C made no real-provider call, persisted no raw evaluator/error material, and added no public contract.
+- P0 and P1-1～P1-6 are `DONE`; P1-6E/P1-6 are `CLOSED`, and parent P1 remains `IN_PROGRESS`. P1-7 is `IN_PROGRESS`; P1-7A is frozen/reviewed; P1-7B/P1-7C/P1-7D are `DONE / ACTUAL_SOURCE_REVIEW_PASS`; P1-7E/P1-8 are `NOT_STARTED`. No real-provider call, private report input exposure, scoring or commercial behavior occurred.
 - P2：完成语音同意、上传、保存和删除设计。
 - P4/P5：完成支付审计、公开隐私设置、投诉和发布合规检查。
 

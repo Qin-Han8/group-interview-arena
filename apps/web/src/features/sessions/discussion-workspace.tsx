@@ -22,6 +22,7 @@ export type SessionHeaderProps = {
   connectionLabel: string;
   startAction: SessionHeaderAction;
   endAction: SessionHeaderAction;
+  reportAction: SessionHeaderAction;
 };
 
 export type DiscussionWorkspaceProps = {
@@ -66,6 +67,7 @@ function SessionHeader({
   connectionLabel,
   startAction,
   endAction,
+  reportAction,
 }: SessionHeaderProps) {
   return (
     <header
@@ -106,6 +108,7 @@ function SessionHeader({
         <div className="flex items-center gap-2" data-testid="header-actions">
           <HeaderAction action={startAction} />
           <HeaderAction action={endAction} />
+          <HeaderAction action={reportAction} />
         </div>
       </div>
     </header>

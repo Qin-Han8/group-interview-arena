@@ -15,6 +15,9 @@ from group_interview_arena_api.db import (
     QuestionTemplate,
     QuestionVersion,
 )
+from group_interview_arena_api.modules.question_personas.content import (
+    ADDITIONAL_V01_QUESTION_BUNDLES,
+)
 from group_interview_arena_api.modules.question_personas.domain import (
     ConstraintItem,
     InternalTextItem,
@@ -269,6 +272,11 @@ INTERNAL_VALIDATION_BUNDLE = PublishedQuestionBundle(
     published_at=_SEED_TIME,
 )
 
+V01_QUESTION_BUNDLES = (
+    INTERNAL_VALIDATION_BUNDLE,
+    *ADDITIONAL_V01_QUESTION_BUNDLES,
+)
+
 
 _PERSONA_FIELDS = (
     "id",
@@ -508,11 +516,10 @@ async def seed_question_persona_foundation(
         async with session.begin():
             for persona in V01_PERSONA_TEMPLATES:
                 personas_inserted += int(await _seed_persona(session, persona))
-            question_versions_inserted += int(
-                await persist_published_question_bundle(
-                    session, INTERNAL_VALIDATION_BUNDLE
+            for bundle in V01_QUESTION_BUNDLES:
+                question_versions_inserted += int(
+                    await persist_published_question_bundle(session, bundle)
                 )
-            )
     return SeedResult(
         personas_inserted=personas_inserted,
         question_versions_inserted=question_versions_inserted,

@@ -54,6 +54,9 @@ from group_interview_arena_api.modules.discussion_sessions.realtime import (
 from group_interview_arena_api.modules.discussion_sessions.routes import (
     create_discussion_session_router,
 )
+from group_interview_arena_api.modules.evaluation_reports.routes import (
+    create_evaluation_report_router,
+)
 from group_interview_arena_api.modules.question_personas.routes import (
     create_question_router,
 )
@@ -134,6 +137,7 @@ def create_app(
     application.include_router(create_auth_router(resolved_settings))
     application.include_router(create_question_router())
     application.include_router(create_discussion_session_router(resolved_settings))
+    application.include_router(create_evaluation_report_router(resolved_settings))
     application.include_router(create_realtime_router(resolved_settings))
 
     application.add_exception_handler(ApiError, api_error_handler)

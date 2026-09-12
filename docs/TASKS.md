@@ -1,13 +1,13 @@
 # 当前任务清单
 
-- Status: P1 in progress; P1-1 through P1-6 completed; P1-6 is `DONE / CLOSED`; P1-7 is `IN_PROGRESS`; P1-7A is `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-7B is `DONE / ACTUAL_SOURCE_REVIEW_PASS`; P1-7C is `IMPLEMENTED / AWAITING_ACTUAL_SOURCE_REVIEW`; P1-7D/P1-7E/P1-8 are `NOT_STARTED`; open implementation findings `NONE`
-- Managed scope: P1-7C public-only source collection, evaluator-neutral proposal contract, deterministic evidence validation/composition and lease/CAS/atomic report generation; no real provider, REST/Web, scoring, content authoring or P1-7D work
-- Current implementation checkpoint: P1-7C — `IMPLEMENTED / AWAITING_ACTUAL_SOURCE_REVIEW`; P1-7B — `DONE / ACTUAL_SOURCE_REVIEW_PASS`; P1-7D/P1-7E/P1-8 — `NOT_STARTED`
+- Status: P1 in progress; P1-1 through P1-6 completed; P1-6 is `DONE / CLOSED`; P1-7 is `IN_PROGRESS`; P1-7A is `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-7B, P1-7C and P1-7D are `DONE / ACTUAL_SOURCE_REVIEW_PASS`; P1-7E/P1-8 are `NOT_STARTED`; P1-7D-F001～F005 are `CLOSED`; open findings `NONE`
+- Managed scope: P1-7D owner-only report generation command/read, reloadable Web report experience and exact V0.1 4/4/4 candidate Question catalog; no real provider, scoring, commercial behavior or P1-7E work
+- Current completed checkpoint: P1-7D — `DONE / ACTUAL_SOURCE_REVIEW_PASS`; content — `4/4/4 IMPLEMENTED / HUMAN_CONTENT_REVIEW_PASS`; P1-7E/P1-8 — `NOT_STARTED`
 - P0-7 final outcome: initial verdict `BLOCKED` with two documentation findings; remediation completed; finding-only independent recheck `PASS`; new blockers none; P1 readiness `READY`
 - Current phase: P1 — `IN_PROGRESS`
-- Current governance checkpoint: P1-7B external actual-source review is `PASS`; `P1-7B-F001` is `CLOSED`; P1-7B open findings are `NONE`
-- Latest completed implementation review: P1-7B initial review plus finding-only re-review are `PASS`; material findings/new blockers/open findings are `NONE`
-- Current task gate: P1-6 — `DONE / CLOSED`; P1-7 — `IN_PROGRESS`; P1-7A — `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-7B — `DONE / ACTUAL_SOURCE_REVIEW_PASS`; P1-7C — `IMPLEMENTED / AWAITING_ACTUAL_SOURCE_REVIEW`; P1-7D/P1-7E/P1-8 — `NOT_STARTED`; open implementation findings — `NONE`; P1 remains `IN_PROGRESS`
+- Current governance checkpoint: P1-7D external actual-source review is `PASS`; P1-7D-F001～F005 are `CLOSED`; content is `4/4/4 IMPLEMENTED / HUMAN_CONTENT_REVIEW_PASS`; material content findings are `NONE OPEN`
+- Latest completed implementation review: P1-7D is `DONE / ACTUAL_SOURCE_REVIEW_PASS`; open findings/new blockers are `NONE`
+- Current task gate: P1-6 — `DONE / CLOSED`; P1-7 — `IN_PROGRESS`; P1-7A — `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-7B/P1-7C/P1-7D — `DONE / ACTUAL_SOURCE_REVIEW_PASS`; P1-7D-F001～F005 — `CLOSED`; P1-7E/P1-8 — `NOT_STARTED`; P1 remains `IN_PROGRESS`
 - P0 status: `DONE`; P0-1 through P0-7 completed
 - Allowed status values: `TODO` / `IN_PROGRESS` / `BLOCKED` / `DONE`
 - Related roadmap: [`ROADMAP.md`](ROADMAP.md)
@@ -821,15 +821,15 @@
 - Status: `IN_PROGRESS`
 - Goal: generate a durable V0.1 basic training report from validated authoritative public discussion evidence after `SimulationSession.COMPLETED`, and close the exact 3-type/12-human-reviewed-question V0.1 content target without importing P3 formal scoring.
 - Source plan: [`exec-plans/P1-7_basic-evidence-report-and-content.md`](exec-plans/P1-7_basic-evidence-report-and-content.md)
-- Current source: exactly 4 Persona seeds; exactly 1 published internal-validation Question Version (`RESOURCE_ALLOCATION`); registered question types are `ORDERING_SELECTION`, `RESOURCE_ALLOCATION`, `PLAN_DESIGN`; report/evidence persistence is implemented while semantic generation and public report surfaces are absent.
+- Current source: exactly 4 Persona seeds and 12 published V0.1 Question Versions at 4 `ORDERING_SELECTION` / 4 `RESOURCE_ALLOCATION` / 4 `PLAN_DESIGN`; report persistence/generation and the owner-only POST command plus independent GET/Web surface have passed external actual-source review.
 - Out of scope: six-dimension scores/overall score/radar/ranking/hiring or fit claims/personality labels; session report lifecycle states; aborted/partial/failed-session reports; voice/audio timestamps; real-provider requirement; P3 drills; V0.5 content; Redis/queue/deferred infrastructure.
 
 ### P1-7 substep progress
 
 - `P1-7A — Basic Evidence Report & V0.1 Content Architecture Freeze`: `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; strict docs-only; external actual-source review verdict `PASS`; material findings/new blockers/open findings `NONE`;
 - `P1-7B — Evidence / Report Persistence Foundation`: `DONE / ACTUAL_SOURCE_REVIEW_PASS`; `P1-7B-F001 CLOSED`; open findings `NONE`;
-- `P1-7C — Evidence Extraction + Basic Report Generation`: `IMPLEMENTED / AWAITING_ACTUAL_SOURCE_REVIEW`;
-- `P1-7D — Report REST/Web + V0.1 Content Closure`: `NOT_STARTED`;
+- `P1-7C — Evidence Extraction + Basic Report Generation`: `DONE / ACTUAL_SOURCE_REVIEW_PASS`;
+- `P1-7D — Report REST/Web + V0.1 Content Closure`: `DONE / ACTUAL_SOURCE_REVIEW_PASS`; `P1-7D-F001～F005 CLOSED`; content `4/4/4 IMPLEMENTED / HUMAN_CONTENT_REVIEW_PASS`; material content findings `NONE OPEN`;
 - `P1-7E — Composition Acceptance + Independent Acceptance`: `NOT_STARTED`.
 
 P1-7A review closeout uses `group-interview-arena-review-20260909-234536.zip` / SHA-256 `4EA3FE5DD23775106C2602CAA2EC6DC68AC8DDA6D9895C5D74465F90390798F3`. The reviewed checkout `bc8cb40148598230bd64feeeaebb498d05137fbe` is a direct parent of current GitHub `main` `f6f105ed2fcc334f6c9dd83c00d934428e1b689b`; their tree identities are equal and their file-content diff is empty. This is review baseline equivalence, not commit-SHA equality and not a claim that the bundle was generated from the later `main` working tree. No real provider was called and no P1-7B implementation occurred.
@@ -843,7 +843,7 @@ P1-7A review closeout uses `group-interview-arena-review-20260909-234536.zip` / 
 - Evaluator input is explicit public Question/session/participant/transcript/Memory context only. Private Stance, persona calibration, hidden conflicts/acceptable outcomes/reference-answer fields, prompts, credentials, raw provider I/O/reasoning and private notes are forbidden.
 - P1-7A freezes conceptual `EvaluationReport`/`EvidenceItem` responsibilities only and creates no schema/migration. P3 may later add dimension/metric/rubric/scoring versions additively.
 - Eligibility is exactly `SimulationSession.status == COMPLETED`; aborted/partial/service-failure reports remain Deferred.
-- Content target is 4 ordering + 4 resource-allocation + 4 plan-design = 12 human-reviewed immutable Question Versions. Current source has 0/1/0 respectively, so P1-7D closure gap is 11; P1-7A writes no question content.
+- Content target is 4 ordering + 4 resource-allocation + 4 plan-design = 12 human-reviewed immutable Question Versions. P1-7D implements the exact 4/4/4 catalog and external human content review is `PASS`; automated validation remains separate supporting evidence rather than a substitute for that review.
 - The master-plan “score versus level + evidence” question remains TBD. P1-7 outputs no formal score, radar, percentile, ranking, hiring probability, job fit or personality type.
 - P1-7E later owns one network-free select → session → 1 Human + 3 AI → all text phases → `COMPLETED` → report → Web/evidence resolution → Browser reload → API restart/durable recovery proof. P1-8 remains separate.
 
@@ -860,7 +860,26 @@ P1-7A review closeout uses `group-interview-arena-review-20260909-234536.zip` / 
 - `ReportSourceCollector` projects only the exact public Question allowlist, ordered public roster and authoritative `participant.utterance.created` events through the report's frozen watermark. It excludes Memory, hidden/reference Question fields and Persona private/calibration data, and preserves source content exactly.
 - `ReportEvaluator` returns a closed evaluator-neutral proposal. `EvidenceValidator` resolves every proposed citation exactly to Human public source identity/sequence/phase/quote, and `ReportComposer` assigns trusted evidence kind and rejects the whole generation if any proposed item is invalid. `DeterministicReportEvaluator` is network-free.
 - `ReportGenerationCoordinator` uses the durable generation identity and `started_at` claim token with an explicit positive lease. Short transactions own claim/failure/finalization CAS; no DB scope is held during evaluation. Completion plus every Evidence row commits atomically, stale claimants persist nothing, FAILED retries reuse the same report, and COMPLETED re-entry does not evaluate again.
-- P1-7C changes no schema, migration, session lifecycle, public API, Web surface or dependency. It adds no P3 score/dimension/ranking behavior and makes no real-provider call. P1-7D/P1-7E and P1-8 remain `NOT_STARTED`.
+- P1-7C changes no schema, migration, session lifecycle, public API, Web surface or dependency. It adds no P3 score/dimension/ranking behavior and makes no real-provider call. External actual-source review passed; P1-7C is `DONE / ACTUAL_SOURCE_REVIEW_PASS`.
+
+### P1-7D implementation checkpoint
+
+- `POST /sessions/{session_id}/report` is the minimal owner-only product command over `ReportGenerationCoordinator.generate`; the server owns schema version `1`, derivation `basic-report/v1`, deterministic evaluator selection and lease. Existing CSRF, completed-session eligibility, non-disclosing ownership, claim/CAS, retry/idempotency and atomic finalization remain authoritative. The response is safe metadata only.
+- `GET /sessions/{session_id}/report` is owner-only and read-only. It selects the current durable report by `created_at DESC, id DESC`, never falls back from a newer non-completed report, and never invokes evaluator/coordinator/provider or creates report/evidence rows.
+- The closed public envelope exposes safe metadata for every durable lifecycle state; content is `null` unless `COMPLETED`. Completed projection reuses the trusted frozen-watermark public source, renders deterministic factual counts and 0..3 evidence cards per kind ordered by source event sequence then evidence identity, and preserves quote/provenance exactly without P3 scoring.
+- The completed SessionPanel exposes `生成 / 查看训练报告`, invokes the POST command and navigates to the reloadable `/sessions/{sessionId}/report` route. The report page handles loading, authentication/not-found, all four report statuses, empty evidence sections and the five-part completed report surface.
+- The immutable seed catalog contains exactly 12 candidate versions at 4/4/4 with the existing four Persona Templates and three explicit question-specific private AI stances per added question. Museum, rural-clinic and heatwave prompts now carry the missing decision-grade public facts. See [`V01_CONTENT_REVIEW_MANIFEST.md`](V01_CONTENT_REVIEW_MANIFEST.md). Content is `4/4/4 IMPLEMENTED / HUMAN_CONTENT_REVIEW_PASS`.
+- P1-7D adds no schema/migration/dependency/WebSocket, score/rank, commercial behavior or P1-7E implementation. External actual-source review passed; P1-7D-F001～F005 are closed; P1-7D is `DONE / ACTUAL_SOURCE_REVIEW_PASS`.
+
+#### P1-7D finding-only remediation matrix
+
+| Finding | Remediation | Review state |
+| --- | --- | --- |
+| P1-7D-F001 | Added the real owner-only POST product command over the accepted coordinator with server-owned V0.1 identity and safe metadata. | `CLOSED` |
+| P1-7D-F002 | Added the completed-session CTA, typed POST client and stable report-route navigation with safe errors. | `CLOSED` |
+| P1-7D-F003 | Added comparable museum facts, three-town rural demand facts and heatwave unit economics. | `CLOSED` |
+| P1-7D-F004 | Replaced generic stance text with three explicit differentiated stances for each of the 11 added questions. | `CLOSED` |
+| P1-7D-F005 | Synchronized P1-7D API/data/agent/architecture/question/task/plan/manifest governance facts. | `CLOSED` |
 
 ## P1-8 — Independent P1 Acceptance
 

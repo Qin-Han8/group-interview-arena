@@ -1,6 +1,6 @@
 # 数据库技术基线
 
-- Status: P0 Data Architecture Baseline + P1-1～P1-6 persistence implemented; P1-7A conceptual report/evidence data boundary frozen docs-only
+- Status: P0 Data Architecture Baseline + P1-1～P1-6 persistence implemented; P1-7A frozen/reviewed; P1-7B Evaluation Report/Evidence persistence and P1-7C generation lifecycle implemented/reviewed
 - Current phase: P1 — IN_PROGRESS
 - Data architecture baseline established by: P0-2 — DONE
 - Local PostgreSQL infrastructure: P0-4B — completed
@@ -15,7 +15,7 @@
 - Target version: V0.1 Internal Validation
 - Business schema: identity, session, question/persona, durable phase timing, participant/floor audit, AI Runtime, structured Discussion Memory, and Evaluation Report/Evidence persistence (twenty-three product tables)
 - P1-1 status: P1-1A～E completed; independent final verdict PASS; P1-1 DONE
-- P1-2～P1-6 status: DONE; P1-6E/P1-6 CLOSED; P1-7 IN_PROGRESS; P1-7A `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-7B `DONE / ACTUAL_SOURCE_REVIEW_PASS` with `P1-7B-F001 CLOSED`; P1-7C `IMPLEMENTED / AWAITING_ACTUAL_SOURCE_REVIEW`; P1-7D/E/P1-8 NOT_STARTED; the schema remains twenty-three product tables at linear revision `f1a17b17c008`
+- P1-2～P1-6 status: DONE; P1-6E/P1-6 CLOSED; P1-7 IN_PROGRESS; P1-7A frozen/reviewed; P1-7B/P1-7C/P1-7D `DONE / ACTUAL_SOURCE_REVIEW_PASS`; P1-7E/P1-8 NOT_STARTED; the schema remains twenty-three product tables at linear revision `f1a17b17c008`
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -452,9 +452,9 @@ P1-7C adds no migration or table. Its coordinator claims generation with the dat
 
 总纲提到 `users`、题目版本、角色模板、会话、参与者、阶段、发言、讨论事件、结构化记忆、报告、证据、训练、反馈、模型调用和审计等未来领域概念。
 
-除上述已实现 identity/session/question/persona/phase/floor schema 外，其余仍只是长期领域导航：
+除上述已实现 identity/session/question/persona/phase/floor/AI Runtime/Memory/report/evidence schema 外，其余仍只是长期领域导航：
 
-- P1-5B implements Prompt Version、Generation Request and final AI Utterance persistence；P1-6B implements structured Discussion Memory state/journal；P1-7A freezes report/evidence conceptual responsibilities only；provider attempts beyond the current one-request/one-attempt identity and detailed retention/deletion policy remain Deferred；physical report/evidence、training and feedback schema remain Deferred to their approved implementation phases；
+- P1-5B implements Prompt Version、Generation Request and final AI Utterance persistence；P1-6B implements structured Discussion Memory state/journal；P1-7B implements physical report/evidence persistence at `f1a17b17c008`；provider attempts beyond the current one-request/one-attempt identity and detailed retention/deletion policy remain Deferred；training and feedback schema remain Deferred to their approved implementation phases；
 - V0.1 最小实体集合仍需在 P1 业务设计中确认；
 - 支付、权益、语音和成长数据不得提前进入 V0.1 Schema；
 - P0/V0.1 initial identity boundary 已由 `ADR-015` 确认；公开身份扩展与 recovery 仍 Deferred。
@@ -478,7 +478,7 @@ P1-7C adds no migration or table. Its coordinator claims generation with the dat
 
 - P0-5C：FastAPI lifespan/request dependency 已成为现有 async DB runtime 的第一个 application caller；真实 PostgreSQL auth integration 只使用迁移到 head 的隔离临时数据库，development DB 保持 head `4fe43b42641b` 且两张表均为 0 rows；
 - P0-5D：completed；browser closure 已实现，existing Cookie/CORS/CSRF/shared trusted-origin boundary 已生效；P1 不得创建第二套 trusted-origin config；
-- P1：`IN_PROGRESS`；P1-1～P1-6 are `DONE`；P1-6E/P1-6 are `CLOSED`；current migration head is `f1a17b17c008` with exactly twenty-three product tables；P1-7 is `IN_PROGRESS` with P1-7A `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`, P1-7B `DONE / ACTUAL_SOURCE_REVIEW_PASS`, `P1-7B-F001 CLOSED`, P1-7C `IMPLEMENTED / AWAITING_ACTUAL_SOURCE_REVIEW`, and P1-7D/E/P1-8 `NOT_STARTED`；
+- P1：`IN_PROGRESS`；P1-1～P1-6 are `DONE`；P1-6E/P1-6 are `CLOSED`；current migration head is `f1a17b17c008` with exactly twenty-three product tables；P1-7 is `IN_PROGRESS` with P1-7A frozen/reviewed, P1-7B/P1-7C/P1-7D `DONE / ACTUAL_SOURCE_REVIEW_PASS`, and P1-7E/P1-8 `NOT_STARTED`；
 - P2～P4：仅随获批范围增加音频、评分训练和商业化数据。
 
 ## 与其他文档关系

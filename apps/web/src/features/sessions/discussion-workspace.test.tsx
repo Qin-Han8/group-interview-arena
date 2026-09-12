@@ -68,6 +68,12 @@ const HEADER: SessionHeaderProps = {
     label: "结束会话",
     onActivate: vi.fn(),
   },
+  reportAction: {
+    visible: false,
+    disabled: false,
+    label: "生成 / 查看训练报告",
+    onActivate: vi.fn(),
+  },
 };
 
 const SURFACE_EXPECTATIONS = [
