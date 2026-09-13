@@ -96,7 +96,7 @@
 
 ## Future work
 
-- P1：P1-7A is frozen/reviewed；P1-7B/P1-7C/P1-7D are `DONE / ACTUAL_SOURCE_REVIEW_PASS`；P1-7D implements the report REST/Web surface without formal scores；P1-7E remains `NOT_STARTED`.
+- P1：P1-7A is frozen/reviewed；P1-7B/P1-7C/P1-7D are `DONE / ACTUAL_SOURCE_REVIEW_PASS`；P1-7D implements the report REST/Web surface without formal scores；P1-7E is `DONE / INDEPENDENT_ACCEPTANCE_PASS`；P1-7 is `DONE / CLOSED`；P1-8 remains `NOT_STARTED`.
 - P3：完成客观指标、证据提取、六维评分、报告和专项训练设计。
 - P5：通过专家标注和公开测试校准可信度与用户认可率。
 

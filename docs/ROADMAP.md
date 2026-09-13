@@ -2,12 +2,12 @@
 
 - Status: Active baseline
 - Most recently completed development phase: P0 — `DONE`
-- Current completed checkpoint: P1-7D — `DONE / ACTUAL_SOURCE_REVIEW_PASS`; P1-7C/P1-7B — `DONE / ACTUAL_SOURCE_REVIEW_PASS`; P1-7A — `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-7 — `IN_PROGRESS`; P1-6 — `DONE / CLOSED`
+- Current acceptance checkpoint: P1-7E — `DONE / INDEPENDENT_ACCEPTANCE_PASS`; P1-7D/P1-7C/P1-7B — `DONE / ACTUAL_SOURCE_REVIEW_PASS`; P1-7A — `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-7 — `DONE / CLOSED`; P1-6 — `DONE / CLOSED`
 - P0-7 final outcome: initial `BLOCKED`; two documentation findings remediated; finding-only independent recheck `PASS`; P1 readiness `READY`
 - Current phase: P1 — `IN_PROGRESS`
-- Current governance checkpoint: P1-7D is `DONE / ACTUAL_SOURCE_REVIEW_PASS`; F001～F005 are `CLOSED`; content is `4/4/4 IMPLEMENTED / HUMAN_CONTENT_REVIEW_PASS`; material content findings are `NONE OPEN`
-- Latest completed implementation review: P1-7D external actual-source review is `PASS`; open findings/new blockers are `NONE`
-- Current task gate: P1-6 — `DONE / CLOSED`; P1-7 — `IN_PROGRESS`; P1-7A — `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-7B/P1-7C/P1-7D — `DONE / ACTUAL_SOURCE_REVIEW_PASS`; P1-7E/P1-8 — `NOT_STARTED`; P1 remains `IN_PROGRESS`
+- Current governance checkpoint: P1-7E external independent acceptance is `PASS`; P1-7E is `DONE / INDEPENDENT_ACCEPTANCE_PASS`; P1-7 is `DONE / CLOSED`; F001～F005 are `CLOSED`; content is `4/4/4 IMPLEMENTED / HUMAN_CONTENT_REVIEW_PASS`; open findings are `NONE`
+- Latest completed acceptance: P1-7E external independent acceptance is `PASS`; P1-7 is `DONE / CLOSED`; open findings/new blockers are `NONE`
+- Current task gate: P1-6 — `DONE / CLOSED`; P1-7 — `DONE / CLOSED`; P1-7A — `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-7B/P1-7C/P1-7D — `DONE / ACTUAL_SOURCE_REVIEW_PASS`; P1-7E — `DONE / INDEPENDENT_ACCEPTANCE_PASS`; P1-8 — `NOT_STARTED`; P1 remains `IN_PROGRESS`
 - P0 status: `DONE`; P0-1 through P0-7 completed
 - Target product version: V0.1 — Internal Validation
 - Source: [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) §30–31
@@ -138,15 +138,15 @@ P1-6D freezes and completes a dedicated network-free Browser Acceptance Scenario
 
 P1-6E independently exercised the committed P1-6 boundary. Initial acceptance and two re-acceptances surfaced bounded defects rather than being rewritten as PASS; three repair/source-review cycles closed the original runner、Memory replay、metadata/document drift and later Web/Crash-E race findings. Re-acceptance 2 then passed the complete runtime/browser/environment matrix but returned `REPAIRABLE` on strict typing and two current-state documents. After the automatic three-repair stop, a user-authorized post-stop closeout remediation closed `P16E-RA2-001`/`P16E-RA2-002`; independent finding-only review passed, and exact accepted-remediation CI run `34336016724` is green. The repair-1 cleanup incident remains explicit: a pre-existing temporary database and Playwright marker were mistakenly deleted, were not fabricated as restored, and later validation used the user-accepted post-incident baseline plus ownership-only cleanup. P1-6E/P1-6 are `DONE / CLOSED`; P1 remains `IN_PROGRESS`; no real provider was called.
 
-`P1-7 — Basic Evidence Report + V0.1 Content Closure` is now `IN_PROGRESS` with this frozen split:
+`P1-7 — Basic Evidence Report + V0.1 Content Closure` is `DONE / CLOSED` with this accepted split:
 
 - `P1-7A — Basic Evidence Report & V0.1 Content Architecture Freeze`: `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; strict docs-only; external review findings `NONE`;
 - `P1-7B — Evidence / Report Persistence Foundation`: `DONE / ACTUAL_SOURCE_REVIEW_PASS`; `P1-7B-F001 CLOSED`; open findings `NONE`;
 - `P1-7C — Evidence Extraction + Basic Report Generation`: `DONE / ACTUAL_SOURCE_REVIEW_PASS`;
 - `P1-7D — Report REST/Web + V0.1 Content Closure`: `DONE / ACTUAL_SOURCE_REVIEW_PASS`; `P1-7D-F001～F005 CLOSED`; content `4/4/4 IMPLEMENTED / HUMAN_CONTENT_REVIEW_PASS`;
-- `P1-7E — Composition Acceptance + Independent Acceptance`: `NOT_STARTED`.
+- `P1-7E — Composition Acceptance + Independent Acceptance`: `DONE / INDEPENDENT_ACCEPTANCE_PASS`.
 
-P1-7 freezes an independent durable/versioned report resource over project-validated authoritative public evidence after session `COMPLETED`; it adds no session report states or activity WebSocket lifecycle and does not import P3 formal six-dimension scoring. P1-7A is frozen/reviewed; P1-7B/P1-7C/P1-7D are `DONE / ACTUAL_SOURCE_REVIEW_PASS`. P1-7D implements the owner-only generation command, mutation-free current-report REST read and reloadable Web experience plus exactly 12 immutable Question Versions at 4 ordering / 4 resource-allocation / 4 plan-design with the existing 4 Persona Templates. External human content review is `PASS`, material content findings are `NONE OPEN`, and F001～F005 are `CLOSED`. P1-7 remains `IN_PROGRESS`; P1-7E and P1-8 remain `NOT_STARTED`. Exact boundaries are frozen in [`exec-plans/P1-7_basic-evidence-report-and-content.md`](exec-plans/P1-7_basic-evidence-report-and-content.md).
+P1-7 freezes an independent durable/versioned report resource over project-validated authoritative public evidence after session `COMPLETED`; it adds no session report states or activity WebSocket lifecycle and does not import P3 formal six-dimension scoring. P1-7A is frozen/reviewed; P1-7B/P1-7C/P1-7D are `DONE / ACTUAL_SOURCE_REVIEW_PASS`. P1-7D implements the owner-only generation command, mutation-free current-report REST read and reloadable Web experience plus exactly 12 immutable Question Versions at 4 ordering / 4 resource-allocation / 4 plan-design with the existing 4 Persona Templates. External human content review is `PASS`, material content findings are `NONE OPEN`, and F001～F005 are `CLOSED`. P1-7E independently accepted its network-free real-boundary composition path: 1 Human + 3 AI, all phases to `COMPLETED`, completion watermark 48, one durable report and one authoritative Human evidence item, mutation-free GET, idempotent POST, reload/restart durability, owner isolation and private-boundary `PASS`, with no production/schema change, scoring or real-provider call. P1-7E is `DONE / INDEPENDENT_ACCEPTANCE_PASS`; P1-7 is `DONE / CLOSED`; open findings are `NONE`; P1-8 remains `NOT_STARTED`. Exact boundaries are frozen in [`exec-plans/P1-7_basic-evidence-report-and-content.md`](exec-plans/P1-7_basic-evidence-report-and-content.md).
 
 ## 5. 产品版本
 
