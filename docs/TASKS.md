@@ -17,13 +17,15 @@ P1 is formally `DONE / CLOSED`; this is the completed text-based discussion clos
 ## HK-BETA-2A1 — Closed Beta Admission, Durable Auth Throttling & Trusted Client Source
 
 - ID: `HK-BETA-2A1`
-- Status: `IN_PROGRESS`
+- Status: `DONE / CLOSED`
 - Goal: 在不改变 P1/P2/P3 路线的前提下，为 Hong Kong Closed Text Beta 增加最小邀请制、PostgreSQL durable auth throttling 与 Caddy trusted-client-source boundary。
 - In scope: 一次性 invitation、原子消费、通用 enrollment failure、register/login durable limits、固定 account shard、trusted Caddy header、Web invitation input、operator CLI、线性 migration、deployment/config/docs/tests。
 - Out of scope: verified recovery、password denylist 扩展、account deletion、quota/token/cost ceiling、payment、Voice、Redis、queue、Admin UI、email/SMS/OAuth、ECS/DNS、backup 与 PostgreSQL least-privilege runtime role。
 - Dependencies: P1 `DONE / CLOSED`；HK-BETA-0/HK-BETA-1 complete；`ADR-015` 与 `ADR-016`。
 - Actual go-live gate: 本任务关闭 admission 与 durable auth throttling gap，但不自行解除 verified recovery、least-privilege DB role、backup/restore、quota/cost 与其他独立 go-live gates。
-- Closeout: implementation 与 risk-matched local acceptance 已通过；actual-source finding remediation 正在进行，finding re-review、commit/push 与任何真实环境操作仍待后续独立步骤，本轮不满足 `DONE` gate。
+- Closeout: implementation、risk-matched local acceptance、actual-source review、finding-only remediation/re-review、commit/push 与 GitHub CI 均已通过；accepted final commit `664857efe8ef9b27c055429e36c45d67ef9395a6` 已推送至 `main`，exact GitHub Actions CI run `35452988196` 为 `completed / success`。
+- Carry-forward: verified recovery、stronger compromised-password control、`consumed_by_user_id ON DELETE RESTRICT` 对未来 account deletion 的依赖、per-existing-invite limiter 的低风险 invite-existence side channel、PostgreSQL least-privilege runtime role、off-host backup/restore、quota/token/cost/concurrency gates、provider production smoke 与 account/data deletion 均保持 open；因此 actual go-live 仍 `BLOCKED`。
+- Phase boundary: 本 closeout 不启动 HK-BETA-2A2；P2 仍为 `NOT_STARTED`。
 - Plan: [`exec-plans/HK-BETA-2A1_closed-beta-admission-auth-hardening.md`](exec-plans/HK-BETA-2A1_closed-beta-admission-auth-hardening.md)
 
 ## P0-1 — 仓库与文档治理
