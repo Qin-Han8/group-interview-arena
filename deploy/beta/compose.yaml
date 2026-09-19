@@ -1,0 +1,150 @@
+name: group-interview-arena-beta
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+x-app-security: &app-security
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  read_only: true
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,size=64m
+
+services:
+  postgres:
+    image: postgres:18.4-trixie
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in deploy/beta/.env}
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in deploy/beta/.env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/beta/.env}
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    networks:
+      - data
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+    logging: *default-logging
+
+  migrate:
+    image: gia-beta-api-migrate:${GIA_IMAGE_TAG:-local}
+    build:
+      context: ../..
+      dockerfile: apps/api/Dockerfile
+      target: migrate
+    environment:
+      GIA_API_DATABASE_URL: ${GIA_API_DATABASE_URL:?set GIA_API_DATABASE_URL in deploy/beta/.env}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - data
+    restart: "no"
+    profiles:
+      - ops
+    <<: *app-security
+    logging: *default-logging
+
+  api:
+    image: gia-beta-api:${GIA_IMAGE_TAG:-local}
+    build:
+      context: ../..
+      dockerfile: apps/api/Dockerfile
+      target: runtime
+    environment:
+      GIA_API_ENVIRONMENT: production
+      GIA_API_LOG_LEVEL: ${GIA_API_LOG_LEVEL:-INFO}
+      GIA_API_DATABASE_URL: ${GIA_API_DATABASE_URL:?set GIA_API_DATABASE_URL in deploy/beta/.env}
+      GIA_API_CORS_ORIGINS: ${GIA_API_CORS_ORIGINS:?set GIA_API_CORS_ORIGINS in deploy/beta/.env}
+      GIA_API_SESSION_COOKIE_SECURE: "true"
+      GIA_API_ZHIPU_API_KEY: ${GIA_API_ZHIPU_API_KEY:?set GIA_API_ZHIPU_API_KEY in deploy/beta/.env}
+      GIA_API_ZHIPU_MODEL: ${GIA_API_ZHIPU_MODEL:?set GIA_API_ZHIPU_MODEL in deploy/beta/.env}
+      GIA_API_OTEL_TRACING_ENABLED: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - edge
+      - data
+    restart: unless-stopped
+    <<: *app-security
+    logging: *default-logging
+
+  web:
+    image: gia-beta-web:${GIA_IMAGE_TAG:-local}
+    build:
+      context: ../..
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:?set NEXT_PUBLIC_API_BASE_URL in deploy/beta/.env}
+    environment:
+      HOSTNAME: 0.0.0.0
+      PORT: "3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - edge
+    restart: unless-stopped
+    <<: *app-security
+    logging: *default-logging
+
+  caddy:
+    image: caddy:2.10.2-alpine
+    environment:
+      BETA_WEB_SITE: ${BETA_WEB_SITE:-beta.lijingai.com}
+      BETA_API_SITE: ${BETA_API_SITE:-api.beta.lijingai.com}
+      BETA_CADDY_TLS: ${BETA_CADDY_TLS:-}
+      CADDY_ACME_EMAIL: ${CADDY_ACME_EMAIL:?set CADDY_ACME_EMAIL in deploy/beta/.env}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      api:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+    networks:
+      - edge
+    restart: unless-stopped
+    user: "1000:1000"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    logging: *default-logging
+
+networks:
+  edge:
+    internal: false
+  data:
+    internal: true
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:
+

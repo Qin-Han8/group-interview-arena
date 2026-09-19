@@ -1,0 +1,18 @@
+{
+	email {$CADDY_ACME_EMAIL}
+	admin off
+}
+
+{$BETA_WEB_SITE} {
+	{$BETA_CADDY_TLS}
+
+	encode zstd gzip
+	reverse_proxy web:3000
+}
+
+{$BETA_API_SITE} {
+	{$BETA_CADDY_TLS}
+
+	encode zstd gzip
+	reverse_proxy api:8000
+}

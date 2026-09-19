@@ -367,3 +367,128 @@ jobs:
           if residual or listeners:
               raise SystemExit("Chromium E2E cleanup verification failed.")
           PY
+
+  beta-deployment-package:
+    name: Beta deployment package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Render and audit Beta Compose topology
+        shell: bash
+        run: |
+          set -euo pipefail
+          config_json="${RUNNER_TEMP}/beta-compose.json"
+          docker compose --profile ops \
+            --env-file deploy/beta/.env.example \
+            -f deploy/beta/compose.yaml \
+            config --format json >"$config_json"
+
+          python - "$config_json" <<'PY'
+          import json
+          import sys
+
+          with open(sys.argv[1], encoding="utf-8") as source:
+              config = json.load(source)
+
+          services = config["services"]
+          required = {"caddy", "web", "api", "migrate", "postgres"}
+          if set(services) != required:
+              raise SystemExit(f"Unexpected services: {sorted(services)}")
+
+          for name, service in services.items():
+              if service.get("privileged"):
+                  raise SystemExit(f"{name} must not be privileged")
+              if name != "caddy" and service.get("ports"):
+                  raise SystemExit(f"{name} unexpectedly publishes host ports")
+
+          caddy_ports = {
+              (int(port["target"]), port.get("protocol", "tcp"))
+              for port in services["caddy"].get("ports", [])
+          }
+          if caddy_ports != {(80, "tcp"), (443, "tcp"), (443, "udp")}:
+              raise SystemExit(f"Unexpected Caddy ports: {sorted(caddy_ports)}")
+
+          expected_networks = {
+              "caddy": {"edge"},
+              "web": {"edge"},
+              "api": {"edge", "data"},
+              "migrate": {"data"},
+              "postgres": {"data"},
+          }
+          for name, expected in expected_networks.items():
+              actual = set(services[name].get("networks", {}))
+              if actual != expected:
+                  raise SystemExit(f"{name} networks {actual} != {expected}")
+
+          if not config["networks"]["data"].get("internal"):
+              raise SystemExit("data network must be internal")
+          if services["migrate"].get("restart") not in ("no", ""):
+              raise SystemExit("migrate must be one-shot")
+          if "postgres_data" not in config.get("volumes", {}):
+              raise SystemExit("PostgreSQL named volume is missing")
+          PY
+
+      - name: Validate Caddy configuration
+        shell: bash
+        run: |
+          docker run --rm \
+            -e BETA_WEB_SITE=beta.lijingai.com \
+            -e BETA_API_SITE=api.beta.lijingai.com \
+            -e BETA_CADDY_TLS= \
+            -e CADDY_ACME_EMAIL=ci@example.invalid \
+            -v "${PWD}/deploy/beta/Caddyfile:/etc/caddy/Caddyfile:ro" \
+            caddy:2.10.2-alpine \
+            caddy validate --config /etc/caddy/Caddyfile
+
+      - name: Build Beta images
+        shell: bash
+        run: |
+          docker compose --profile ops \
+            --env-file deploy/beta/.env.example \
+            -f deploy/beta/compose.yaml \
+            build migrate api web
+
+      - name: Audit image users and browser bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(docker image inspect gia-beta-web:local --format '{{.Config.User}}')" = "10001:10001"
+          test "$(docker image inspect gia-beta-api:local --format '{{.Config.User}}')" = "10001:10001"
+          test "$(docker image inspect gia-beta-api-migrate:local --format '{{.Config.User}}')" = "10001:10001"
+
+          docker run --rm --entrypoint sh gia-beta-web:local -c \
+            "grep -R -a -q 'api.beta.lijingai.com' /app && ! grep -R -a -E -q 'localhost:8000|http://localhost' /app"
+          docker run --rm --entrypoint python gia-beta-api:local -c \
+            "import importlib.util; from group_interview_arena_api.app import app; assert app.title; assert importlib.util.find_spec('alembic') is None; assert importlib.util.find_spec('pytest') is None"
+          docker run --rm --entrypoint python gia-beta-api-migrate:local -c \
+            "import importlib.util; assert importlib.util.find_spec('alembic') is not None; assert importlib.util.find_spec('pytest') is None; assert importlib.util.find_spec('ruff') is None; assert importlib.util.find_spec('pyright') is None"
+          docker run --rm --entrypoint alembic gia-beta-api-migrate:local heads
+
+          for image in gia-beta-web:local gia-beta-api:local gia-beta-api-migrate:local; do
+            if docker history --no-trunc "$image" | grep -E \
+              'CHANGE_ME_|synthetic-never-called|hk_beta_1_synthetic_password_only'; then
+              echo "Secret-like validation material found in $image history."
+              exit 1
+            fi
+          done
+
+      - name: Audit committed deployment files for secret material
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -e deploy/beta/.env
+          if git grep -n -E -e \
+            '(BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|sk-[A-Za-z0-9_-]{24,}|Bearer [A-Za-z0-9._-]{24,})' \
+            -- . ':!pnpm-lock.yaml' ':!apps/api/uv.lock'; then
+            echo "Potential committed secret material detected."
+            exit 1
+          else
+            status=$?
+            test "$status" -eq 1 || exit "$status"
+          fi

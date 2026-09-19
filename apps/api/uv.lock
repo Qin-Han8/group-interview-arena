@@ -292,6 +292,9 @@ dev = [
     { name = "pytest" },
     { name = "ruff" },
 ]
+ops = [
+    { name = "alembic" },
+]
 
 [package.metadata]
 requires-dist = [
@@ -315,6 +318,7 @@ dev = [
     { name = "pytest", specifier = ">=9.1.1" },
     { name = "ruff", specifier = ">=0.16.2" },
 ]
+ops = [{ name = "alembic", specifier = ">=1.18.5,<1.19" }]
 
 [[package]]
 name = "h11"
