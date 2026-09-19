@@ -1,9 +1,9 @@
 # 隐私、安全、合规与反作弊基线
 
-- Status: Active baseline through P1-7D implementation checkpoint
-- Current phase: P1 — IN_PROGRESS
+- Status: Active baseline through formal P1 closeout
+- Current phase: P1 — DONE / CLOSED; P2 — NOT_STARTED
 - Target version: V0.1 Internal Validation
-- Detailed design: P1-5 runtime/recovery privacy boundaries are complete；P1-6 implements public-only structured Memory and bounded Working Context while preserving candidate-private isolation；P1-7A freezes public-only evaluator/report/evidence validation boundaries；P1-7B/P1-7C are accepted persistence/generation；P1-7D implements a closed public report read and private-isolated candidate content catalog；P1-7E/P1-8 remain incomplete
+- Detailed design: P1-5 runtime/recovery privacy boundaries are complete；P1-6 implements public-only structured Memory and bounded Working Context while preserving candidate-private isolation；P1-7A～P1-7E report/evidence work and P1-8 interaction remediation are closed；P1 phase-close assessment/re-assessment passed
 - Security boundaries: Active from project start
 - P0-5A identity security boundary: completed / approved
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
@@ -85,6 +85,8 @@
 
 P0-5B 已实现显式参数的 Argon2id hash/verify/verify-and-update、username/password policy、`users`/`auth_sessions` persistence、SHA-256 session digest 与 7-day absolute-expiry primitives。P0-5C 已实现 backend register/login/logout/me、固定 dummy Argon2 unknown-user path、server-side session validation 与 host-only HttpOnly `gia_session` Cookie issue/clear；raw session token 不进入普通 result repr，production + insecure Cookie 配置会 fail closed，safe response tests 与 structured-log field audit 确认不回显 password、hash、raw token 或 digest。P0-5D 已实现 shared exact-origin credentialed CORS、unsafe auth POST 的 Origin/custom-header CSRF、`credentials: "include"` Web client 与真实 Chromium closure；浏览器验证确认 `document.cookie` 不暴露 `gia_session`，local/session storage 不保存认证 secret，logout 后服务端 session 与 Cookie 均失效。recovery 继续 Deferred。
 
+当前新注册密码基线为 8～128 个字符，并必须分别包含 ASCII 大写字母、小写字母、数字和 ASCII 标点；空白字符和 Unicode 标点不能替代 ASCII 标点。NFC 行为、full-password blocklist、Argon2id 与历史账号登录兼容性保持不变；该新规则不用于拒绝按历史策略创建且密码仍可验证的既有账号。
+
 ## P0-6C application logging safety boundary — completed
 
 - application logs 只从显式安全字段构造，不先收集 body/header/query/path/exception 再依赖通用 redaction；
@@ -164,6 +166,13 @@ P1-7C implements this boundary with a closed immutable `ReportSourceSnapshot`: i
 
 P1-7D exposes only the closed report DTO. Non-completed reports expose no partial content or failure detail; completed content reuses the frozen public source and persisted evidence provenance. The strict browser parser rejects extras and lifecycle/content mismatches. Public Question reads remain allowlisted while reference dimensions, hidden conflicts, acceptable outcome patterns, phase prompts, safety tags, assignments and private stances stay server-side. Browser acceptance uses a disposable database and no real provider.
 
+## P1-8 interaction and latency observability boundary
+
+- Off-topic recovery remains inside the existing candidate Prompt Version and existing generation request. It introduces no second classifier call, moderation transcript, semantic label persistence or new public contract.
+- Internal timing correlation is content-free: safe session、participant、floor-grant、generation-request identities, log timestamps, durations, sequence/status may distinguish generation start、provider completion、utterance commit and Browser render. Prompt text、utterance content、Private Stance、provider payload/error body、credentials and hidden reasoning remain forbidden.
+- Browser `PerformanceMark` for the latest committed AI utterance contains only utterance identity、participant identity and authoritative sequence. It is local instrumentation, not a new analytics upload or privacy API.
+- Demo V2 is a visual reference only. Its Mock scores、dimensions、behavior statistics、growth/payment/settings data and Discussion Memory are not copied into production UI or persistence.
+
 ## Implementation guidance
 
 - 每个新数据字段都应说明目的、保留、删除、访问和日志处理。
@@ -190,7 +199,7 @@ P1-7D exposes only the closed report DTO. Non-completed reports expose no partia
 
 - P0-2：在架构决策中记录基础信任边界；完整威胁建模随实际接口、数据和 Provider 逐步细化。
 - P0-5C～P0-5E：backend/browser authentication、Cookie/CORS/CSRF 与最小日志边界已实现；P0-5E final outcome 为 `PASS after findings remediation and independent recheck`，P0-5 已转为 `DONE`。
-- P0 and P1-1～P1-6 are `DONE`; P1-6E/P1-6 are `CLOSED`, and parent P1 remains `IN_PROGRESS`. P1-7 is `IN_PROGRESS`; P1-7A is frozen/reviewed; P1-7B/P1-7C/P1-7D are `DONE / ACTUAL_SOURCE_REVIEW_PASS`; P1-7E/P1-8 are `NOT_STARTED`. No real-provider call, private report input exposure, scoring or commercial behavior occurred.
+- P0 and P1 are `DONE / CLOSED`; P1-1～P1-8 mandatory scope and the approved acceptance chain are complete. No private report input exposure, formal scoring or commercial behavior was introduced by P1 closeout; P2 remains `NOT_STARTED`.
 - P2：完成语音同意、上传、保存和删除设计。
 - P4/P5：完成支付审计、公开隐私设置、投诉和发布合规检查。
 

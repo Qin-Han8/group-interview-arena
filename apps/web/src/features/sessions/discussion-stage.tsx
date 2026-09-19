@@ -1,6 +1,12 @@
 "use client";
 
-import type { KeyboardEvent, ReactNode, RefObject } from "react";
+import {
+  useEffect,
+  useRef,
+  type KeyboardEvent,
+  type ReactNode,
+  type RefObject,
+} from "react";
 
 import type { SessionSnapshot } from "@/lib/api/client";
 import type {
@@ -20,6 +26,12 @@ export type RejectedDraftPresentation = {
 export type DiscussionNotice = {
   key: string;
   message: string;
+};
+
+export type LiveAiRenderCandidate = {
+  utteranceId: string;
+  sequence: number;
+  participantId: string;
 };
 
 export type DiscussionStageProps = {
@@ -45,10 +57,15 @@ export type DiscussionStageProps = {
   errorMessage: string | null;
   aiWaitingLabel: string | null;
   interruptedAiNotices: readonly DiscussionNotice[];
+  liveAiRenderCandidate: LiveAiRenderCandidate | null;
+  onLiveAiRenderMarked: (utteranceId: string) => void;
   showComposer: boolean;
 };
 
 type StageParticipant = SessionSnapshot["floor"]["participants"][number];
+type VisibleStageParticipant = StageParticipant & {
+  actor_kind: "HUMAN" | "AI";
+};
 
 function safeParticipantLabel(
   participants: SessionSnapshot["floor"]["participants"],
@@ -57,6 +74,16 @@ function safeParticipantLabel(
   return participant.actor_kind === "HUMAN"
     ? "你"
     : participantLabel(participants, participant.participant_id);
+}
+
+function participantAvatar(
+  participants: SessionSnapshot["floor"]["participants"],
+  participantId: string,
+  actorKind: "HUMAN" | "AI",
+) {
+  if (actorKind === "HUMAN") return "我";
+  const label = participantLabel(participants, participantId);
+  return label.replace("AI 候选人 ", "") || "AI";
 }
 
 function participantStatus(
@@ -98,6 +125,7 @@ function Transcript({
       </h2>
       <div
         className="mt-3 min-h-0 flex-1 overflow-y-auto pr-1"
+        data-scroll-owner="discussion-transcript"
         data-testid="confirmed-transcript-list"
         onScroll={onTranscriptScroll}
         ref={containerRef}
@@ -113,26 +141,55 @@ function Transcript({
           >
             {items.map((item) => (
               <li
-                className="py-5 first:pt-0 last:pb-0"
+                className="flex gap-3 py-4 first:pt-0 last:pb-0"
                 data-contribution-layout="aligned-record"
+                data-speaker-kind={item.actor_kind === "HUMAN" ? "human" : "ai"}
                 key={item.utterance_id}
               >
-                <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <p className="text-sm font-semibold text-neutral-900">
-                    {item.actor_kind === "HUMAN"
-                      ? "你"
-                      : participantLabel(participants, item.participant_id)}
-                  </p>
-                  <p className="text-xs text-neutral-500">
-                    {phaseLabel(item.phase)}
+                <span
+                  className={`flex size-8 shrink-0 items-center justify-center rounded-lg text-xs font-semibold ${
+                    item.actor_kind === "HUMAN"
+                      ? "bg-indigo-100 text-indigo-700"
+                      : "bg-slate-100 text-slate-700"
+                  }`}
+                  data-speaker-avatar={
+                    item.actor_kind === "HUMAN" ? "human" : "ai"
+                  }
+                >
+                  {participantAvatar(
+                    participants,
+                    item.participant_id,
+                    item.actor_kind,
+                  )}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-semibold text-neutral-900">
+                        {item.actor_kind === "HUMAN"
+                          ? "你"
+                          : participantLabel(participants, item.participant_id)}
+                      </p>
+                      {item.actor_kind === "AI" ? (
+                        <span
+                          className="rounded border border-neutral-200 px-1.5 py-0.5 text-[0.625rem] font-semibold text-neutral-500"
+                          data-speaker-badge="ai"
+                        >
+                          AI
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="text-xs text-neutral-500">
+                      {phaseLabel(item.phase)}
+                    </p>
+                  </div>
+                  <p
+                    className="mt-1.5 whitespace-pre-wrap text-sm leading-6 text-neutral-800"
+                    data-testid={`utterance-content-${item.utterance_id}`}
+                  >
+                    {item.content}
                   </p>
                 </div>
-                <p
-                  className="mt-2 whitespace-pre-wrap text-sm leading-6 text-neutral-800"
-                  data-testid={`utterance-content-${item.utterance_id}`}
-                >
-                  {item.content}
-                </p>
               </li>
             ))}
           </ol>
@@ -185,6 +242,7 @@ function Composer({
       aria-labelledby="human-composer-heading"
       className="shrink-0 rounded-xl border border-neutral-200 bg-neutral-50 p-4"
       data-action-zone="human-composer"
+      data-composer-attachment="discussion-center"
       data-testid="human-composer"
     >
       <h2 className="text-sm font-semibold" id="human-composer-heading">
@@ -279,7 +337,6 @@ function primaryNotice({
   rejectedDraft,
   pendingContent,
   interruptedAiNotices,
-  aiWaitingLabel,
 }: Pick<
   DiscussionStageProps,
   | "connection"
@@ -288,7 +345,6 @@ function primaryNotice({
   | "rejectedDraft"
   | "pendingContent"
   | "interruptedAiNotices"
-  | "aiWaitingLabel"
 >): { message: string; tone: "fatal" | "information" | "recoverable" } | null {
   if (errorMessage) return { message: errorMessage, tone: "fatal" };
   if (connection !== "connected") {
@@ -302,9 +358,6 @@ function primaryNotice({
   }
   if (interruptedAiNotices[0]) {
     return { message: interruptedAiNotices[0].message, tone: "information" };
-  }
-  if (aiWaitingLabel) {
-    return { message: aiWaitingLabel, tone: "information" };
   }
   return null;
 }
@@ -332,11 +385,40 @@ export default function DiscussionStage({
   errorMessage,
   aiWaitingLabel,
   interruptedAiNotices,
+  liveAiRenderCandidate,
+  onLiveAiRenderMarked,
   showComposer,
 }: DiscussionStageProps): ReactNode {
+  const lastRenderedAiUtteranceId = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (!liveAiRenderCandidate) return;
+    const committedCandidate = confirmedTranscript.find(
+      (item) =>
+        item.actor_kind === "AI" &&
+        item.utterance_id === liveAiRenderCandidate.utteranceId &&
+        item.sequence === liveAiRenderCandidate.sequence &&
+        item.participant_id === liveAiRenderCandidate.participantId,
+    );
+    if (
+      !committedCandidate ||
+      lastRenderedAiUtteranceId.current === committedCandidate.utterance_id ||
+      typeof performance.mark !== "function"
+    ) {
+      return;
+    }
+    lastRenderedAiUtteranceId.current = committedCandidate.utterance_id;
+    performance.mark("gia.ai-utterance.rendered", {
+      detail: {
+        utteranceId: committedCandidate.utterance_id,
+        sequence: committedCandidate.sequence,
+        participantId: committedCandidate.participant_id,
+      },
+    });
+    onLiveAiRenderMarked(committedCandidate.utterance_id);
+  }, [confirmedTranscript, liveAiRenderCandidate, onLiveAiRenderMarked]);
   const candidates = participants
     .filter(
-      (participant) =>
+      (participant): participant is VisibleStageParticipant =>
         participant.actor_kind === "HUMAN" || participant.actor_kind === "AI",
     )
     .toSorted((left, right) => left.seat_order - right.seat_order);
@@ -347,7 +429,6 @@ export default function DiscussionStage({
     rejectedDraft,
     pendingContent,
     interruptedAiNotices,
-    aiWaitingLabel,
   });
   const terminalCopy =
     status === "COMPLETED"
@@ -357,10 +438,30 @@ export default function DiscussionStage({
         : null;
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-4 p-4 sm:p-5">
+    <div
+      className="flex h-full min-h-0 flex-col gap-4 p-4 sm:p-5"
+      data-center-composition="participants-transcript-composer"
+    >
+      <div
+        className="discussion-stage-header flex shrink-0 items-end justify-between gap-3"
+        data-testid="discussion-stage-header"
+      >
+        <div>
+          <p className="text-[0.625rem] font-semibold tracking-[0.16em] text-neutral-500 uppercase">
+            LIVE DISCUSSION
+          </p>
+          <h2 className="mt-0.5 text-base font-semibold text-neutral-950">
+            实时讨论
+          </h2>
+        </div>
+        <p className="rounded-full border border-neutral-200 px-2.5 py-1 text-xs text-neutral-600">
+          文字轮次讨论
+        </p>
+      </div>
       <ol
         aria-label="会话参与者"
-        className="grid shrink-0 grid-cols-2 gap-2 sm:grid-cols-4"
+        className="grid shrink-0 grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-1.5"
+        data-strip-density="compact"
         data-testid="participant-strip"
       >
         {candidates.map((participant) => {
@@ -368,22 +469,50 @@ export default function DiscussionStage({
             participant.participant_id === currentGrant?.participant_id;
           return (
             <li
-              className={`rounded-lg border px-3 py-2 text-sm ${
+              className={`flex min-w-0 items-center gap-1.5 rounded-lg border px-2 py-2 text-sm ${
                 current
                   ? "border-indigo-500 bg-indigo-50 text-indigo-950 shadow-sm ring-1 ring-indigo-200"
                   : "border-neutral-200 bg-neutral-50 text-neutral-700"
               }`}
               aria-current={current ? "true" : undefined}
+              data-ai-preparing={
+                current && participant.actor_kind === "AI" && aiWaitingLabel
+                  ? "true"
+                  : "false"
+              }
               data-current-speaker={current ? "true" : "false"}
               data-participant-state={current ? "current" : "neutral"}
               key={participant.participant_id}
             >
-              <p className="font-medium">
-                {safeParticipantLabel(participants, participant)}
-              </p>
-              <p className="mt-1 text-xs">
-                {participantStatus(participant, currentGrant, aiWaitingLabel)}
-              </p>
+              <span
+                className={`flex size-6 shrink-0 items-center justify-center rounded-md text-[0.625rem] font-semibold ${
+                  participant.actor_kind === "HUMAN"
+                    ? "bg-indigo-100 text-indigo-700"
+                    : "bg-white text-neutral-700"
+                }`}
+              >
+                {participantAvatar(
+                  participants,
+                  participant.participant_id,
+                  participant.actor_kind,
+                )}
+              </span>
+              <div className="min-w-0">
+                <p className="truncate text-xs font-medium">
+                  {safeParticipantLabel(participants, participant)}
+                </p>
+                <p className="mt-0.5 flex items-center gap-1 truncate text-[0.625rem]">
+                  {current &&
+                  participant.actor_kind === "AI" &&
+                  aiWaitingLabel ? (
+                    <span
+                      aria-hidden="true"
+                      className="size-1.5 shrink-0 animate-pulse rounded-full bg-indigo-500"
+                    />
+                  ) : null}
+                  {participantStatus(participant, currentGrant, aiWaitingLabel)}
+                </p>
+              </div>
             </li>
           );
         })}

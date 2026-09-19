@@ -35,7 +35,7 @@ pytestmark = pytest.mark.integration
 
 TRUSTED_ORIGIN = "http://localhost:3000"
 AUTH_HEADERS = {"Origin": TRUSTED_ORIGIN, "X-GIA-CSRF": "1"}
-VALID_PASSWORD = "session api integration password"
+VALID_PASSWORD = "Session API integration 1!"
 
 
 class TemporaryDatabaseContext(Protocol):

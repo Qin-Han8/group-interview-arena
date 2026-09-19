@@ -1,6 +1,6 @@
 # P1-4 Floor Control / Speaker Scheduling Execution Plan
 
-Status: `P1 IN_PROGRESS`; `P1-4 DONE`; `P1-4A completed`; `P1-4B completed`; `P1-4C completed`; `P1-4D completed`; `P1-4E completed`; final independent verdict `PASS`; `P1-5 NOT_STARTED / awaiting explicit approval`
+Status: `P1 DONE / CLOSED`; `P1-4 DONE`; `P1-4A completed`; `P1-4B completed`; `P1-4C completed`; `P1-4D completed`; `P1-4E completed`; final independent verdict `PASS`. The original P1-5 approval gate remains historical; current phase status is tracked in `TASKS.md`.
 
 Target version: `V0.1 Internal Validation`
 

@@ -1,7 +1,7 @@
 # 评分与证据体系骨架
 
-- Status: Baseline + P1-7A basic evidence report design freeze
-- Current phase: P1 — IN_PROGRESS
+- Status: Baseline + completed P1 basic evidence report; formal scoring remains P3
+- Current phase: P1 — DONE / CLOSED; P2 — NOT_STARTED
 - Target version: V0.1 Internal Validation
 - Detailed design: P1-7A V0.1 basic evidence report boundary frozen; formal scoring remains P3
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
@@ -96,7 +96,7 @@
 
 ## Future work
 
-- P1：P1-7A is frozen/reviewed；P1-7B/P1-7C/P1-7D are `DONE / ACTUAL_SOURCE_REVIEW_PASS`；P1-7D implements the report REST/Web surface without formal scores；P1-7E remains `NOT_STARTED`.
+- P1：`DONE / CLOSED`；the basic evidence report and its P1-7E composition/independent acceptance are complete without formal scores。
 - P3：完成客观指标、证据提取、六维评分、报告和专项训练设计。
 - P5：通过专家标注和公开测试校准可信度与用户认可率。
 

@@ -1,4 +1,5 @@
 import re
+import string
 import unicodedata
 
 from pwdlib import PasswordHash
@@ -7,7 +8,7 @@ from pwdlib.hashers.argon2 import Argon2Hasher
 
 USERNAME_MIN_LENGTH = 3
 USERNAME_MAX_LENGTH = 32
-PASSWORD_MIN_LENGTH = 15
+PASSWORD_MIN_LENGTH = 8
 PASSWORD_MAX_LENGTH = 128
 
 ARGON2_TIME_COST = 3
@@ -24,6 +25,7 @@ _BLOCKED_PASSWORDS = frozenset(
         "qwertyuiop12345",
     }
 )
+_ASCII_PUNCTUATION = frozenset(string.punctuation)
 _PASSWORD_HASH = PasswordHash(
     (
         Argon2Hasher(
@@ -60,6 +62,16 @@ def validate_password(password: str) -> None:
         raise ValueError("Password length is outside the allowed range.")
     if password.casefold() in _BLOCKED_PASSWORDS:
         raise ValueError("Password is blocked by the application policy.")
+    has_required_composition = (
+        any("A" <= character <= "Z" for character in password)
+        and any("a" <= character <= "z" for character in password)
+        and any("0" <= character <= "9" for character in password)
+        and any(character in _ASCII_PUNCTUATION for character in password)
+    )
+    if not has_required_composition:
+        raise ValueError(
+            "Password does not meet the required ASCII composition policy."
+        )
 
 
 def hash_password(password: str) -> str:

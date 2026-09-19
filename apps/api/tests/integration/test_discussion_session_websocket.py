@@ -71,7 +71,7 @@ pytestmark = pytest.mark.integration
 
 TRUSTED_ORIGIN = "http://localhost:3000"
 UNTRUSTED_ORIGIN = "https://attacker.invalid"
-VALID_PASSWORD = "websocket integration password"
+VALID_PASSWORD = "Websocket integration 1!"
 AUTH_HEADERS = {"Origin": TRUSTED_ORIGIN, "X-GIA-CSRF": "1"}
 DeniedConnection = (WebSocketDenialResponse, WebSocketDisconnect)
 

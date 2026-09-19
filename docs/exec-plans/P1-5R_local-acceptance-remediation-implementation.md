@@ -1,6 +1,6 @@
 # P1-5R Local Acceptance Remediation — Detailed Implementation Plan
 
-Status: P1 = IN_PROGRESS; P1-5 = DONE; P1-5R = CLOSED
+Status: P1 = DONE / CLOSED; P1-5 = DONE; P1-5R = CLOSED
 
 Batch status: R1 = DONE; R2-A = DONE; R2-B = DONE; R3 = DONE; Historical Final Composition Acceptance = PASS / DONE; Historical Independent Acceptance = PASS; Previous P1-5R closeout = PASS / CLOSED; Later post-closeout real-provider smoke = EXECUTED / DEFECT_EXPOSED; Formal R3.8 = NOT_EXECUTED / REQUIRES_SEPARATE_EXPLICIT_USER_AUTHORIZATION; No further real-provider call; Remediation actual-source review = PASS; Accepted commit = 3b09d20a704c0fd3ff473ccb79311065b7e70408; Exact CI = 33257343273 completed / success
 
@@ -822,7 +822,7 @@ Stop and report before changing scope if implementation requires a schema/migrat
 ## Current governance hierarchy after post-acceptance remediation
 
 ~~~text
-P1 = IN_PROGRESS
+P1 = DONE / CLOSED
 P1-5 = DONE
 Previous P1-5 closeout = PASS / DONE at commit 9d6270660cb7a358a62989a6a59bab2a521fa041
 P1-5R = CLOSED

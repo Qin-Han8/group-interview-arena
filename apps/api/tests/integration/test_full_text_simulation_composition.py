@@ -50,7 +50,7 @@ from group_interview_arena_api.modules.ai_runtime.runtime import (
     RuntimeGenerationOutcome,
 )
 from group_interview_arena_api.modules.ai_runtime.seed import (
-    AI_CANDIDATE_TURN_V3,
+    AI_CANDIDATE_TURN_V4,
     DISCUSSION_MEMORY_UPDATE_V2,
     seed_ai_runtime_prompt_versions,
 )
@@ -477,8 +477,8 @@ async def _happy_memory_and_reentry_proof(
         assert OTHER_PRIVATE_SENTINEL not in semantic_input.rendered_prompt
 
         candidate_input = provider.candidate_inputs[0]
-        assert candidate_input.prompt_version_id == AI_CANDIDATE_TURN_V3.id
-        assert candidate_input.prompt_version_number == 3
+        assert candidate_input.prompt_version_id == AI_CANDIDATE_TURN_V4.id
+        assert candidate_input.prompt_version_number == 4
         assert candidate_input.prompt_key == "AI_CANDIDATE_TURN"
         assert MEMORY_SENTINEL in candidate_input.rendered_prompt
         assert "P1_6C_HUMAN_RELEASE_EVIDENCE" in candidate_input.rendered_prompt
@@ -527,7 +527,7 @@ async def _happy_memory_and_reentry_proof(
 
         assert request is not None
         assert request.status == GenerationRequestStatus.COMPLETED
-        assert request.prompt_version_id == AI_CANDIDATE_TURN_V3.id
+        assert request.prompt_version_id == AI_CANDIDATE_TURN_V4.id
         assert request.request_metadata == {
             "schema_version": 2,
             "configuration_version": ZHIPU_CONFIGURATION_VERSION,
@@ -598,7 +598,7 @@ async def _happy_memory_and_reentry_proof(
         assert len(replayed_generated_events) == 1
 
 
-def test_real_progression_composes_memory_v3_persistence_and_reentry(
+def test_real_progression_composes_memory_v4_persistence_and_reentry(
     migrated_database: TemporaryDatabaseContext,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -645,8 +645,8 @@ async def _safe_raw_fallback_proof(
         assert OTHER_PRIVATE_SENTINEL not in provider.semantic_inputs[0].rendered_prompt
 
         candidate_input = provider.candidate_inputs[0]
-        assert candidate_input.prompt_version_id == AI_CANDIDATE_TURN_V3.id
-        assert candidate_input.prompt_version_number == 3
+        assert candidate_input.prompt_version_id == AI_CANDIDATE_TURN_V4.id
+        assert candidate_input.prompt_version_number == 4
         assert "P1_6C_PUBLIC_EVIDENCE_0" in candidate_input.rendered_prompt
         assert "P1_6C_HUMAN_RELEASE_EVIDENCE" in candidate_input.rendered_prompt
         assert OTHER_PRIVATE_SENTINEL not in candidate_input.rendered_prompt
@@ -673,7 +673,7 @@ async def _safe_raw_fallback_proof(
         assert revisions == []
         assert request is not None
         assert request.status == GenerationRequestStatus.COMPLETED
-        assert request.prompt_version_id == AI_CANDIDATE_TURN_V3.id
+        assert request.prompt_version_id == AI_CANDIDATE_TURN_V4.id
         assert request.request_metadata == {
             "schema_version": 2,
             "configuration_version": ZHIPU_CONFIGURATION_VERSION,

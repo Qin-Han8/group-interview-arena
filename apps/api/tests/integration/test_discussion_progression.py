@@ -57,12 +57,15 @@ from group_interview_arena_api.modules.floor_control.domain import (
     FloorPolicyReason,
     FloorReleaseReason,
     GrantFloorCommand,
+    ParticipantActorKind,
     ParticipantAvailability,
     ReleaseFloorCommand,
     SafeDecisionMetadata,
 )
 from group_interview_arena_api.modules.floor_control.scheduler import (
     V0_1_SCHEDULER_POLICY,
+    V0_1_SCHEDULER_POLICY_V1,
+    V0_1_SCHEDULER_POLICY_V2,
     ScheduleFloorCommand,
 )
 from group_interview_arena_api.modules.floor_control.service import apply_floor_command
@@ -744,7 +747,7 @@ def test_initial_phase_entry_proof_drift_fails_closed_without_schedule(
     run_async(exercise)
 
 
-def test_initial_driver_reconstructs_exact_command_and_replays_one_checkpoint(
+def test_initial_driver_persists_exact_command_then_replays_without_recomputing(
     migrated_database: TemporaryDatabaseContext,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -801,8 +804,7 @@ def test_initial_driver_reconstructs_exact_command_and_replays_one_checkpoint(
             )
 
             assert first == second
-            assert len(captured_commands) == 2
-            assert captured_commands[0] == captured_commands[1]
+            assert len(captured_commands) == 1
             command = captured_commands[0]
             assert command.expected_phase is proof.phase
             assert command.expected_last_sequence == proof.event_sequence
@@ -829,10 +831,109 @@ def test_initial_driver_reconstructs_exact_command_and_replays_one_checkpoint(
                     .select_from(FloorGrant)
                     .where(FloorGrant.id == identities.next_floor_grant_id)
                 )
+                persisted_decision = await session.get(
+                    FloorDecision,
+                    identities.decision_id,
+                )
 
             assert action_count == 1
             assert decision_count == 1
             assert grant_count == 1
+            assert persisted_decision is not None
+            assert persisted_decision.policy_version == "v0.1-floor-2"
+
+    run_async(exercise)
+
+
+def test_initial_checkpoint_replays_persisted_v1_under_current_v2_without_rewrite(
+    migrated_database: TemporaryDatabaseContext,
+) -> None:
+    async def exercise() -> None:
+        async with _initial_phase_context(migrated_database) as context:
+            async with context.session_factory() as session:
+                aggregate = await session.get(SimulationSession, context.session_id)
+                assert aggregate is not None
+                state, proof = await progression._initial_phase_entry_checkpoint(  # pyright: ignore[reportPrivateUsage]
+                    session,
+                    owner_id=context.owner_id,
+                    aggregate=aggregate,
+                )
+            assert state is progression._InitialPhaseCheckpointState.EXACT  # pyright: ignore[reportPrivateUsage]
+            assert proof is not None
+            identities = progression.derive_initial_scheduler_identities(
+                session_id=context.session_id,
+                phase=proof.phase,
+                phase_entry_sequence=proof.event_sequence,
+            )
+
+            first = await floor_progression.drive_initial_scheduler_checkpoint(
+                context.session_factory,
+                owner_id=context.owner_id,
+                session_id=context.session_id,
+                phase_entry=proof,
+                identities=identities,
+                scheduling_policy=V0_1_SCHEDULER_POLICY_V1,
+            )
+            replay = await floor_progression.drive_initial_scheduler_checkpoint(
+                context.session_factory,
+                owner_id=context.owner_id,
+                session_id=context.session_id,
+                phase_entry=proof,
+                identities=identities,
+                scheduling_policy=V0_1_SCHEDULER_POLICY_V2,
+            )
+
+            async with context.session_factory() as session:
+                decision = await session.get(FloorDecision, identities.decision_id)
+            assert replay == first
+            assert decision is not None
+            assert decision.policy_version == "v0.1-floor-1"
+
+    run_async(exercise)
+
+
+def test_released_checkpoint_replays_persisted_v1_under_current_v2_without_rewrite(
+    migrated_database: TemporaryDatabaseContext,
+) -> None:
+    async def exercise() -> None:
+        async with _released_human_context(migrated_database) as context:
+            async with context.session_factory() as session:
+                release = await session.get(FloorRelease, context.human_grant_id)
+            assert release is not None
+            assert release.causation_action_id is not None
+            released_floor = floor_progression.ReleasedFloorProof(
+                floor_grant_id=context.human_grant_id,
+                release_action_id=release.causation_action_id,
+                release_command_type="participant.utterance.submit",
+                allowed_reasons=frozenset({FloorReleaseReason.SPEAKER_FINISHED}),
+            )
+            identities = progression.derive_human_scheduler_identities(
+                session_id=context.session_id,
+                released_floor_grant_id=context.human_grant_id,
+            )
+
+            first = await floor_progression.drive_scheduler_checkpoint(
+                context.session_factory,
+                owner_id=context.owner_id,
+                session_id=context.session_id,
+                released_floor=released_floor,
+                identities=identities,
+                scheduling_policy=V0_1_SCHEDULER_POLICY_V1,
+            )
+            replay = await floor_progression.drive_scheduler_checkpoint(
+                context.session_factory,
+                owner_id=context.owner_id,
+                session_id=context.session_id,
+                released_floor=released_floor,
+                identities=identities,
+                scheduling_policy=V0_1_SCHEDULER_POLICY_V2,
+            )
+
+            async with context.session_factory() as session:
+                decision = await session.get(FloorDecision, identities.decision_id)
+            assert replay == first
+            assert decision is not None
+            assert decision.policy_version == "v0.1-floor-1"
 
     run_async(exercise)
 
@@ -936,16 +1037,19 @@ def test_resume_progression_naturally_grants_initial_ai_floor(
                     aggregate.current_floor_grant_id,
                 )
                 assert grant is not None
+                participant = await session.get(
+                    SessionParticipant,
+                    grant.participant_id,
+                )
 
             assert (
                 result.outcome
                 is progression.DiscussionProgressionOutcome.AI_DRIVE_COMPLETED
             )
             assert result.scheduler_result is not None
-            assert result.scheduler_result.next_participant_id == (
-                context.ai_participant_id
-            )
-            assert grant.participant_id == context.ai_participant_id
+            assert result.scheduler_result.next_participant_id == grant.participant_id
+            assert participant is not None
+            assert participant.actor_kind == ParticipantActorKind.AI
             assert configured_calls == 1
 
     run_async(exercise)

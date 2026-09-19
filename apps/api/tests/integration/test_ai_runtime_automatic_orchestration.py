@@ -2193,7 +2193,7 @@ def test_automatic_no_grant_checkpoint_replays_without_provider(
     run_async(exercise)
 
 
-def test_automatic_intervention_checkpoint_replays_without_provider(
+def test_automatic_deadline_pause_checkpoint_replays_without_public_intervention(
     migrated_database: TemporaryDatabaseContext,
 ) -> None:
     async def exercise() -> None:
@@ -2245,11 +2245,11 @@ def test_automatic_intervention_checkpoint_replays_without_provider(
                 )
 
             assert provider_calls == 1
-            assert first.outcome is SingleAiTurnOutcome.INTERVENTION_REQUESTED
-            assert replay.outcome is SingleAiTurnOutcome.INTERVENTION_REQUESTED
+            assert first.outcome is SingleAiTurnOutcome.NO_GRANT
+            assert replay.outcome is SingleAiTurnOutcome.NO_GRANT
             assert decision is not None
-            assert decision.outcome_kind == FloorDecisionOutcome.REQUEST_INTERVENTION
-            assert intervention is not None
-            assert intervention.decision_id == identities.decision_id
+            assert decision.outcome_kind == FloorDecisionOutcome.NO_GRANT
+            assert decision.primary_reason_code == "DEADLINE_RECOVERY"
+            assert intervention is None
 
     run_async(exercise)

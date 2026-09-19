@@ -236,7 +236,7 @@ def _run_playwright(*, environment_overrides: dict[str, str]) -> None:
         )
 
 
-def _run_browser_flow(temporary_database: TemporaryDatabase) -> UUID:
+def _run_browser_flow(temporary_database: TemporaryDatabase) -> tuple[UUID, UUID]:
     _require_available_port(WEB_PORT)
     _require_available_port(API_PORT)
 
@@ -280,6 +280,7 @@ def _run_browser_flow(temporary_database: TemporaryDatabase) -> UUID:
             "async def _network_free_provider(generation_input):\n"
             "    global _provider_call_count\n"
             "    _provider_call_count += 1\n"
+            "    session_id = str(generation_input.session_id)\n"
             "    floor_grant_id = str(generation_input.floor_grant_id)\n"
             "    with Path(os.environ['GIA_E2E_PROVIDER_CALLS']).open(\n"
             "        'a', encoding='utf-8'\n"
@@ -290,9 +291,9 @@ def _run_browser_flow(temporary_database: TemporaryDatabase) -> UUID:
             "        }) + '\\n')\n"
             "    rendered_prompt = generation_input.rendered_prompt\n"
             "    checks = {\n"
-            "        'v3_id': str(generation_input.prompt_version_id) == "
-            "'56000000-0000-4000-8000-000000000003',\n"
-            "        'v3_number': generation_input.prompt_version_number == 3,\n"
+            "        'v4_id': str(generation_input.prompt_version_id) == "
+            "'56000000-0000-4000-8000-000000000004',\n"
+            "        'v4_number': generation_input.prompt_version_number == 4,\n"
             "        'prompt_key': generation_input.prompt_key == "
             "'AI_CANDIDATE_TURN',\n"
             "        'phase': generation_input.phase == "
@@ -357,6 +358,7 @@ def _run_browser_flow(temporary_database: TemporaryDatabase) -> UUID:
             "            )\n"
             "        Path(os.environ['GIA_E2E_PROVIDER_BLOCKED']).write_text(\n"
             "            json.dumps({\n"
+            "                'session_id': session_id,\n"
             "                'floor_grant_id': floor_grant_id,\n"
             "                'request_status': 'RUNNING',\n"
             "            }),\n"
@@ -515,6 +517,7 @@ def _run_browser_flow(temporary_database: TemporaryDatabase) -> UUID:
                     json.loads(line)
                     for line in provider_calls.read_text(encoding="utf-8").splitlines()
                 ]
+                recovery_session_id = UUID(blocked_state["session_id"])
                 cancelled_grant_id = UUID(cancelled_state["floor_grant_id"])
                 if blocked_state["floor_grant_id"] != str(cancelled_grant_id):
                     raise RuntimeError(
@@ -543,11 +546,12 @@ def _run_browser_flow(temporary_database: TemporaryDatabase) -> UUID:
                 current_api[0] = None
             _wait_for_port_release(WEB_PORT)
             _wait_for_port_release(API_PORT)
-        return cancelled_grant_id
+        return recovery_session_id, cancelled_grant_id
 
 
 def _verify_session_persistence(
     temporary_database: TemporaryDatabase,
+    recovery_session_id: UUID,
     cancelled_grant_id: UUID,
 ) -> None:
     database_url = temporary_database.database_url
@@ -561,10 +565,13 @@ def _verify_session_persistence(
         session_rows = connection.execute(
             "SELECT id, status, last_sequence, question_version_id, "
             "phase_started_at, phase_deadline_at, current_floor_grant_id "
-            "FROM simulation_sessions"
+            "FROM simulation_sessions WHERE id = %s",
+            (recovery_session_id,),
         ).fetchall()
         if len(session_rows) != 1:
-            raise RuntimeError("Browser E2E did not persist exactly one session.")
+            raise RuntimeError(
+                "Browser E2E did not persist exactly one matching recovery session."
+            )
 
         (
             session_id,
@@ -849,8 +856,12 @@ def main() -> int:
     ) as temporary_database:
         migrate_database(temporary_database)
         _seed_browser_question(temporary_database)
-        cancelled_grant_id = _run_browser_flow(temporary_database)
-        _verify_session_persistence(temporary_database, cancelled_grant_id)
+        recovery_session_id, cancelled_grant_id = _run_browser_flow(temporary_database)
+        _verify_session_persistence(
+            temporary_database,
+            recovery_session_id,
+            cancelled_grant_id,
+        )
 
     print(
         "P1-5F-4 browser E2E passed with exact durable Human submit/restore, "

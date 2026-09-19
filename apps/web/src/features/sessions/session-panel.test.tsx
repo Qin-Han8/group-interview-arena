@@ -298,6 +298,13 @@ async function renderRestoredSession(
   return { realtime, rendered };
 }
 
+async function selectQuestionForCreation(title = QUESTION_SUMMARY.title) {
+  fireEvent.click(await screen.findByRole("button", { name: "开始选题" }));
+  const radio = await screen.findByRole("radio", { name: title });
+  fireEvent.click(radio);
+  await waitFor(() => expect(radio).toBeChecked());
+}
+
 describe("SessionPanel", () => {
   beforeEach(() => {
     mockedLoadSessionTranscript.mockResolvedValue([]);
@@ -580,6 +587,76 @@ describe("SessionPanel", () => {
     ).toHaveTextContent(aiItem.content);
   });
 
+  it("marks one genuine live AI render but never marks hydrated transcript", async () => {
+    const snapshot = discussionSnapshot(AI_PARTICIPANT_ID);
+    const hydratedAi: TranscriptUtterance = {
+      ...HUMAN_TRANSCRIPT,
+      utterance_id: "00000000-0000-4000-8000-000000000040",
+      sequence: 5,
+      action_id: null,
+      participant_id: AI_PARTICIPANT_ID,
+      actor_kind: "AI",
+      content: "hydrated AI content must not create latency telemetry",
+    };
+    const liveAi: TranscriptUtterance = {
+      ...hydratedAi,
+      utterance_id: "00000000-0000-4000-8000-000000000041",
+      sequence: 6,
+      content: "live AI content must stay out of telemetry",
+    };
+    const mark = vi.spyOn(performance, "mark");
+    const { realtime } = await renderRestoredSession(snapshot, [hydratedAi]);
+
+    expect(mark).not.toHaveBeenCalledWith(
+      "gia.ai-utterance.rendered",
+      expect.anything(),
+    );
+
+    act(() => realtime.options().onEvent(utteranceEvent(liveAi)));
+    await waitFor(() =>
+      expect(mark).toHaveBeenCalledWith("gia.ai-utterance.rendered", {
+        detail: {
+          utteranceId: liveAi.utterance_id,
+          sequence: liveAi.sequence,
+          participantId: liveAi.participant_id,
+        },
+      }),
+    );
+    expect(
+      mark.mock.calls.filter(([name]) => name === "gia.ai-utterance.rendered"),
+    ).toHaveLength(1);
+    expect(JSON.stringify(mark.mock.calls)).not.toContain(liveAi.content);
+
+    act(() => realtime.options().onEvent(utteranceEvent(liveAi)));
+    expect(
+      mark.mock.calls.filter(([name]) => name === "gia.ai-utterance.rendered"),
+    ).toHaveLength(1);
+
+    mark.mockClear();
+    const liveHuman: TranscriptUtterance = {
+      ...HUMAN_TRANSCRIPT,
+      utterance_id: "00000000-0000-4000-8000-000000000042",
+      sequence: 7,
+      content: "live Human content is not AI render telemetry",
+    };
+    act(() => realtime.options().onEvent(utteranceEvent(liveHuman)));
+    expect(mark).not.toHaveBeenCalled();
+
+    const recoveredAi: TranscriptUtterance = {
+      ...hydratedAi,
+      utterance_id: "00000000-0000-4000-8000-000000000043",
+      sequence: 8,
+      content: "recovered AI content must not create latency telemetry",
+    };
+    act(() =>
+      realtime.options().onRecoveryBundle({
+        snapshot: { ...snapshot, last_sequence: 8 },
+        transcript: [hydratedAi, liveAi, liveHuman, recoveredAi],
+      }),
+    );
+    expect(mark).not.toHaveBeenCalled();
+  });
+
   it("keeps the textarea editable while enforcing all six send gates", async () => {
     const human = discussionSnapshot(HUMAN_PARTICIPANT_ID);
     const { realtime } = await renderRestoredSession(human);
@@ -810,7 +887,10 @@ describe("SessionPanel", () => {
     const aiFloor = discussionSnapshot(AI_PARTICIPANT_ID);
     const { realtime, rendered } = await renderRestoredSession(aiFloor);
     act(() => realtime.options().onConnectionChange("connected"));
-    expect(screen.getByText("AI 候选人 1 正在准备发言…")).toBeInTheDocument();
+    const preparingParticipant = screen.getByText("AI 候选人 1").closest("li");
+    expect(preparingParticipant).toHaveTextContent("正在准备发言");
+    expect(preparingParticipant).toHaveAttribute("data-ai-preparing", "true");
+    expect(screen.queryByTestId("discussion-notice")).toBeNull();
 
     const otherGrant: TranscriptUtterance = {
       ...HUMAN_TRANSCRIPT,
@@ -823,7 +903,11 @@ describe("SessionPanel", () => {
       content: "other grant",
     };
     act(() => realtime.options().onEvent(utteranceEvent(otherGrant)));
-    expect(screen.getByText("AI 候选人 1 正在准备发言…")).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("participant-strip"))
+        .getByText("AI 候选人 1")
+        .closest("li"),
+    ).toHaveAttribute("data-ai-preparing", "true");
 
     const matching = {
       ...otherGrant,
@@ -833,8 +917,10 @@ describe("SessionPanel", () => {
     };
     act(() => realtime.options().onEvent(utteranceEvent(matching)));
     expect(
-      screen.queryByText("AI 候选人 1 正在准备发言…"),
-    ).not.toBeInTheDocument();
+      within(screen.getByTestId("participant-strip"))
+        .getByText("AI 候选人 1")
+        .closest("li"),
+    ).toHaveAttribute("data-ai-preparing", "false");
 
     act(() =>
       realtime.options().onRecoveryBundle({
@@ -1066,7 +1152,7 @@ describe("SessionPanel", () => {
     render(
       <SessionPanel apiClient={API_CLIENT} baseUrl="http://localhost:8000" />,
     );
-    await screen.findByRole("button", { name: "创建文字会话" });
+    await selectQuestionForCreation();
     fireEvent.click(screen.getByRole("button", { name: "创建文字会话" }));
 
     expect((await screen.findAllByText("未开始")).length).toBeGreaterThan(0);
@@ -1108,6 +1194,156 @@ describe("SessionPanel", () => {
     expect((await screen.findAllByText("已结束")).length).toBeGreaterThan(0);
   });
 
+  it("reports a restored active session as active navigation state", async () => {
+    const active = discussionSnapshot(AI_PARTICIPANT_ID);
+    window.history.replaceState({}, "", `/?session_id=${SESSION_ID}`);
+    mockedGetSessionSnapshot.mockResolvedValue({
+      data: active,
+      response: new Response(null, { status: 200 }),
+    });
+    mockedLoadSessionTranscript.mockResolvedValue([]);
+    mockedGetQuestion.mockResolvedValue({
+      data: QUESTION_DETAIL,
+      response: new Response(null, { status: 200 }),
+    });
+    const realtime = installRealtimeDouble();
+    const onNavigationStateChange = vi.fn();
+
+    render(
+      <SessionPanel
+        apiClient={API_CLIENT}
+        baseUrl="http://localhost:8000"
+        onNavigationStateChange={onNavigationStateChange}
+      />,
+    );
+
+    await waitFor(() => expect(realtime.start).toHaveBeenCalledOnce());
+    await waitFor(() =>
+      expect(onNavigationStateChange).toHaveBeenLastCalledWith({
+        sessionId: SESSION_ID,
+        status: "OPENING_STATEMENTS",
+        reportAvailable: false,
+      }),
+    );
+  });
+
+  it("reports real discovery as a narrow lobby projection and opens setup without another API call", async () => {
+    installQuestionDiscovery();
+    const onNavigationStateChange = vi.fn();
+    const rendered = render(
+      <SessionPanel
+        apiClient={API_CLIENT}
+        baseUrl="http://localhost:8000"
+        onNavigationStateChange={onNavigationStateChange}
+        openSetupRequest={0}
+      />,
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "下一场完整模拟" }),
+    ).toBeVisible();
+    await waitFor(() =>
+      expect(onNavigationStateChange).toHaveBeenLastCalledWith({
+        sessionId: null,
+        status: "lobby",
+        reportAvailable: false,
+      }),
+    );
+    expect(mockedListQuestions).toHaveBeenCalledOnce();
+
+    rendered.rerender(
+      <SessionPanel
+        apiClient={API_CLIENT}
+        baseUrl="http://localhost:8000"
+        onNavigationStateChange={onNavigationStateChange}
+        openSetupRequest={1}
+      />,
+    );
+    expect(
+      await screen.findByRole("heading", { name: "选择本次训练题目" }),
+    ).toBeVisible();
+    expect(mockedListQuestions).toHaveBeenCalledOnce();
+    expect(mockedGetQuestion).not.toHaveBeenCalled();
+  });
+
+  it.each(["COMPLETED", "ABORTED_USER"] as const)(
+    "returns a restored %s session to a clean lobby and uses normal creation",
+    async (terminalStatus) => {
+      installQuestionDiscovery();
+      const terminal = discussionSnapshot(null, GRANT_ID, terminalStatus);
+      const historicalAi: TranscriptUtterance = {
+        ...HUMAN_TRANSCRIPT,
+        utterance_id: "00000000-0000-4000-8000-000000000099",
+        actor_kind: "AI",
+        participant_id: AI_PARTICIPANT_ID,
+        content: "historical AI text must leave the workspace",
+      };
+      window.history.replaceState({}, "", `/?session_id=${SESSION_ID}`);
+      mockedGetSessionSnapshot.mockResolvedValue({
+        data: terminal,
+        response: new Response(null, { status: 200 }),
+      });
+      mockedLoadSessionTranscript.mockResolvedValue([historicalAi]);
+      mockedGetQuestion.mockResolvedValue({
+        data: QUESTION_DETAIL,
+        response: new Response(null, { status: 200 }),
+      });
+      mockedCreateSession.mockResolvedValue({
+        data: CREATED,
+        response: new Response(null, { status: 201 }),
+      });
+      const realtime = installRealtimeDouble();
+      const onNavigationStateChange = vi.fn();
+      const rendered = render(
+        <SessionPanel
+          apiClient={API_CLIENT}
+          baseUrl="http://localhost:8000"
+          onNavigationStateChange={onNavigationStateChange}
+          returnToLobbyRequest={0}
+        />,
+      );
+      await waitFor(() => expect(realtime.start).toHaveBeenCalledOnce());
+      await waitFor(() =>
+        expect(onNavigationStateChange).toHaveBeenLastCalledWith({
+          sessionId: SESSION_ID,
+          status: terminalStatus,
+          reportAvailable: terminalStatus === "COMPLETED",
+        }),
+      );
+
+      rendered.rerender(
+        <SessionPanel
+          apiClient={API_CLIENT}
+          baseUrl="http://localhost:8000"
+          onNavigationStateChange={onNavigationStateChange}
+          returnToLobbyRequest={1}
+        />,
+      );
+
+      expect(
+        await screen.findByRole("button", { name: "开始选题" }),
+      ).toBeInTheDocument();
+      expect(realtime.stop).toHaveBeenCalledOnce();
+      expect(new URL(window.location.href).searchParams.has("session_id")).toBe(
+        false,
+      );
+      expect(
+        screen.queryByText("historical AI text must leave the workspace"),
+      ).toBeNull();
+      expect(screen.queryByText(/当前发言：/)).toBeNull();
+      expect(screen.queryByText(QUESTION_DETAIL.scenario)).toBeNull();
+
+      await selectQuestionForCreation();
+      fireEvent.click(screen.getByRole("button", { name: "创建文字会话" }));
+      await waitFor(() =>
+        expect(mockedCreateSession).toHaveBeenCalledWith(
+          API_CLIENT,
+          QUESTION_VERSION_ID,
+        ),
+      );
+    },
+  );
+
   it("starts a session and projects authoritative phase timing from v2 events", async () => {
     installQuestionDiscovery();
     mockedCreateSession.mockResolvedValue({
@@ -1119,9 +1355,8 @@ describe("SessionPanel", () => {
     render(
       <SessionPanel apiClient={API_CLIENT} baseUrl="http://localhost:8000" />,
     );
-    fireEvent.click(
-      await screen.findByRole("button", { name: "创建文字会话" }),
-    );
+    await selectQuestionForCreation();
+    fireEvent.click(screen.getByRole("button", { name: "创建文字会话" }));
     await screen.findAllByText("未开始");
 
     realtime
@@ -1281,7 +1516,7 @@ describe("SessionPanel", () => {
     const rendered = render(
       <SessionPanel apiClient={API_CLIENT} baseUrl="http://localhost:8000" />,
     );
-    await screen.findByRole("button", { name: "创建文字会话" });
+    await selectQuestionForCreation();
     fireEvent.click(screen.getByRole("button", { name: "创建文字会话" }));
     await waitFor(() => expect(realtime.start).toHaveBeenCalledOnce());
 
@@ -1300,12 +1535,11 @@ describe("SessionPanel", () => {
       <SessionPanel apiClient={API_CLIENT} baseUrl="http://localhost:8000" />,
     );
 
+    fireEvent.click(await screen.findByRole("button", { name: "开始选题" }));
     expect(
-      await screen.findByText("当前没有可用于新训练的题目。"),
+      await screen.findByText("当前分类暂无可用题目。"),
     ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "创建文字会话" }),
-    ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "创建文字会话" })).toBeDisabled();
   });
 
   it("uses the exact explicitly selected immutable version", async () => {
@@ -1325,14 +1559,65 @@ describe("SessionPanel", () => {
       <SessionPanel apiClient={API_CLIENT} baseUrl="http://localhost:8000" />,
     );
 
-    fireEvent.change(await screen.findByLabelText("选择训练题目"), {
-      target: { value: second.id },
-    });
+    await selectQuestionForCreation(second.title);
     fireEvent.click(screen.getByRole("button", { name: "创建文字会话" }));
 
     await waitFor(() =>
       expect(mockedCreateSession).toHaveBeenCalledWith(API_CLIENT, second.id),
     );
+  });
+
+  it("ignores a stale selected-detail response after a later card selection", async () => {
+    const second = {
+      ...QUESTION_SUMMARY,
+      id: "21000000-0000-4000-8000-000000000002",
+      title: "第二道资源分配题",
+    };
+    const firstLoad = deferred<{
+      data: QuestionDetail;
+      response: Response;
+    }>();
+    const secondLoad = deferred<{
+      data: QuestionDetail;
+      response: Response;
+    }>();
+    mockedListQuestions.mockResolvedValue({
+      data: [QUESTION_SUMMARY, second],
+      response: new Response(null, { status: 200 }),
+    });
+    mockedGetQuestion
+      .mockReturnValueOnce(firstLoad.promise)
+      .mockReturnValueOnce(secondLoad.promise);
+
+    render(
+      <SessionPanel apiClient={API_CLIENT} baseUrl="http://localhost:8000" />,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "开始选题" }));
+    fireEvent.click(
+      screen.getByRole("radio", { name: QUESTION_SUMMARY.title }),
+    );
+    fireEvent.click(screen.getByRole("radio", { name: second.title }));
+    expect(mockedGetQuestion).toHaveBeenNthCalledWith(
+      1,
+      API_CLIENT,
+      QUESTION_SUMMARY.id,
+    );
+    expect(mockedGetQuestion).toHaveBeenNthCalledWith(2, API_CLIENT, second.id);
+
+    secondLoad.resolve({
+      data: { ...QUESTION_DETAIL, ...second, objective: "第二题真实目标" },
+      response: new Response(null, { status: 200 }),
+    });
+    expect(await screen.findByText("第二题真实目标")).toBeVisible();
+
+    firstLoad.resolve({
+      data: { ...QUESTION_DETAIL, objective: "过期的第一题目标" },
+      response: new Response(null, { status: 200 }),
+    });
+    await waitFor(() =>
+      expect(screen.queryByText("过期的第一题目标")).toBeNull(),
+    );
+    expect(screen.getByText("第二题真实目标")).toBeVisible();
   });
 
   it("shows a safe error when question discovery fails", async () => {
@@ -1359,9 +1644,8 @@ describe("SessionPanel", () => {
     const rendered = render(
       <SessionPanel apiClient={API_CLIENT} baseUrl="http://localhost:8000" />,
     );
-    fireEvent.click(
-      await screen.findByRole("button", { name: "创建文字会话" }),
-    );
+    await selectQuestionForCreation();
+    fireEvent.click(screen.getByRole("button", { name: "创建文字会话" }));
 
     expect(await screen.findByText("讨论情境")).toBeInTheDocument();
     expect(screen.getByText("可选方案")).toBeInTheDocument();
@@ -1608,6 +1892,143 @@ describe("SessionPanel", () => {
       expect(mockedGenerateReport).toHaveBeenCalledWith(API_CLIENT, SESSION_ID),
     );
     expect(pushRoute).toHaveBeenCalledWith(`/sessions/${SESSION_ID}/report`);
+  });
+
+  it("handles a matching completed Shell report intent once and blocks an in-flight duplicate", async () => {
+    const completed = discussionSnapshot(null, GRANT_ID, "COMPLETED");
+    window.history.replaceState({}, "", `/?session_id=${SESSION_ID}`);
+    mockedGetSessionSnapshot.mockResolvedValue({
+      data: completed,
+      response: new Response(null, { status: 200 }),
+    });
+    mockedLoadSessionTranscript.mockResolvedValue([]);
+    mockedGetQuestion.mockResolvedValue({
+      data: QUESTION_DETAIL,
+      response: new Response(null, { status: 200 }),
+    });
+    const generation = deferred<Awaited<ReturnType<typeof generateReport>>>();
+    mockedGenerateReport.mockReturnValue(generation.promise);
+    const realtime = installRealtimeDouble();
+    const rendered = render(
+      <SessionPanel apiClient={API_CLIENT} baseUrl="http://localhost:8000" />,
+    );
+    await waitFor(() => expect(realtime.start).toHaveBeenCalledOnce());
+
+    rendered.rerender(
+      <SessionPanel
+        apiClient={API_CLIENT}
+        baseUrl="http://localhost:8000"
+        openCurrentReportRequest={{ requestId: 1, sessionId: SESSION_ID }}
+      />,
+    );
+    await waitFor(() => expect(mockedGenerateReport).toHaveBeenCalledOnce());
+
+    rendered.rerender(
+      <SessionPanel
+        apiClient={API_CLIENT}
+        baseUrl="http://localhost:8000"
+        openCurrentReportRequest={{ requestId: 2, sessionId: SESSION_ID }}
+      />,
+    );
+    expect(mockedGenerateReport).toHaveBeenCalledOnce();
+
+    generation.resolve({
+      data: {
+        report_id: "40000000-0000-4000-8000-000000000001",
+        session_id: SESSION_ID,
+        status: "COMPLETED",
+        report_schema_version: 1,
+        derivation_version: "basic-report/v1",
+        source_through_sequence: 4,
+        created_at: "2026-08-16T00:05:00Z",
+        completed_at: "2026-08-16T00:05:01Z",
+      },
+      response: new Response(null, { status: 200 }),
+    });
+    await waitFor(() =>
+      expect(pushRoute).toHaveBeenCalledWith(`/sessions/${SESSION_ID}/report`),
+    );
+
+    rendered.rerender(
+      <SessionPanel
+        apiClient={API_CLIENT}
+        baseUrl="http://localhost:8000"
+        openCurrentReportRequest={{ requestId: 2, sessionId: SESSION_ID }}
+      />,
+    );
+    expect(mockedGenerateReport).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    {
+      name: "mismatched completed session",
+      snapshot: discussionSnapshot(null, GRANT_ID, "COMPLETED"),
+      requestSessionId: "00000000-0000-4000-8000-000000000099",
+    },
+    {
+      name: "active session",
+      snapshot: PREPARATION,
+      requestSessionId: SESSION_ID,
+    },
+    {
+      name: "aborted session",
+      snapshot: ABORTED,
+      requestSessionId: SESSION_ID,
+    },
+  ])(
+    "rejects a stale Shell report intent for $name",
+    async ({ snapshot, requestSessionId }) => {
+      window.history.replaceState({}, "", `/?session_id=${SESSION_ID}`);
+      mockedGetSessionSnapshot.mockResolvedValue({
+        data: snapshot,
+        response: new Response(null, { status: 200 }),
+      });
+      mockedLoadSessionTranscript.mockResolvedValue([]);
+      mockedGetQuestion.mockResolvedValue({
+        data: QUESTION_DETAIL,
+        response: new Response(null, { status: 200 }),
+      });
+      const realtime = installRealtimeDouble();
+      const rendered = render(
+        <SessionPanel apiClient={API_CLIENT} baseUrl="http://localhost:8000" />,
+      );
+      await waitFor(() => expect(realtime.start).toHaveBeenCalledOnce());
+
+      rendered.rerender(
+        <SessionPanel
+          apiClient={API_CLIENT}
+          baseUrl="http://localhost:8000"
+          openCurrentReportRequest={{
+            requestId: 1,
+            sessionId: requestSessionId,
+          }}
+        />,
+      );
+
+      await act(async () => Promise.resolve());
+      expect(mockedGenerateReport).not.toHaveBeenCalled();
+      expect(pushRoute).not.toHaveBeenCalled();
+    },
+  );
+
+  it("rejects a Shell report intent while no authoritative session exists", async () => {
+    installQuestionDiscovery();
+    const rendered = render(
+      <SessionPanel apiClient={API_CLIENT} baseUrl="http://localhost:8000" />,
+    );
+    await screen.findByRole("heading", { name: "下一场完整模拟" });
+
+    rendered.rerender(
+      <SessionPanel
+        apiClient={API_CLIENT}
+        baseUrl="http://localhost:8000"
+        openCurrentReportRequest={{ requestId: 1, sessionId: SESSION_ID }}
+      />,
+    );
+
+    await act(async () => Promise.resolve());
+    expect(mockedGenerateReport).not.toHaveBeenCalled();
+    expect(pushRoute).not.toHaveBeenCalled();
   });
 
   it("keeps report generation errors safe and does not navigate", async () => {

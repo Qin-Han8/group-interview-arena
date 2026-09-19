@@ -1,7 +1,7 @@
 # 数据库技术基线
 
-- Status: P0 Data Architecture Baseline + P1-1～P1-6 persistence implemented; P1-7A frozen/reviewed; P1-7B Evaluation Report/Evidence persistence and P1-7C generation lifecycle implemented/reviewed
-- Current phase: P1 — IN_PROGRESS
+- Status: P0 Data Architecture Baseline + completed P1 persistence/report schema; P1 `DONE / CLOSED`
+- Current phase: P1 — DONE / CLOSED; P2 — NOT_STARTED
 - Data architecture baseline established by: P0-2 — DONE
 - Local PostgreSQL infrastructure: P0-4B — completed
 - SQLAlchemy async foundation: P0-4C — completed
@@ -15,7 +15,7 @@
 - Target version: V0.1 Internal Validation
 - Business schema: identity, session, question/persona, durable phase timing, participant/floor audit, AI Runtime, structured Discussion Memory, and Evaluation Report/Evidence persistence (twenty-three product tables)
 - P1-1 status: P1-1A～E completed; independent final verdict PASS; P1-1 DONE
-- P1-2～P1-6 status: DONE; P1-6E/P1-6 CLOSED; P1-7 IN_PROGRESS; P1-7A frozen/reviewed; P1-7B/P1-7C/P1-7D `DONE / ACTUAL_SOURCE_REVIEW_PASS`; P1-7E/P1-8 NOT_STARTED; the schema remains twenty-three product tables at linear revision `f1a17b17c008`
+- P1-2～P1-7 status: DONE; P1-6E/P1-6 and P1-7 CLOSED; P1-7A frozen/reviewed; P1-7B/P1-7C/P1-7D `DONE / ACTUAL_SOURCE_REVIEW_PASS`; P1-7E `DONE / CLOSED / COMPOSITION_ACCEPTANCE_PASS / INDEPENDENT_ACCEPTANCE_PASS`; P1-8 `DONE / CLOSED`; the schema remains twenty-three product tables at linear revision `f1a17b17c008`
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -478,7 +478,7 @@ P1-7C adds no migration or table. Its coordinator claims generation with the dat
 
 - P0-5C：FastAPI lifespan/request dependency 已成为现有 async DB runtime 的第一个 application caller；真实 PostgreSQL auth integration 只使用迁移到 head 的隔离临时数据库，development DB 保持 head `4fe43b42641b` 且两张表均为 0 rows；
 - P0-5D：completed；browser closure 已实现，existing Cookie/CORS/CSRF/shared trusted-origin boundary 已生效；P1 不得创建第二套 trusted-origin config；
-- P1：`IN_PROGRESS`；P1-1～P1-6 are `DONE`；P1-6E/P1-6 are `CLOSED`；current migration head is `f1a17b17c008` with exactly twenty-three product tables；P1-7 is `IN_PROGRESS` with P1-7A frozen/reviewed, P1-7B/P1-7C/P1-7D `DONE / ACTUAL_SOURCE_REVIEW_PASS`, and P1-7E/P1-8 `NOT_STARTED`；
+- P1：`DONE / CLOSED`；current migration head remains `f1a17b17c008` with exactly twenty-three product tables；P1-1～P1-8 mandatory scope and approved acceptance chain are complete；
 - P2～P4：仅随获批范围增加音频、评分训练和商业化数据。
 
 ## 与其他文档关系

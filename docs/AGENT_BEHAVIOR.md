@@ -1,14 +1,14 @@
 # AI 候选人与讨论编排骨架
 
-- Status: P1-2～P1-6 completed; P1-6E/P1-6 `DONE / CLOSED`; P1-7 `IN_PROGRESS`; P1-7A/P1-7B/P1-7C/P1-7D review PASS; P1-7D `DONE / ACTUAL_SOURCE_REVIEW_PASS`; P1-7E/P1-8 `NOT_STARTED`
-- Current phase: P1 — IN_PROGRESS
+- Status: P1-2～P1-8 completed; P1 `DONE / CLOSED`; approved composition, independent and phase-close acceptance chain passed
+- Current phase: P1 — DONE / CLOSED; P2 — NOT_STARTED
 - Target version: V0.1 Internal Validation
-- Detailed orchestrator/agent design: P1-3 lifecycle、P1-4 floor、P1-5 runtime/public transport、P1-6 structured Memory/full text composition and P1-7A～P1-7D report/content work are implemented；P1-7E and P1-8 full-P1 acceptance remain unimplemented
+- Detailed orchestrator/agent design: P1-3 lifecycle、P1-4 floor、P1-5 runtime/public transport、P1-6 structured Memory/full text composition、P1-7A～P1-7E report/content work and P1-8 interaction remediation are complete；P1-7E composition/independent acceptance and P1 phase-close assessment/re-assessment passed
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
 
-本文件记录已确认的 AI 候选人/私有立场基础、P1-3 讨论状态机、P1-4 floor-control、P1-5 runtime/public transport，以及 P1-6 structured Discussion Memory 和完整文字模拟行为。P1-7 report/content、P1-8 full-P1 acceptance and streaming remain future work。
+本文件记录已确认的 AI 候选人/私有立场基础、P1-3 讨论状态机、P1-4 floor-control、P1-5 runtime/public transport、P1-6 structured Discussion Memory 和完整文字模拟行为，以及已完成的 P1-7A～P1-7E report/content 与已关闭的 P1-8 interaction remediation。P1 phase-close assessment/re-assessment passed and P1 is `DONE / CLOSED`；streaming remains future work。
 
 ## Confirmed by PROJECT_MASTER_PLAN
 
@@ -223,6 +223,12 @@ Scheduler only answers **who should speak**. Future LLM/provider may answer **wh
 
 Full D～E scope、recovery boundary、validation and stop conditions are in [`exec-plans/P1-4_floor-control.md`](exec-plans/P1-4_floor-control.md)。P1-4D and P1-4E are completed；final independent verdict is `PASS`。
 
+### P1-8 approved scheduling remediation
+
+P1-4 的上述条目保留为历史验收记录；当前运行基线由 P1-8 作两项有界修正。所有高优先级 eligibility、opportunity、first-opportunity、monopoly 和 phase-aware fairness 规则仍先执行；完全同级时保留 Human 先于 AI 的参与节奏，AI 候选人之间不再按固定 seat 顺序轮转，而使用由 session identity、phase 和 participant identity 派生的稳定顺序。同一 session/phase/checkpoint 重试与重启结果一致，不同 session 或 phase 可产生不同 AI 顺序，仍不使用随机或语义排名。
+
+距离正常 phase deadline 过近时 scheduler 返回可审计的 `NO_GRANT / DEADLINE_RECOVERY`，不再产生公开 deadline intervention 或约 15 秒主持暂停。P1-3 deadline reconciliation 继续按原 deadline 连续推进；`SILENCE`、`NO_ELIGIBLE_PARTICIPANT` 和 reconciliation uncertainty 仍是允许的异常恢复路径。
+
 ## P1-5A AI Participant and Runtime boundary
 
 ### Participant is identity; Runtime is capability
@@ -247,7 +253,7 @@ Scheduler 决定 **who speaks**；AI Runtime 决定 **what the already-granted A
 
 ### Prompt and model provenance
 
-Prompt 是可追踪版本资产。Generation Request 必须固定 exact Question Version、Persona Template/Assignment/Private Stance、Prompt Version，以及实际 provider/model/effective non-secret configuration。历史 final utterance 必须从自己的 request 解释这些来源，不能依赖 mutable latest pointer。
+Prompt 是可追踪版本资产。Generation Request 必须固定 exact Question Version、Persona Template/Assignment/Private Stance、Prompt Version，以及实际 provider/model/effective non-secret configuration。历史 final utterance 必须从自己的 request 解释这些来源，不能依赖 mutable latest pointer。P1-8 发布 immutable `AI_CANDIDATE_TURN` V4：仍消费 bounded recent public discussion，并在同一次 candidate generation 内只对 latest clearly unrelated Human utterance 做一句自然拉回后继续讨论；弱论证、异议、流程协调、时间提醒和有效替代方案不得误判为跑题，也不增加 classifier/provider call。
 
 现有 Question Version `phase_prompts` 只是题目级内部素材，不等于完整 Prompt Version。Persona Template 也不承担 prompt storage。Rendered prompt、chain-of-thought、provider raw body 和 secret 应最小化，不因审计要求默认完整保存。
 
@@ -357,7 +363,7 @@ Generation Request 与 final Utterance 是不同 identity。一个 logical reque
 
 ## Future work
 
-- P1：`IN_PROGRESS`；P1-1～P1-6 are `DONE`；P1-6E/P1-6 are `CLOSED`；P1-7 is `IN_PROGRESS` with P1-7A/P1-7B/P1-7C/P1-7D review PASS and P1-7D `DONE / ACTUAL_SOURCE_REVIEW_PASS`；P1-7E and P1-8 are `NOT_STARTED`。
+- P1：`DONE / CLOSED`；P1-1～P1-8 mandatory scope and approved acceptance chain are complete。
 - P2：加入语音、打断、播放停止和恢复语义。
 - P3：建立角色行为与评分证据之间的校准边界。
 - P6/V1.0：扩展到 6～8 种角色和压力模式。

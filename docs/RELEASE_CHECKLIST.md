@@ -1,10 +1,10 @@
 # 发布与阶段验收清单骨架
 
-- Status: Skeleton / Baseline
-- Most recently completed phase: P0 — DONE
-- Current phase: P1 — IN_PROGRESS
+- Status: Active staged-release baseline through P1 closeout
+- Most recently completed phase: P1 — DONE / CLOSED
+- Current phase: P1 — DONE / CLOSED; P2 — NOT_STARTED
 - Target version: V0.1 Internal Validation
-- Detailed design: P1-5A～P1-5F historically completed; P1-5R remediation is `IN_PROGRESS / DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN`
+- Detailed design: P1-1 through P1-8 mandatory scope and all approved P1 acceptance gates are complete; P2+ remains deferred
 - Detailed operational checklist: Not started
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
@@ -18,7 +18,7 @@
 
 ## 当前版本范围
 
-P0-1～P0-7 均已完成，P0 整体已转为 `DONE`。P0-7 finding-only independent recheck `PASS` 后用户已批准进入 P1。P1-1～P1-4 and P1-5A～P1-5F retain historical `DONE`；P1-5 is `IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN` only for `P1-5R IN_PROGRESS / DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN`；R1 is `IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PENDING`，F1 is `OPEN / IMPLEMENTATION_COMPLETE_AWAITING_REVIEW`，R2-A is `NOT_STARTED / BLOCKED_BY_R1`，and later batches remain dependency-blocked and `NOT_STARTED`。
+P0 与 P1 均已完成并关闭。P1-1～P1-5 为 `DONE`，P1-6/P1-7/P1-7E/P1-8 为 `DONE / CLOSED`；P1 phase-close assessment/re-assessment 通过，open findings `NONE`。这只关闭文字版讨论闭环，不代表 V0.1 已公开发布；P2+ 仍为后续范围。
 
 ## Implementation guidance
 
@@ -187,7 +187,7 @@ P0-4 已通过独立最终验收并转为 `DONE`。该验收时 P0-5 尚未获�
 - [x] `pwdlib[argon2]>=0.3.0,<0.4` 是唯一新增 direct runtime dependency；解析 `pwdlib 0.3.1`、`argon2-cffi 25.1.0`，CPython 3.14.7 import/API 验证通过；
 - [x] Argon2id 参数由 application 显式拥有：memory 65536 KiB、time 3、parallelism 4、hash 32、salt 16；未使用 `PasswordHash.recommended()`；
 - [x] 5 个本机样本的 hash median 约 54.3 ms、verify median 约 51.6 ms，未出现不合理秒级成本；该证据不是跨机器性能保证；
-- [x] canonical username 先校验 raw ASCII，Unicode lowercase bypass regression 通过；15–128 password、NFC/no-trim/no-silent-change、small offline full-match blocklist、hash/verify/verify-and-update、policy drift 与 malformed hash safe-failure 测试通过；
+- [x] canonical username 先校验 raw ASCII，Unicode lowercase bypass regression 通过；新注册执行 8–128 password 与 ASCII 大小写字母/数字/标点组合策略，同时保持 NFC/no-trim/no-silent-change、small offline full-match blocklist、hash/verify/verify-and-update、历史凭证登录兼容、policy drift 与 malformed hash safe-failure 测试通过；
 - [x] `users`、`auth_sessions` models 与 exact PK/unique/FK `ON DELETE CASCADE`/expiry index schema 已实现，session primitive 与 integration persistence 验证 32-byte SHA-256 digest，metadata product table count 精确为 2；
 - [x] identity revision `4fe43b42641b` 线性承接 immutable baseline `7c6ccd86b3c5`；single head、revision count 2；
 - [x] fresh temporary PostgreSQL upgrade/repeat/check、downgrade 至 baseline、identity table removal、re-upgrade/final check 与 exact schema validation 通过；
@@ -237,7 +237,7 @@ P0-5D actual-source final review 已 PASS 并转为 completed；P0-5E initial in
 - [x] 产品及技术决策记录完整可追溯；
 - [x] P0-1～P0-6 均满足各自验收条件；
 - [x] 已完成 P0-7 独立验收；initial blockers 已 remediation，finding-only independent recheck `PASS`，P1 readiness `READY`。
-- [ ] 已获得进入 P1 的明确用户批准。
+- [x] 已获得进入 P1 的明确用户批准；P1 后续完成并正式关闭。
 
 P0-2 已 Accepted PostgreSQL、SQLAlchemy 2.x 和 Alembic，P0-4 实施基线为 PostgreSQL 18.x，并要求真实 PostgreSQL integration/migration checks。`ADR-015` 已确认 P0/V0.1 initial identity boundary；email/phone/WeChat/OAuth、verified recovery 与完整公开账号产品继续 Deferred，不是 P0-5B 的前置实现范围。
 
@@ -256,6 +256,15 @@ P0-2 已 Accepted PostgreSQL、SQLAlchemy 2.x 和 Alembic，P0-4 实施基线为
 - [x] Surgical follow-up proved RED `expected sequence 3, received 4` when a fresh command committed reconciliation `N+1` immediately before command fact `N+2`；the final branch is exactly OLD/partial → exact replay and fresh → normal committed drain；delivery matrix `3/3`、WebSocket `19/19`、affected API `19/19`、Web realtime `36/36` and real Chromium `2/2` passed；
 - [x] Post-commit remediation validation：utterance `16`、backend transport `1`、affected API `39`、API unit `438`、PostgreSQL integration `142`、full API `580`、Web `64` and real Chromium `2/2` passed；Ruff lint/format、Pyright、Web lint/format/typecheck/build、OpenAPI drift and cleanup passed；provider calls remain zero；P1-5F-2 remains `DONE` and P1-5F-3/F4 remain `NOT_STARTED`；
 - [x] Commit/push remains separately authorized and has not occurred。
+
+## P1 phase closeout — 2026-09-19
+
+- [x] P1-1 through P1-8 mandatory scope is complete; P1-6, P1-7, P1-7E and P1-8 are `DONE / CLOSED`.
+- [x] The text closed loop includes username/password auth, the real 3-category/12-question catalog, 1 Human + 3 AI, authoritative lifecycle/floor scheduling, realtime transcript, durable Memory and recovery, `COMPLETED` lifecycle, owner-isolated evidence report and the production frontend flow.
+- [x] New registration uses the 8–128 Option B rule: ASCII uppercase, lowercase, digit and punctuation are required; whitespace does not satisfy punctuation. NFC, blacklist, Argon2id and historical-login compatibility remain preserved.
+- [x] Final P1 independent acceptance semantics are satisfied by P1-7E composition/independent acceptance, P1-8 Final Composition Acceptance and independent review/re-review, plus P1 phase-close assessment/re-assessment.
+- [x] P2 voice/audio, P3 formal scoring/radar/ranking/hiring or job-fit claims, and commercial/payment/growth functionality remain outside the closed P1 scope.
+- [x] No new technical acceptance run was introduced by formal documentation closeout; the previously approved evidence remains authoritative.
 
 ## V0.1 internal validation
 
@@ -363,7 +372,8 @@ P0-2 已 Accepted PostgreSQL、SQLAlchemy 2.x 和 Alembic，P0-4 实施基线为
 - P0-5D：completed；P0-5E completed；final outcome `PASS after findings remediation and independent recheck`。
 - P0-6：`DONE`；P0-6A～P0-6E completed，cross-layer validation/closeout `PASS`。
 - P0-7：completed；initial verdict `BLOCKED`，2 documentation findings remediated，finding-only independent recheck `PASS`，P1 readiness `READY`。
-- P1：`IN_PROGRESS`；P1-5A～P1-5F retain historical `DONE`；P1-5 is `IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN` for `P1-5R IN_PROGRESS / DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN`；R1 is `IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PENDING`；F1 is `OPEN / IMPLEMENTATION_COMPLETE_AWAITING_REVIEW`；R2-A is `NOT_STARTED / BLOCKED_BY_R1`；R2-B/R3 are `NOT_STARTED`。
+- P1：`DONE / CLOSED`；P1-1 through P1-8 mandatory scope and the approved acceptance chain are complete，open findings `NONE`。
+- P2：`NOT_STARTED`；voice/ASR/TTS and real-interaction work require separate explicit approval。
 - 各版本发布任务：补充负责人、环境、命令、证据和发布/回滚步骤。
 
 ## 与其他文档关系

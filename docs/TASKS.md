@@ -1,18 +1,18 @@
 # 当前任务清单
 
-- Status: P1 in progress; P1-1 through P1-6 completed; P1-6 is `DONE / CLOSED`; P1-7 is `IN_PROGRESS`; P1-7A is `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-7B, P1-7C and P1-7D are `DONE / ACTUAL_SOURCE_REVIEW_PASS`; P1-7E/P1-8 are `NOT_STARTED`; P1-7D-F001～F005 are `CLOSED`; open findings `NONE`
-- Managed scope: P1-7D owner-only report generation command/read, reloadable Web report experience and exact V0.1 4/4/4 candidate Question catalog; no real provider, scoring, commercial behavior or P1-7E work
-- Current completed checkpoint: P1-7D — `DONE / ACTUAL_SOURCE_REVIEW_PASS`; content — `4/4/4 IMPLEMENTED / HUMAN_CONTENT_REVIEW_PASS`; P1-7E/P1-8 — `NOT_STARTED`
+- Status: P1 — `DONE / CLOSED`; P1-1 through P1-5 are `DONE`; P1-6, P1-7, P1-7E and P1-8 are `DONE / CLOSED`; all required composition, independent acceptance and phase-close assessment gates passed; open findings `NONE`
+- Managed scope: completed P1 text-based discussion closed loop and formal governance closeout only; P2 voice/real-interaction work, P3 formal scoring/training and later commercial scope remain `NOT_STARTED`
+- Current completed checkpoint: P1 Phase-Close Assessment + Re-Assessment — `PASS / READY FOR FORMAL P1 CLOSEOUT`; formal P1 status transition — `DONE / CLOSED`
 - P0-7 final outcome: initial verdict `BLOCKED` with two documentation findings; remediation completed; finding-only independent recheck `PASS`; new blockers none; P1 readiness `READY`
-- Current phase: P1 — `IN_PROGRESS`
-- Current governance checkpoint: P1-7D external actual-source review is `PASS`; P1-7D-F001～F005 are `CLOSED`; content is `4/4/4 IMPLEMENTED / HUMAN_CONTENT_REVIEW_PASS`; material content findings are `NONE OPEN`
-- Latest completed implementation review: P1-7D is `DONE / ACTUAL_SOURCE_REVIEW_PASS`; open findings/new blockers are `NONE`
-- Current task gate: P1-6 — `DONE / CLOSED`; P1-7 — `IN_PROGRESS`; P1-7A — `DONE / DESIGN_SCOPE_FROZEN / ACTUAL_SOURCE_REVIEW_PASS`; P1-7B/P1-7C/P1-7D — `DONE / ACTUAL_SOURCE_REVIEW_PASS`; P1-7D-F001～F005 — `CLOSED`; P1-7E/P1-8 — `NOT_STARTED`; P1 remains `IN_PROGRESS`
+- Current phase: P1 — `DONE / CLOSED`; P2 — `NOT_STARTED`
+- Current governance checkpoint: P1 formal closeout — `PASS / DONE / CLOSED`; P1-7D-F001～F005 remain `CLOSED`; P1-7 content remains `4/4/4 IMPLEMENTED / HUMAN_CONTENT_REVIEW_PASS`; material findings are `NONE OPEN`
+- Latest completed implementation review: P1-8 Final Composition Acceptance and bounded closeout re-verification are `PASS`; open findings/new blockers are `NONE`
+- Current task gate: P1-1 through P1-8 mandatory scope is closed; final P1 independent acceptance semantics are satisfied by the P1-7E same-session composition/independent acceptance, P1-8 Final Composition Acceptance and independent review/re-review, plus P1 phase-close assessment/re-assessment; no additional acceptance gate remains
 - P0 status: `DONE`; P0-1 through P0-7 completed
 - Allowed status values: `TODO` / `IN_PROGRESS` / `BLOCKED` / `DONE`
 - Related roadmap: [`ROADMAP.md`](ROADMAP.md)
 
-用户已明确批准正式进入 P1；P1 本身保持 `IN_PROGRESS`。P1-5A～P1-5F 的历史实现、review、commit/push、CI 和 acceptance 证据不变，P1-5F-4 的 `F4-ACC-001` 仍为 `CLOSED`，且 F4 accepted path 未调用 real provider/model。P1-5R later legitimately completed R1～R3、Final Composition Acceptance and Independent Acceptance，and the committed `PASS / CLOSED` closeout remains historical evidence。A later explicitly authorized post-closeout real-provider smoke exposed P1-5R-POST-001：provider-await cancellation could leave a generation request and AI floor durably stuck。The network-free remediation and review finding passed actual-source review，accepted commit `3b09d20a704c0fd3ff473ccb79311065b7e70408` has exact CI run `33257343273` green，P1-5R-POST-REV-001、P1-5R-POST-001 and P1-5R are `CLOSED`，parent P1-5 is `DONE`，and open findings are `NONE`。Formal R3.8 remains `NOT_EXECUTED / REQUIRES_SEPARATE_EXPLICIT_USER_AUTHORIZATION`；no further real-provider call occurred。
+P1 is formally `DONE / CLOSED`; this is the completed text-based discussion closed loop, not a public production launch. P1-5A～P1-5F 的历史实现、review、commit/push、CI 和 acceptance 证据不变，P1-5F-4 的 `F4-ACC-001` 仍为 `CLOSED`，且 F4 accepted path 未调用 real provider/model。P1-5R later legitimately completed R1～R3、Final Composition Acceptance and Independent Acceptance，and the committed `PASS / CLOSED` closeout remains historical evidence。A later explicitly authorized post-closeout real-provider smoke exposed P1-5R-POST-001：provider-await cancellation could leave a generation request and AI floor durably stuck。The network-free remediation and review finding passed actual-source review，accepted commit `3b09d20a704c0fd3ff473ccb79311065b7e70408` has exact CI run `33257343273` green，P1-5R-POST-REV-001、P1-5R-POST-001 and P1-5R are `CLOSED`，parent P1-5 is `DONE`，and open findings are `NONE`。Formal R3.8 remains `NOT_EXECUTED / REQUIRES_SEPARATE_EXPLICIT_USER_AUTHORIZATION`；no further real-provider call occurred。
 
 ## P0-1 — 仓库与文档治理
 
@@ -237,7 +237,7 @@
 ### P0-5B completion note
 
 - 唯一新增 direct runtime dependency 为 `pwdlib[argon2]>=0.3.0,<0.4`，解析 `pwdlib 0.3.1` 与 `argon2-cffi 25.1.0`，已在 CPython 3.14.7 验证；
-- 已实现先校验 raw ASCII 的 canonical username、15–128 code-point password policy、small offline full-match blocklist、显式参数 Argon2id hash/verify/verify-and-update，以及 opaque token generation、32-byte SHA-256 digest 与 7-day absolute expiry primitives；
+- 已实现先校验 raw ASCII 的 canonical username、新注册 8–128 code-point password policy（至少包含一个 ASCII 大写字母、小写字母、数字与标点；登录保持历史凭证兼容）、small offline full-match blocklist、显式参数 Argon2id hash/verify/verify-and-update，以及 opaque token generation、32-byte SHA-256 digest 与 7-day absolute expiry primitives；
 - 已建立 `users`、`auth_sessions` ORM models，`Base.metadata` 精确包含两张 product table；session primitive 与 integration persistence 验证 32-byte SHA-256 digest，无 Deferred field、relationship 或额外 product table；
 - 已新增 identity revision `4fe43b42641b`，线性承接 immutable baseline `7c6ccd86b3c5`，fresh PostgreSQL migration/downgrade/re-upgrade/check 与 exact schema tests 全部通过；
 - development database 已在 exact-name/read-only/schema preflight 后首次迁移至 identity head，重复 upgrade 为 no-op，未 downgrade、未写入测试 user/session；
@@ -615,7 +615,7 @@
 - `P1-5R — Local Acceptance Remediation`：`CLOSED`；R1/R2-A/R2-B/R3 and F1/F2/Visual fidelity remediation/F3 retain their accepted `DONE / CLOSED` states；previous Independent Acceptance and closeout remain historical `PASS / CLOSED` evidence。
 - `P1-5R-POST-001 — Recover cancelled in-flight AI generation`：`CLOSED`；remediation actual-source review `PASS`；accepted commit `3b09d20a704c0fd3ff473ccb79311065b7e70408`；exact CI run `33257343273` `completed / success` with all four required jobs green；later post-closeout real-provider smoke discovery remains historical evidence；no further real-provider call。
 - `P1-5R-POST-REV-001 — Real WebSocket teardown composition proof`：`CLOSED`；the existing network-free Browser harness proves durable `RUNNING`，actual reload/WebSocket teardown cancellation，normal reconnect/resume，exactly one `INTERRUPTED` release，continued scheduling and no retry、utterance or release duplicate for the cancelled grant；open findings `NONE`。
-- P1-5F-2 and P1-5F-3A remain historical `DONE` with their previously recorded evidence。F3B implementation review、commit/push、CI and F4 composition acceptance passed with no findings open，so F3B and parent P1-5F-3 remain historical `DONE`。F4 initially `BLOCKED` on `F4-ACC-001`；finding-only remediation added network-free Human→AI Browser composition proof，its actual-source review passed，the accepted remediation commit and CI passed，and fresh independent final acceptance returned `PASS` with findings `NONE`；`F4-ACC-001` remains `CLOSED`。P1-5R Final Composition Acceptance、Independent Acceptance and the prior P1-5R/P1-5 closeout remain historical `PASS / CLOSED` evidence。The later post-closeout smoke exposed P1-5R-POST-001；its remediation review and exact accepted-commit CI passed，so P1-5R and parent P1-5 are closed/done with open findings `NONE`；P1 remains `IN_PROGRESS`。Formal R3.8 remains `NOT_EXECUTED / REQUIRES_SEPARATE_EXPLICIT_USER_AUTHORIZATION`。
+- P1-5F-2 and P1-5F-3A remain historical `DONE` with their previously recorded evidence。F3B implementation review、commit/push、CI and F4 composition acceptance passed with no findings open，so F3B and parent P1-5F-3 remain historical `DONE`。F4 initially `BLOCKED` on `F4-ACC-001`；finding-only remediation added network-free Human→AI Browser composition proof，its actual-source review passed，the accepted remediation commit and CI passed，and fresh independent final acceptance returned `PASS` with findings `NONE`；`F4-ACC-001` remains `CLOSED`。P1-5R Final Composition Acceptance、Independent Acceptance and the prior P1-5R/P1-5 closeout remain historical `PASS / CLOSED` evidence。The later post-closeout smoke exposed P1-5R-POST-001；its remediation review and exact accepted-commit CI passed，so P1-5R and parent P1-5 are closed/done with open findings `NONE`。At that checkpoint P1 remained `IN_PROGRESS`; the later phase-close assessment/re-assessment passed and P1 is now `DONE / CLOSED`。Formal R3.8 remains `NOT_EXECUTED / REQUIRES_SEPARATE_EXPLICIT_USER_AUTHORIZATION`。
 
 ### P1-5F-3A design-freeze checkpoint
 
@@ -644,7 +644,7 @@
 - Finding-only remediation added one deterministic network-free provider boundary while preserving the real scheduler、continuous drive、generation-request and AI-utterance persistence、public event、WebSocket、Browser transcript and reload/API-restart recovery path；it made no real provider/model call。
 - Remediation actual-source review: `PASS`；`F4-ACC-001 CLOSED`；open findings `NONE`。
 - Accepted final commit: `af33d89baa0355ae1ee5174a2ef8cfb5e7b14554`；GitHub Actions run `33050532295` `SUCCESS`；fresh independent final acceptance `PASS` with findings `NONE`。
-- Resulting hierarchy: `P1 IN_PROGRESS`; `P1-5 DONE`; `P1-5F DONE`; `P1-5F-3 DONE`; `P1-5F-3A DONE`; `P1-5F-3B DONE`; `P1-5F-4 DONE`。
+- At the P1-5F-4 closeout checkpoint, the resulting hierarchy was `P1 IN_PROGRESS`; `P1-5 DONE`; `P1-5F DONE`; `P1-5F-3 DONE`; `P1-5F-3A DONE`; `P1-5F-3B DONE`; `P1-5F-4 DONE`。Current P1 status is recorded at the top of this file。
 
 ### P1-5R design-freeze checkpoint
 
@@ -818,7 +818,7 @@
 ## P1-7 — Basic Evidence Report + V0.1 Content Closure
 
 - ID: `P1-7`
-- Status: `IN_PROGRESS`
+- Status: `DONE / CLOSED`
 - Goal: generate a durable V0.1 basic training report from validated authoritative public discussion evidence after `SimulationSession.COMPLETED`, and close the exact 3-type/12-human-reviewed-question V0.1 content target without importing P3 formal scoring.
 - Source plan: [`exec-plans/P1-7_basic-evidence-report-and-content.md`](exec-plans/P1-7_basic-evidence-report-and-content.md)
 - Current source: exactly 4 Persona seeds and 12 published V0.1 Question Versions at 4 `ORDERING_SELECTION` / 4 `RESOURCE_ALLOCATION` / 4 `PLAN_DESIGN`; report persistence/generation and the owner-only POST command plus independent GET/Web surface have passed external actual-source review.
@@ -830,7 +830,7 @@
 - `P1-7B — Evidence / Report Persistence Foundation`: `DONE / ACTUAL_SOURCE_REVIEW_PASS`; `P1-7B-F001 CLOSED`; open findings `NONE`;
 - `P1-7C — Evidence Extraction + Basic Report Generation`: `DONE / ACTUAL_SOURCE_REVIEW_PASS`;
 - `P1-7D — Report REST/Web + V0.1 Content Closure`: `DONE / ACTUAL_SOURCE_REVIEW_PASS`; `P1-7D-F001～F005 CLOSED`; content `4/4/4 IMPLEMENTED / HUMAN_CONTENT_REVIEW_PASS`; material content findings `NONE OPEN`;
-- `P1-7E — Composition Acceptance + Independent Acceptance`: `NOT_STARTED`.
+- `P1-7E — Composition Acceptance + Independent Acceptance`: `DONE / CLOSED / COMPOSITION_ACCEPTANCE_PASS / INDEPENDENT_ACCEPTANCE_PASS`; one real categorized Question → one unchanged session with 1 Human + 3 AI → all authoritative phases → `COMPLETED` → owner-only report generation/read → Browser reload → second API restart recovered the identical durable report. Human evidence/provenance, frozen watermark, mutation-free GET/idempotency, nondisclosing second-user isolation and privacy sentinels passed; independent reviewer reran the real PostgreSQL/Chromium path and returned `PASS`; Critical/High/Medium/open blocking findings `NONE`.
 
 P1-7A review closeout uses `group-interview-arena-review-20260909-234536.zip` / SHA-256 `4EA3FE5DD23775106C2602CAA2EC6DC68AC8DDA6D9895C5D74465F90390798F3`. The reviewed checkout `bc8cb40148598230bd64feeeaebb498d05137fbe` is a direct parent of current GitHub `main` `f6f105ed2fcc334f6c9dd83c00d934428e1b689b`; their tree identities are equal and their file-content diff is empty. This is review baseline equivalence, not commit-SHA equality and not a claim that the bundle was generated from the later `main` working tree. No real provider was called and no P1-7B implementation occurred.
 
@@ -845,7 +845,7 @@ P1-7A review closeout uses `group-interview-arena-review-20260909-234536.zip` / 
 - Eligibility is exactly `SimulationSession.status == COMPLETED`; aborted/partial/service-failure reports remain Deferred.
 - Content target is 4 ordering + 4 resource-allocation + 4 plan-design = 12 human-reviewed immutable Question Versions. P1-7D implements the exact 4/4/4 catalog and external human content review is `PASS`; automated validation remains separate supporting evidence rather than a substitute for that review.
 - The master-plan “score versus level + evidence” question remains TBD. P1-7 outputs no formal score, radar, percentile, ranking, hiring probability, job fit or personality type.
-- P1-7E later owns one network-free select → session → 1 Human + 3 AI → all text phases → `COMPLETED` → report → Web/evidence resolution → Browser reload → API restart/durable recovery proof. P1-8 remains separate.
+- P1-7E completed one network-free select → session → 1 Human + 3 AI → all text phases → `COMPLETED` → report → Web/evidence resolution → Browser reload → API restart/durable recovery proof. P1-8 remains separate and `DONE / CLOSED`.
 
 ### P1-7B implementation checkpoint
 
@@ -881,11 +881,29 @@ P1-7A review closeout uses `group-interview-arena-review-20260909-234536.zip` / 
 | P1-7D-F004 | Replaced generic stance text with three explicit differentiated stances for each of the 11 added questions. | `CLOSED` |
 | P1-7D-F005 | Synchronized P1-7D API/data/agent/architecture/question/task/plan/manifest governance facts. | `CLOSED` |
 
-## P1-8 — Independent P1 Acceptance
+## P1-8 — Interaction remediation before final P1 acceptance
 
 - ID: `P1-8`
-- Status: `NOT_STARTED`
-- Boundary: future independent acceptance of complete P1; not the same as P1-6E.
+- Status: `DONE / CLOSED`
+- Approval state: user explicitly approved implementation on 2026-09-14 and formal status closeout on 2026-09-19 after Final Composition Acceptance, bounded repairs and closeout re-verification all passed.
+- Boundary: bounded prompt relevance, deterministic session/phase-aware scheduler tie-break, continuous deadline handoff, compact AI preparing state, safe latency observability, and Demo V2-informed real-product surfaces. Exact scope and acceptance gates are frozen in [`exec-plans/P1-8_interaction-remediation.md`](exec-plans/P1-8_interaction-remediation.md).
+- Historical scope deferrals at P1-8 approval: P1-7E and final independent P1 acceptance remained separate gates and were later completed; voice/ASR/TTS, formal scoring, payment/growth backend, streaming, public Discussion Memory, new privacy APIs and all Demo-only Mock functionality remain deferred.
+
+### P1-8 formal closeout — 2026-09-19
+
+- Integrated composition across P1-1 through the P1-7 report/content surface is verified. P1-7E subsequently completed its same-session composition and independent acceptance; authentication, owner isolation, real categorized question selection, immutable question-version binding, evidence-based report generation/read and report owner isolation remain intact.
+- Immutable candidate Prompt V4 is the current candidate provenance and historical prompt provenance remains resolvable. The approved runtime incorporates Human public contribution and bounded off-topic guidance without a second classifier call. Scheduler V1 remains historical provenance; Scheduler V2 is current, with Human equal-layer precedence, stable deterministic AI-only tie-breaking and auditable `NO_GRANT / DEADLINE_RECOVERY` without fake public Host intervention.
+- Exact-once AI generation/recovery, cancellation and API-restart recovery, content-free latency observability, hydration-safe live-render telemetry, Memory/privacy boundaries and historical P1-6D contracts passed the final integrated acceptance path.
+- The production frontend now uses the approved Demo V2-aligned entry, ProductShell, categorized setup, focused training shell, resizable workspace, Settings center, evidence report and full-sidebar/icon-rail/top-navigation responsive modes; responsive and accessibility gates passed without mock product data or deferred P2/P3 controls.
+- Final bounded identity repair applies the new-registration rule of 8–128 characters with at least one ASCII uppercase letter, lowercase letter, digit and punctuation character; whitespace and Unicode punctuation alone do not satisfy punctuation. Login backward compatibility, NFC validation, the full-match blocklist and Argon2id remain preserved.
+- Final Composition Acceptance, the sole Pyright blocker repair and verification, Registration Password Policy Option B repair, and password-policy closeout re-verification all passed. Open P1-8 findings are `NONE`; P1-8 is `DONE / CLOSED`. The later P1 phase-close assessment and re-assessment also passed.
+
+## P1 formal closeout — 2026-09-19
+
+- Status: `DONE / CLOSED`; P2 and later phases remain `NOT_STARTED` under their existing approval gates.
+- Final capability: username/password auth with the current 8–128 Option B registration policy and historical-login compatibility; a real 3-category/12-question immutable-version catalog; 1 Human + 3 AI with persona/private-stance isolation; backend-authoritative lifecycle, scheduler/floor control, Human equal-layer precedence, deterministic AI ordering and Prompt V4; realtime transcript, durable Memory, reload/reconnect/API-restart/cancellation/exact-once recovery; `COMPLETED` lifecycle and owner-isolated evidence report with provenance; ProductShell, focused responsive training workspace, Settings and browser-local layout persistence.
+- Privacy/non-goals: no private stance or prompt leakage, no P2 voice/audio, no P3 formal six-dimension score/radar/ranking/hiring/job-fit verdict, and no payment/commercial or unsupported growth metrics.
+- Final independent acceptance semantics are satisfied by the combined P1-7E same-session composition acceptance, P1-7E independent acceptance, P1-8 Final Composition Acceptance, P1-8 independent review/re-review, P1 phase-close assessment and P1 phase-close re-assessment. No artificial additional acceptance gate or new closeout test run was introduced.
 
 ## 任务更新规则
 

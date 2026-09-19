@@ -10,22 +10,14 @@ AI 群面训练场让用户无需临时召集真人，即可与具有不同性�
 
 ## 当前状态
 
-- 最近完成开发阶段：`P0 — 项目基础（DONE）`
-- 已完成任务：
-  - `P0-1 — 仓库与文档治理`
-  - `P0-2 — 技术架构决策`
-  - `P0-3 — 前后端项目骨架`
-  - `P0-4 — 数据库与迁移基础`
-  - `P0-5 — 最小身份边界`
-  - `P0-6 — CI、日志与基础可观测性`
-  - `P0-7 — P0 独立验收`
-- 已完成子步骤：`P0-4A`～`P0-4F`、`P0-5A`～`P0-5E`、`P0-6A`～`P0-6E`
-- 最近完成任务：`P0-7 — P0 独立验收（DONE；PASS after two documentation findings remediation and finding-only independent recheck）`
-- 下一阶段门禁：`P1 — 文字版讨论闭环（NOT_STARTED；awaiting explicit user approval）`
+- 最近完成开发阶段：`P1 — 文字版讨论闭环（DONE / CLOSED）`
+- 已完成阶段：`P0 — 项目基础`、`P1 — 文字版讨论闭环`
+- P1 已完成范围：身份认证、3 类 12 题真实题库、参数化 AI 候选人、后端权威讨论状态机与发言权调度、实时逐句记录、持久化恢复、结构化讨论记忆、基础证据报告及完整 Web 训练流程
+- 下一阶段：`P2 — 语音与真实交互（NOT_STARTED；requires separate explicit approval）`
 - 当前目标版本：`V0.1 — Internal Validation / 内部技术验证版`
-- 当前实现状态：Web/API 技术骨架、本地 PostgreSQL 18.4、SQLAlchemy async/psycopg 3、Alembic 与 reusable PostgreSQL integration harness 已建立；P0-5 identity/browser boundary 与 P0-6 CI、structured logging、默认关闭且 app-owned 的 provider-neutral tracing 及 cross-layer closeout 均已完成
+- 当前实现状态：可运行的 Next.js/FastAPI/PostgreSQL 文字群面闭环已建立，包括 ProductShell、专注训练工作区、响应式布局、设置/本地布局偏好、真实会话与报告路由；P1 的组合验收、独立验收与阶段收口复核均已通过
 
-> P0-1～P0-7 均已完成，P0 整体已转为 `DONE`。P1 readiness 为 `READY`，但 P1 仍为 `NOT_STARTED`，等待用户明确批准后才能进入。
+> P1 收口只表示文字版讨论闭环完成，不表示公开生产发布或生产规模就绪。语音/音频、正式六维评分、商业化及完整成长系统仍属于 P2+ 后续范围。
 
 ## 核心原则摘要
 
@@ -66,21 +58,22 @@ P0-5 已批准的初始身份边界为 username/password、Argon2id、稳定 UUI
 ├── pnpm-workspace.yaml          # 当前仅包含 apps/web
 ├── pnpm-lock.yaml               # JavaScript workspace 唯一 lockfile
 ├── apps/
-│   ├── web/                     # Next.js App Router 技术骨架
-│       ├── src/app/             # 最小首页、layout、全局样式和组件测试
+│   ├── web/                     # Next.js App Router 产品前端
+│       ├── src/app/             # 认证、训练、报告、设置路由与全局样式
 │       ├── package.json         # Web 命令与依赖
 │       ├── eslint.config.mjs    # ESLint 配置
 │       ├── prettier.config.mjs  # Prettier 配置
 │       ├── vitest.config.mts    # Vitest + jsdom 配置
 │       └── tsconfig.json        # TypeScript strict 配置
-│   └── api/                     # FastAPI 技术骨架
+│   └── api/                     # FastAPI 业务 API
 │       ├── src/group_interview_arena_api/
-│       │   ├── api/             # 当前仅有 GET /health
+│       │   ├── api/             # 健康、认证、题目、会话、实时与报告接口
 │       │   ├── core/            # 配置、错误、日志、request_id 与 tracing
-│       │   ├── db/              # SQLAlchemy Base、identity models 与 async engine/session factory
+│       │   ├── db/              # SQLAlchemy models 与 async engine/session factory
 │       │   ├── identity/        # username/password/session security primitives
+│       │   ├── modules/         # 题目、会话、调度、AI、Memory 与报告模块
 │       │   └── app.py           # application factory 与模块级 app
-│       ├── migrations/          # Alembic async environment、baseline 与 identity revision
+│       ├── migrations/          # Alembic async environment 与线性业务迁移
 │       ├── tests/               # 本地确定性后端测试
 │       ├── alembic.ini          # 不含 credential 的 Alembic 配置
 │       ├── pyproject.toml        # Python policy、依赖与质量配置
@@ -92,19 +85,19 @@ P0-5 已批准的初始身份边界为 username/password、Argon2id、稳定 UUI
     ├── DECISIONS.md             # 产品与技术决策记录
     ├── ROADMAP.md               # 阶段、版本和里程碑
     ├── TASKS.md                 # 当前阶段任务清单
-    ├── PRODUCT_REQUIREMENTS.md  # 产品需求骨架
-    ├── QUESTION_SYSTEM.md       # 题型与题目系统骨架
-    ├── AGENT_BEHAVIOR.md        # AI 角色与讨论编排骨架
-    ├── SCORING_RUBRIC.md        # 评分与证据体系骨架
-    ├── ARCHITECTURE.md          # 技术架构骨架
-    ├── DATABASE.md              # 数据模型骨架
-    ├── API.md                   # API 与事件设计骨架
+    ├── PRODUCT_REQUIREMENTS.md  # 产品需求与当前范围
+    ├── QUESTION_SYSTEM.md       # 题型与题目系统
+    ├── AGENT_BEHAVIOR.md        # AI 角色与讨论编排
+    ├── SCORING_RUBRIC.md        # 基础证据报告与正式评分边界
+    ├── ARCHITECTURE.md          # 技术架构基线
+    ├── DATABASE.md              # 数据模型基线
+    ├── API.md                   # API 与事件契约
     ├── PRIVACY_AND_SAFETY.md    # 隐私、安全与反作弊基线
     ├── RELEASE_CHECKLIST.md     # 分阶段发布检查骨架
     └── exec-plans/              # 复杂任务执行计划约定
 ```
 
-当前数据基础包括 PostgreSQL 18.4、SQLAlchemy 2.0、psycopg 3 async runtime，以及 Alembic 1.18.5 async migration environment、zero-op baseline 和 identity revision。Development database 当前 head 为 `4fe43b42641b`，product tables 精确为 `users`、`auth_sessions`，两表均为 `0` rows；FastAPI lifespan/request dependency 已成为 DB runtime caller，但尚无群面业务模块。
+当前数据基础包括 PostgreSQL 18.4、SQLAlchemy 2.0、psycopg 3 async runtime 与 Alembic 1.18.5 async migration environment。P1 线性 migration head 为 `f1a17b17c008`，共 23 张产品表，覆盖身份、题目/角色、会话阶段、参与者/发言权审计、AI Runtime、结构化 Discussion Memory 和基础证据报告；仓库不承诺公开生产规模就绪。
 
 ## 文档阅读顺序
 
@@ -215,7 +208,7 @@ uv run pytest
 
 `integration` 与完整 suite 需要 Docker Desktop、healthy 的 PostgreSQL Compose service，以及仓库根目录中被 Git ignore 的本地 `.env`；unit-only 命令不读取这些本地数据库配置。Integration fixture 为每个需要数据库状态的测试创建并精确删除独立 `gia_p04e_*` database，不迁移 development database。
 
-当前已实现 `GET /health`、本地 PostgreSQL Compose、FastAPI lifespan/request-scoped SQLAlchemy async runtime、baseline → identity head 的线性 Alembic history、backend register/login/logout/me、credentialed CORS/CSRF 与最小 Web auth。`pnpm.cmd web:test:e2e` 会创建并迁移精确的 `gia_p05d_*` 临时数据库，启动本地 API/Web，运行 Chromium auth flow，并在成功或失败后停止服务、精确删除临时库；它绝不使用 development database。群面业务功能尚未建立。
+当前已实现健康检查、注册/登录/登出、题目读取、会话创建与推进、REST/WebSocket 实时恢复、AI 候选人编排、Discussion Memory、证据报告生成/读取，以及对应的 Web 认证、选题、训练、报告和设置流程。集成与浏览器验收使用迁移到当前 head 的隔离临时 PostgreSQL 数据库，不迁移 development database；P2+ 语音、正式评分和商业功能尚未实现。
 
 ## 贡献规则
 

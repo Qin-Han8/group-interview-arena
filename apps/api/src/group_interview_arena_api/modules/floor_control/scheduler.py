@@ -1,3 +1,4 @@
+import hashlib
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -47,7 +48,7 @@ class SchedulerPolicy:
                 raise ValueError("Scheduler thresholds must be positive durations.")
 
 
-V0_1_SCHEDULER_POLICY = SchedulerPolicy(
+V0_1_SCHEDULER_POLICY_V1 = SchedulerPolicy(
     version="v0.1-floor-1",
     opportunity_order=(
         SpeakingOpportunityKind.PHASE_MANDATED,
@@ -60,6 +61,29 @@ V0_1_SCHEDULER_POLICY = SchedulerPolicy(
     silence_threshold=timedelta(seconds=20),
     deadline_intervention_threshold=timedelta(seconds=15),
 )
+
+V0_1_SCHEDULER_POLICY_V2 = SchedulerPolicy(
+    version="v0.1-floor-2",
+    opportunity_order=V0_1_SCHEDULER_POLICY_V1.opportunity_order,
+    max_consecutive_grants=V0_1_SCHEDULER_POLICY_V1.max_consecutive_grants,
+    max_phase_grants=V0_1_SCHEDULER_POLICY_V1.max_phase_grants,
+    silence_threshold=V0_1_SCHEDULER_POLICY_V1.silence_threshold,
+    deadline_intervention_threshold=(
+        V0_1_SCHEDULER_POLICY_V1.deadline_intervention_threshold
+    ),
+)
+
+# Existing callers use this name for the current policy. Historical decisions keep
+# their own immutable policy version and are never rewritten to this alias.
+V0_1_SCHEDULER_POLICY = V0_1_SCHEDULER_POLICY_V2
+
+
+def scheduler_policy_for_version(version: str) -> SchedulerPolicy | None:
+    if version == V0_1_SCHEDULER_POLICY_V1.version:
+        return V0_1_SCHEDULER_POLICY_V1
+    if version == V0_1_SCHEDULER_POLICY_V2.version:
+        return V0_1_SCHEDULER_POLICY_V2
+    return None
 
 
 @dataclass(frozen=True)
@@ -106,6 +130,7 @@ class SchedulerGrantHistory:
 
 @dataclass(frozen=True)
 class SchedulerInput:
+    session_id: UUID
     decision_id: UUID
     phase: SessionStatus
     expected_last_sequence: int
@@ -222,6 +247,8 @@ def _intervention_decision(
 def _no_grant_decision(
     scheduler_input: SchedulerInput,
     policy: SchedulerPolicy,
+    *,
+    reason: FloorPolicyReason = FloorPolicyReason.NO_ELIGIBLE_PARTICIPANT,
 ) -> FloorDecisionRecord:
     return FloorDecisionRecord(
         decision_id=scheduler_input.decision_id,
@@ -232,7 +259,7 @@ def _no_grant_decision(
         opportunity_id=None,
         intervention_kind=None,
         policy_version=policy.version,
-        primary_reason=FloorPolicyReason.NO_ELIGIBLE_PARTICIPANT,
+        primary_reason=reason,
         supporting_reasons=(),
         metadata=SafeDecisionMetadata(
             current_phase_grant_count=0,
@@ -325,35 +352,61 @@ def _tie_break_class(
     candidates: list[_Candidate],
     selected: _Candidate,
     prefix_key: Callable[[_Candidate], tuple[object, ...]],
+    policy: SchedulerPolicy,
 ) -> str:
     tied = [item for item in candidates if prefix_key(item) == prefix_key(selected)]
     if len(tied) <= 1:
         return "NOT_APPLICABLE"
-    lowest_seat = min(item.participant.seat_order for item in tied)
-    if sum(item.participant.seat_order == lowest_seat for item in tied) == 1:
-        return "SEAT_ORDER"
+    if policy.version == V0_1_SCHEDULER_POLICY_V1.version:
+        lowest_seat = min(item.participant.seat_order for item in tied)
+        if sum(item.participant.seat_order == lowest_seat for item in tied) == 1:
+            return "SEAT_ORDER"
     return "PARTICIPANT_ID"
+
+
+def _stable_tie_break_value(
+    scheduler_input: SchedulerInput,
+    participant_id: UUID,
+) -> int:
+    payload = (
+        f"{scheduler_input.session_id}:{scheduler_input.phase.value}:{participant_id}"
+    ).encode("ascii")
+    return int.from_bytes(hashlib.sha256(payload).digest(), "big")
 
 
 def decide_floor(
     scheduler_input: SchedulerInput,
     policy: SchedulerPolicy,
 ) -> FloorDecisionRecord:
+    if scheduler_policy_for_version(policy.version) is None:
+        raise ValueError("Unsupported scheduler policy version.")
     if scheduler_input.now >= scheduler_input.phase_deadline_at:
-        return _intervention_decision(
+        if policy.version == V0_1_SCHEDULER_POLICY_V1.version:
+            return _intervention_decision(
+                scheduler_input,
+                policy,
+                kind=FloorInterventionKind.DEADLINE,
+                reason=FloorPolicyReason.DEADLINE_RECOVERY,
+            )
+        return _no_grant_decision(
             scheduler_input,
             policy,
-            kind=FloorInterventionKind.DEADLINE,
             reason=FloorPolicyReason.DEADLINE_RECOVERY,
         )
     if (
         scheduler_input.phase_deadline_at - scheduler_input.now
         <= policy.deadline_intervention_threshold
     ):
-        return _intervention_decision(
+        if policy.version == V0_1_SCHEDULER_POLICY_V1.version:
+            return _intervention_decision(
+                scheduler_input,
+                policy,
+                kind=FloorInterventionKind.DEADLINE,
+                reason=FloorPolicyReason.DEADLINE_RECOVERY,
+            )
+        return _no_grant_decision(
             scheduler_input,
             policy,
-            kind=FloorInterventionKind.DEADLINE,
             reason=FloorPolicyReason.DEADLINE_RECOVERY,
         )
 
@@ -441,22 +494,37 @@ def decide_floor(
     class_rank = {kind: index for index, kind in enumerate(policy.opportunity_order)}
 
     def prefix(candidate: _Candidate) -> tuple[object, ...]:
-        return (
+        shared = (
             class_rank[candidate.opportunity_kind],
             candidate.phase_grant_count != 0,
             *_phase_order_key(candidate, scheduler_input.phase),
         )
+        if policy.version == V0_1_SCHEDULER_POLICY_V1.version:
+            return shared
+        return (
+            *shared,
+            0 if candidate.participant.actor_kind is ParticipantActorKind.HUMAN else 1,
+        )
 
     def full_key(candidate: _Candidate) -> tuple[object, ...]:
+        if policy.version == V0_1_SCHEDULER_POLICY_V1.version:
+            return (
+                *prefix(candidate),
+                candidate.participant.seat_order,
+                candidate.participant.participant_id.int,
+            )
         return (
             *prefix(candidate),
-            candidate.participant.seat_order,
+            _stable_tie_break_value(
+                scheduler_input,
+                candidate.participant.participant_id,
+            ),
             candidate.participant.participant_id.int,
         )
 
     ordered = sorted(candidates, key=full_key)
     selected = ordered[0]
-    tie_break_class = _tie_break_class(ordered, selected, prefix)
+    tie_break_class = _tie_break_class(ordered, selected, prefix, policy)
     opportunity_reason = _opportunity_reason(
         scheduler_input.phase,
         selected.opportunity_kind,

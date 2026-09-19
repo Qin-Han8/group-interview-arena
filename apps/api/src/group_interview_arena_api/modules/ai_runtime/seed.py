@@ -88,6 +88,29 @@ AI_CANDIDATE_TURN_V3 = PromptVersionDefinition(
 )
 
 
+_AI_CANDIDATE_TURN_V4_TEMPLATE = _AI_CANDIDATE_TURN_V3_TEMPLATE.replace(
+    "直接输出这一轮候选人发言的纯文本，不要输出分析过程或后台信息。",
+    "关联性处理：\n"
+    "- 始终结合最近公开讨论，尤其是最近一条 Human 发言。\n"
+    "- 只有当最近一条 Human 发言明显与当前题目和讨论无关时，才在本轮开头用一句话简短、自然地拉回当前任务，然后继续推进实质讨论。\n"
+    "- 论证较弱、不同意见、流程协调、时间提醒和可行替代方案都不是跑题，不要纠正或打断这些正常贡献。\n"
+    "- 在本次候选人生成中直接完成关联性判断，不要另行分类、不要扮演主持人，也不要反复提醒规则。\n\n"
+    "直接输出这一轮候选人发言的纯文本，不要输出分析过程或后台信息。",
+)
+
+
+AI_CANDIDATE_TURN_V4 = PromptVersionDefinition(
+    id=UUID("56000000-0000-4000-8000-000000000004"),
+    prompt_key="AI_CANDIDATE_TURN",
+    version_number=4,
+    purpose_code="CANDIDATE_UTTERANCE",
+    template_text=_AI_CANDIDATE_TURN_V4_TEMPLATE,
+    created_at=datetime(2026, 9, 14, 0, 0, tzinfo=UTC),
+    published_at=datetime(2026, 9, 14, 0, 0, tzinfo=UTC),
+    retired_at=None,
+)
+
+
 _DISCUSSION_MEMORY_UPDATE_V1_TEMPLATE = """你负责从公开群面发言中提出结构化讨论记忆补丁。
 
 只使用输入中的公开题目字段、既有公开记忆与公开发言证据。
@@ -171,6 +194,7 @@ async def seed_ai_runtime_prompt_versions(
         results = [
             await publish_prompt_version(session, AI_CANDIDATE_TURN_V2),
             await publish_prompt_version(session, AI_CANDIDATE_TURN_V3),
+            await publish_prompt_version(session, AI_CANDIDATE_TURN_V4),
             await publish_prompt_version(session, DISCUSSION_MEMORY_UPDATE_V1),
             await publish_prompt_version(session, DISCUSSION_MEMORY_UPDATE_V2),
         ]

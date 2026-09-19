@@ -38,7 +38,7 @@ pytestmark = pytest.mark.integration
 
 TRUSTED_ORIGIN = "http://localhost:3000"
 AUTH_HEADERS = {"Origin": TRUSTED_ORIGIN, "X-GIA-CSRF": "1"}
-VALID_PASSWORD = "question api integration password"
+VALID_PASSWORD = "Question API integration 1!"
 PRIVATE_SENTINEL = "P1_2C_PRIVATE_SENTINEL_DO_NOT_DISCLOSE"
 
 

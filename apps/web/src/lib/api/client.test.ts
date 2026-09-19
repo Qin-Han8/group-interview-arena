@@ -4,6 +4,7 @@ import {
   createSession,
   createApiClient,
   getCurrentUser,
+  getSafeAuthErrorMessage,
   getQuestion,
   getSessionSnapshot,
   listQuestions,
@@ -21,7 +22,7 @@ const USER = {
 };
 const CREDENTIALS = {
   username: "web_user",
-  password: "web unit-only password phrase",
+  password: "Abcd123!",
 };
 const SESSION = {
   id: "00000000-0000-4000-8000-000000000010",
@@ -109,6 +110,20 @@ describe("browser API client", () => {
     expect(request.method).toBe("POST");
     expect(request.credentials).toBe("include");
     expect(request.headers.get("X-GIA-CSRF")).toBe("1");
+  });
+
+  it("maps registration password rejection to the actionable public rule", () => {
+    expect(
+      getSafeAuthErrorMessage({
+        error: {
+          code: "INVALID_PASSWORD",
+          message: "must not be rendered",
+          request_id: "00000000-0000-4000-8000-000000000099",
+        },
+      }),
+    ).toBe(
+      "密码需为 8–128 位，并同时包含大写英文字母、小写英文字母、数字和符号。",
+    );
   });
 
   it("creates a session with credentials and the CSRF marker", async () => {

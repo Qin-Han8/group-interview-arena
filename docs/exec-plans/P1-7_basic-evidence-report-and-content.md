@@ -1,10 +1,10 @@
 # P1-7 Basic Evidence Report & V0.1 Content Closure Execution Plan
 
-- Status: `P1-7 IN_PROGRESS`
-- Current completed checkpoint: `P1-7D DONE / ACTUAL_SOURCE_REVIEW_PASS`
-- Accepted checkpoints: `P1-7A / P1-7B / P1-7C / P1-7D`
-- Remaining checkpoint: `P1-7E NOT_STARTED`
-- Parent phase: `P1 IN_PROGRESS`
+- Status: `P1-7 DONE / CLOSED`
+- Current completed checkpoint: `P1-7E DONE / CLOSED / COMPOSITION_ACCEPTANCE_PASS / INDEPENDENT_ACCEPTANCE_PASS`
+- Accepted checkpoints: `P1-7A / P1-7B / P1-7C / P1-7D / P1-7E`
+- Remaining checkpoint: `NONE`
+- Parent phase: `P1 DONE / CLOSED`
 - Product target: `V0.1 Internal Validation`
 - P1-7A reviewed baseline: `codex/p1-6e-closeout` at `bc8cb40148598230bd64feeeaebb498d05137fbe`
 - P1-7B implementation baseline: `dcd9c0670fb239e4ad2b1f77b867ea68636df245`
@@ -201,7 +201,7 @@ Done with external actual-source review `PASS`. The owner-only POST command invo
 
 ### P1-7E — Composition Acceptance + Independent Acceptance
 
-After separate approval, independently prove the complete P1-7 boundary and close P1-7 only if findings are resolved. P1-8 remains the separate full-P1 independent acceptance.
+Done. The separately approved network-free composition acceptance and independent acceptance both passed with no open Critical/High/Medium finding. P1-7 is `DONE / CLOSED`; the later P1 phase-close assessment/re-assessment passed and parent P1 is `DONE / CLOSED`. P1-8 remains a separate already-closed interaction-remediation boundary.
 
 ## 13. P1-7E required composed acceptance
 
@@ -222,6 +222,17 @@ select question
 ```
 
 The proof must also show owner isolation, source watermark correctness, Human-source enforcement, quote/phase/participant validation, stable read without GET regeneration, no private/evaluator/provider-secret leakage, and no real-provider call. P1-8 later performs separate full-P1 acceptance and is not folded into P1-7E.
+
+### P1-7E acceptance record
+
+- Primary acceptance: `uv run --project apps/api python apps/api/tests/integration/p1_7e_final_composition_e2e.py` — `2 passed` in Chromium. One real categorized Question selection supplied the exact immutable `question_version_id`; one unchanged owner/session then exercised 1 Human + 3 AI, every authoritative phase through `FINAL_SUMMARY -> COMPLETED`, report generation/read, Browser reload, a second API restart and identical durable report recovery against migrated temporary PostgreSQL.
+- Report semantics: pre-generation GET returned nondisclosing not-found; non-completed and `ABORTED_USER` sessions were ineligible; repeated POST returned the same generation identity; repeated GET, reload and restart returned identical content; durable post-verification found exactly one report and one deterministic Human evidence row.
+- Provenance: `source_through_sequence` equals the terminal session `last_sequence`. Every Evidence row resolves to the same-session authoritative Human utterance by participant, utterance UUID, DiscussionEvent sequence, phase and exact quote.
+- Isolation/privacy: a second authenticated user received the established nondisclosing `404` for session read, report read and report generation. Private-Persona sentinels remained absent from public events/transcript, report/API responses, Browser-visible output, provider evidence and API/Web logs. The provider was deterministic and network-isolated; no real-provider call occurred.
+- Directly affected gates: report API integration `9 passed`; focused Web report/session tests `70 passed`; historical P1-6D acceptance `2 passed`; API/Web type, lint and format checks plus `git diff --check` passed.
+- Independent acceptance: separate read-only reviewer reran the P1-7E harness (`2 passed`, 46.1s) and report integration (`9 passed`), verified real PostgreSQL/migrations/Chromium/REST/WebSocket execution and returned `PASS`; Critical/High/Medium findings `NONE`, open blocking findings `NONE`.
+- P1-7E status: `DONE / CLOSED / COMPOSITION_ACCEPTANCE_PASS / INDEPENDENT_ACCEPTANCE_PASS`.
+- P1-7 status: `DONE / CLOSED`.
 
 ## 14. Future implementation scope and STOP conditions
 

@@ -475,3 +475,52 @@ def test_realtime_correlation_fields_allow_only_validated_uuid4_and_sequence() -
             "action-origin-sentinel",
         ),
     )
+
+
+def test_ai_runtime_correlation_fields_allow_only_validated_uuid4_and_duration() -> (
+    None
+):
+    logger = logging.getLogger(f"{APPLICATION_LOGGER_NAME}.ai_runtime_test")
+    session_id = str(uuid4())
+    generation_request_id = str(uuid4())
+    floor_grant_id = str(uuid4())
+    participant_id = str(uuid4())
+
+    with _captured_application_logs() as stream:
+        log_event(
+            logger,
+            logging.INFO,
+            "ai.provider.completed",
+            duration_ms=12.5,
+            session_id=session_id,
+            generation_request_id=generation_request_id,
+            floor_grant_id=floor_grant_id,
+            participant_id=participant_id,
+        )
+        log_event(
+            logger,
+            logging.WARNING,
+            "ai.provider.completed",
+            session_id="session-token-sentinel",
+            generation_request_id="provider-payload-sentinel",
+            floor_grant_id="private-note-sentinel",
+            participant_id="private-stance-sentinel",
+        )
+
+    payloads = _payloads(stream)
+    assert payloads[0]["session_id"] == session_id
+    assert payloads[0]["generation_request_id"] == generation_request_id
+    assert payloads[0]["floor_grant_id"] == floor_grant_id
+    assert payloads[0]["participant_id"] == participant_id
+    assert payloads[0]["duration_ms"] == 12.5
+    assert isinstance(payloads[0]["duration_ms"], float)
+    assert set(payloads[1]) == {"timestamp", "level", "event", "logger"}
+    _assert_values_absent(
+        stream.getvalue(),
+        (
+            "session-token-sentinel",
+            "provider-payload-sentinel",
+            "private-note-sentinel",
+            "private-stance-sentinel",
+        ),
+    )

@@ -1,6 +1,6 @@
 # P1-3 Session State-Machine Execution Plan
 
-Status: `P1 IN_PROGRESS`; `P1-3 DONE`; `P1-3A completed`; `P1-3B completed`; `P1-3C completed`; `P1-3D completed`; independent verdict `PASS`
+Status: `P1 DONE / CLOSED`; `P1-3 DONE`; `P1-3A completed`; `P1-3B completed`; `P1-3C completed`; `P1-3D completed`; independent verdict `PASS`
 
 Target version: `V0.1 Internal Validation`
 

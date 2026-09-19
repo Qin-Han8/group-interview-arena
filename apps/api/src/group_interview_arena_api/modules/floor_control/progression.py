@@ -39,6 +39,7 @@ from group_interview_arena_api.modules.floor_control.domain import (
 from group_interview_arena_api.modules.floor_control.scheduler import (
     ScheduleFloorCommand,
     SchedulerPolicy,
+    scheduler_policy_for_version,
 )
 from group_interview_arena_api.modules.floor_control.service import (
     apply_scheduler_command,
@@ -204,7 +205,7 @@ async def _recover_scheduler_result(
             and action.command_type == "floor.schedule"
             and decision is not None
             and decision.session_id == session_id
-            and decision.policy_version == scheduling_policy.version
+            and scheduler_policy_for_version(decision.policy_version) is not None
         ):
             return _result(
                 SchedulerCheckpointOutcome.RECONCILIATION_REQUIRED,
@@ -588,7 +589,7 @@ async def _recover_initial_scheduler_result(
             and decision.session_id == session_id
             and decision.phase == phase_entry.phase.value
             and decision.expected_last_sequence == phase_entry.event_sequence
-            and decision.policy_version == scheduling_policy.version
+            and scheduler_policy_for_version(decision.policy_version) is not None
             and decision.decided_at == phase_entry.occurred_at
         ):
             return _initial_result(
@@ -762,6 +763,18 @@ async def drive_initial_scheduler_checkpoint(
             phase_entry=phase_entry,
             identities=identities,
         )
+
+    if existing_action is not None:
+        recovered = await _recover_initial_scheduler_result(
+            session_factory,
+            owner_id=owner_id,
+            session_id=session_id,
+            phase_entry=phase_entry,
+            identities=identities,
+            scheduling_policy=scheduling_policy,
+        )
+        if recovered is not None:
+            return recovered
 
     command = ScheduleFloorCommand(
         session_id=session_id,

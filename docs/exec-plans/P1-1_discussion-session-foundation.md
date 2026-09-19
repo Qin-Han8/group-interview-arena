@@ -1,6 +1,6 @@
 # P1-1 Discussion Session Foundation Execution Plan
 
-Status: `P1 IN_PROGRESS`; `P1-1 DONE`; `P1-1A` through `P1-1E completed`; independent final verdict `PASS`; `P1-2` not started and requires separate explicit approval
+Status: `P1 DONE / CLOSED`; `P1-1 DONE`; `P1-1A` through `P1-1E completed`; independent final verdict `PASS`. The original later-task approval boundary remains historical; current phase status is tracked in `TASKS.md`.
 
 Target version: `V0.1 Internal Validation`
 

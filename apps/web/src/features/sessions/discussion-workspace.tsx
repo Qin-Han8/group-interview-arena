@@ -1,8 +1,23 @@
 "use client";
 
-import { useRef, type KeyboardEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent,
+  type PointerEvent,
+  type ReactNode,
+} from "react";
 
 import type { RealtimeConnectionState } from "@/lib/realtime/client";
+import {
+  DEFAULT_TRAINING_WORKSPACE_LAYOUT,
+  TRAINING_WORKSPACE_LAYOUT_BOUNDS,
+  readTrainingWorkspaceLayout,
+  writeTrainingWorkspaceLayout,
+  type TrainingWorkspaceLayout,
+} from "@/lib/ui/training-workspace-layout";
 
 export type ActiveDiscussionSurface = "discussion" | "task" | "progress";
 
@@ -14,7 +29,6 @@ export type SessionHeaderAction = {
 };
 
 export type SessionHeaderProps = {
-  productName: "AI 群面训练场";
   sessionTitle: string;
   phaseLabel: string;
   countdown: string | null;
@@ -43,12 +57,73 @@ const SURFACES: ReadonlyArray<{
   { id: "progress", label: "进程" },
 ];
 
+const DESKTOP_MEDIA_QUERY = "(min-width: 1200px)";
+const WORKSPACE_HORIZONTAL_PADDING = 32;
+const WORKSPACE_SEPARATOR_WIDTH = 16;
+const WORKSPACE_COLUMN_GAP = 4;
+const WORKSPACE_STRUCTURE_WIDTH =
+  WORKSPACE_HORIZONTAL_PADDING +
+  WORKSPACE_SEPARATOR_WIDTH * 2 +
+  WORKSPACE_COLUMN_GAP * 4;
+const MINIMUM_DESKTOP_WORKSPACE_WIDTH =
+  WORKSPACE_STRUCTURE_WIDTH +
+  TRAINING_WORKSPACE_LAYOUT_BOUNDS.left.min +
+  TRAINING_WORKSPACE_LAYOUT_BOUNDS.centerMin +
+  TRAINING_WORKSPACE_LAYOUT_BOUNDS.right.min;
+
+type ResizeSide = "left" | "right";
+
+type ActiveResize = {
+  pointerId: number;
+  side: ResizeSide;
+  startClientX: number;
+  startWidth: number;
+};
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function dynamicMaximum(
+  side: ResizeSide,
+  workspaceWidth: number,
+  otherWidth: number,
+) {
+  const hardBounds = TRAINING_WORKSPACE_LAYOUT_BOUNDS[side];
+  const centerProtectedMaximum =
+    workspaceWidth -
+    WORKSPACE_STRUCTURE_WIDTH -
+    TRAINING_WORKSPACE_LAYOUT_BOUNDS.centerMin -
+    otherWidth;
+  return Math.max(
+    hardBounds.min,
+    Math.min(hardBounds.max, centerProtectedMaximum),
+  );
+}
+
+function effectiveLayout(
+  layout: TrainingWorkspaceLayout,
+  workspaceWidth: number,
+): TrainingWorkspaceLayout {
+  const rightWidth = clamp(
+    layout.rightWidth,
+    TRAINING_WORKSPACE_LAYOUT_BOUNDS.right.min,
+    TRAINING_WORKSPACE_LAYOUT_BOUNDS.right.max,
+  );
+  const leftWidth = clamp(
+    layout.leftWidth,
+    TRAINING_WORKSPACE_LAYOUT_BOUNDS.left.min,
+    dynamicMaximum("left", workspaceWidth, rightWidth),
+  );
+  return { leftWidth, rightWidth };
+}
+
 function HeaderAction({ action }: { action: SessionHeaderAction }) {
   if (!action.visible) return null;
 
   return (
     <button
-      className="rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm font-medium text-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"
+      className="shrink-0 whitespace-nowrap rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm font-medium text-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"
       disabled={action.disabled}
       onClick={action.onActivate}
       type="button"
@@ -59,7 +134,6 @@ function HeaderAction({ action }: { action: SessionHeaderAction }) {
 }
 
 function SessionHeader({
-  productName,
   sessionTitle,
   phaseLabel,
   countdown,
@@ -71,22 +145,27 @@ function SessionHeader({
 }: SessionHeaderProps) {
   return (
     <header
-      className="flex shrink-0 flex-wrap items-center justify-between gap-4 border-b border-neutral-200 bg-white px-4 py-3 shadow-[0_1px_0_rgba(15,23,42,0.03)] sm:px-6"
+      className="training-session-header shrink-0 border-b border-neutral-200 bg-white px-4 py-2.5 sm:px-5"
       data-testid="training-session-header"
     >
-      <div className="min-w-0" data-testid="studio-identity">
-        <p className="text-xs font-medium tracking-[0.12em] text-neutral-500 uppercase">
-          {productName}
+      <div
+        className="training-session-header-title min-w-0"
+        data-overflow-policy="truncate"
+        data-testid="header-title-region"
+      >
+        <p className="text-[0.625rem] font-semibold tracking-[0.16em] text-neutral-500 uppercase">
+          Live session
         </p>
-        <p className="mt-0.5 text-[0.625rem] font-medium tracking-[0.16em] text-indigo-600 uppercase">
-          Interview Simulation Studio
-        </p>
-        <h1 className="mt-1 truncate text-xl font-semibold tracking-tight text-neutral-950">
+        <h1 className="mt-0.5 truncate text-xl font-semibold tracking-tight text-neutral-950">
           {sessionTitle}
         </h1>
       </div>
 
-      <div className="flex flex-wrap items-center justify-end gap-3 text-sm">
+      <div
+        className="training-session-header-status flex flex-wrap items-center justify-end gap-3 text-sm"
+        data-control-priority="preserve"
+        data-testid="header-status-region"
+      >
         <p
           className="rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1.5 font-medium text-indigo-950"
           data-session-phase={phaseLabel}
@@ -105,7 +184,10 @@ function SessionHeader({
         <p className="text-neutral-600" data-connection-state={connection}>
           {connectionLabel}
         </p>
-        <div className="flex items-center gap-2" data-testid="header-actions">
+        <div
+          className="training-session-header-actions flex shrink-0 items-center gap-2"
+          data-testid="header-actions"
+        >
           <HeaderAction action={startAction} />
           <HeaderAction action={endAction} />
           <HeaderAction action={reportAction} />
@@ -124,6 +206,164 @@ export default function DiscussionWorkspace({
   onActiveSurfaceChange,
 }: DiscussionWorkspaceProps): ReactNode {
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const workspaceRef = useRef<HTMLDivElement | null>(null);
+  const activeResizeRef = useRef<ActiveResize | undefined>(undefined);
+  const preferenceLoadedRef = useRef(false);
+  const [desktopViewport, setDesktopViewport] = useState(() => {
+    if (typeof window === "undefined") return false;
+    if (typeof window.matchMedia !== "function") {
+      return window.innerWidth >= 1200;
+    }
+    return window.matchMedia(DESKTOP_MEDIA_QUERY).matches;
+  });
+  const [workspaceWidth, setWorkspaceWidth] = useState(0);
+  const [layout, setLayout] = useState<TrainingWorkspaceLayout>({
+    ...DEFAULT_TRAINING_WORKSPACE_LAYOUT,
+  });
+  const layoutRef = useRef(layout);
+  const [resizingSide, setResizingSide] = useState<ResizeSide>();
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
+    const mediaQuery = window.matchMedia(DESKTOP_MEDIA_QUERY);
+    const update = (event: MediaQueryListEvent) =>
+      setDesktopViewport(event.matches);
+    mediaQuery.addEventListener("change", update);
+    return () => mediaQuery.removeEventListener("change", update);
+  }, []);
+
+  useEffect(() => {
+    const workspace = workspaceRef.current;
+    if (!workspace) return;
+
+    const updateWidth = (width: number) => {
+      if (Number.isFinite(width) && width >= 0) setWorkspaceWidth(width);
+    };
+    updateWidth(workspace.getBoundingClientRect().width);
+
+    if (typeof ResizeObserver === "undefined") {
+      const updateFromWindow = () =>
+        updateWidth(workspace.getBoundingClientRect().width);
+      window.addEventListener("resize", updateFromWindow);
+      return () => window.removeEventListener("resize", updateFromWindow);
+    }
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (entry) {
+        updateWidth(
+          entry.target.getBoundingClientRect().width || entry.contentRect.width,
+        );
+      }
+    });
+    observer.observe(workspace);
+    return () => observer.disconnect();
+  }, []);
+
+  const desktopLayoutReady =
+    desktopViewport && workspaceWidth >= MINIMUM_DESKTOP_WORKSPACE_WIDTH;
+
+  useEffect(() => {
+    if (!desktopLayoutReady || preferenceLoadedRef.current) return;
+    preferenceLoadedRef.current = true;
+    const preference = readTrainingWorkspaceLayout();
+    layoutRef.current = preference;
+    setLayout(preference);
+  }, [desktopLayoutReady]);
+
+  const appliedLayout = effectiveLayout(layout, workspaceWidth);
+  const leftMaximum = dynamicMaximum(
+    "left",
+    workspaceWidth,
+    appliedLayout.rightWidth,
+  );
+  const rightMaximum = dynamicMaximum(
+    "right",
+    workspaceWidth,
+    appliedLayout.leftWidth,
+  );
+
+  function updateLayout(next: TrainingWorkspaceLayout, persist: boolean) {
+    layoutRef.current = next;
+    setLayout(next);
+    if (persist) writeTrainingWorkspaceLayout(next);
+  }
+
+  function requestedLayout(side: ResizeSide, requestedWidth: number) {
+    const current = effectiveLayout(layoutRef.current, workspaceWidth);
+    if (side === "left") {
+      return {
+        leftWidth: clamp(
+          requestedWidth,
+          TRAINING_WORKSPACE_LAYOUT_BOUNDS.left.min,
+          dynamicMaximum("left", workspaceWidth, current.rightWidth),
+        ),
+        rightWidth: current.rightWidth,
+      };
+    }
+    return {
+      leftWidth: current.leftWidth,
+      rightWidth: clamp(
+        requestedWidth,
+        TRAINING_WORKSPACE_LAYOUT_BOUNDS.right.min,
+        dynamicMaximum("right", workspaceWidth, current.leftWidth),
+      ),
+    };
+  }
+
+  function handleResizeStart(
+    event: PointerEvent<HTMLDivElement>,
+    side: ResizeSide,
+  ) {
+    event.preventDefault();
+    const current = effectiveLayout(layoutRef.current, workspaceWidth);
+    activeResizeRef.current = {
+      pointerId: event.pointerId,
+      side,
+      startClientX: event.clientX,
+      startWidth: side === "left" ? current.leftWidth : current.rightWidth,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setResizingSide(side);
+  }
+
+  function handleResizeMove(event: PointerEvent<HTMLDivElement>) {
+    const active = activeResizeRef.current;
+    if (!active || active.pointerId !== event.pointerId) return;
+    const horizontalDelta = event.clientX - active.startClientX;
+    const requestedWidth =
+      active.side === "left"
+        ? active.startWidth + horizontalDelta
+        : active.startWidth - horizontalDelta;
+    updateLayout(requestedLayout(active.side, requestedWidth), false);
+  }
+
+  function finishResize(event: PointerEvent<HTMLDivElement>) {
+    const active = activeResizeRef.current;
+    if (!active || active.pointerId !== event.pointerId) return;
+    activeResizeRef.current = undefined;
+    setResizingSide(undefined);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    writeTrainingWorkspaceLayout(layoutRef.current);
+  }
+
+  function handleSeparatorKeyDown(
+    event: KeyboardEvent<HTMLDivElement>,
+    side: ResizeSide,
+  ) {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    event.preventDefault();
+    const step = event.shiftKey ? 40 : 16;
+    const axisDelta = event.key === "ArrowRight" ? step : -step;
+    const current = effectiveLayout(layoutRef.current, workspaceWidth);
+    const currentWidth =
+      side === "left" ? current.leftWidth : current.rightWidth;
+    const requestedWidth =
+      side === "left" ? currentWidth + axisDelta : currentWidth - axisDelta;
+    updateLayout(requestedLayout(side, requestedWidth), true);
+  }
 
   function handleTabKeyDown(
     event: KeyboardEvent<HTMLButtonElement>,
@@ -153,8 +393,10 @@ export default function DiscussionWorkspace({
 
   return (
     <div
-      className="flex h-dvh max-h-dvh w-full flex-col overflow-hidden bg-neutral-100 text-neutral-950"
+      className="flex h-full max-h-full w-full flex-col overflow-hidden bg-[#f3f5f9] text-slate-950"
       data-product-surface="interview-simulation-studio"
+      data-scroll-owner="viewport-constrained"
+      data-visual-reference="demo-v2"
     >
       <SessionHeader {...header} />
 
@@ -189,7 +431,7 @@ export default function DiscussionWorkspace({
       </nav>
 
       <div
-        className="hidden shrink-0 items-center justify-end gap-2 border-b border-neutral-200 bg-neutral-50 px-5 py-2 md:flex min-[1200px]:!hidden"
+        className={`hidden shrink-0 items-center justify-end gap-2 border-b border-neutral-200 bg-neutral-50 px-5 py-2 md:flex ${desktopLayoutReady ? "min-[1200px]:!hidden" : ""}`}
         data-responsive-mode="tablet-support"
         data-testid="tablet-support-controls"
       >
@@ -212,18 +454,33 @@ export default function DiscussionWorkspace({
       </div>
 
       <div
-        className="relative min-h-0 flex-1 overflow-hidden p-4 min-[1200px]:grid min-[1200px]:grid-cols-[minmax(16rem,0.85fr)_minmax(36rem,2.4fr)_minmax(16rem,0.85fr)] min-[1200px]:gap-4"
+        className={`relative min-h-0 flex-1 overflow-hidden p-3 sm:p-4 ${desktopLayoutReady ? "training-workspace-grid min-[1200px]:grid" : ""}`}
+        data-center-min-width={TRAINING_WORKSPACE_LAYOUT_BOUNDS.centerMin}
+        data-desktop-columns={`support-${appliedLayout.leftWidth} primary-min-520 support-${appliedLayout.rightWidth}`}
         data-desktop-layout="three-column"
+        data-resizable-layout={desktopLayoutReady}
+        data-resizing-panel={resizingSide}
+        data-scroll-owner="none"
         data-support-surface={activeSurface}
         data-testid="discussion-workspace-grid"
+        ref={workspaceRef}
+        style={
+          desktopLayoutReady
+            ? ({
+                "--workspace-left-width": `${appliedLayout.leftWidth}px`,
+                "--workspace-right-width": `${appliedLayout.rightWidth}px`,
+              } as CSSProperties)
+            : undefined
+        }
       >
         <aside
           aria-labelledby="task-tab"
           className={`${
             activeSurface === "task" ? "block" : "hidden"
-          } studio-scroll-region min-h-0 overflow-y-auto rounded-xl border border-neutral-200 bg-white p-4 md:absolute md:inset-y-4 md:right-4 md:z-20 md:w-96 md:max-w-[calc(100%_-_2rem)] md:shadow-xl min-[1200px]:!static min-[1200px]:!block min-[1200px]:!w-auto min-[1200px]:!max-w-none min-[1200px]:!bg-neutral-50 min-[1200px]:!shadow-none`}
+          } studio-scroll-region min-h-0 overflow-y-auto rounded-xl border border-neutral-200 bg-white p-4 md:absolute md:inset-y-4 md:right-4 md:z-20 md:w-96 md:max-w-[calc(100%_-_2rem)] md:shadow-xl ${desktopLayoutReady ? "min-[1200px]:!static min-[1200px]:!block min-[1200px]:!w-auto min-[1200px]:!max-w-none min-[1200px]:!shadow-[0_8px_24px_rgba(15,23,42,0.04)]" : ""}`}
           data-support-mode="sheet"
           data-region-priority="support"
+          data-scroll-owner="task-panel"
           id="task-surface"
           role="tabpanel"
           tabIndex={0}
@@ -231,12 +488,35 @@ export default function DiscussionWorkspace({
           {taskBrief}
         </aside>
 
+        {desktopLayoutReady ? (
+          <div
+            aria-label="调整题目与思考面板宽度"
+            aria-orientation="vertical"
+            aria-valuemax={leftMaximum}
+            aria-valuemin={TRAINING_WORKSPACE_LAYOUT_BOUNDS.left.min}
+            aria-valuenow={appliedLayout.leftWidth}
+            className="training-workspace-separator"
+            data-dragging={resizingSide === "left"}
+            data-separator-side="left"
+            onKeyDown={(event) => handleSeparatorKeyDown(event, "left")}
+            onLostPointerCapture={finishResize}
+            onPointerCancel={finishResize}
+            onPointerDown={(event) => handleResizeStart(event, "left")}
+            onPointerMove={handleResizeMove}
+            onPointerUp={finishResize}
+            role="separator"
+            tabIndex={0}
+          />
+        ) : null}
+
         <section
           aria-labelledby="discussion-tab"
           className={`${
             activeSurface === "discussion" ? "block" : "hidden"
-          } studio-scroll-region h-full min-h-0 overflow-hidden rounded-xl border border-neutral-200 bg-white md:block min-[1200px]:shadow-[0_12px_32px_rgba(15,23,42,0.08)] min-[1200px]:ring-1 min-[1200px]:ring-neutral-200`}
+          } studio-scroll-region h-full min-h-0 overflow-hidden rounded-xl border border-neutral-200 bg-white md:block ${desktopLayoutReady ? "min-[1200px]:shadow-[0_12px_32px_rgba(15,23,42,0.08)] min-[1200px]:ring-1 min-[1200px]:ring-neutral-200" : ""}`}
           data-region-priority="primary"
+          data-region-role="live-discussion"
+          data-scroll-owner="discussion-transcript"
           id="discussion-surface"
           role="tabpanel"
           tabIndex={0}
@@ -244,13 +524,35 @@ export default function DiscussionWorkspace({
           {discussion}
         </section>
 
+        {desktopLayoutReady ? (
+          <div
+            aria-label="调整训练进程面板宽度"
+            aria-orientation="vertical"
+            aria-valuemax={rightMaximum}
+            aria-valuemin={TRAINING_WORKSPACE_LAYOUT_BOUNDS.right.min}
+            aria-valuenow={appliedLayout.rightWidth}
+            className="training-workspace-separator"
+            data-dragging={resizingSide === "right"}
+            data-separator-side="right"
+            onKeyDown={(event) => handleSeparatorKeyDown(event, "right")}
+            onLostPointerCapture={finishResize}
+            onPointerCancel={finishResize}
+            onPointerDown={(event) => handleResizeStart(event, "right")}
+            onPointerMove={handleResizeMove}
+            onPointerUp={finishResize}
+            role="separator"
+            tabIndex={0}
+          />
+        ) : null}
+
         <aside
           aria-labelledby="progress-tab"
           className={`${
             activeSurface === "progress" ? "block" : "hidden"
-          } studio-scroll-region min-h-0 overflow-y-auto rounded-xl border border-neutral-200 bg-white p-4 md:absolute md:inset-y-4 md:right-4 md:z-20 md:w-96 md:max-w-[calc(100%_-_2rem)] md:shadow-xl min-[1200px]:!static min-[1200px]:!block min-[1200px]:!w-auto min-[1200px]:!max-w-none min-[1200px]:!bg-neutral-50 min-[1200px]:!shadow-none`}
+          } studio-scroll-region min-h-0 overflow-y-auto rounded-xl border border-neutral-200 bg-white p-4 md:absolute md:inset-y-4 md:right-4 md:z-20 md:w-96 md:max-w-[calc(100%_-_2rem)] md:shadow-xl ${desktopLayoutReady ? "min-[1200px]:!static min-[1200px]:!block min-[1200px]:!w-auto min-[1200px]:!max-w-none min-[1200px]:!shadow-[0_8px_24px_rgba(15,23,42,0.04)]" : ""}`}
           data-support-mode="sheet"
           data-region-priority="support"
+          data-scroll-owner="progress-panel"
           id="progress-surface"
           role="tabpanel"
           tabIndex={0}

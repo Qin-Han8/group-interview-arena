@@ -10,8 +10,17 @@ const PROVIDER_CALLS = process.env.GIA_P16D_FINAL_PROVIDER_CALLS;
 const CANCELLATION_ARM = process.env.GIA_P16D_FINAL_CANCELLATION_ARM;
 const PROVIDER_BLOCKED = process.env.GIA_P16D_FINAL_PROVIDER_BLOCKED;
 const PROVIDER_CANCELLED = process.env.GIA_P16D_FINAL_PROVIDER_CANCELLED;
+const P17E_FINAL_COMPOSITION = process.env.GIA_P17E_FINAL_COMPOSITION === "1";
+const REPORT_API_RESTART_REQUEST =
+  process.env.GIA_P17E_REPORT_API_RESTART_REQUEST;
+const REPORT_API_RESTART_READY = process.env.GIA_P17E_REPORT_API_RESTART_READY;
 const INTERNAL_VALIDATION_QUESTION_VERSION_ID =
   "21000000-0000-4000-8000-000000000001";
+const QUESTION_TYPE_LABELS = {
+  ORDERING_SELECTION: "排序选择型",
+  RESOURCE_ALLOCATION: "资源分配型",
+  PLAN_DESIGN: "方案策划型",
+} as const;
 const PRIVATE_SENTINELS = [
   "P16D_PRIVATE_ALPHA_DO_NOT_DISCLOSE",
   "P16D_PRIVATE_BRAVO_DO_NOT_DISCLOSE",
@@ -38,11 +47,50 @@ type SessionSnapshot = {
   };
 };
 type TranscriptItem = {
+  utterance_id: string;
   sequence: number;
   participant_id: string;
   actor_kind: "AI" | "HUMAN";
   floor_grant_id: string;
+  phase: string;
   content: string;
+};
+type ReportEvidence = {
+  kind: "STRENGTH" | "IMPROVEMENT";
+  source_participant_id: string;
+  source_utterance_id: string;
+  source_event_sequence: number;
+  phase: string;
+  quote: string;
+  interpretation: string;
+  confidence: string | number;
+};
+type ReportView = {
+  report: {
+    report_id: string;
+    session_id: string;
+    status: string;
+    report_schema_version: number;
+    derivation_version: string;
+    source_through_sequence: number;
+    created_at: string;
+    completed_at: string | null;
+  };
+  content: {
+    overview: {
+      session_status: string;
+      question: { id: string };
+      participant_count: number;
+      human_utterance_count: number;
+      ai_utterance_count: number;
+      total_utterance_count: number;
+      covered_phases: string[];
+      summary: string;
+    };
+    strengths: ReportEvidence[];
+    improvements: ReportEvidence[];
+    priority_improvement: string;
+  } | null;
 };
 type ProviderCall = {
   workload: "candidate" | "semantic";
@@ -69,7 +117,9 @@ test.skip(
     !PROVIDER_CALLS ||
     !CANCELLATION_ARM ||
     !PROVIDER_BLOCKED ||
-    !PROVIDER_CANCELLED,
+    !PROVIDER_CANCELLED ||
+    (P17E_FINAL_COMPOSITION &&
+      (!REPORT_API_RESTART_REQUEST || !REPORT_API_RESTART_READY)),
   "P1-6D D2-D4 requires its dedicated API/provider/PostgreSQL harness.",
 );
 
@@ -106,11 +156,46 @@ test.describe.serial("P1-6D final integrated acceptance", () => {
       .getByLabel("密码")
       .fill(`P1-6D final ${crypto.randomUUID()} phrase`);
     await page.getByRole("button", { name: "创建账户" }).click();
-    await expect(page.getByRole("heading", { name: "讨论会话" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "下一场完整模拟" }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "开始选题" }).click();
+    await expect(
+      page.getByRole("heading", { name: "选择本次训练题目" }),
+    ).toBeVisible();
 
+    const discovery = await page.evaluate(async (apiBaseUrl) => {
+      const response = await fetch(`${apiBaseUrl}/questions`, {
+        credentials: "include",
+      });
+      return { status: response.status, body: await response.json() };
+    }, API_BASE_URL);
+    expect(discovery.status).toBe(200);
+    const targetQuestion = discovery.body.find(
+      (item: { id: string; question_type: string; title: string }) =>
+        item.id === INTERNAL_VALIDATION_QUESTION_VERSION_ID,
+    ) as
+      | {
+          id: string;
+          question_type: keyof typeof QUESTION_TYPE_LABELS;
+          title: string;
+        }
+      | undefined;
+    expect(targetQuestion).toBeDefined();
+    expect(QUESTION_TYPE_LABELS[targetQuestion!.question_type]).toBeDefined();
     await page
-      .getByRole("combobox")
-      .selectOption(INTERNAL_VALIDATION_QUESTION_VERSION_ID);
+      .getByRole("tab", {
+        name: new RegExp(
+          `^${QUESTION_TYPE_LABELS[targetQuestion!.question_type]}`,
+        ),
+      })
+      .click();
+    const targetQuestionCard = page.getByRole("radio", {
+      name: targetQuestion!.title,
+    });
+    await targetQuestionCard.focus();
+    await targetQuestionCard.press("Space");
+    await expect(targetQuestionCard).toBeChecked();
 
     const createResponsePromise = page.waitForResponse(
       (response) =>
@@ -120,7 +205,31 @@ test.describe.serial("P1-6D final integrated acceptance", () => {
     await page.getByRole("button", { name: "创建文字会话" }).click();
     const createResponse = await createResponsePromise;
     expect(createResponse.status()).toBe(201);
+    expect(createResponse.request().postDataJSON()).toEqual({
+      question_version_id: targetQuestion!.id,
+    });
     const sessionId = ((await createResponse.json()) as SessionSnapshot).id;
+
+    if (P17E_FINAL_COMPOSITION) {
+      const activeReportAttempt = await page.evaluate(
+        async ({ apiBaseUrl, session }) => {
+          const response = await fetch(
+            `${apiBaseUrl}/sessions/${session}/report`,
+            {
+              method: "POST",
+              credentials: "include",
+              headers: { "X-GIA-CSRF": "1" },
+            },
+          );
+          return { status: response.status, body: await response.json() };
+        },
+        { apiBaseUrl: API_BASE_URL, session: sessionId },
+      );
+      expect(activeReportAttempt.status).toBe(409);
+      expect(activeReportAttempt.body).toMatchObject({
+        error: { code: "INVALID_SESSION_STATE" },
+      });
+    }
 
     const fetchSnapshot = () =>
       page.evaluate(
@@ -313,10 +422,10 @@ test.describe.serial("P1-6D final integrated acceptance", () => {
               spokenAiIds.has(participant.participant_id),
             ),
             semantic: calls.some((call) => call.workload === "semantic"),
-            memoryV3: calls.some(
+            candidateV4WithMemory: calls.some(
               (call) =>
                 call.workload === "candidate" &&
-                call.prompt_version_number === 3 &&
+                call.prompt_version_number === 4 &&
                 call.prompt_key === "AI_CANDIDATE_TURN" &&
                 call.request_metadata?.schema_version === 2 &&
                 (call.request_metadata.memory_revision ?? 0) > 0,
@@ -340,7 +449,7 @@ test.describe.serial("P1-6D final integrated acceptance", () => {
         human: true,
         threeAi: true,
         semantic: true,
-        memoryV3: true,
+        candidateV4WithMemory: true,
         stableHumanBoundary: true,
       });
 
@@ -483,10 +592,199 @@ test.describe.serial("P1-6D final integrated acceptance", () => {
       await expect(
         page.getByText("已完成", { exact: true }).first(),
       ).toBeVisible();
+
+      if (!P17E_FINAL_COMPOSITION) return;
+
+      const fetchReport = () =>
+        page.evaluate(
+          async ({ apiBaseUrl, session }) => {
+            const response = await fetch(
+              `${apiBaseUrl}/sessions/${session}/report`,
+              { credentials: "include" },
+            );
+            return {
+              status: response.status,
+              body: (await response.json()) as ReportView,
+            };
+          },
+          { apiBaseUrl: API_BASE_URL, session: sessionId },
+        );
+      const beforeGeneration = await fetchReport();
+      expect(beforeGeneration.status).toBe(404);
+
+      const generateResponsePromise = page.waitForResponse(
+        (response) =>
+          response.url() === `${API_BASE_URL}/sessions/${sessionId}/report` &&
+          response.request().method() === "POST",
+      );
+      await page
+        .getByRole("button", {
+          name: "训练报告 · 生成 / 查看本次训练报告",
+        })
+        .first()
+        .click();
+      const generateResponse = await generateResponsePromise;
+      expect(generateResponse.status()).toBe(200);
+      const generatedReport =
+        (await generateResponse.json()) as ReportView["report"];
+      expect(generatedReport).toMatchObject({
+        session_id: sessionId,
+        status: "COMPLETED",
+        report_schema_version: 1,
+        derivation_version: "basic-report/v1",
+        source_through_sequence: finalSnapshot.last_sequence,
+      });
+      await expect(page).toHaveURL(`/sessions/${sessionId}/report`);
+      await expect(page.getByTestId("report-bento")).toBeVisible();
+      await expect(page.getByTestId("studio-shell")).toBeVisible();
+
+      const firstRead = await fetchReport();
+      expect(firstRead.status).toBe(200);
+      expect(firstRead.body.report).toEqual(generatedReport);
+      expect(firstRead.body.content).not.toBeNull();
+      const reportContent = firstRead.body.content!;
+      const humanTranscript = finalTranscript.filter(
+        (item) => item.actor_kind === "HUMAN",
+      );
+      const aiTranscript = finalTranscript.filter(
+        (item) => item.actor_kind === "AI",
+      );
+      expect(reportContent.overview).toMatchObject({
+        session_status: "COMPLETED",
+        question: { id: targetQuestion!.id },
+        participant_count: 4,
+        human_utterance_count: humanTranscript.length,
+        ai_utterance_count: aiTranscript.length,
+        total_utterance_count: finalTranscript.length,
+      });
+      expect(reportContent.overview.summary).toBe(
+        "The report is derived from authoritative public discussion history.",
+      );
+      const evidence = [
+        ...reportContent.strengths,
+        ...reportContent.improvements,
+      ];
+      expect(evidence.length).toBeGreaterThan(0);
+      for (const item of evidence) {
+        const source = finalTranscript.find(
+          (utterance) =>
+            utterance.sequence === item.source_event_sequence &&
+            utterance.utterance_id === item.source_utterance_id,
+        );
+        expect(source).toBeDefined();
+        expect(item.source_event_sequence).toBeLessThanOrEqual(
+          generatedReport.source_through_sequence,
+        );
+        expect(source).toMatchObject({
+          actor_kind: "HUMAN",
+          participant_id: item.source_participant_id,
+          phase: item.phase,
+          content: item.quote,
+        });
+      }
+
+      const idempotentGeneration = await page.evaluate(
+        async ({ apiBaseUrl, session }) => {
+          const response = await fetch(
+            `${apiBaseUrl}/sessions/${session}/report`,
+            {
+              method: "POST",
+              credentials: "include",
+              headers: { "X-GIA-CSRF": "1" },
+            },
+          );
+          return { status: response.status, body: await response.json() };
+        },
+        { apiBaseUrl: API_BASE_URL, session: sessionId },
+      );
+      expect(idempotentGeneration.status).toBe(200);
+      expect(idempotentGeneration.body).toEqual(generatedReport);
+
+      await page.reload();
+      await expect(page.getByTestId("report-bento")).toBeVisible();
+      const afterBrowserReload = await fetchReport();
+      expect(afterBrowserReload).toEqual(firstRead);
+
+      await writeFile(REPORT_API_RESTART_REQUEST!, "restart", "utf8");
+      await expect
+        .poll(() => fileExists(REPORT_API_RESTART_READY!), {
+          timeout: 15_000,
+        })
+        .toBe(true);
+      await page.reload();
+      await expect(page.getByTestId("report-bento")).toBeVisible();
+      const afterApiRestart = await fetchReport();
+      expect(afterApiRestart).toEqual(firstRead);
+
+      const otherContext = await browser.newContext();
+      try {
+        const otherPage = await otherContext.newPage();
+        await otherPage.goto("/");
+        await otherPage.getByRole("button", { name: "注册" }).click();
+        await otherPage
+          .getByLabel("用户名")
+          .fill(`P17E_OTHER_${Date.now().toString(36)}`);
+        await otherPage
+          .getByLabel("密码")
+          .fill(`P1-7E Other ${crypto.randomUUID()}!`);
+        await otherPage.getByRole("button", { name: "创建账户" }).click();
+        await expect(
+          otherPage.getByRole("heading", { name: "下一场完整模拟" }),
+        ).toBeVisible();
+        const isolation = await otherPage.evaluate(
+          async ({ apiBaseUrl, session }) => {
+            const sessionRead = await fetch(
+              `${apiBaseUrl}/sessions/${session}`,
+              { credentials: "include" },
+            );
+            const read = await fetch(
+              `${apiBaseUrl}/sessions/${session}/report`,
+              { credentials: "include" },
+            );
+            const generate = await fetch(
+              `${apiBaseUrl}/sessions/${session}/report`,
+              {
+                method: "POST",
+                credentials: "include",
+                headers: { "X-GIA-CSRF": "1" },
+              },
+            );
+            return {
+              sessionRead: {
+                status: sessionRead.status,
+                body: await sessionRead.text(),
+              },
+              read: { status: read.status, body: await read.text() },
+              generate: {
+                status: generate.status,
+                body: await generate.text(),
+              },
+            };
+          },
+          { apiBaseUrl: API_BASE_URL, session: sessionId },
+        );
+        expect(isolation.sessionRead.status).toBe(404);
+        expect(isolation.read.status).toBe(404);
+        expect(isolation.generate.status).toBe(404);
+        expect(JSON.stringify(isolation)).not.toContain(sessionId);
+        expect(JSON.stringify(isolation)).not.toContain(
+          generatedReport.report_id,
+        );
+      } finally {
+        await otherContext.close();
+      }
+
+      const reportEvidence = JSON.stringify(firstRead.body);
+      const reportPageText = await page.locator("body").innerText();
+      for (const sentinel of PRIVATE_SENTINELS) {
+        expect(reportEvidence).not.toContain(sentinel);
+        expect(reportPageText).not.toContain(sentinel);
+      }
     };
   });
 
   test("continues the same durable session to COMPLETED", async () => {
+    if (P17E_FINAL_COMPOSITION) test.setTimeout(90_000);
     expect(finishLifecycle).toBeDefined();
     await finishLifecycle!();
   });

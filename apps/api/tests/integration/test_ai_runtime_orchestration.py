@@ -1,10 +1,11 @@
 import asyncio
 import json
+import logging
 from collections.abc import Callable, Coroutine
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 from uuid import UUID, uuid4
 
 import httpx
@@ -17,6 +18,7 @@ from group_interview_arena_api.core.config import (
     DatabaseSettings,
     ZhipuProviderSettings,
 )
+from group_interview_arena_api.core.logging import JsonFormatter
 from group_interview_arena_api.db import (
     AiUtterance,
     DiscussionEvent,
@@ -706,6 +708,92 @@ def test_runtime_success_replay_context_isolation_and_no_long_row_lock(
     assert CURRENT_STANCE_SENTINEL not in caplog.text
     assert OTHER_STANCE_SENTINEL not in caplog.text
     assert LATEST_PROMPT_SENTINEL not in caplog.text
+
+
+def test_ai_generation_latency_log_contract_is_content_free(
+    migrated_database: TemporaryDatabaseContext,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    sensitive_values = (
+        "AI_UTTERANCE_CONTENT_SENTINEL_P18",
+        "PROVIDER_REQUEST_RESPONSE_PAYLOAD_SENTINEL_P18",
+        "HIDDEN_CONFLICT_SENTINEL_P18",
+        "USER_DRAFT_SENTINEL_P18",
+        "PRIVATE_NOTE_SENTINEL_P18",
+        "AUTH_SESSION_TOKEN_SENTINEL_P18",
+        CURRENT_STANCE_SENTINEL,
+        OTHER_STANCE_SENTINEL,
+        PROVIDER_SECRET_SENTINEL,
+        COOKIE_SENTINEL,
+        DATABASE_URL_SENTINEL,
+    )
+
+    async def exercise() -> GenerateAiUtteranceCommand:
+        async with _runtime_context(migrated_database) as context:
+            command = _command(context)
+
+            async def executor(
+                generation_input: RuntimeGenerationInput,
+            ) -> RawGenerationSuccess:
+                assert CURRENT_STANCE_SENTINEL in generation_input.rendered_prompt
+                return RawGenerationSuccess(content=" ".join(sensitive_values[:6]))
+
+            result = await generate_ai_utterance(
+                context.session_factory,
+                owner_id=context.owner_id,
+                command=command,
+                executor=executor,
+            )
+            assert result.outcome is RuntimeGenerationOutcome.COMPLETED
+            return command
+
+    caplog.set_level(logging.INFO, logger=runtime_module.__name__)
+    command = run_async(exercise)
+    formatter = JsonFormatter()
+    payloads = [
+        cast(dict[str, object], json.loads(formatter.format(record)))
+        for record in caplog.records
+        if record.name == runtime_module.__name__
+        and record.__dict__.get("event")
+        in {
+            "ai.generation.started",
+            "ai.provider.completed",
+            "ai.utterance.committed",
+        }
+    ]
+
+    assert [payload["event"] for payload in payloads] == [
+        "ai.generation.started",
+        "ai.provider.completed",
+        "ai.utterance.committed",
+    ]
+    common_fields = {
+        "timestamp",
+        "level",
+        "event",
+        "logger",
+        "session_id",
+        "generation_request_id",
+        "floor_grant_id",
+        "participant_id",
+    }
+    assert set(payloads[0]) == common_fields
+    assert set(payloads[1]) == common_fields | {"duration_ms"}
+    assert set(payloads[2]) == common_fields | {"duration_ms"}
+    for payload in payloads:
+        assert payload["level"] == "INFO"
+        assert payload["logger"] == runtime_module.__name__
+        assert payload["session_id"] == str(command.session_id)
+        assert payload["generation_request_id"] == str(command.generation_request_id)
+        assert payload["floor_grant_id"] == str(command.floor_grant_id)
+        assert payload["participant_id"] == str(command.participant_id)
+    for payload in payloads[1:]:
+        assert isinstance(payload["duration_ms"], float)
+        assert payload["duration_ms"] >= 0
+
+    serialized = "\n".join(json.dumps(payload) for payload in payloads)
+    for sensitive in sensitive_values:
+        assert sensitive not in serialized
 
 
 async def _zhipu_mocked_provider_success_and_provenance(

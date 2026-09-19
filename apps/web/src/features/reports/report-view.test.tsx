@@ -73,6 +73,7 @@ describe("ReportView", () => {
       }),
     );
     expect(await screen.findByText("报告已进入生成队列")).toBeInTheDocument();
+    expect(screen.getByTestId("report-state-surface")).toBeInTheDocument();
     expect(rendered.container.textContent).not.toContain("%");
 
     for (const [status, copy] of [
@@ -142,14 +143,75 @@ describe("ReportView", () => {
         screen.getByRole("heading", { name: heading }),
       ).toBeInTheDocument();
     }
+    expect(screen.getByTestId("report-bento")).toHaveAttribute(
+      "data-visual-reference",
+      "demo-v2",
+    );
+    expect(screen.getByTestId("report-overview")).toHaveClass("lg:col-span-8");
+    expect(screen.getByTestId("report-priority")).toHaveClass("lg:col-span-4");
+    expect(screen.getByTestId("report-strengths")).toHaveClass("lg:col-span-6");
+    expect(screen.getByTestId("report-improvements")).toHaveClass(
+      "lg:col-span-6",
+    );
+    expect(
+      screen
+        .getByTestId("report-overview")
+        .compareDocumentPosition(screen.getByTestId("report-priority")) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      screen
+        .getByTestId("report-priority")
+        .compareDocumentPosition(screen.getByTestId("report-strengths")) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     const quote = rendered.container.querySelector("blockquote");
     expect(quote).toHaveTextContent("exact source");
     expect(quote?.textContent).toBe("  exact source\n");
     expect(quote).toHaveClass("whitespace-pre-wrap");
+    expect(quote).toHaveAttribute("data-wrap-policy", "anywhere");
+    expect(screen.getByTestId("report-priority-copy")).toHaveAttribute(
+      "data-wrap-policy",
+      "anywhere",
+    );
     expect(screen.getByText(/发言事件 #2/)).toBeInTheDocument();
     expect(screen.getByText("暂无可展示的改进证据")).toBeInTheDocument();
     expect(rendered.container.textContent).not.toMatch(
-      /得分|排名|百分位|score|rank/i,
+      /得分|总分|排名|百分位|雷达|六维|录用|招聘概率|岗位匹配|成长趋势|行为统计|推荐专项训练|score|rank|radar/i,
+    );
+  });
+
+  it("renders an honest completed sparse report instead of filler cards", async () => {
+    mockedGetReport.mockResolvedValueOnce(
+      await response({
+        report: metadata,
+        content: {
+          overview: {
+            session_status: "COMPLETED",
+            question,
+            participant_count: 4,
+            human_utterance_count: 0,
+            ai_utterance_count: 0,
+            total_utterance_count: 0,
+            covered_phases: [],
+            summary: "本次公开发言证据较少。",
+          },
+          strengths: [],
+          improvements: [],
+          priority_improvement: "下一次先完成一次清晰发言。",
+        },
+      }),
+    );
+
+    const rendered = render(
+      <ReportView apiClient={client} sessionId={sessionId} />,
+    );
+
+    expect(await screen.findByText("暂无可展示的亮点证据")).toBeVisible();
+    expect(screen.getByText("暂无可展示的改进证据")).toBeVisible();
+    expect(rendered.container.querySelectorAll("blockquote")).toHaveLength(0);
+    expect(rendered.container.textContent).not.toMatch(
+      /示例|模拟数据|补充证据/,
     );
   });
 

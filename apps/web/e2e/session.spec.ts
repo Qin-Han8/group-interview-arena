@@ -5,6 +5,11 @@ const API_BASE_URL = process.env.GIA_E2E_API_ORIGIN ?? "http://localhost:8000";
 const PRIVATE_SENTINEL = "P1_2C_PRIVATE_SENTINEL_DO_NOT_DISCLOSE";
 const INTERNAL_VALIDATION_QUESTION_VERSION_ID =
   "21000000-0000-4000-8000-000000000001";
+const QUESTION_TYPE_LABELS = {
+  ORDERING_SELECTION: "排序选择型",
+  RESOURCE_ALLOCATION: "资源分配型",
+  PLAN_DESIGN: "方案策划型",
+} as const;
 const HUMAN_CONTRIBUTION = [
   "  Human evidence: preserve this exact contribution.",
   ...Array.from(
@@ -235,7 +240,9 @@ test("browser session recovers durable phases across API restart and reload", as
       const composer = document.querySelector<HTMLElement>(
         '[data-testid="human-composer"]',
       );
-      const root = discussion?.closest<HTMLElement>('[class~="h-dvh"]');
+      const root = discussion?.closest<HTMLElement>(
+        '[data-product-surface="interview-simulation-studio"]',
+      );
       if (
         !transcript ||
         !discussion ||
@@ -296,10 +303,15 @@ test("browser session recovers durable phases across API restart and reload", as
   await page.getByLabel("用户名").fill(username);
   await page.getByLabel("密码").fill(password);
   await page.getByRole("button", { name: "创建账户" }).click();
-  await expect(page.getByRole("heading", { name: "讨论会话" })).toBeVisible();
-  await expect(page.getByLabel("选择训练题目")).toContainText(
-    "内部验证：社区活动资源安排",
-  );
+  await expect(
+    page.getByRole("heading", {
+      name: "下一场完整模拟",
+    }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "开始选题" }).click();
+  await expect(
+    page.getByRole("heading", { name: "选择本次训练题目" }),
+  ).toBeVisible();
 
   const discovery = await page.evaluate(async (apiBaseUrl) => {
     const response = await fetch(`${apiBaseUrl}/questions`, {
@@ -310,13 +322,31 @@ test("browser session recovers durable phases across API restart and reload", as
   expect(discovery.status).toBe(200);
   expect(discovery.body).toHaveLength(12);
   const discoveredQuestion = discovery.body.find(
-    (item: { id: string }) =>
+    (item: { id: string; question_type: string }) =>
       item.id === INTERNAL_VALIDATION_QUESTION_VERSION_ID,
-  );
+  ) as
+    | {
+        id: string;
+        question_type: keyof typeof QUESTION_TYPE_LABELS;
+      }
+    | undefined;
   expect(discoveredQuestion).toBeDefined();
-  const questionVersionId = discoveredQuestion.id as string;
+  const questionVersionId = discoveredQuestion!.id;
+  const questionType = discoveredQuestion!.question_type;
+  expect(questionType).toBe("RESOURCE_ALLOCATION");
+  expect(QUESTION_TYPE_LABELS[questionType]).toBeDefined();
   expect(JSON.stringify(discovery)).not.toContain(PRIVATE_SENTINEL);
-  await page.getByRole("combobox").selectOption(questionVersionId);
+  await page
+    .getByRole("tab", {
+      name: new RegExp(`^${QUESTION_TYPE_LABELS[questionType]}`),
+    })
+    .click();
+  const selectedQuestion = page.getByRole("radio", {
+    name: "内部验证：社区活动资源安排",
+  });
+  await selectedQuestion.focus();
+  await selectedQuestion.press("Space");
+  await expect(selectedQuestion).toBeChecked();
 
   const createResponsePromise = page.waitForResponse(
     (response) =>
@@ -373,9 +403,8 @@ test("browser session recovers durable phases across API restart and reload", as
   await expect(
     page.locator('[data-product-surface="interview-simulation-studio"]'),
   ).toHaveCount(1);
-  await expect(page.getByTestId("studio-identity")).toContainText(
-    "Interview Simulation Studio",
-  );
+  await expect(page.getByTestId("studio-identity")).toHaveCount(0);
+  await expect(page.getByText("Interview Simulation Studio")).toHaveCount(0);
   const progressSurface = page.locator("#progress-surface");
   await expect(taskSurface).toBeVisible();
   await expect(discussionSurface).toBeVisible();
@@ -631,14 +660,15 @@ test("browser session recovers durable phases across API restart and reload", as
     .toBeLessThanOrEqual(48);
   await page.getByTestId("human-composer").scrollIntoViewIfNeeded();
   await page
-    .locator('[class~="h-dvh"]')
+    .locator('[data-product-surface="interview-simulation-studio"]')
     .evaluate((element) => element.scrollIntoView({ block: "start" }));
   const desktopLayout = await readLoadedLayout();
   expect(desktopLayout.documentHeight).toBe(
     boundedDocumentHeightAtWideBaseline,
   );
+  expect(desktopLayout.root.bottom).toBe(desktopLayout.viewportHeight);
   expect(desktopLayout.root.bottom - desktopLayout.root.top).toBe(
-    desktopLayout.viewportHeight,
+    desktopLayout.viewportHeight - desktopLayout.root.top,
   );
   expect(desktopLayout.transcript.scrollHeight).toBeGreaterThan(
     desktopLayout.transcript.clientHeight,
@@ -772,6 +802,7 @@ test("browser session recovers durable phases across API restart and reload", as
     )
     .toBeLessThanOrEqual(48);
   await expect(returnToLatest).toHaveCount(0);
+  await captureResponsiveEvidence("f010-task4-discussion-1440x900");
   await expect.poll(() => releaseHistoryTail).toBeTruthy();
   releaseHistoryTail?.();
   await expect.poll(exactConfirmedAiContributionCount).toBe(2);
@@ -823,6 +854,10 @@ test("browser session recovers durable phases across API restart and reload", as
     await readFile(PROVIDER_BLOCKED!, "utf8"),
   ) as { floor_grant_id: string; request_status: string };
   expect(runningProviderState).toMatchObject({ request_status: "RUNNING" });
+  await expect(page.locator('[data-ai-preparing="true"]')).toHaveCount(1);
+  await captureResponsiveEvidence(
+    "f010-task4-discussion-1440x900-ai-preparing",
+  );
   const socketsBeforeCancellationReload = workspaceWebSocketCount;
 
   await page.reload();
@@ -903,15 +938,27 @@ test("browser session recovers durable phases across API restart and reload", as
 
   const readsBeforeLongResponsiveSwitching = authoritativeReadCount;
   const socketsBeforeLongResponsiveSwitching = workspaceWebSocketCount;
+  await page.setViewportSize({ height: 1024, width: 768 });
+  await page
+    .locator('[data-product-surface="interview-simulation-studio"]')
+    .evaluate((element) => element.scrollIntoView({ block: "start" }));
+  await expect(discussionSurface).toBeVisible();
+  await expect(taskSurface).toBeHidden();
+  await expect(progressSurface).toBeHidden();
+  await captureResponsiveEvidence("f010-task4-discussion-768x1024");
+
   await page.setViewportSize({ height: 900, width: 900 });
   await page
-    .locator('[class~="h-dvh"]')
+    .locator('[data-product-surface="interview-simulation-studio"]')
     .evaluate((element) => element.scrollIntoView({ block: "start" }));
   let responsiveLayout = await readLoadedLayout();
   expect(responsiveLayout.documentHeight).toBe(
     boundedDocumentHeightAtTabletBaseline,
   );
-  expect(responsiveLayout.root.bottom - responsiveLayout.root.top).toBe(900);
+  expect(responsiveLayout.root.bottom).toBe(900);
+  expect(responsiveLayout.root.bottom - responsiveLayout.root.top).toBe(
+    900 - responsiveLayout.root.top,
+  );
   expect(responsiveLayout.transcript.scrollHeight).toBeGreaterThan(
     responsiveLayout.transcript.clientHeight,
   );
@@ -938,13 +985,16 @@ test("browser session recovers durable phases across API restart and reload", as
     "true",
   );
   await page
-    .locator('[class~="h-dvh"]')
+    .locator('[data-product-surface="interview-simulation-studio"]')
     .evaluate((element) => element.scrollIntoView({ block: "start" }));
   responsiveLayout = await readLoadedLayout();
   expect(responsiveLayout.documentHeight).toBe(
     boundedDocumentHeightAtMobileBaseline,
   );
-  expect(responsiveLayout.root.bottom - responsiveLayout.root.top).toBe(844);
+  expect(responsiveLayout.root.bottom).toBe(844);
+  expect(responsiveLayout.root.bottom - responsiveLayout.root.top).toBe(
+    844 - responsiveLayout.root.top,
+  );
   expect(responsiveLayout.transcript.scrollHeight).toBeGreaterThan(
     responsiveLayout.transcript.clientHeight,
   );
@@ -953,11 +1003,16 @@ test("browser session recovers durable phases across API restart and reload", as
     "confirmed-transcript-list",
   ]);
   expect(responsiveLayout.composer.bottom).toBeLessThanOrEqual(844);
+  await captureResponsiveEvidence(
+    "f010-task4-discussion-390x844-discussion-tab",
+  );
   await page.getByRole("tab", { name: "题目" }).click();
   await page
     .getByRole("textbox", { name: "我的思路 / 私人笔记" })
     .fill(PRIVATE_NOTES);
+  await captureResponsiveEvidence("f010-task4-discussion-390x844-task-tab");
   await page.getByRole("tab", { name: "进程" }).click();
+  await captureResponsiveEvidence("f010-task4-discussion-390x844-progress-tab");
   await page.getByRole("tab", { name: "讨论" }).click();
   await expect(discussionSurface).toBeVisible();
   expect(authoritativeReadCount).toBe(readsBeforeLongResponsiveSwitching);
@@ -1206,4 +1261,387 @@ test("browser session recovers durable phases across API restart and reload", as
   ]) {
     await expect(page.getByTestId(diagnosticTestId)).toHaveCount(0);
   }
+});
+
+test("F010 Task 4-7 focused workspace visual and resize gates", async ({
+  page,
+}, testInfo) => {
+  const username = `F010T4_${Date.now().toString(36)}`;
+  const password = `F010 Task 4 ${crypto.randomUUID()} phrase`;
+  const humanContribution =
+    "我建议先统一目标和硬性约束，再逐项比较各方案的影响与可执行性。";
+  let holdAfterHuman = false;
+  let holdAiConfirmation = false;
+  let releaseHumanTail: (() => void) | undefined;
+  let releaseAiTail: (() => void) | undefined;
+
+  await page.routeWebSocket(/\/ws\/sessions\//, (socket) => {
+    const server = socket.connectToServer();
+    const humanTail: Array<Parameters<typeof socket.send>[0]> = [];
+    const aiTail: Array<Parameters<typeof socket.send>[0]> = [];
+
+    socket.onMessage((message) => server.send(message));
+    server.onMessage((message) => {
+      const payload = message.toString();
+      const isHumanConfirmation =
+        payload.includes("participant.utterance.created") &&
+        payload.includes('\"actor_kind\":\"HUMAN\"');
+      const isAiConfirmation =
+        payload.includes("participant.utterance.created") &&
+        payload.includes('\"actor_kind\":\"AI\"');
+
+      if (holdAiConfirmation || isAiConfirmation) {
+        holdAiConfirmation = true;
+        aiTail.push(message);
+        releaseAiTail ??= () => {
+          holdAiConfirmation = false;
+          for (const frame of aiTail.splice(0)) socket.send(frame);
+          releaseAiTail = undefined;
+        };
+        return;
+      }
+      if (holdAfterHuman) {
+        humanTail.push(message);
+        return;
+      }
+
+      socket.send(message);
+      if (isHumanConfirmation) {
+        holdAfterHuman = true;
+        releaseHumanTail = () => {
+          holdAfterHuman = false;
+          for (const frame of humanTail.splice(0)) {
+            const framePayload = frame.toString();
+            if (
+              framePayload.includes("participant.utterance.created") &&
+              framePayload.includes('\"actor_kind\":\"AI\"')
+            ) {
+              holdAiConfirmation = true;
+              aiTail.push(frame);
+            } else {
+              socket.send(frame);
+            }
+          }
+          releaseHumanTail = undefined;
+        };
+      }
+    });
+  });
+
+  const capture = async (name: string) => {
+    const path = testInfo.outputPath(`${name}.png`);
+    await page.screenshot({ fullPage: true, path });
+    await testInfo.attach(name, { contentType: "image/png", path });
+  };
+
+  const readPanelWidths = () =>
+    page.evaluate(() => {
+      const task = document.querySelector<HTMLElement>("#task-surface");
+      const discussion = document.querySelector<HTMLElement>(
+        "#discussion-surface",
+      );
+      const progress = document.querySelector<HTMLElement>("#progress-surface");
+      if (!task || !discussion || !progress) {
+        throw new Error("Workspace panels unavailable");
+      }
+      return {
+        center: discussion.getBoundingClientRect().width,
+        left: task.getBoundingClientRect().width,
+        right: progress.getBoundingClientRect().width,
+      };
+    });
+
+  const dragSeparator = async (
+    separator: ReturnType<typeof page.getByRole>,
+    deltaX: number,
+  ) => {
+    const box = await separator.boundingBox();
+    if (!box) throw new Error("Resize separator is not visible");
+    const startX = box.x + box.width / 2;
+    const y = box.y + box.height / 2;
+    await page.mouse.move(startX, y);
+    await page.mouse.down();
+    await page.mouse.move(startX + deltaX, y, { steps: 6 });
+    await page.mouse.up();
+  };
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
+  await page.getByRole("button", { name: "注册" }).click();
+  await page.getByLabel("用户名").fill(username);
+  await page.getByLabel("密码").fill(password);
+  await page.getByRole("button", { name: "创建账户" }).click();
+  await expect(
+    page.getByRole("heading", { name: "下一场完整模拟" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "开始选题" }).click();
+  const selectedQuestion = page.getByRole("radio").first();
+  await expect(selectedQuestion).toBeVisible();
+  await selectedQuestion.focus();
+  await selectedQuestion.press("Space");
+  await expect(selectedQuestion).toBeChecked();
+  await page.getByRole("button", { name: "创建文字会话" }).click();
+  await expect(page.getByText("连接正常").first()).toBeVisible();
+  await expect(
+    page.locator('[data-presentation-mode="focused-training"]'),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("navigation", { name: "桌面主导航" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("navigation", { name: "移动主导航" }),
+  ).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "训练大厅" })).toHaveCount(0);
+  await expect(page.getByRole("separator")).toHaveCount(2);
+  await page.getByRole("button", { name: "开始讨论" }).click();
+  await expect(page.getByText("当前发言：你", { exact: true })).toBeVisible({
+    timeout: 35_000,
+  });
+  await page.getByLabel("发言草稿").fill(humanContribution);
+  await page.getByRole("button", { name: "发送发言" }).click();
+  await expect(
+    page.locator('[data-testid^="utterance-content-"]').filter({
+      hasText: humanContribution,
+    }),
+  ).toHaveCount(1);
+  await capture("f010-task4-discussion-1440x900");
+  await capture("focused-training-1440-active");
+  await capture("f010-final-discussion-1440x900");
+
+  // Capture the aggregate visual matrix before the deterministic recovery
+  // provider writes its prompt-provenance sentinel into the real transcript.
+  // The later Task 4 captures and recovery assertions still exercise that
+  // durable provider output unchanged.
+  await page.setViewportSize({ width: 768, height: 1024 });
+  await expect(page.getByRole("separator")).toHaveCount(0);
+  await expect(page.locator("#discussion-surface")).toBeVisible();
+  await expect(page.locator("#task-surface")).toBeHidden();
+  await expect(page.locator("#progress-surface")).toBeHidden();
+  await capture("f010-final-discussion-768x1024");
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  const finalDiscussionTab = page.getByRole("tab", { name: "讨论" });
+  const finalTaskTab = page.getByRole("tab", { name: "题目" });
+  const finalProgressTab = page.getByRole("tab", { name: "进程" });
+  await expect(finalDiscussionTab).toHaveAttribute("aria-selected", "true");
+  await capture("f010-final-discussion-390x844");
+  await finalTaskTab.click();
+  await expect(page.locator("#task-surface")).toBeVisible();
+  await capture("f010-final-discussion-390x844-task-tab");
+  await finalProgressTab.click();
+  await expect(page.locator("#progress-surface")).toBeVisible();
+  await capture("f010-final-discussion-390x844-progress-tab");
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.evaluate(() => {
+    document.body.style.zoom = "1.25";
+  });
+  await expect(page.getByLabel("发言草稿")).toBeVisible();
+  await page.getByLabel("发言草稿").scrollIntoViewIfNeeded();
+  await expect(page.getByLabel("发言草稿")).toBeInViewport();
+  await capture("f010-final-focused-125-percent-1440x900");
+  await page.evaluate(() => {
+    document.body.style.zoom = "";
+  });
+
+  expect(releaseHumanTail).toBeDefined();
+  releaseHumanTail?.();
+  await expect(page.locator('[data-ai-preparing="true"]')).toHaveCount(1, {
+    timeout: 15_000,
+  });
+  await capture("f010-task4-discussion-1440x900-ai-preparing");
+  await capture("focused-training-1440-ai-preparing");
+  await capture("f010-final-discussion-1440x900-ai-preparing");
+
+  const leftSeparator = page.getByRole("separator", {
+    name: "调整题目与思考面板宽度",
+  });
+  const rightSeparator = page.getByRole("separator", {
+    name: "调整训练进程面板宽度",
+  });
+  await expect(leftSeparator).toHaveAttribute("aria-valuenow", "280");
+  await expect(rightSeparator).toHaveAttribute("aria-valuenow", "280");
+  expect(await readPanelWidths()).toMatchObject({ left: 280, right: 280 });
+  await capture("f010-task7-layout-default-1440x900");
+
+  await dragSeparator(leftSeparator, 100);
+  await expect(leftSeparator).toHaveAttribute("aria-valuenow", "380");
+  expect((await readPanelWidths()).left).toBe(380);
+  await capture("f010-task7-layout-left-expanded-1440x900");
+
+  await dragSeparator(leftSeparator, -100);
+  await dragSeparator(rightSeparator, -80);
+  await expect(rightSeparator).toHaveAttribute("aria-valuenow", "360");
+  expect((await readPanelWidths()).right).toBe(360);
+  await capture("f010-task7-layout-right-expanded-1440x900");
+  await capture("f010-final-discussion-1440x900-custom-widths");
+
+  await dragSeparator(leftSeparator, -1000);
+  await expect(leftSeparator).toHaveAttribute("aria-valuenow", "220");
+  await dragSeparator(leftSeparator, 1000);
+  await expect(leftSeparator).toHaveAttribute("aria-valuenow", "420");
+  await dragSeparator(rightSeparator, 1000);
+  await expect(rightSeparator).toHaveAttribute("aria-valuenow", "220");
+  await dragSeparator(rightSeparator, -1000);
+  await expect(rightSeparator).toHaveAttribute("aria-valuenow", "380");
+  expect((await readPanelWidths()).center).toBeGreaterThanOrEqual(520);
+  await capture("f010-task7-layout-bounds-clamped-1440x900");
+
+  await dragSeparator(leftSeparator, -120);
+  await dragSeparator(rightSeparator, 100);
+  await leftSeparator.focus();
+  const leftBeforeKeyboard = Number(
+    await leftSeparator.getAttribute("aria-valuenow"),
+  );
+  await leftSeparator.press("ArrowRight");
+  await expect(leftSeparator).toHaveAttribute(
+    "aria-valuenow",
+    String(leftBeforeKeyboard + 16),
+  );
+  await leftSeparator.press("Shift+ArrowRight");
+  await expect(leftSeparator).toHaveAttribute(
+    "aria-valuenow",
+    String(leftBeforeKeyboard + 56),
+  );
+  await rightSeparator.focus();
+  const rightBeforeKeyboard = Number(
+    await rightSeparator.getAttribute("aria-valuenow"),
+  );
+  await rightSeparator.press("ArrowLeft");
+  await expect(rightSeparator).toHaveAttribute(
+    "aria-valuenow",
+    String(rightBeforeKeyboard + 16),
+  );
+  await rightSeparator.press("Shift+ArrowLeft");
+  await expect(rightSeparator).toHaveAttribute(
+    "aria-valuenow",
+    String(rightBeforeKeyboard + 56),
+  );
+  await leftSeparator.focus();
+  await capture("f010-task7-layout-separator-keyboard-focus-1440x900");
+
+  const persistedBeforeReload = await page.evaluate(() =>
+    localStorage.getItem("gia.training.workspace.layout"),
+  );
+  expect(persistedBeforeReload).not.toBeNull();
+  expect(Object.keys(JSON.parse(persistedBeforeReload!))).toEqual([
+    "version",
+    "leftWidth",
+    "rightWidth",
+  ]);
+  const persistedWidths = await readPanelWidths();
+
+  await page.setViewportSize({ width: 1200, height: 900 });
+  await expect(leftSeparator).toBeVisible();
+  expect((await readPanelWidths()).center).toBeGreaterThanOrEqual(520);
+  await capture("f010-task7-layout-center-protected-1200x900");
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await expect(leftSeparator).toHaveAttribute(
+    "aria-valuenow",
+    String(persistedWidths.left),
+  );
+
+  await page.reload();
+  await expect(
+    page.locator('[data-presentation-mode="focused-training"]'),
+  ).toBeVisible();
+  await expect(leftSeparator).toHaveAttribute(
+    "aria-valuenow",
+    String(persistedWidths.left),
+  );
+  await expect(rightSeparator).toHaveAttribute(
+    "aria-valuenow",
+    String(persistedWidths.right),
+  );
+  await capture("f010-task7-layout-reload-persisted-1440x900");
+  await capture("f010-final-layout-reload-persisted-1440x900");
+
+  await page.setViewportSize({ width: 1100, height: 360 });
+  await expect(page.getByRole("separator")).toHaveCount(0);
+  await expect(page.getByLabel("发言草稿")).toBeVisible();
+  await page.getByLabel("发言草稿").scrollIntoViewIfNeeded();
+  await expect(page.getByLabel("发言草稿")).toBeInViewport();
+  await capture("f010-final-discussion-1100x360");
+
+  await page.setViewportSize({ width: 768, height: 1024 });
+  await expect(page.getByRole("separator")).toHaveCount(0);
+  await expect(page.locator("#discussion-surface")).toBeVisible();
+  await expect(page.locator("#task-surface")).toBeHidden();
+  await expect(page.locator("#progress-surface")).toBeHidden();
+  await capture("f010-task4-discussion-768x1024");
+  await capture("focused-training-768");
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  const discussionTab = page.getByRole("tab", { name: "讨论" });
+  const taskTab = page.getByRole("tab", { name: "题目" });
+  const progressTab = page.getByRole("tab", { name: "进程" });
+  await expect(discussionTab).toHaveAttribute("aria-selected", "true");
+  await capture("f010-task4-discussion-390x844-discussion-tab");
+  await capture("focused-training-390-discussion");
+  await taskTab.click();
+  await expect(page.locator("#task-surface")).toBeVisible();
+  await capture("f010-task4-discussion-390x844-task-tab");
+  await capture("focused-training-390-task");
+  await progressTab.click();
+  await expect(page.locator("#progress-surface")).toBeVisible();
+  await capture("f010-task4-discussion-390x844-progress-tab");
+  await capture("focused-training-390-progress");
+
+  releaseAiTail?.();
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.getByRole("button", { name: "结束会话" }).click();
+  await expect(
+    page.getByRole("navigation", { name: "桌面主导航" }),
+  ).toBeVisible();
+  await page
+    .getByRole("navigation", { name: "桌面主导航" })
+    .getByRole("button", { name: "完整模拟" })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "下一场完整模拟" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "开始选题" }).click();
+  const nextQuestion = page.getByRole("radio").first();
+  await nextQuestion.focus();
+  await nextQuestion.press("Space");
+  await page.getByRole("button", { name: "创建文字会话" }).click();
+  await expect(
+    page.locator('[data-presentation-mode="focused-training"]'),
+  ).toBeVisible();
+  await expect(leftSeparator).toHaveAttribute(
+    "aria-valuenow",
+    String(persistedWidths.left),
+  );
+  await expect(rightSeparator).toHaveAttribute(
+    "aria-valuenow",
+    String(persistedWidths.right),
+  );
+  await capture("f010-task7-layout-new-session-persisted-1440x900");
+  await capture("f010-final-layout-new-session-persisted-1440x900");
+
+  await page.evaluate(() => {
+    localStorage.setItem("gia.training.workspace.layout", "{malformed");
+  });
+  await page.reload();
+  await expect(
+    page.locator('[data-presentation-mode="focused-training"]'),
+  ).toBeVisible();
+  await expect(leftSeparator).toHaveAttribute("aria-valuenow", "280");
+  await expect(rightSeparator).toHaveAttribute("aria-valuenow", "280");
+  await capture("f010-final-layout-malformed-storage-fallback-1440x900");
+
+  await page.evaluate(() => {
+    localStorage.setItem(
+      "gia.training.workspace.layout",
+      JSON.stringify({ version: 2, leftWidth: 356, rightWidth: 336 }),
+    );
+  });
+  await page.reload();
+  await expect(
+    page.locator('[data-presentation-mode="focused-training"]'),
+  ).toBeVisible();
+  await expect(leftSeparator).toHaveAttribute("aria-valuenow", "280");
+  await expect(rightSeparator).toHaveAttribute("aria-valuenow", "280");
+  await capture("f010-final-layout-unsupported-version-fallback-1440x900");
 });

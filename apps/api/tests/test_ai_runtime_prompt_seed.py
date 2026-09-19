@@ -6,14 +6,42 @@ from uuid import UUID
 import pytest
 
 from group_interview_arena_api.modules.ai_runtime import seed as seed_module
-from group_interview_arena_api.modules.ai_runtime.prompting import PROMPT_VARIABLES
+from group_interview_arena_api.modules.ai_runtime.prompting import (
+    PROMPT_VARIABLES,
+    PROMPT_VARIABLES_V3,
+)
 from group_interview_arena_api.modules.ai_runtime.seed import (
     AI_CANDIDATE_TURN_V2,
     AI_CANDIDATE_TURN_V3,
+    AI_CANDIDATE_TURN_V4,
     DISCUSSION_MEMORY_UPDATE_V1,
     DISCUSSION_MEMORY_UPDATE_V2,
     seed_ai_runtime_prompt_versions,
 )
+
+
+def test_candidate_v4_adds_bounded_off_topic_recovery_without_a_classifier() -> None:
+    definition = AI_CANDIDATE_TURN_V4
+
+    assert definition.id == UUID("56000000-0000-4000-8000-000000000004")
+    assert definition.version_number == 4
+    assert definition.created_at > AI_CANDIDATE_TURN_V3.created_at
+    assert frozenset(Template(definition.template_text).get_identifiers()) == (
+        PROMPT_VARIABLES_V3
+    )
+    for required in (
+        "最近一条 Human 发言",
+        "明显与当前题目和讨论无关",
+        "简短、自然地拉回当前任务",
+        "论证较弱",
+        "不同意见",
+        "流程协调",
+        "时间提醒",
+        "可行替代方案",
+        "不要另行分类",
+    ):
+        assert required in definition.template_text
+    assert "$recent_discussion" in definition.template_text
 
 
 def test_candidate_v3_is_additive_and_memory_backed_without_mutating_v2() -> None:
@@ -162,6 +190,7 @@ def test_ai_runtime_prompt_seed_returns_exact_publication_result(
     assert published == [
         (session, AI_CANDIDATE_TURN_V2),
         (session, AI_CANDIDATE_TURN_V3),
+        (session, AI_CANDIDATE_TURN_V4),
         (session, DISCUSSION_MEMORY_UPDATE_V1),
         (session, DISCUSSION_MEMORY_UPDATE_V2),
     ]

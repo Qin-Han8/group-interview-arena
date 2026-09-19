@@ -61,7 +61,7 @@ ADR-015 确认：
 ### Password and Argon2id
 
 - P0-5B 唯一新增 direct runtime dependency 为 `pwdlib[argon2]>=0.3.0,<0.4`；实际解析 `pwdlib 0.3.1` 与 `argon2-cffi 25.1.0`，并已在 CPython 3.14.7 验证 API 与 dependency graph。
-- Password scoped baseline：15–128 Unicode code points；以一致的 NFC 规范化进行验证和处理，不 trim、不改变大小写、不拼接额外内容、不静默截断。
+- P0-5B 当时的 Password scoped baseline 为 15–128 Unicode code points；当前新注册策略已调整为 8–128 code points，并要求至少一个 ASCII 大写字母、小写字母、数字与标点。登录不会用新注册策略预校验历史密码；NFC 验证、no trim、不改变大小写、不拼接额外内容与不静默截断继续保持。
 - Application 必须显式配置并拥有 Argon2id 参数，不能只调用 `PasswordHash.recommended()` 后声称参数永久固定。
 - 以下值已通过本机 benchmark，冻结为 P0-5B implementation values，但不是长期 ADR contract：
   - `memory_cost = 65536 KiB`

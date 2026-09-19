@@ -118,14 +118,14 @@ def _provider_module_source() -> str:
                         "Candidate prompt did not contain exactly one private stance."
                     )
                 if not all(section in prompt for section in required_sections):
-                    raise RuntimeError("Candidate V3 context contract was incomplete.")
+                    raise RuntimeError("Candidate V4 context contract was incomplete.")
                 if (
                     str(generation_input.prompt_version_id)
-                    != "56000000-0000-4000-8000-000000000003"
-                    or generation_input.prompt_version_number != 3
+                    != "56000000-0000-4000-8000-000000000004"
+                    or generation_input.prompt_version_number != 4
                     or generation_input.prompt_key != "AI_CANDIDATE_TURN"
                 ):
-                    raise RuntimeError("Candidate generation did not use accepted V3.")
+                    raise RuntimeError("Candidate generation did not use accepted V4.")
 
                 with psycopg.connect(_database_url()) as connection:
                     row = connection.execute(
@@ -340,16 +340,16 @@ def _verify_durable_result(
         completed_ai_ids = {str(row[2]) for row in completed}
         if not ai_ids.issubset(completed_ai_ids):
             raise RuntimeError("Not all three AI participants completed a generation.")
-        memory_backed_v3 = [
+        memory_backed_v4 = [
             row
             for row in completed
             if row[6] == "AI_CANDIDATE_TURN"
-            and row[7] == 3
+            and row[7] == 4
             and row[5].get("schema_version") == 2
             and row[5].get("memory_revision", 0) > 0
         ]
-        if not memory_backed_v3:
-            raise RuntimeError("No completed V3/metadata-V2 Memory-backed request.")
+        if not memory_backed_v4:
+            raise RuntimeError("No completed V4/metadata-V2 Memory-backed request.")
 
         exact_once = connection.execute(
             "SELECT request.id, count(DISTINCT utterance.id), "
@@ -385,12 +385,12 @@ def _verify_durable_result(
             raise RuntimeError(f"Cancelled request mismatch: {cancelled_rows!r}.")
         cancelled_metadata = cancelled_rows[0][5]
         if (
-            cancelled_rows[0][6:] != ("AI_CANDIDATE_TURN", 3)
+            cancelled_rows[0][6:] != ("AI_CANDIDATE_TURN", 4)
             or cancelled_metadata.get("schema_version") != 2
             or cancelled_metadata.get("memory_revision", 0) < 1
         ):
             raise RuntimeError(
-                "Cancelled request was not a Memory-backed V3/metadata-V2 candidate: "
+                "Cancelled request was not a Memory-backed V4/metadata-V2 candidate: "
                 f"{cancelled_rows!r}."
             )
         cancelled_shape = connection.execute(
@@ -638,7 +638,7 @@ def main() -> int:
         _seed_question(temporary_database)
         _run_final_flow(temporary_database)
     print(
-        "P1-6D D2-D4 passed: Human plus exactly three AI, durable Memory/V3/V2, "
+        "P1-6D D2-D4 passed: Human plus exactly three AI, durable Memory/V4/V2, "
         "Browser reload, API restart, cancellation recovery, privacy/exact-once "
         "evidence, and final COMPLETED lifecycle with deterministic cleanup."
     )

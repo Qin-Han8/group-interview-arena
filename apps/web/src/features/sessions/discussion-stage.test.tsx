@@ -93,6 +93,8 @@ function stageProps(
     errorMessage: null,
     aiWaitingLabel: null,
     interruptedAiNotices: [],
+    liveAiRenderCandidate: null,
+    onLiveAiRenderMarked: vi.fn(),
     showComposer: true,
     ...overrides,
   };
@@ -117,7 +119,15 @@ describe("DiscussionStage", () => {
       "min-h-0",
       "flex-col",
     );
+    expect(container.firstElementChild).toHaveAttribute(
+      "data-center-composition",
+      "participants-transcript-composer",
+    );
     expect(screen.getByTestId("participant-strip")).toHaveClass("shrink-0");
+    expect(screen.getByTestId("participant-strip")).toHaveAttribute(
+      "data-strip-density",
+      "compact",
+    );
     expect(screen.getByTestId("discussion-notice")).toHaveClass("shrink-0");
     expect(screen.getByTestId("confirmed-transcript")).toHaveClass(
       "min-h-0",
@@ -127,6 +137,10 @@ describe("DiscussionStage", () => {
       "min-h-0",
       "flex-1",
       "overflow-y-auto",
+    );
+    expect(screen.getByTestId("confirmed-transcript-list")).toHaveAttribute(
+      "data-scroll-owner",
+      "discussion-transcript",
     );
 
     rerender(
@@ -176,16 +190,9 @@ describe("DiscussionStage", () => {
       <DiscussionStage {...stageProps()} />,
     );
     const strip = screen.getByRole("list", { name: "会话参与者" });
-    expect(
-      within(strip)
-        .getAllByRole("listitem")
-        .map((item) => item.textContent),
-    ).toEqual([
-      "你轮到你发言",
-      "AI 候选人 1等待中",
-      "AI 候选人 2等待中",
-      "AI 候选人 3等待中",
-    ]);
+    expect(within(strip).getAllByRole("listitem")).toHaveLength(4);
+    expect(within(strip).getByText("轮到你发言")).toBeInTheDocument();
+    expect(within(strip).getAllByText("等待中")).toHaveLength(3);
     expect(within(strip).getByText("你").closest("li")).toHaveAttribute(
       "data-participant-state",
       "current",
@@ -215,6 +222,10 @@ describe("DiscussionStage", () => {
     expect(
       within(strip).getByText("AI 候选人 2").closest("li"),
     ).toHaveTextContent("正在准备发言");
+    expect(
+      within(strip).getByText("AI 候选人 2").closest("li"),
+    ).toHaveAttribute("data-ai-preparing", "true");
+    expect(screen.queryByTestId("discussion-notice")).toBeNull();
     expect(container.textContent).not.toMatch(
       /强势型|固执型|逻辑型|persona|strategy|emotion|provider|model/i,
     );
@@ -255,9 +266,20 @@ describe("DiscussionStage", () => {
         "data-contribution-layout",
         "aligned-record",
       );
-      expect(record).toHaveClass("py-5", "first:pt-0", "last:pb-0");
+      expect(record).toHaveClass("first:pt-0", "last:pb-0");
       expect(record).not.toHaveClass("rounded-lg");
     }
+    expect(records[0]).toHaveAttribute("data-speaker-kind", "human");
+    expect(records[1]).toHaveAttribute("data-speaker-kind", "ai");
+    expect(
+      records[0].querySelector('[data-speaker-avatar="human"]'),
+    ).toHaveAttribute("data-speaker-avatar", "human");
+    expect(within(records[1]).getByText("AI")).toHaveAttribute(
+      "data-speaker-badge",
+      "ai",
+    );
+    expect(list.textContent).not.toContain(CONFIRMED[0].utterance_id);
+    expect(list.textContent).not.toContain(CONFIRMED[0].action_id!);
     const exact = within(list).getByTestId(
       `utterance-content-${CONFIRMED[0].utterance_id}`,
     );
@@ -312,6 +334,10 @@ describe("DiscussionStage", () => {
     const composer = screen.getByTestId("human-composer");
     expect(composer).toHaveClass("shrink-0");
     expect(composer).toHaveAttribute("data-action-zone", "human-composer");
+    expect(composer).toHaveAttribute(
+      "data-composer-attachment",
+      "discussion-center",
+    );
     expect(composer).toHaveClass(
       "rounded-xl",
       "border",
@@ -453,7 +479,48 @@ describe("DiscussionStage", () => {
         {...stageProps({ aiWaitingLabel: "AI 候选人 1 正在准备发言…" })}
       />,
     );
-    expect(notice()).toHaveTextContent("AI 候选人 1 正在准备发言…");
+    expect(screen.queryByTestId("discussion-notice")).toBeNull();
+  });
+
+  it("marks only an explicitly live AI render candidate without exposing content", () => {
+    const mark = vi.spyOn(performance, "mark");
+    const onLiveAiRenderMarked = vi.fn();
+    const rendered = render(
+      <DiscussionStage {...stageProps({ confirmedTranscript: CONFIRMED })} />,
+    );
+
+    expect(mark).not.toHaveBeenCalled();
+
+    rendered.rerender(
+      <DiscussionStage
+        {...stageProps({
+          confirmedTranscript: CONFIRMED,
+          liveAiRenderCandidate: {
+            utteranceId: CONFIRMED.at(-1)!.utterance_id,
+            sequence: CONFIRMED.at(-1)!.sequence,
+            participantId: CONFIRMED.at(-1)!.participant_id,
+          },
+          onLiveAiRenderMarked,
+        })}
+      />,
+    );
+
+    expect(mark).toHaveBeenCalledWith(
+      "gia.ai-utterance.rendered",
+      expect.objectContaining({
+        detail: expect.objectContaining({
+          utteranceId: CONFIRMED.at(-1)?.utterance_id,
+          sequence: CONFIRMED.at(-1)?.sequence,
+        }),
+      }),
+    );
+    expect(JSON.stringify(mark.mock.calls)).not.toContain(
+      CONFIRMED.at(-1)?.content,
+    );
+    expect(onLiveAiRenderMarked).toHaveBeenCalledOnce();
+    expect(onLiveAiRenderMarked).toHaveBeenCalledWith(
+      CONFIRMED.at(-1)?.utterance_id,
+    );
   });
 
   it.each([

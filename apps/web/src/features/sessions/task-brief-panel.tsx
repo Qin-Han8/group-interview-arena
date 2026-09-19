@@ -4,6 +4,8 @@ import type { ReactNode } from "react";
 
 import type { QuestionDetail } from "@/lib/api/client";
 
+import { questionTypeLabel } from "./question-presentation";
+
 export type TaskBriefQuestionState =
   | { kind: "available"; question: QuestionDetail }
   | { kind: "loading" }
@@ -16,12 +18,6 @@ export type TaskBriefPanelProps = {
   onNotesChange: (value: string) => void;
 };
 
-const QUESTION_TYPE_LABELS: Record<string, string> = {
-  RESOURCE_ALLOCATION: "资源分配",
-  PRIORITIZATION: "优先级排序",
-  OPEN_DISCUSSION: "开放讨论",
-};
-
 const DIFFICULTY_LABELS: Record<string, string> = {
   BASIC: "基础",
   STANDARD: "标准",
@@ -30,7 +26,7 @@ const DIFFICULTY_LABELS: Record<string, string> = {
 
 function QuestionContent({ question }: { question: QuestionDetail }) {
   const metadata = [
-    QUESTION_TYPE_LABELS[question.question_type],
+    questionTypeLabel(question.question_type),
     DIFFICULTY_LABELS[question.difficulty],
     question.estimated_minutes > 0
       ? `约 ${question.estimated_minutes} 分钟`
@@ -145,17 +141,25 @@ export default function TaskBriefPanel({
 }: TaskBriefPanelProps): ReactNode {
   return (
     <div
-      className="flex min-h-0 flex-col gap-6"
+      className="flex min-h-0 flex-col gap-4"
       data-information-hierarchy="task-brief"
       data-testid="task-brief-panel"
     >
+      <div className="shrink-0 border-b border-neutral-200 pb-3">
+        <p className="text-[0.625rem] font-semibold tracking-[0.16em] text-neutral-500 uppercase">
+          CASE BRIEF
+        </p>
+        <h2 className="mt-0.5 text-base font-semibold text-neutral-950">
+          题目与思考
+        </h2>
+      </div>
       <div className="min-h-0 flex-1 overflow-y-auto">
         <QuestionState state={questionState} />
       </div>
 
       <section
         aria-labelledby="private-notes-heading"
-        className="rounded-xl border border-neutral-200 bg-neutral-50 p-4"
+        className="rounded-lg border border-neutral-200 bg-neutral-50 p-3"
         data-private-notes="memory-only"
       >
         <h2 className="text-sm font-semibold" id="private-notes-heading">

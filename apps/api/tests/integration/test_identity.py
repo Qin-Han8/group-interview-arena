@@ -45,7 +45,7 @@ async def _exercise_identity_schema(
 ) -> None:
     engine = create_database_engine(temporary_database.database_settings())
     session_factory = create_database_session_factory(engine)
-    plaintext_password = "integration-only password phrase"
+    plaintext_password = "Integration-only password 1!"
     password_hash = hash_password(plaintext_password)
     canonical_username = normalize_username("Integration_User")
 
@@ -70,7 +70,7 @@ async def _exercise_identity_schema(
 
             duplicate_user = User(
                 username=canonical_username,
-                password_hash=hash_password("another integration password"),
+                password_hash=hash_password("Another integration password 2!"),
             )
             session.add(duplicate_user)
             with pytest.raises(IntegrityError):

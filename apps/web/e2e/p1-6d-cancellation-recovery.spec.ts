@@ -7,6 +7,13 @@ const API_LOG = process.env.GIA_P16D_D2D3_API_LOG;
 const PROVIDER_BLOCKED = process.env.GIA_P16D_D2D3_PROVIDER_BLOCKED;
 const PROVIDER_CALLS = process.env.GIA_P16D_D2D3_PROVIDER_CALLS;
 const PROVIDER_CANCELLED = process.env.GIA_P16D_D2D3_PROVIDER_CANCELLED;
+const INTERNAL_VALIDATION_QUESTION_VERSION_ID =
+  "21000000-0000-4000-8000-000000000001";
+const QUESTION_TYPE_LABELS = {
+  ORDERING_SELECTION: "排序选择型",
+  RESOURCE_ALLOCATION: "资源分配型",
+  PLAN_DESIGN: "方案策划型",
+} as const;
 const PRIVATE_SENTINELS = [
   "P16D_D2D3_PRIVATE_ALPHA_DO_NOT_DISCLOSE",
   "P16D_D2D3_PRIVATE_BRAVO_DO_NOT_DISCLOSE",
@@ -76,7 +83,46 @@ test("P1-6D D2-D3 proves durable cancellation and recovery", async ({
     .getByLabel("密码")
     .fill(`P1-6D D2-D3 ${crypto.randomUUID()} phrase`);
   await page.getByRole("button", { name: "创建账户" }).click();
-  await expect(page.getByRole("heading", { name: "讨论会话" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "下一场完整模拟" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "开始选题" }).click();
+  await expect(
+    page.getByRole("heading", { name: "选择本次训练题目" }),
+  ).toBeVisible();
+
+  const discovery = await page.evaluate(async (apiBaseUrl) => {
+    const response = await fetch(`${apiBaseUrl}/questions`, {
+      credentials: "include",
+    });
+    return { status: response.status, body: await response.json() };
+  }, API_BASE_URL);
+  expect(discovery.status).toBe(200);
+  const targetQuestion = discovery.body.find(
+    (item: { id: string; question_type: string; title: string }) =>
+      item.id === INTERNAL_VALIDATION_QUESTION_VERSION_ID,
+  ) as
+    | {
+        id: string;
+        question_type: keyof typeof QUESTION_TYPE_LABELS;
+        title: string;
+      }
+    | undefined;
+  expect(targetQuestion).toBeDefined();
+  expect(QUESTION_TYPE_LABELS[targetQuestion!.question_type]).toBeDefined();
+  await page
+    .getByRole("tab", {
+      name: new RegExp(
+        `^${QUESTION_TYPE_LABELS[targetQuestion!.question_type]}`,
+      ),
+    })
+    .click();
+  const targetQuestionCard = page.getByRole("radio", {
+    name: targetQuestion!.title,
+  });
+  await targetQuestionCard.focus();
+  await targetQuestionCard.press("Space");
+  await expect(targetQuestionCard).toBeChecked();
 
   const createResponsePromise = page.waitForResponse(
     (response) =>
@@ -86,6 +132,9 @@ test("P1-6D D2-D3 proves durable cancellation and recovery", async ({
   await page.getByRole("button", { name: "创建文字会话" }).click();
   const createResponse = await createResponsePromise;
   expect(createResponse.status()).toBe(201);
+  expect(createResponse.request().postDataJSON()).toEqual({
+    question_version_id: targetQuestion!.id,
+  });
   const sessionId = ((await createResponse.json()) as SessionSnapshot).id;
 
   const fetchSnapshot = () =>

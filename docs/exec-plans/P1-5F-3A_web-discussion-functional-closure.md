@@ -8,10 +8,10 @@ Accepted committed target: `30446af520e55977a7c7a4839e00ab1a0a94d44e`
 
 GitHub Actions: run `32945590023`; all four required jobs `PASS`
 
-Current parent status: `P1 IN_PROGRESS`;
-`P1-5 IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN`;
+Current parent status: `P1 DONE / CLOSED`;
+`P1-5 DONE`;
 P1-5F/F3/F3A/F3B/F4 retain historical `DONE`;
-`P1-5R IN_PROGRESS / DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN`; R1 `IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PENDING`; F1 `OPEN / IMPLEMENTATION_COMPLETE_AWAITING_REVIEW`; R2-A `NOT_STARTED / BLOCKED_BY_R1`; R2-B/R3 `NOT_STARTED`
+P1-5R and its post-closeout remediation/review are `CLOSED`; open findings `NONE`
 
 Target version: `V0.1 Internal Validation`
 

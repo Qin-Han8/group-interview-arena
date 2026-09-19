@@ -1,14 +1,12 @@
 "use client";
 
-import {
-  useEffect,
-  useMemo,
-  useState,
-  type FormEvent,
-  type ReactNode,
-} from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
 
-import SessionPanel from "@/features/sessions/session-panel";
+import SessionPanel, {
+  type OpenCurrentReportRequest,
+  type SessionNavigationState,
+} from "@/features/sessions/session-panel";
 import {
   createApiClient,
   getCurrentUser,
@@ -21,6 +19,11 @@ import {
 import { getPublicApiConfig } from "@/lib/config/public-env";
 
 import HealthStatus from "./health-status";
+import {
+  AuthenticatedAppShell,
+  ProductEntryShell,
+  type ProductShellNavigation,
+} from "./product-shell";
 
 type AuthState =
   | { status: "loading" }
@@ -29,42 +32,42 @@ type AuthState =
 
 type AuthMode = "login" | "register";
 
-function EntryShell({ children }: { children: ReactNode }) {
+const REGISTRATION_PASSWORD_REQUIREMENT =
+  "密码需为 8–128 位，并同时包含大写英文字母、小写英文字母、数字和符号。";
+const ASCII_PUNCTUATION = "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~";
+
+function isValidRegistrationPassword(password: string) {
+  const characters = [...password];
   return (
-    <div
-      className="mx-auto flex min-h-dvh w-full max-w-3xl flex-col justify-center px-6 py-16 sm:px-10 sm:py-24"
-      data-testid="entry-shell"
-    >
-      <p className="mb-8 text-sm font-medium tracking-[0.16em] text-neutral-500 uppercase">
-        Internal validation foundation
-      </p>
-
-      <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl">
-        AI 群面训练场
-      </h1>
-      <p className="mt-3 text-xl text-neutral-600 sm:text-2xl">
-        Group Interview Arena
-      </p>
-
-      <div className="my-10 space-y-2 border-y border-neutral-300 py-6 text-sm sm:flex sm:gap-10 sm:space-y-0">
-        <p>Current phase: P1</p>
-        <p>Target: V0.1 Internal Validation</p>
-      </div>
-
-      <div className="space-y-2 text-sm leading-6 text-neutral-600">
-        <p>AI candidates are virtual characters.</p>
-        <p>
-          Question-bound text sessions are available for internal validation.
-        </p>
-        <HealthStatus />
-      </div>
-
-      {children}
-    </div>
+    characters.length >= 8 &&
+    characters.length <= 128 &&
+    characters.some((character) => character >= "A" && character <= "Z") &&
+    characters.some((character) => character >= "a" && character <= "z") &&
+    characters.some((character) => character >= "0" && character <= "9") &&
+    characters.some((character) => ASCII_PUNCTUATION.includes(character))
   );
 }
 
+function usesFocusedTrainingPresentation(state: SessionNavigationState) {
+  if (state.sessionId === null) return false;
+
+  switch (state.status) {
+    case "CREATED":
+    case "PREPARATION":
+    case "OPENING_STATEMENTS":
+    case "EXPLORATION":
+    case "CONFLICT_AND_EVALUATION":
+    case "CONVERGENCE":
+    case "FINAL_SUMMARY":
+      return true;
+    case "COMPLETED":
+    case "ABORTED_USER":
+      return false;
+  }
+}
+
 export default function AuthPanel() {
+  const router = useRouter();
   const config = getPublicApiConfig();
   const baseUrl = config.status === "configured" ? config.baseUrl : undefined;
   const client = useMemo(
@@ -77,6 +80,114 @@ export default function AuthPanel() {
   const [password, setPassword] = useState("");
   const [pending, setPending] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string>();
+  const [sessionNavigationState, setSessionNavigationState] =
+    useState<SessionNavigationState>({
+      sessionId: null,
+      status: "loading",
+      reportAvailable: false,
+    });
+  const [openSetupRequest, setOpenSetupRequest] = useState(0);
+  const [returnToLobbyRequest, setReturnToLobbyRequest] = useState(0);
+  const [openCurrentReportRequest, setOpenCurrentReportRequest] =
+    useState<OpenCurrentReportRequest>();
+
+  function startNewTraining() {
+    if (sessionNavigationState.status === "lobby") {
+      setOpenSetupRequest((request) => request + 1);
+      return;
+    }
+    if (
+      sessionNavigationState.status === "COMPLETED" ||
+      sessionNavigationState.status === "ABORTED_USER"
+    ) {
+      setReturnToLobbyRequest((request) => request + 1);
+    }
+  }
+
+  const hasActiveSession =
+    sessionNavigationState.sessionId !== null &&
+    sessionNavigationState.status !== "COMPLETED" &&
+    sessionNavigationState.status !== "ABORTED_USER";
+  const hasTerminalSession =
+    sessionNavigationState.status === "COMPLETED" ||
+    sessionNavigationState.status === "ABORTED_USER";
+  const presentationMode = usesFocusedTrainingPresentation(
+    sessionNavigationState,
+  )
+    ? "focused-training"
+    : "product";
+
+  const reportNavigation = (() => {
+    if (sessionNavigationState.status === "loading") {
+      return {
+        disabled: true,
+        label: "正在确认训练状态",
+        description: "正在确认报告是否可用",
+      };
+    }
+    if (sessionNavigationState.status === "lobby") {
+      return {
+        disabled: true,
+        label: "完成训练后可查看",
+        description: "完成一次训练后生成报告",
+      };
+    }
+    if (sessionNavigationState.status === "ABORTED_USER") {
+      return {
+        disabled: true,
+        label: "本次训练未完成，暂无报告",
+        description: "开始新训练后再试一次",
+      };
+    }
+    if (
+      sessionNavigationState.status === "COMPLETED" &&
+      sessionNavigationState.reportAvailable
+    ) {
+      return {
+        disabled: false,
+        label: "生成 / 查看本次训练报告",
+        description: "基于当前完成场次",
+      };
+    }
+    return {
+      disabled: true,
+      label: "训练完成后生成报告",
+      description: "完成当前训练后可查看",
+    };
+  })();
+
+  const navigation: ProductShellNavigation = {
+    activeItem: "simulation",
+    simulation: {
+      disabled: sessionNavigationState.status === "loading" || hasActiveSession,
+      description: hasActiveSession
+        ? "请先结束当前训练"
+        : hasTerminalSession
+          ? "返回训练大厅"
+          : null,
+      onActivate: startNewTraining,
+    },
+    report: {
+      ...reportNavigation,
+      onActivate: () => {
+        if (
+          sessionNavigationState.sessionId === null ||
+          sessionNavigationState.status !== "COMPLETED" ||
+          !sessionNavigationState.reportAvailable
+        ) {
+          return;
+        }
+        const sessionId = sessionNavigationState.sessionId;
+        setOpenCurrentReportRequest((request) => ({
+          requestId: (request?.requestId ?? 0) + 1,
+          sessionId,
+        }));
+      },
+    },
+    settings: {
+      onActivate: () => router.push("/settings"),
+    },
+  };
 
   useEffect(() => {
     let active = true;
@@ -121,6 +232,11 @@ export default function AuthPanel() {
     event.preventDefault();
     if (!client || pending) return;
 
+    if (mode === "register" && !isValidRegistrationPassword(password)) {
+      setErrorMessage(REGISTRATION_PASSWORD_REQUIREMENT);
+      return;
+    }
+
     setPending(true);
     setErrorMessage(undefined);
     try {
@@ -131,6 +247,11 @@ export default function AuthPanel() {
 
       setPassword("");
       if (result.data) {
+        setSessionNavigationState({
+          sessionId: null,
+          status: "loading",
+          reportAvailable: false,
+        });
         setAuthState({ status: "authenticated", user: result.data });
       } else {
         setErrorMessage(getSafeAuthErrorMessage(result.error));
@@ -155,6 +276,11 @@ export default function AuthPanel() {
         return;
       }
       setAuthState({ status: "unauthenticated" });
+      setSessionNavigationState({
+        sessionId: null,
+        status: "loading",
+        reportAvailable: false,
+      });
       setUsername("");
       setPassword("");
     } catch {
@@ -166,87 +292,94 @@ export default function AuthPanel() {
 
   if (authState.status === "loading") {
     return (
-      <EntryShell>
-        <section
-          aria-live="polite"
-          className="mt-10 border-t border-neutral-300 pt-6"
-        >
-          <p className="text-sm text-neutral-600">正在检查登录状态…</p>
+      <ProductEntryShell diagnostic={<HealthStatus />}>
+        <section aria-live="polite" className="auth-loading-state">
+          <span aria-hidden="true" className="auth-loading-dot" />
+          <p>正在检查登录状态…</p>
         </section>
-      </EntryShell>
+      </ProductEntryShell>
     );
   }
 
   if (authState.status === "authenticated") {
     return (
-      <section
-        className="studio-surface min-h-dvh w-full px-4 py-4 sm:px-6 sm:py-5"
-        data-testid="studio-shell"
+      <AuthenticatedAppShell
+        contentScrollMode="contained"
+        logoutPending={pending}
+        navigation={navigation}
+        onLogout={() => void logout()}
+        pageTitle="训练大厅"
+        presentationMode={presentationMode}
+        username={authState.user.username}
       >
-        <div className="mb-4 flex flex-wrap items-center justify-end gap-3 text-sm text-neutral-600">
-          <p>
-            当前用户：
-            <span
-              className="font-medium text-neutral-900"
-              data-testid="current-username"
-            >
-              {authState.user.username}
-            </span>
-          </p>
-          <button
-            className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 font-medium text-neutral-800 disabled:opacity-50"
-            disabled={pending}
-            onClick={() => void logout()}
-            type="button"
-          >
-            {pending ? "正在退出…" : "退出登录"}
-          </button>
-        </div>
         {errorMessage ? (
-          <p aria-live="polite" className="mb-3 text-sm text-red-700">
+          <p
+            aria-live="polite"
+            className="mx-4 mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+          >
             {errorMessage}
           </p>
         ) : null}
         {client && baseUrl ? (
-          <SessionPanel apiClient={client} baseUrl={baseUrl} />
+          <SessionPanel
+            apiClient={client}
+            baseUrl={baseUrl}
+            onNavigationStateChange={setSessionNavigationState}
+            openCurrentReportRequest={openCurrentReportRequest}
+            openSetupRequest={openSetupRequest}
+            returnToLobbyRequest={returnToLobbyRequest}
+          />
         ) : null}
-      </section>
+      </AuthenticatedAppShell>
     );
   }
 
+  const hasRegistrationPasswordError =
+    mode === "register" && errorMessage === REGISTRATION_PASSWORD_REQUIREMENT;
+
   return (
-    <EntryShell>
-      <section className="mt-10 border-t border-neutral-300 pt-6">
-        <div className="flex items-center justify-between gap-4">
-          <h2 className="text-lg font-medium">登录或注册</h2>
-          <div aria-label="认证方式" className="flex border border-neutral-300">
-            {(["login", "register"] as const).map((candidate) => (
-              <button
-                aria-pressed={mode === candidate}
-                className="px-3 py-1.5 text-sm aria-pressed:bg-neutral-900 aria-pressed:text-white"
-                key={candidate}
-                onClick={() => {
-                  setMode(candidate);
-                  setErrorMessage(undefined);
-                  setPassword("");
-                }}
-                type="button"
-              >
-                {candidate === "login" ? "登录" : "注册"}
-              </button>
-            ))}
-          </div>
+    <ProductEntryShell diagnostic={<HealthStatus />}>
+      <section className="auth-task">
+        <header className="auth-task-header">
+          <p className="auth-task-kicker">Welcome back</p>
+          <h2>登录或注册</h2>
+          <p>
+            {mode === "login"
+              ? "继续你的下一场完整模拟。"
+              : "创建账户，开始第一次文字群面。"}
+          </p>
+        </header>
+        <div aria-label="认证方式" className="auth-mode-switch">
+          {(["login", "register"] as const).map((candidate) => (
+            <button
+              aria-pressed={mode === candidate}
+              key={candidate}
+              onClick={() => {
+                setMode(candidate);
+                setErrorMessage(undefined);
+                setPassword("");
+              }}
+              type="button"
+            >
+              {candidate === "login" ? "登录" : "注册"}
+            </button>
+          ))}
         </div>
 
         <form
-          className="mt-5 grid gap-4"
+          aria-label={mode === "login" ? "登录账户" : "注册账户"}
+          className="auth-form"
           onSubmit={(event) => void submitCredentials(event)}
         >
-          <label className="grid gap-1 text-sm" htmlFor="auth-username">
-            用户名
+          <label className="auth-field" htmlFor="auth-username">
+            <span>用户名</span>
             <input
+              aria-describedby={
+                errorMessage && !hasRegistrationPasswordError
+                  ? "auth-error"
+                  : undefined
+              }
               autoComplete="username"
-              className="border border-neutral-300 bg-white px-3 py-2"
               id="auth-username"
               maxLength={32}
               minLength={3}
@@ -256,34 +389,68 @@ export default function AuthPanel() {
               value={username}
             />
           </label>
-          <label className="grid gap-1 text-sm" htmlFor="auth-password">
-            密码
+          <label className="auth-field" htmlFor="auth-password">
+            <span>密码</span>
             <input
+              aria-label="密码"
+              aria-describedby={
+                mode === "register"
+                  ? errorMessage
+                    ? "auth-password-requirement auth-error"
+                    : "auth-password-requirement"
+                  : errorMessage
+                    ? "auth-error"
+                    : undefined
+              }
+              aria-invalid={hasRegistrationPasswordError || undefined}
               autoComplete={
                 mode === "login" ? "current-password" : "new-password"
               }
-              className="border border-neutral-300 bg-white px-3 py-2"
               id="auth-password"
-              onChange={(event) => setPassword(event.target.value)}
+              maxLength={128}
+              minLength={mode === "register" ? 8 : undefined}
+              onChange={(event) => {
+                setPassword(event.target.value);
+                if (hasRegistrationPasswordError) {
+                  setErrorMessage(undefined);
+                }
+              }}
+              onInvalid={(event) => {
+                if (mode === "register") {
+                  event.preventDefault();
+                  setErrorMessage(REGISTRATION_PASSWORD_REQUIREMENT);
+                }
+              }}
               required
               type="password"
               value={password}
             />
+            {mode === "register" ? (
+              <small className="auth-field-hint" id="auth-password-requirement">
+                {REGISTRATION_PASSWORD_REQUIREMENT}
+              </small>
+            ) : null}
           </label>
           <button
-            className="justify-self-start bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+            className="auth-submit"
             disabled={pending || !client}
             type="submit"
           >
-            {pending ? "正在提交…" : mode === "login" ? "登录" : "创建账户"}
+            {pending
+              ? mode === "login"
+                ? "正在登录…"
+                : "正在创建…"
+              : mode === "login"
+                ? "登录"
+                : "创建账户"}
           </button>
         </form>
         {errorMessage ? (
-          <p aria-live="polite" className="mt-3 text-sm text-red-700">
+          <p aria-live="polite" className="auth-error" id="auth-error">
             {errorMessage}
           </p>
         ) : null}
       </section>
-    </EntryShell>
+    </ProductEntryShell>
   );
 }

@@ -4,9 +4,10 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
   within,
 } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { QuestionDetail, SessionSnapshot } from "@/lib/api/client";
 
@@ -16,6 +17,62 @@ import DiscussionWorkspace, {
 } from "./discussion-workspace";
 import SessionProgressPanel from "./session-progress-panel";
 import TaskBriefPanel from "./task-brief-panel";
+
+let workspaceViewportWidth = 1440;
+
+class WorkspaceResizeObserver {
+  readonly callback: ResizeObserverCallback;
+
+  constructor(callback: ResizeObserverCallback) {
+    this.callback = callback;
+  }
+
+  disconnect() {}
+
+  observe(target: Element) {
+    this.callback(
+      [
+        {
+          contentRect: { width: workspaceViewportWidth },
+          target,
+        } as ResizeObserverEntry,
+      ],
+      this,
+    );
+  }
+
+  unobserve() {}
+}
+
+class WorkspacePointerEvent extends MouseEvent {
+  readonly pointerId: number;
+
+  constructor(type: string, init: PointerEventInit = {}) {
+    super(type, init);
+    this.pointerId = init.pointerId ?? 0;
+  }
+}
+
+function configureWorkspaceViewport(width: number) {
+  workspaceViewportWidth = width;
+  Object.defineProperty(window, "innerWidth", {
+    configurable: true,
+    value: width,
+  });
+  Object.defineProperty(window, "matchMedia", {
+    configurable: true,
+    value: vi.fn((query: string) => ({
+      addEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+      matches: query === "(min-width: 1200px)" && width >= 1200,
+      media: query,
+      onchange: null,
+      removeEventListener: vi.fn(),
+    })),
+  });
+  vi.stubGlobal("ResizeObserver", WorkspaceResizeObserver);
+  vi.stubGlobal("PointerEvent", WorkspacePointerEvent);
+}
 
 const QUESTION: QuestionDetail = {
   id: "21000000-0000-4000-8000-000000000001",
@@ -50,7 +107,6 @@ const PARTICIPANTS: SessionSnapshot["floor"]["participants"] = [
 ];
 
 const HEADER: SessionHeaderProps = {
-  productName: "AI 群面训练场",
   sessionTitle: "社区活动资源安排",
   phaseLabel: "讨论与评估",
   countdown: "3:20",
@@ -86,7 +142,16 @@ const SURFACE_EXPECTATIONS = [
   { label: "进程", panelId: "progress-surface", tabId: "progress-tab" },
 ] as const;
 
-afterEach(() => cleanup());
+beforeEach(() => {
+  window.localStorage.clear();
+  configureWorkspaceViewport(1440);
+});
+
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
 
 function MountProbe({
   name,
@@ -101,7 +166,13 @@ function MountProbe({
   return <p>{name} 内容</p>;
 }
 
-function WorkspaceHarness({ onMount }: { onMount?: (name: string) => void }) {
+function WorkspaceHarness({
+  header = HEADER,
+  onMount,
+}: {
+  header?: SessionHeaderProps;
+  onMount?: (name: string) => void;
+}) {
   const [activeSurface, setActiveSurface] =
     useState<ActiveDiscussionSurface>("discussion");
 
@@ -109,7 +180,7 @@ function WorkspaceHarness({ onMount }: { onMount?: (name: string) => void }) {
     <DiscussionWorkspace
       activeSurface={activeSurface}
       discussion={<MountProbe name="讨论" onMount={onMount} />}
-      header={HEADER}
+      header={header}
       onActiveSurfaceChange={setActiveSurface}
       progress={<MountProbe name="进程" onMount={onMount} />}
       taskBrief={<MountProbe name="题目" onMount={onMount} />}
@@ -124,11 +195,12 @@ describe("DiscussionWorkspace", () => {
     const root = container.firstElementChild;
     expect(root).toHaveClass(
       "flex",
-      "h-dvh",
-      "max-h-dvh",
+      "h-full",
+      "max-h-full",
       "overflow-hidden",
       "flex-col",
     );
+    expect(root).toHaveAttribute("data-scroll-owner", "viewport-constrained");
     expect(screen.getByRole("banner")).toHaveClass("shrink-0");
     expect(screen.getByRole("tablist", { name: "讨论工作区" })).toHaveClass(
       "shrink-0",
@@ -139,18 +211,31 @@ describe("DiscussionWorkspace", () => {
 
     const grid = screen.getByTestId("discussion-workspace-grid");
     expect(grid).toHaveClass("min-h-0", "flex-1", "overflow-hidden");
+    expect(grid).toHaveAttribute("data-scroll-owner", "none");
     expect(screen.getByRole("tabpanel", { name: "题目" })).toHaveClass(
       "min-h-0",
       "overflow-y-auto",
+    );
+    expect(screen.getByRole("tabpanel", { name: "题目" })).toHaveAttribute(
+      "data-scroll-owner",
+      "task-panel",
     );
     expect(screen.getByRole("tabpanel", { name: "进程" })).toHaveClass(
       "min-h-0",
       "overflow-y-auto",
     );
+    expect(screen.getByRole("tabpanel", { name: "进程" })).toHaveAttribute(
+      "data-scroll-owner",
+      "progress-panel",
+    );
     expect(screen.getByRole("tabpanel", { name: "讨论" })).toHaveClass(
       "h-full",
       "min-h-0",
       "overflow-hidden",
+    );
+    expect(screen.getByRole("tabpanel", { name: "讨论" })).toHaveAttribute(
+      "data-scroll-owner",
+      "discussion-transcript",
     );
   });
 
@@ -159,9 +244,10 @@ describe("DiscussionWorkspace", () => {
 
     const header = screen.getByRole("banner");
     expect(header).toHaveAttribute("data-testid", "training-session-header");
-    const identity = within(header).getByTestId("studio-identity");
-    expect(identity).toHaveTextContent("AI 群面训练场");
-    expect(identity).toHaveTextContent("Interview Simulation Studio");
+    expect(within(header).queryByText("AI 群面训练场")).not.toBeInTheDocument();
+    expect(
+      within(header).queryByText("Interview Simulation Studio"),
+    ).not.toBeInTheDocument();
     expect(
       within(header).getByRole("heading", {
         level: 1,
@@ -175,18 +261,51 @@ describe("DiscussionWorkspace", () => {
     expect(within(header).getByTestId("header-countdown")).toHaveTextContent(
       HEADER.countdown!,
     );
+    expect(within(header).getByText(HEADER.connectionLabel)).toHaveAttribute(
+      "data-connection-state",
+      HEADER.connection,
+    );
     expect(within(header).getByTestId("header-actions")).toHaveTextContent(
       "结束会话",
+    );
+    expect(within(header).getByTestId("header-title-region")).toHaveAttribute(
+      "data-overflow-policy",
+      "truncate",
+    );
+    expect(within(header).getByTestId("header-status-region")).toHaveAttribute(
+      "data-control-priority",
+      "preserve",
+    );
+  });
+
+  it("keeps status, countdown and actions structurally protected beside a long title", () => {
+    const longTitle =
+      "这是一个需要在非常有限资源下完成跨部门协作并说明多项硬约束取舍的超长训练题目标题";
+    render(
+      <WorkspaceHarness header={{ ...HEADER, sessionTitle: longTitle }} />,
+    );
+
+    const header = screen.getByTestId("training-session-header");
+    expect(header).toHaveClass("training-session-header");
+    expect(
+      within(header).getByRole("heading", { name: longTitle }),
+    ).toHaveClass("truncate");
+    expect(within(header).getByTestId("header-status-region")).toContainElement(
+      within(header).getByTestId("header-countdown"),
+    );
+    expect(within(header).getByTestId("header-actions")).toHaveClass(
+      "training-session-header-actions",
     );
   });
   it("renders one desktop three-region studio with Discussion as visual priority", () => {
     render(<WorkspaceHarness />);
 
     const grid = screen.getByTestId("discussion-workspace-grid");
-    expect(grid).toHaveClass(
-      "min-[1200px]:grid-cols-[minmax(16rem,0.85fr)_minmax(36rem,2.4fr)_minmax(16rem,0.85fr)]",
-    );
     expect(grid).toHaveAttribute("data-desktop-layout", "three-column");
+    expect(grid).toHaveAttribute(
+      "data-desktop-columns",
+      "support-280 primary-min-520 support-280",
+    );
     expect(screen.getByRole("tabpanel", { name: "题目" })).toHaveClass(
       "min-[1200px]:!block",
     );
@@ -198,10 +317,9 @@ describe("DiscussionWorkspace", () => {
       "data-region-priority",
       "primary",
     );
-    expect(screen.getByRole("tabpanel", { name: "讨论" })).toHaveClass(
-      "min-[1200px]:shadow-[0_12px_32px_rgba(15,23,42,0.08)]",
-      "min-[1200px]:ring-1",
-      "min-[1200px]:ring-neutral-200",
+    expect(screen.getByRole("tabpanel", { name: "讨论" })).toHaveAttribute(
+      "data-region-role",
+      "live-discussion",
     );
     expect(screen.getByRole("tabpanel", { name: "进程" })).toHaveClass(
       "min-[1200px]:!block",
@@ -209,6 +327,222 @@ describe("DiscussionWorkspace", () => {
     expect(screen.getByRole("tabpanel", { name: "进程" })).toHaveAttribute(
       "data-region-priority",
       "support",
+    );
+  });
+
+  it("starts desktop training at 280 / 280 with two accessible separators", async () => {
+    render(<WorkspaceHarness />);
+
+    const separators = await screen.findAllByRole("separator");
+    expect(separators).toHaveLength(2);
+    const left = screen.getByRole("separator", {
+      name: "调整题目与思考面板宽度",
+    });
+    const right = screen.getByRole("separator", {
+      name: "调整训练进程面板宽度",
+    });
+    expect(left).toHaveAttribute("aria-orientation", "vertical");
+    expect(left).toHaveAttribute("aria-valuemin", "220");
+    expect(left).toHaveAttribute("aria-valuemax", "420");
+    expect(left).toHaveAttribute("aria-valuenow", "280");
+    expect(right).toHaveAttribute("aria-valuemin", "220");
+    expect(right).toHaveAttribute("aria-valuemax", "380");
+    expect(right).toHaveAttribute("aria-valuenow", "280");
+    expect(left).toHaveAttribute("tabindex", "0");
+    expect(right).toHaveAttribute("tabindex", "0");
+    expect(left).toHaveClass("training-workspace-separator");
+    expect(screen.queryByRole("button", { name: /保存/ })).toBeNull();
+
+    const grid = screen.getByTestId("discussion-workspace-grid");
+    expect(grid.style.getPropertyValue("--workspace-left-width")).toBe("280px");
+    expect(grid.style.getPropertyValue("--workspace-right-width")).toBe(
+      "280px",
+    );
+    expect(Object.entries(window.localStorage)).toEqual([]);
+  });
+
+  it("resizes only the left panel with pointer capture and persists on completion", async () => {
+    render(<WorkspaceHarness />);
+    const left = await screen.findByRole("separator", {
+      name: "调整题目与思考面板宽度",
+    });
+    const setPointerCapture = vi.fn();
+    const releasePointerCapture = vi.fn();
+    Object.assign(left, {
+      hasPointerCapture: () => true,
+      releasePointerCapture,
+      setPointerCapture,
+    });
+
+    fireEvent.pointerDown(left, { clientX: 500, pointerId: 7 });
+    fireEvent.pointerMove(left, { clientX: 580, pointerId: 7 });
+
+    const grid = screen.getByTestId("discussion-workspace-grid");
+    expect(grid.style.getPropertyValue("--workspace-left-width")).toBe("360px");
+    expect(grid.style.getPropertyValue("--workspace-right-width")).toBe(
+      "280px",
+    );
+    expect(grid).toHaveAttribute("data-resizing-panel", "left");
+    expect(setPointerCapture).toHaveBeenCalledWith(7);
+    expect(window.localStorage.length).toBe(0);
+
+    fireEvent.pointerUp(left, { clientX: 580, pointerId: 7 });
+    expect(releasePointerCapture).toHaveBeenCalledWith(7);
+    expect(grid).not.toHaveAttribute("data-resizing-panel");
+    expect(window.localStorage.getItem("gia.training.workspace.layout")).toBe(
+      '{"version":1,"leftWidth":360,"rightWidth":280}',
+    );
+  });
+
+  it("resizes only the right panel and clamps both panels to hard bounds", async () => {
+    render(<WorkspaceHarness />);
+    const grid = screen.getByTestId("discussion-workspace-grid");
+    const left = await screen.findByRole("separator", {
+      name: "调整题目与思考面板宽度",
+    });
+    const right = screen.getByRole("separator", {
+      name: "调整训练进程面板宽度",
+    });
+    Object.assign(left, {
+      hasPointerCapture: () => false,
+      setPointerCapture: vi.fn(),
+    });
+    Object.assign(right, {
+      hasPointerCapture: () => false,
+      setPointerCapture: vi.fn(),
+    });
+
+    fireEvent.pointerDown(right, { clientX: 1000, pointerId: 1 });
+    fireEvent.pointerMove(right, { clientX: 900, pointerId: 1 });
+    fireEvent.pointerUp(right, { clientX: 900, pointerId: 1 });
+    expect(grid.style.getPropertyValue("--workspace-left-width")).toBe("280px");
+    expect(grid.style.getPropertyValue("--workspace-right-width")).toBe(
+      "380px",
+    );
+
+    fireEvent.pointerDown(right, { clientX: 1000, pointerId: 2 });
+    fireEvent.pointerMove(right, { clientX: 2000, pointerId: 2 });
+    fireEvent.pointerUp(right, { clientX: 2000, pointerId: 2 });
+    expect(grid.style.getPropertyValue("--workspace-right-width")).toBe(
+      "220px",
+    );
+
+    fireEvent.pointerDown(left, { clientX: 500, pointerId: 3 });
+    fireEvent.pointerMove(left, { clientX: 1000, pointerId: 3 });
+    fireEvent.pointerUp(left, { clientX: 1000, pointerId: 3 });
+    expect(grid.style.getPropertyValue("--workspace-left-width")).toBe("420px");
+
+    fireEvent.pointerDown(left, { clientX: 500, pointerId: 4 });
+    fireEvent.pointerMove(left, { clientX: 0, pointerId: 4 });
+    fireEvent.pointerUp(left, { clientX: 0, pointerId: 4 });
+    expect(grid.style.getPropertyValue("--workspace-left-width")).toBe("220px");
+  });
+
+  it("dynamically clamps an aggressive side resize to preserve a 520px center", async () => {
+    configureWorkspaceViewport(1200);
+    render(<WorkspaceHarness />);
+    const left = await screen.findByRole("separator", {
+      name: "调整题目与思考面板宽度",
+    });
+    Object.assign(left, {
+      hasPointerCapture: () => false,
+      setPointerCapture: vi.fn(),
+    });
+
+    expect(left).toHaveAttribute("aria-valuemax", "320");
+    fireEvent.pointerDown(left, { clientX: 300, pointerId: 1 });
+    fireEvent.pointerMove(left, { clientX: 1300, pointerId: 1 });
+    fireEvent.pointerUp(left, { clientX: 1300, pointerId: 1 });
+
+    expect(left).toHaveAttribute("aria-valuenow", "320");
+    expect(screen.getByTestId("discussion-workspace-grid")).toHaveAttribute(
+      "data-center-min-width",
+      "520",
+    );
+  });
+
+  it("supports 16px and Shift+40px screen-axis keyboard resizing and persists each step", async () => {
+    render(<WorkspaceHarness />);
+    const left = await screen.findByRole("separator", {
+      name: "调整题目与思考面板宽度",
+    });
+    const right = screen.getByRole("separator", {
+      name: "调整训练进程面板宽度",
+    });
+
+    fireEvent.keyDown(left, { key: "ArrowRight" });
+    expect(left).toHaveAttribute("aria-valuenow", "296");
+    expect(window.localStorage.getItem("gia.training.workspace.layout")).toBe(
+      '{"version":1,"leftWidth":296,"rightWidth":280}',
+    );
+    fireEvent.keyDown(left, { key: "ArrowLeft", shiftKey: true });
+    expect(left).toHaveAttribute("aria-valuenow", "256");
+
+    fireEvent.keyDown(right, { key: "ArrowLeft" });
+    expect(right).toHaveAttribute("aria-valuenow", "296");
+    fireEvent.keyDown(right, { key: "ArrowRight", shiftKey: true });
+    expect(right).toHaveAttribute("aria-valuenow", "256");
+    expect(window.localStorage.getItem("gia.training.workspace.layout")).toBe(
+      '{"version":1,"leftWidth":256,"rightWidth":256}',
+    );
+  });
+
+  it("keeps current-page resizing functional when browser storage rejects writes", async () => {
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("full", "QuotaExceededError");
+    });
+    render(<WorkspaceHarness />);
+    const left = await screen.findByRole("separator", {
+      name: "调整题目与思考面板宽度",
+    });
+
+    fireEvent.keyDown(left, { key: "ArrowRight" });
+
+    expect(left).toHaveAttribute("aria-valuenow", "296");
+    expect(screen.getByTestId("discussion-workspace-grid")).toHaveStyle({
+      "--workspace-left-width": "296px",
+    });
+  });
+
+  it("restores a valid preference on reload and a later workspace mount", async () => {
+    window.localStorage.setItem(
+      "gia.training.workspace.layout",
+      '{"version":1,"leftWidth":352,"rightWidth":336}',
+    );
+    const first = render(<WorkspaceHarness />);
+
+    await waitFor(() =>
+      expect(
+        screen
+          .getByTestId("discussion-workspace-grid")
+          .style.getPropertyValue("--workspace-left-width"),
+      ).toBe("352px"),
+    );
+    first.unmount();
+    render(<WorkspaceHarness />);
+    const grid = await screen.findByTestId("discussion-workspace-grid");
+    await waitFor(() =>
+      expect(grid.style.getPropertyValue("--workspace-right-width")).toBe(
+        "336px",
+      ),
+    );
+  });
+
+  it("keeps stored desktop widths dormant and renders no separators on tablet/mobile", () => {
+    configureWorkspaceViewport(768);
+    window.localStorage.setItem(
+      "gia.training.workspace.layout",
+      '{"version":1,"leftWidth":420,"rightWidth":380}',
+    );
+    render(<WorkspaceHarness />);
+
+    const grid = screen.getByTestId("discussion-workspace-grid");
+    expect(screen.queryByRole("separator")).toBeNull();
+    expect(grid.style.getPropertyValue("--workspace-left-width")).toBe("");
+    expect(grid.style.getPropertyValue("--workspace-right-width")).toBe("");
+    expect(screen.getByTestId("tablet-support-controls")).toBeVisible();
+    expect(window.localStorage.getItem("gia.training.workspace.layout")).toBe(
+      '{"version":1,"leftWidth":420,"rightWidth":380}',
     );
   });
 
@@ -338,6 +672,10 @@ describe("TaskBriefPanel", () => {
       "data-content-priority",
       "primary",
     );
+    expect(screen.getByText("CASE BRIEF")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "题目与思考" }),
+    ).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: QUESTION.title })).toHaveClass(
       "text-xl",
       "font-semibold",
@@ -351,7 +689,7 @@ describe("TaskBriefPanel", () => {
     expect(screen.getByText("总资源不得超过 100 个单位。")).toBeInTheDocument();
     expect(screen.getByText("基础服务")).toBeInTheDocument();
     expect(
-      screen.getByText("资源分配 · 标准 · 约 25 分钟"),
+      screen.getByText("资源分配型 · 标准 · 约 25 分钟"),
     ).toBeInTheDocument();
     expect(screen.queryByText("不进入初始任务面板")).not.toBeInTheDocument();
     expect(screen.queryByText("不渲染的利益相关方")).not.toBeInTheDocument();
@@ -359,6 +697,26 @@ describe("TaskBriefPanel", () => {
     expect(
       screen.queryByText(/AI 提示|参考答案|建议发言/),
     ).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["ORDERING_SELECTION", "排序选择型"],
+    ["RESOURCE_ALLOCATION", "资源分配型"],
+    ["PLAN_DESIGN", "方案策划型"],
+  ])("presents %s with the frozen product label", (questionType, label) => {
+    const { container } = render(
+      <TaskBriefPanel
+        notes=""
+        onNotesChange={vi.fn()}
+        questionState={{
+          kind: "available",
+          question: { ...QUESTION, question_type: questionType },
+        }}
+      />,
+    );
+
+    expect(screen.getByText(new RegExp(`^${label} ·`))).toBeVisible();
+    expect(container.textContent).not.toMatch(/PRIORITIZATION|OPEN_DISCUSSION/);
   });
 
   it("keeps notes controlled and makes the no-storage boundary visible", () => {
@@ -377,7 +735,7 @@ describe("TaskBriefPanel", () => {
     ).toHaveAttribute("data-private-notes", "memory-only");
     expect(
       screen.getByRole("region", { name: "我的思路 / 私人笔记" }),
-    ).toHaveClass("rounded-xl", "bg-neutral-50");
+    ).toHaveAttribute("data-private-notes", "memory-only");
     expect(notes).toHaveClass(
       "focus-visible:ring-2",
       "focus-visible:ring-indigo-500",
@@ -453,6 +811,10 @@ describe("SessionProgressPanel", () => {
       "data-progress-model",
       "six-phase",
     );
+    expect(screen.getByText("SESSION STATE")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "训练进程" }),
+    ).toBeInTheDocument();
     const phaseList = screen.getByRole("list", { name: "讨论阶段" });
     expect(
       within(phaseList)
@@ -489,7 +851,9 @@ describe("SessionProgressPanel", () => {
     expect(screen.getByText("等待服务端提供阶段时间")).toBeInTheDocument();
     expect(screen.getByText("当前发言：AI 候选人 1")).toBeInTheDocument();
     expect(screen.getByText("连接正常")).toBeInTheDocument();
-    expect(screen.queryByText(/投票|结论|报告|共识率/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/Discussion Memory|讨论结构|投票|结论|报告|共识率/i),
+    ).not.toBeInTheDocument();
     expect(screen.queryByText(/每阶段|分钟\/阶段/)).not.toBeInTheDocument();
   });
 

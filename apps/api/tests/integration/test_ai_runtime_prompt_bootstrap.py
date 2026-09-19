@@ -31,6 +31,7 @@ from group_interview_arena_api.modules.ai_runtime.domain import (
 from group_interview_arena_api.modules.ai_runtime.seed import (
     AI_CANDIDATE_TURN_V2,
     AI_CANDIDATE_TURN_V3,
+    AI_CANDIDATE_TURN_V4,
     DISCUSSION_MEMORY_UPDATE_V1,
     DISCUSSION_MEMORY_UPDATE_V2,
 )
@@ -99,6 +100,7 @@ async def _verify_normal_lifespan_publication(
                     select(func.count()).select_from(PromptVersion)
                 )
                 v3 = await session.get(PromptVersion, AI_CANDIDATE_TURN_V3.id)
+                v4 = await session.get(PromptVersion, AI_CANDIDATE_TURN_V4.id)
                 memory_prompt = await session.get(
                     PromptVersion, DISCUSSION_MEMORY_UPDATE_V1.id
                 )
@@ -106,8 +108,9 @@ async def _verify_normal_lifespan_publication(
                     PromptVersion, DISCUSSION_MEMORY_UPDATE_V2.id
                 )
             assert row is not None
-            assert count == 4
+            assert count == 5
             assert v3 is not None
+            assert v4 is not None
             assert memory_prompt is not None
             assert memory_prompt_v2 is not None
             snapshot = _prompt_snapshot(row)
@@ -166,7 +169,7 @@ async def _verify_v1_is_immutable_during_bootstrap(
             )
         assert after is not None
         assert v2 is not None
-        assert count == 5
+        assert count == 6
         assert _prompt_snapshot(after) == before_snapshot
 
 

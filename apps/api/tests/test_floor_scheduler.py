@@ -17,6 +17,8 @@ from group_interview_arena_api.modules.floor_control.domain import (
 )
 from group_interview_arena_api.modules.floor_control.scheduler import (
     V0_1_SCHEDULER_POLICY,
+    V0_1_SCHEDULER_POLICY_V1,
+    V0_1_SCHEDULER_POLICY_V2,
     SchedulerGrantHistory,
     SchedulerInput,
     SchedulerOpportunity,
@@ -30,6 +32,9 @@ NOW = datetime(2026, 8, 20, 8, 0, tzinfo=UTC)
 
 def _uuid(value: int) -> UUID:
     return UUID(int=value)
+
+
+SESSION_ID = _uuid(899)
 
 
 def _participant(
@@ -73,8 +78,10 @@ def _input(
     opportunities: tuple[SchedulerOpportunity, ...] = (),
     history: tuple[SchedulerGrantHistory, ...] = (),
     now: datetime = NOW,
+    session_id: UUID = SESSION_ID,
 ) -> SchedulerInput:
     return SchedulerInput(
+        session_id=session_id,
         decision_id=_uuid(900),
         phase=phase,
         expected_last_sequence=7,
@@ -111,6 +118,35 @@ def test_identical_and_shuffled_inputs_have_identical_decision_semantics() -> No
         )
         assert actual == expected
     assert expected.selected_participant_id == participants[2].participant_id
+
+
+@pytest.mark.parametrize(
+    "kind",
+    (
+        SpeakingOpportunityKind.PHASE_MANDATED,
+        SpeakingOpportunityKind.EXPLICIT_REQUEST,
+        SpeakingOpportunityKind.NOMINATION,
+    ),
+)
+def test_real_opportunity_priority_precedes_equal_human_participation(
+    kind: SpeakingOpportunityKind,
+) -> None:
+    human = _participant(13, 1, actor=ParticipantActorKind.HUMAN)
+    ai = _participant(14, 2)
+    opportunity = SchedulerOpportunity(
+        opportunity_id=_uuid(101),
+        participant_id=ai.participant_id,
+        kind=kind,
+        created_at=NOW - timedelta(seconds=5),
+    )
+
+    decision = decide_floor(
+        _input((human, ai), opportunities=(opportunity,)),
+        V0_1_SCHEDULER_POLICY,
+    )
+
+    assert decision.selected_participant_id == ai.participant_id
+    assert decision.opportunity_id == opportunity.opportunity_id
 
 
 def test_first_opportunity_precedes_already_granted_candidate() -> None:
@@ -189,8 +225,78 @@ def test_phase_aware_order_and_stable_tie_break() -> None:
     )
 
     assert discussion.selected_participant_id == older.participant_id
-    assert opening.selected_participant_id == newer.participant_id
-    assert opening.metadata.tie_break_class == "SEAT_ORDER"
+    assert opening.selected_participant_id in {
+        newer.participant_id,
+        older.participant_id,
+    }
+    assert opening.metadata.tie_break_class == "PARTICIPANT_ID"
+
+
+def test_human_keeps_equal_priority_before_session_shuffled_ai_order() -> None:
+    human = _participant(52, 4, actor=ParticipantActorKind.HUMAN)
+    ai_participants = tuple(_participant(index, index) for index in range(53, 56))
+
+    decision = decide_floor(
+        _input((ai_participants[2], human, *ai_participants[:2])),
+        V0_1_SCHEDULER_POLICY,
+    )
+
+    assert decision.selected_participant_id == human.participant_id
+    assert decision.metadata.tie_break_class == "NOT_APPLICABLE"
+
+
+def test_final_tie_break_is_retry_stable_but_session_and_phase_aware() -> None:
+    participants = tuple(_participant(index, index) for index in range(1, 5))
+    baseline = _input(participants, phase=SessionStatus.OPENING_STATEMENTS)
+
+    first = decide_floor(baseline, V0_1_SCHEDULER_POLICY)
+    retry = decide_floor(
+        replace(baseline, participants=tuple(reversed(participants))),
+        V0_1_SCHEDULER_POLICY,
+    )
+    different_decision_id = decide_floor(
+        replace(baseline, decision_id=_uuid(999)),
+        V0_1_SCHEDULER_POLICY,
+    )
+    alternatives = {
+        decide_floor(
+            replace(baseline, session_id=_uuid(session_number)),
+            V0_1_SCHEDULER_POLICY,
+        ).selected_participant_id
+        for session_number in range(901, 921)
+    }
+    later_phase = decide_floor(
+        replace(baseline, phase=SessionStatus.FINAL_SUMMARY),
+        V0_1_SCHEDULER_POLICY,
+    )
+    phase_pairs = {
+        (
+            decide_floor(
+                replace(baseline, session_id=_uuid(session_number)),
+                V0_1_SCHEDULER_POLICY,
+            ).selected_participant_id,
+            decide_floor(
+                replace(
+                    baseline,
+                    session_id=_uuid(session_number),
+                    phase=SessionStatus.FINAL_SUMMARY,
+                ),
+                V0_1_SCHEDULER_POLICY,
+            ).selected_participant_id,
+        )
+        for session_number in range(901, 921)
+    }
+
+    assert retry == first
+    assert (
+        different_decision_id.selected_participant_id == first.selected_participant_id
+    )
+    assert len(alternatives) > 1
+    assert any(opening != final for opening, final in phase_pairs)
+    assert later_phase.selected_participant_id in {
+        participant.participant_id for participant in participants
+    }
+    assert first.metadata.tie_break_class == "PARTICIPANT_ID"
 
 
 def test_shuffled_history_cannot_change_fairness_result() -> None:
@@ -217,7 +323,7 @@ def test_shuffled_history_cannot_change_fairness_result() -> None:
     assert expected.selected_participant_id == second.participant_id
 
 
-def test_uuid_is_final_tie_break_when_slots_are_equal() -> None:
+def test_participant_identity_is_stable_final_tie_break_when_slots_are_equal() -> None:
     higher = _participant(61, 1)
     lower = _participant(60, 1)
 
@@ -226,11 +332,59 @@ def test_uuid_is_final_tie_break_when_slots_are_equal() -> None:
         V0_1_SCHEDULER_POLICY,
     )
 
-    assert decision.selected_participant_id == lower.participant_id
+    assert decision.selected_participant_id in {
+        lower.participant_id,
+        higher.participant_id,
+    }
+    assert decide_floor(_input((lower, higher)), V0_1_SCHEDULER_POLICY) == decision
     assert decision.metadata.tie_break_class == "PARTICIPANT_ID"
 
 
-def test_deadline_pressure_precedes_grant_and_is_explainable() -> None:
+def test_new_scheduler_decisions_publish_distinct_v2_policy_identity() -> None:
+    decision = decide_floor(
+        _input((_participant(1, 1), _participant(2, 2))),
+        V0_1_SCHEDULER_POLICY,
+    )
+
+    assert V0_1_SCHEDULER_POLICY.version == "v0.1-floor-2"
+    assert V0_1_SCHEDULER_POLICY is V0_1_SCHEDULER_POLICY_V2
+    assert decision.policy_version == "v0.1-floor-2"
+
+
+def test_legacy_v1_policy_preserves_seat_then_uuid_tie_break() -> None:
+    lower_seat = _participant(1, 1)
+    higher_seat = _participant(2, 2)
+    scheduler_input = _input(
+        (higher_seat, lower_seat),
+        phase=SessionStatus.OPENING_STATEMENTS,
+    )
+
+    decision = decide_floor(scheduler_input, V0_1_SCHEDULER_POLICY_V1)
+    current = decide_floor(scheduler_input, V0_1_SCHEDULER_POLICY_V2)
+
+    assert decision.selected_participant_id == lower_seat.participant_id
+    assert decision.policy_version == "v0.1-floor-1"
+    assert decision.metadata.tie_break_class == "SEAT_ORDER"
+    assert current.selected_participant_id == higher_seat.participant_id
+    assert current.policy_version == "v0.1-floor-2"
+    assert current.metadata.tie_break_class == "PARTICIPANT_ID"
+
+
+def test_legacy_v1_policy_preserves_public_deadline_intervention() -> None:
+    scheduler_input = replace(
+        _input((_participant(69, 1),)),
+        phase_deadline_at=NOW + timedelta(seconds=10),
+    )
+
+    decision = decide_floor(scheduler_input, V0_1_SCHEDULER_POLICY_V1)
+
+    assert decision.outcome is FloorDecisionOutcome.REQUEST_INTERVENTION
+    assert decision.intervention_kind is FloorInterventionKind.DEADLINE
+    assert decision.primary_reason is FloorPolicyReason.DEADLINE_RECOVERY
+    assert decision.policy_version == "v0.1-floor-1"
+
+
+def test_deadline_pressure_pauses_scheduling_without_public_intervention() -> None:
     scheduler_input = replace(
         _input((_participant(70, 1),)),
         phase_deadline_at=NOW + timedelta(seconds=10),
@@ -238,8 +392,8 @@ def test_deadline_pressure_precedes_grant_and_is_explainable() -> None:
 
     decision = decide_floor(scheduler_input, V0_1_SCHEDULER_POLICY)
 
-    assert decision.outcome is FloorDecisionOutcome.REQUEST_INTERVENTION
-    assert decision.intervention_kind is FloorInterventionKind.DEADLINE
+    assert decision.outcome is FloorDecisionOutcome.NO_GRANT
+    assert decision.intervention_kind is None
     assert decision.primary_reason is FloorPolicyReason.DEADLINE_RECOVERY
 
 

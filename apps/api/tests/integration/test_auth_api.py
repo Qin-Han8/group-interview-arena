@@ -43,7 +43,7 @@ from group_interview_arena_api.identity.sessions import (
 
 pytestmark = pytest.mark.integration
 
-VALID_PASSWORD = "integration-only password phrase"
+VALID_PASSWORD = "Integration-only password 1!"
 TRUSTED_ORIGIN = "http://localhost:3000"
 AUTH_POST_HEADERS = {"Origin": TRUSTED_ORIGIN, "X-GIA-CSRF": "1"}
 
@@ -225,7 +225,7 @@ async def _exercise_registration_failures(
             "/auth/register",
             json={
                 "username": "duplicate_user",
-                "password": "another integration password",
+                "password": "Another integration password 2!",
             },
         )
         _assert_safe_error(duplicate, 409, "USERNAME_UNAVAILABLE")
@@ -247,7 +247,7 @@ async def _exercise_registration_failures(
             "/auth/register",
             json={
                 "username": "rollback_user",
-                "password": "rollback integration password",
+                "password": "Rollback integration password 3!",
             },
         )
         _assert_safe_error(rollback, 500, "INTERNAL_ERROR")
@@ -433,6 +433,38 @@ def test_login_rehash_and_session_failure_rollback_are_atomic(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     run_async(lambda: _exercise_rehash_and_rollback(migrated_database, monkeypatch))
+
+
+async def _exercise_legacy_password_login(
+    temporary_database: TemporaryDatabaseContext,
+) -> None:
+    legacy_password = "legacy lowercase password phrase"
+    async with _auth_client(temporary_database) as (application, client):
+        async with _session_factory(application)() as session:
+            async with session.begin():
+                session.add(
+                    User(
+                        username="legacy_password_user",
+                        password_hash=_old_password_hash(legacy_password),
+                    )
+                )
+
+        login = await client.post(
+            "/auth/login",
+            json={
+                "username": "legacy_password_user",
+                "password": legacy_password,
+            },
+        )
+
+        assert login.status_code == 200
+        assert login.json()["username"] == "legacy_password_user"
+
+
+def test_login_accepts_matching_historical_password_without_registration_policy(
+    migrated_database: TemporaryDatabaseContext,
+) -> None:
+    run_async(lambda: _exercise_legacy_password_login(migrated_database))
 
 
 async def _exercise_me_failures(

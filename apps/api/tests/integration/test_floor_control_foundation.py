@@ -888,7 +888,7 @@ async def _verify_scheduler_retry_fairness_and_audit(
                 "first_opportunity_unmet": True,
                 "previous_owner_was_selected": False,
                 "consecutive_grant_count": 0,
-                "tie_break_class": "SEAT_ORDER",
+                "tie_break_class": "NOT_APPLICABLE",
             }
             sequences = list(
                 (
@@ -966,7 +966,7 @@ def test_concurrent_scheduler_calls_produce_one_active_grant(
     run_async(lambda: _verify_concurrent_scheduling(migrated_database))
 
 
-async def _verify_scheduler_deadline_intervention(
+async def _verify_scheduler_deadline_handoff(
     temporary_database: TemporaryDatabaseContext,
 ) -> None:
     async with _session_factory(temporary_database) as session_factory:
@@ -991,11 +991,7 @@ async def _verify_scheduler_deadline_intervention(
             )
 
         assert duplicate == events
-        assert [(item.sequence, item.event_type) for item in events] == [
-            (4, "floor.intervention_requested")
-        ]
-        assert events[0].payload["intervention_kind"] == "DEADLINE"
-        assert events[0].payload["reason_code"] == "DEADLINE_RECOVERY"
+        assert events == []
         async with session_factory() as session:
             aggregate = await session.get(SimulationSession, session_id)
             decision = await session.get(FloorDecision, command.decision_id)
@@ -1006,15 +1002,15 @@ async def _verify_scheduler_deadline_intervention(
             assert aggregate is not None
             assert aggregate.current_floor_grant_id is None
             assert aggregate.status == SessionStatus.OPENING_STATEMENTS.value
-            assert decision is not None and intervention is not None
-            assert decision.outcome_kind == "REQUEST_INTERVENTION"
-            assert intervention.decision_id == decision.id
+            assert decision is not None and intervention is None
+            assert decision.outcome_kind == "NO_GRANT"
+            assert decision.primary_reason_code == "DEADLINE_RECOVERY"
 
 
-def test_scheduler_deadline_intervention_is_atomic_and_idempotent(
+def test_scheduler_deadline_handoff_is_atomic_and_idempotent(
     migrated_database: TemporaryDatabaseContext,
 ) -> None:
-    run_async(lambda: _verify_scheduler_deadline_intervention(migrated_database))
+    run_async(lambda: _verify_scheduler_deadline_handoff(migrated_database))
 
 
 async def _verify_scheduler_phase_boundary_and_rollback(

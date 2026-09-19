@@ -2,7 +2,7 @@
 
 - Status: `P1-6 DONE / CLOSED`
 - Previous checkpoint: `P1-6E post-stop closeout remediation finding-only review PASS`
-- Current checkpoint: `P1-6E DONE / POST_STOP_CLOSEOUT_REMEDIATION_PASS`; P1 remains `IN_PROGRESS`
+- Current checkpoint: `P1-6E DONE / POST_STOP_CLOSEOUT_REMEDIATION_PASS`; parent P1 is `DONE / CLOSED`
 - P1-6D initial external actual-source review verdict: `BLOCKED`
 - P1-6D initial reviewed bundle: `group-interview-arena-review-20260831-004302.zip`
 - P1-6D initial reviewed bundle SHA-256: `7CE39C1EB4DE8314DCE7DB1CDE9809EB386E0E0CADDED8620D11B47FDB1791D0`
@@ -34,8 +34,8 @@
 - P1-6B implementation reviewed bundle SHA-256: `0EAA4B3FEE82F4D8A82D5098CECFDA1BF04F9161B7A63E7F7779B2512D9347F6`
 - P1-6B implementation findings: `P16B-IMP-001 CLOSED`; `P16B-IMP-002 CLOSED`; `P16B-IMP-003 CLOSED`; `P16B-IMP-004 CLOSED`; `P16B-IMP-005 CLOSED`; `P16B-IMP-006 CLOSED`; `P16B-IMP-007 CLOSED`; new findings `NONE`; open findings `NONE`
 - P1-6D design-time production wiring gap: `NONE`; design-time STOP conditions: `NONE`; production source changes: `NONE`
-- Remaining checkpoint: `NONE`; P1-7/P1-8 remain `NOT_STARTED`
-- Parent phase: `P1 IN_PROGRESS`
+- Remaining checkpoint: `NONE`; P1-7/P1-8 subsequently completed and parent P1 is `DONE / CLOSED`
+- Parent phase: `P1 DONE / CLOSED`
 - Product target: `V0.1 Internal Validation`
 - Authority: [`PROJECT_MASTER_PLAN.md`](../PROJECT_MASTER_PLAN.md) > Accepted [`DECISIONS.md`](../DECISIONS.md) > [`ROADMAP.md`](../ROADMAP.md) > [`TASKS.md`](../TASKS.md) > this plan > domain docs > code
 - Immutable master-plan SHA-256: `2388A9660320406CB35D5354126AD71C6849A98DB7C4A356796CA951BF372F26`
@@ -791,4 +791,4 @@ The three-repair automatic stop condition was honored. The user then explicitly 
 
 The repair-1 cleanup incident remains part of the final record. One temporary database (`gia_p04e_dcaf6d0303de`) and one Playwright `.last-run.json` marker that predated P1-6E acceptance were mistakenly deleted and could not be restored identically. The user explicitly accepted a new post-incident baseline; neither resource was recreated as historical evidence. Later acceptance used run-unique ownership manifests and ownership-only cleanup, and proved the development database unchanged across the accepted post-incident baseline.
 
-Final state: `P16E-001`～`P16E-004`, `P16E-SR1-001`, `P16E-RA-001`, `P16E-RA-002`, `P16E-RA2-001` and `P16E-RA2-002` are `CLOSED`; new findings/open findings are `NONE`; P1-6E and parent P1-6 are `DONE / CLOSED`; P1 remains `IN_PROGRESS`; P1-7/P1-8 remain `NOT_STARTED`; no real provider was called in P1-6E.
+At the P1-6E closeout checkpoint, `P16E-001`～`P16E-004`, `P16E-SR1-001`, `P16E-RA-001`, `P16E-RA-002`, `P16E-RA2-001` and `P16E-RA2-002` were `CLOSED`; new findings/open findings were `NONE`; P1-6E and parent P1-6 were `DONE / CLOSED`; P1 remained `IN_PROGRESS`; P1-7/P1-8 remained `NOT_STARTED`; no real provider was called in P1-6E. The current parent status is recorded in the plan header.

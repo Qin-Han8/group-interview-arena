@@ -1,6 +1,6 @@
 # P1-5 AI Runtime Foundation Execution Plan
 
-Status: `P1 IN_PROGRESS`; `P1-5 IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN`; P1-5A～P1-5F retain historical `DONE`; `P1-5F-3 DONE`; `P1-5F-3A DONE`; `P1-5F-3B DONE` with its recorded evidence；`P1-5F-4 DONE`; `P1-5R IN_PROGRESS / DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN`; R1 `IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PENDING`; F1 `OPEN / IMPLEMENTATION_COMPLETE_AWAITING_REVIEW`; R2-A `NOT_STARTED / BLOCKED_BY_R1`; R2-B/R3 dependency-blocked and `NOT_STARTED`
+Status: `P1 DONE / CLOSED`; `P1-5 DONE`; P1-5A～P1-5F retain historical `DONE`; P1-5R and its post-closeout remediation/review are `CLOSED`; open findings `NONE`
 
 Target version: `V0.1 Internal Validation`
 
@@ -60,7 +60,7 @@ P1-5C 是 separately approved deterministic runtime vertical slice。它在不�
     - `P1-5F-3B — Complete Discussion Page Composition`：`DONE` with `DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_IMPLEMENTATION_REVIEW_PASS / COMMIT_PUSH_COMPLETE / CI_PASS / F4_COMPOSITION_ACCEPTANCE_PASS / FINDINGS_NONE_OPEN`；accepted implementation baseline `5efe1346532b95b7fabdd521015fd9f8199a457f`；CI `33044682226` `SUCCESS`；
   - `P1-5F-4 — Composition E2E + Independent Acceptance`：`DONE`；initial acceptance `BLOCKED` on `F4-ACC-001`；remediation actual-source review `PASS`；accepted commit `af33d89baa0355ae1ee5174a2ef8cfb5e7b14554`；CI `33050532295` `SUCCESS`；independent final acceptance `PASS`；findings `NONE`；`F4-ACC-001 CLOSED`；network-free fake-provider path only。
 
-P1-5D design freeze、implementation and config-driven model patch were separately approved；both actual-source reviews and its final user-run sanitized real-provider acceptance smoke passed，so P1-5D is `DONE`。P1-5E-1、P1-5E-2 and P1-5E-3 are also `DONE` after their required reviews，closing P1-5E as `DONE`。P1-5F-1/P1-5F-2/P1-5F-3A remain historical `DONE` with their recorded evidence。F3B implementation review、commit/push、CI and F4 composition acceptance passed with no findings open；F4 later closed `F4-ACC-001` after review、accepted commit/CI and independent acceptance。Those historical statuses remain unchanged。Later local acceptance opened P1-5R only，so parent P1-5 is currently `IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN` while P1 remains `IN_PROGRESS`。
+P1-5D design freeze、implementation and config-driven model patch were separately approved；both actual-source reviews and its final user-run sanitized real-provider acceptance smoke passed，so P1-5D is `DONE`。P1-5E-1、P1-5E-2 and P1-5E-3 are also `DONE` after their required reviews，closing P1-5E as `DONE`。P1-5F-1/P1-5F-2/P1-5F-3A remain historical `DONE` with their recorded evidence。F3B implementation review、commit/push、CI and F4 composition acceptance passed with no findings open；F4 later closed `F4-ACC-001` after review、accepted commit/CI and independent acceptance。Those historical statuses remain unchanged。Later local acceptance temporarily reopened P1-5R；that remediation and its review are now `CLOSED`, parent P1-5 is `DONE`, and P1 is `DONE / CLOSED`。
 
 ## Context and authority
 
@@ -510,7 +510,7 @@ Still Deferred after the P1-5E-1 docs-only freeze:
 
 ## Later implementation gates
 
-P1-5D implementation and config-driven patch followed the frozen section above without scope expansion；both actual-source reviews and the final user-run sanitized real-provider acceptance smoke passed，and P1-5D is `DONE`。P1-5E-1/E2/E3 and P1-5F-1/F2/F3A/F3B/F4 retain historical `DONE` and all recorded acceptance evidence；`F4-ACC-001` remains `CLOSED`。The parent historically closed after F4，then local acceptance opened P1-5R；therefore P1-5 is currently `IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN` and P1 remains `IN_PROGRESS`。Any later implementation/transport subphase must preserve:
+P1-5D implementation and config-driven patch followed the frozen section above without scope expansion；both actual-source reviews and the final user-run sanitized real-provider acceptance smoke passed，and P1-5D is `DONE`。P1-5E-1/E2/E3 and P1-5F-1/F2/F3A/F3B/F4 retain historical `DONE` and all recorded acceptance evidence；`F4-ACC-001` remains `CLOSED`。The parent historically closed after F4，then local acceptance temporarily reopened P1-5R；that remediation is now `CLOSED`, P1-5 is `DONE`, and P1 is `DONE / CLOSED`。Any later implementation/transport subphase must preserve:
 
 - any additive schema need and historical deletion/retention semantics；
 - provider-neutral request/result/error contract with a real caller；
@@ -833,7 +833,7 @@ If later actual-source implementation disproves any of those facts，requires a 
 - The initial external actual-source review was `BLOCKED` by one floor-event v1 `action_id` compatibility finding。Remediation preserved historical v1 semantics and froze additive floor-event v2 without changing source、schema or ADR authority。
 - The finding-only external re-review verdict is `PASS` with findings none。Reviewed bundle：`group-interview-arena-review-20260825-110115.zip`；SHA-256：`6603b1f0377aa449d3a209e475fb3afbb74f9f83c9be38f84df97918eeb1ac0c`。
 - A narrow F1 command erratum was later discovered during P1-5F-2 actual-source review：the previously approved exact-floor binding is restored by requiring `floor_grant_id` in the v1 submit payload and matching it to the locked authoritative current grant。This does not reopen the unrelated F1 design or alter the independently versioned public-event contract。
-- At the P1-5F-1 closeout checkpoint，P1-5F-2～F4 were `NOT_STARTED` and no commit or push was authorized。After separately approved later turns，P1-5F-1/P1-5F-2/P1-5F-3A/F3B/F4 became historical `DONE` with the recorded evidence，and parent P1-5 historically closed。Later local acceptance opened P1-5R only；the current parent state is therefore `P1-5 IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN` while all F descendants remain historical `DONE`。
+- At the P1-5F-1 closeout checkpoint，P1-5F-2～F4 were `NOT_STARTED` and no commit or push was authorized。After separately approved later turns，P1-5F-1/P1-5F-2/P1-5F-3A/F3B/F4 became historical `DONE` with the recorded evidence，and parent P1-5 historically closed。Later local acceptance temporarily reopened P1-5R；the current parent state is `P1-5 DONE`, P1-5R is `CLOSED`, and all F descendants remain historical `DONE`。
 
 
 ## P1-5R post-closeout remediation design freeze
@@ -843,7 +843,7 @@ P1-5R is the approved remediation track for four findings found by real local ac
 - R1 freezes deterministic phase-entry progression recovery and connected deadline catch-up ordering without a new scheduler authority or background loop。
 - R2-A freezes loaded-session viewport ownership、transcript-local scrolling and a presentation-only new-message return affordance；R2-B preserves the F3B Interview Simulation Studio composition across `1440x900`、`900x900` and `390x844`。
 - R3 freezes Prompt Version v2 selection、bounded recent public transcript context、pure Persona-to-behavior translation and three-layer network-free acceptance；real-provider checks remain separately approval-gated。
-- Current state is `P1-5R IN_PROGRESS / DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN`; R1 `IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PENDING`; F1 `OPEN / IMPLEMENTATION_COMPLETE_AWAITING_REVIEW`; R2-A `NOT_STARTED / BLOCKED_BY_R1`; R2-B `NOT_STARTED / BLOCKED_BY_R2-A`; R3 `NOT_STARTED / BLOCKED_BY_R2-B`; F2/Visual fidelity remediation/F3 remain `OPEN`; open implementation findings `NONE`。
+- Current state is `P1-5 DONE`; P1-5R R1/R2-A/R2-B/R3 are `DONE`, F1/F2/Visual fidelity remediation/F3 and the post-closeout cancellation finding/review are `CLOSED`, and open findings are `NONE`。Historical batch gates below remain preserved as the record of execution order。
 - Detailed implementation authority: [`P1-5R_local-acceptance-remediation-implementation.md`](P1-5R_local-acceptance-remediation-implementation.md)。
 - Frozen exact design、source-grounded feasibility、privacy exclusions、acceptance and stop conditions are in [`P1-5R_local-acceptance-remediation.md`](P1-5R_local-acceptance-remediation.md)。Future implementation order is R1 → R2-A → R2-B → R3 → final composition acceptance / independent acceptance。
 ## Decisions
@@ -896,5 +896,5 @@ P1-5R is the approved remediation track for four findings found by real local ac
   - P1-5F-3：`DONE`；P1-5F-3A and P1-5F-3B are both `DONE`；
   - P1-5F-3B：`DONE` with `DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN / IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_IMPLEMENTATION_REVIEW_PASS / COMMIT_PUSH_COMPLETE / CI_PASS / F4_COMPOSITION_ACCEPTANCE_PASS / FINDINGS_NONE_OPEN`；accepted implementation baseline `5efe1346532b95b7fabdd521015fd9f8199a457f`；GitHub Actions run `33044682226` `SUCCESS`；
   - P1-5F-4：`DONE`；initial acceptance `BLOCKED` on `F4-ACC-001`；finding-only remediation actual-source review `PASS`；accepted commit `af33d89baa0355ae1ee5174a2ef8cfb5e7b14554`；GitHub Actions run `33050532295` `SUCCESS`；independent final acceptance `PASS`；findings `NONE`；`F4-ACC-001 CLOSED`；no real provider/model call。
-- P1-5R：`IN_PROGRESS / DESIGN_FROZEN / IMPLEMENTATION_PLAN_FROZEN`；R1 `IMPLEMENTATION_COMPLETE / ACTUAL_SOURCE_REVIEW_PENDING`；F1 `OPEN / IMPLEMENTATION_COMPLETE_AWAITING_REVIEW`；R2-A `NOT_STARTED / BLOCKED_BY_R1`；R2-B/R3 dependency-blocked and `NOT_STARTED`。
-- P1-5：`IN_PROGRESS / POST_CLOSEOUT_REMEDIATION_OPEN`；historical P1-5A～P1-5F statuses remain `DONE`；P1 remains `IN_PROGRESS`。
+- P1-5R：`CLOSED`；R1/R2-A/R2-B/R3 are `DONE`；F1/F2/Visual fidelity remediation/F3 and post-closeout finding/review are `CLOSED`；open findings `NONE`。
+- P1-5：`DONE`；historical P1-5A～P1-5F statuses remain `DONE`；P1 is `DONE / CLOSED`。

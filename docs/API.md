@@ -1,7 +1,7 @@
 # API 与事件技术基线
 
-- Status: P0 API Architecture Baseline + P1-1～P1-6 completed; P1-7A frozen/reviewed; P1-7B/P1-7C/P1-7D `DONE / ACTUAL_SOURCE_REVIEW_PASS`; P1-7 remains `IN_PROGRESS`
-- Current phase: P1 — IN_PROGRESS
+- Status: P0 API Architecture Baseline + completed P1 text-discussion contracts; P1 `DONE / CLOSED`
+- Current phase: P1 — DONE / CLOSED; P2 — NOT_STARTED
 - API architecture baseline established by: P0-2 — DONE
 - Target version: V0.1 Internal Validation
 - Implemented REST contracts: `GET /health`, `POST /auth/register`, `POST /auth/login`, `POST /auth/logout`, `GET /auth/me`, `GET /questions`, `GET /questions/{question_version_id}`, `POST /sessions`, `GET /sessions/{session_id}`, `GET /sessions/{session_id}/utterances`, `POST /sessions/{session_id}/start`, `POST /sessions/{session_id}/report`, `GET /sessions/{session_id}/report`
@@ -449,14 +449,14 @@ P0-3D 已完成最小 API、OpenAPI authority、typed config、request correlati
 
 ### P1
 
-- `IN_PROGRESS`；P1-1A～E 已完成第一条文字会话 scoped contract、persistence、backend REST/WS、Web caller、browser reconnect regression 和 independent acceptance；P1-1 `DONE`；
+- `DONE / CLOSED`；P1-1A～E 已完成第一条文字会话 scoped contract、persistence、backend REST/WS、Web caller、browser reconnect regression 和 independent acceptance；P1-1 `DONE`；
 - P1-2A safe question/session/private projection design freeze 已完成 docs-only；
 - P1-2B persistence/domain/seed、P1-2C safe API/session/Web vertical slice 与 P1-2D independent acceptance 均已完成；P1-2 `DONE`。
 - P1-3A～D 已完成；state/timing/command/event/snapshot、backend durable foundation 与 realtime/Web complete phase flow 已独立验收 `PASS`；P1-3 `DONE`，P1 保持 `IN_PROGRESS`。
 - P1-4A～E 已完成；P1-4 `DONE`，final independent verdict `PASS`。Safe snapshot/WS/Web floor projection 已实现且无 public floor command。
 - P1-5A～P1-5R and the network-free post-closeout remediation are `DONE`; their accepted runtime、public transport and recovery contracts remain unchanged.
-- P1-6A～P1-6E and parent P1-6 are `DONE / CLOSED`; P1 remains `IN_PROGRESS`. Structured Memory consumes authoritative public evidence and supplies bounded Working Context internally; no Memory field or command is added to REST、OpenAPI、public events or WebSocket payloads.
-- P1-7 is `IN_PROGRESS`; P1-7A is frozen/reviewed, P1-7B/P1-7C/P1-7D are `DONE / ACTUAL_SOURCE_REVIEW_PASS`, and P1-7E/P1-8 remain `NOT_STARTED`.
+- P1-6A～P1-6E and parent P1-6 are `DONE / CLOSED`. Structured Memory consumes authoritative public evidence and supplies bounded Working Context internally; no Memory field or command is added to REST、OpenAPI、public events or WebSocket payloads.
+- P1-7/P1-7E and P1-8 are `DONE / CLOSED`; P1 phase-close assessment/re-assessment passed, so P1 is `DONE / CLOSED`. P2 contracts remain `NOT_STARTED` and require separate approval.
 
 ### P2 and later
 

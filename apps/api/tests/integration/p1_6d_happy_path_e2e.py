@@ -139,14 +139,14 @@ def _provider_module_source() -> str:
                         "Candidate prompt did not contain exactly one private stance."
                     )
                 if not all(section in prompt for section in required_sections):
-                    raise RuntimeError("Candidate V3 context contract was incomplete.")
+                    raise RuntimeError("Candidate V4 context contract was incomplete.")
                 if (
                     str(generation_input.prompt_version_id)
-                    != "56000000-0000-4000-8000-000000000003"
-                    or generation_input.prompt_version_number != 3
+                    != "56000000-0000-4000-8000-000000000004"
+                    or generation_input.prompt_version_number != 4
                     or generation_input.prompt_key != "AI_CANDIDATE_TURN"
                 ):
-                    raise RuntimeError("Candidate generation did not use accepted prompt V3.")
+                    raise RuntimeError("Candidate generation did not use accepted prompt V4.")
                 with psycopg.connect(_database_url()) as connection:
                     row = connection.execute(
                         "SELECT status, request_metadata FROM llm_generation_requests "

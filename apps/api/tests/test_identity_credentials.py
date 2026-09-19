@@ -12,7 +12,6 @@ from group_interview_arena_api.identity.credentials import (
     ARGON2_SALT_LENGTH,
     ARGON2_TIME_COST,
     PASSWORD_MAX_LENGTH,
-    PASSWORD_MIN_LENGTH,
     hash_password,
     normalize_username,
     validate_password,
@@ -70,14 +69,13 @@ def test_validate_username_requires_already_canonical_input() -> None:
 @pytest.mark.parametrize(
     "password",
     [
-        "a" * PASSWORD_MIN_LENGTH,
-        "a" * PASSWORD_MAX_LENGTH,
-        "lowercase words only",
-        "123456789012345",
-        "symbols-only-!@#$%",
+        "Abcd123!",
+        "Group2026#",
+        "Hello8@x",
+        "Aa1!" + "a" * (PASSWORD_MAX_LENGTH - 4),
     ],
 )
-def test_password_policy_accepts_boundaries_without_composition_rules(
+def test_password_policy_accepts_ascii_composition_and_length_boundaries(
     password: str,
 ) -> None:
     validate_password(password)
@@ -86,12 +84,28 @@ def test_password_policy_accepts_boundaries_without_composition_rules(
 @pytest.mark.parametrize(
     "password",
     [
-        "a" * (PASSWORD_MIN_LENGTH - 1),
-        "a" * (PASSWORD_MAX_LENGTH + 1),
+        "Ab1!xyz",
+        "Aa1!" + "a" * (PASSWORD_MAX_LENGTH - 3),
     ],
 )
 def test_password_policy_rejects_outside_length_boundaries(password: str) -> None:
     with pytest.raises(ValueError, match="length"):
+        validate_password(password)
+
+
+@pytest.mark.parametrize(
+    "password",
+    [
+        "abcdef1!",
+        "ABCDEF1!",
+        "Abcdefg!",
+        "Abcdefg1",
+        "Abcd123 ",
+        "Abcd123。",
+    ],
+)
+def test_password_policy_requires_each_ascii_character_class(password: str) -> None:
+    with pytest.raises(ValueError, match="composition"):
         validate_password(password)
 
 
@@ -110,7 +124,7 @@ def test_password_policy_rejects_full_match_blocklist(password: str) -> None:
 
 
 def test_password_blocklist_does_not_reject_substrings() -> None:
-    validate_password("prefix-password1234567-suffix")
+    validate_password("Prefix-password1234567-suffix!")
 
 
 def test_password_policy_rejects_non_nfc_without_silently_changing_input() -> None:
@@ -121,7 +135,7 @@ def test_password_policy_rejects_non_nfc_without_silently_changing_input() -> No
 
 
 def test_password_hash_preserves_significant_whitespace() -> None:
-    password = "  lowercase words  "
+    password = "  Password words 1!  "
     password_hash = hash_password(password)
 
     assert verify_password(password, password_hash) is True
@@ -129,7 +143,7 @@ def test_password_hash_preserves_significant_whitespace() -> None:
 
 
 def test_password_hash_is_argon2id_with_explicit_application_parameters() -> None:
-    password_hash = hash_password("a sufficiently long password")
+    password_hash = hash_password("A sufficiently long password 1!")
     fields = password_hash.split("$")
     parameters = dict(part.split("=") for part in fields[3].split(","))
 
@@ -144,27 +158,27 @@ def test_password_hash_is_argon2id_with_explicit_application_parameters() -> Non
 
 
 def test_password_hash_uses_random_salts_and_verifies_only_correct_password() -> None:
-    password = "a sufficiently long password"
+    password = "A sufficiently long password 1!"
     first_hash = hash_password(password)
     second_hash = hash_password(password)
 
     assert first_hash != password
     assert first_hash != second_hash
     assert verify_password(password, first_hash) is True
-    assert verify_password("a different long password", first_hash) is False
+    assert verify_password("A different long password 2!", first_hash) is False
 
 
 @pytest.mark.parametrize("password_hash", ["", "not-a-password-hash", "$unknown$v=1"])
 def test_password_verification_safely_rejects_malformed_or_unknown_hashes(
     password_hash: str,
 ) -> None:
-    assert verify_password("a sufficiently long password", password_hash) is False
+    assert verify_password("A sufficiently long password 1!", password_hash) is False
 
 
 def test_existing_hash_remains_valid_after_enrollment_blocklist_changes(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    password = "future policy blocked password"
+    password = "Future policy blocked password 1!"
     password_hash = hash_password(password)
     monkeypatch.setattr(
         credentials_module,
@@ -179,7 +193,7 @@ def test_existing_hash_remains_valid_after_enrollment_blocklist_changes(
 
 
 def test_password_verification_and_update_rehashes_old_argon2_parameters() -> None:
-    password = "a sufficiently long rehash password"
+    password = "A sufficiently long rehash password 1!"
     old_password_hash = PasswordHash(
         (
             Argon2Hasher(
@@ -208,7 +222,7 @@ def test_password_verification_and_update_rehashes_old_argon2_parameters() -> No
 
 
 def test_password_verification_and_update_keeps_current_hash() -> None:
-    password = "a sufficiently long current password"
+    password = "A sufficiently long current password 1!"
     password_hash = hash_password(password)
 
     valid, updated_hash = verify_password_and_update(password, password_hash)
@@ -222,6 +236,6 @@ def test_password_verification_and_update_safely_rejects_invalid_hashes(
     password_hash: str,
 ) -> None:
     assert verify_password_and_update(
-        "a sufficiently long password",
+        "A sufficiently long password 1!",
         password_hash,
     ) == (False, None)

@@ -1,9 +1,9 @@
 # 题型与题目系统
 
-- Status: P1-2 completed; design, persistence/domain/seed, safe caller, and independent acceptance complete
-- Current phase: P1 — IN_PROGRESS
+- Status: P1 question/persona system complete; exact 3-category/12-question catalog and P1 acceptance closed
+- Current phase: P1 — DONE / CLOSED; P2 — NOT_STARTED
 - Target version: V0.1 Internal Validation
-- Current status: P1-2/P1-3/P1-4 and P1-5A～P1-5F historical DONE；deterministic prompt assembly and first-provider path implemented；P1-5R R3 prompt/context/persona remediation is design-frozen but NOT_STARTED
+- Current status: P1-2 through P1-8 mandatory scope is complete；the exact published catalog remains 4 `ORDERING_SELECTION` / 4 `RESOURCE_ALLOCATION` / 4 `PLAN_DESIGN`；P1-5R R3 prompt/context/persona remediation and Prompt V4 follow-up are implemented and closed
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md) 和已确认的 [`DECISIONS.md`](DECISIONS.md)
 
 ## 文档目的
@@ -80,7 +80,7 @@ Question Version and Prompt Version are separate immutable assets:
 - each P1-5B Generation Request links the session-bound exact Question Version and exact Prompt Version, plus actual provider/model/effective non-secret configuration version, so a historical utterance can be explained without following `latest` pointers；
 - Persona Template must not absorb prompt content/provider secrets, and ordinary public question projection remains unchanged。
 
-P1-5A added no schema。P1-5B stores Prompt Version independently and P1-5C renders the exact request-bound version without latest pointers；later P1-5D～P1-5F implemented the approved provider、orchestration and public discussion path without adding question schema。P1-5R R3 now freezes Prompt Version v2、bounded recent public context and pure Persona translation only；implementation remains `NOT_STARTED`。See [`exec-plans/P1-5_ai-runtime-foundation.md`](exec-plans/P1-5_ai-runtime-foundation.md) and [`exec-plans/P1-5R_local-acceptance-remediation.md`](exec-plans/P1-5R_local-acceptance-remediation.md)。
+P1-5A added no schema。P1-5B stores Prompt Version independently and P1-5C renders the exact request-bound version without latest pointers；later P1-5D～P1-5F implemented the approved provider、orchestration and public discussion path without adding question schema。P1-5R R3 implemented its accepted Prompt Version v2、bounded recent public context and pure Persona translation boundary；P1-8 later added immutable candidate Prompt V4 while preserving historical prompt provenance。See [`exec-plans/P1-5_ai-runtime-foundation.md`](exec-plans/P1-5_ai-runtime-foundation.md) and [`exec-plans/P1-5R_local-acceptance-remediation.md`](exec-plans/P1-5R_local-acceptance-remediation.md)。
 
 ## Public and private projections
 

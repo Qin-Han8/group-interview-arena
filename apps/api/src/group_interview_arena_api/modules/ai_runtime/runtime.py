@@ -1,7 +1,9 @@
 import asyncio
+import logging
 from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from enum import StrEnum
+from time import perf_counter
 from typing import cast
 from uuid import UUID
 
@@ -10,6 +12,7 @@ from sqlalchemy import and_, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from group_interview_arena_api.core.logging import log_event
 from group_interview_arena_api.db import (
     AiUtterance,
     FloorGrant,
@@ -108,6 +111,8 @@ from group_interview_arena_api.modules.question_personas.domain import (
     QuestionOption,
     StakeholderItem,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class RuntimeGenerationOutcome(StrEnum):
@@ -829,6 +834,16 @@ async def generate_ai_utterance(
             request_status=claim.snapshot.status,
         )
 
+    provider_started = perf_counter()
+    log_event(
+        logger,
+        logging.INFO,
+        "ai.generation.started",
+        session_id=str(command.session_id),
+        generation_request_id=str(command.generation_request_id),
+        floor_grant_id=str(command.floor_grant_id),
+        participant_id=str(command.participant_id),
+    )
     try:
         try:
             raw_result = await executor(generation_input)
@@ -836,6 +851,17 @@ async def generate_ai_utterance(
             raw_result = RawGenerationFailure(
                 failure_code=GenerationFailureCode.INTERNAL_ERROR
             )
+        provider_duration_ms = (perf_counter() - provider_started) * 1_000
+        log_event(
+            logger,
+            logging.INFO,
+            "ai.provider.completed",
+            duration_ms=provider_duration_ms,
+            session_id=str(command.session_id),
+            generation_request_id=str(command.generation_request_id),
+            floor_grant_id=str(command.floor_grant_id),
+            participant_id=str(command.participant_id),
+        )
         validated = validate_generation_result(raw_result)
         if validated.failure_code is not None:
             failed = await _fail_generation(
@@ -902,12 +928,23 @@ async def generate_ai_utterance(
                 confirmed_outcome=RuntimeGenerationOutcome.FAILED,
             )
 
-        return _result(
+        result = _result(
             command,
             RuntimeGenerationOutcome.COMPLETED,
             request_status=completed.status,
             utterance_id=completed.utterance_id,
         )
+        log_event(
+            logger,
+            logging.INFO,
+            "ai.utterance.committed",
+            duration_ms=(perf_counter() - provider_started) * 1_000,
+            session_id=str(command.session_id),
+            generation_request_id=str(command.generation_request_id),
+            floor_grant_id=str(command.floor_grant_id),
+            participant_id=str(command.participant_id),
+        )
+        return result
     except asyncio.CancelledError:
         await _fail_generation(
             session_factory,

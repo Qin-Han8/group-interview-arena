@@ -432,6 +432,7 @@ async def _scheduler_input(
         ).all()
     )
     return SchedulerInput(
+        session_id=aggregate.id,
         decision_id=command.decision_id,
         phase=phase,
         expected_last_sequence=command.expected_last_sequence,

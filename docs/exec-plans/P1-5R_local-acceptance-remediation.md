@@ -1,6 +1,6 @@
 # P1-5R Local Acceptance Remediation — Design Freeze
 
-Status: `P1 IN_PROGRESS`; `P1-5 DONE`; `P1-5R CLOSED`; `P1-5R-POST-001 CLOSED`; `P1-5R-POST-REV-001 CLOSED`; `OPEN FINDINGS NONE`; `R1/R2-A/R2-B/R3 DONE`; `F1/F2/Visual fidelity remediation/F3 CLOSED`; `Historical Final Composition Acceptance PASS / DONE`; `Historical Independent Acceptance PASS`; `Previous P1-5R closeout PASS / CLOSED`; `Later post-closeout real-provider smoke EXECUTED / DEFECT_EXPOSED`; `Formal R3.8 NOT_EXECUTED / REQUIRES_SEPARATE_EXPLICIT_USER_AUTHORIZATION`; `No further real-provider call`; `Remediation review PASS`; `Accepted commit 3b09d20a704c0fd3ff473ccb79311065b7e70408`; `CI 33257343273 completed / success`
+Status: `P1 DONE / CLOSED`; `P1-5 DONE`; `P1-5R CLOSED`; `P1-5R-POST-001 CLOSED`; `P1-5R-POST-REV-001 CLOSED`; `OPEN FINDINGS NONE`; `R1/R2-A/R2-B/R3 DONE`; `F1/F2/Visual fidelity remediation/F3 CLOSED`; `Historical Final Composition Acceptance PASS / DONE`; `Historical Independent Acceptance PASS`; `Previous P1-5R closeout PASS / CLOSED`; `Later post-closeout real-provider smoke EXECUTED / DEFECT_EXPOSED`; `Formal R3.8 NOT_EXECUTED / REQUIRES_SEPARATE_EXPLICIT_USER_AUTHORIZATION`; `No further real-provider call`; `Remediation review PASS`; `Accepted commit 3b09d20a704c0fd3ff473ccb79311065b7e70408`; `CI 33257343273 completed / success`
 
 Target version: `V0.1 Internal Validation`
 
@@ -626,7 +626,7 @@ The remediation changes no schema/migration、REST/WS contract、scheduler polic
 ## Current governance status after post-acceptance remediation
 
 ```text
-P1 = IN_PROGRESS
+P1 = DONE / CLOSED
 
 P1-5 = DONE
 Previous P1-5 closeout = PASS / DONE at commit 9d6270660cb7a358a62989a6a59bab2a521fa041

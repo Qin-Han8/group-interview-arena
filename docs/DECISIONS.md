@@ -1,7 +1,7 @@
 # 产品与技术决策记录
 
 - Status: Active governance baseline
-- Current phase: P1
+- Current phase: P1 — DONE / CLOSED; P2 — NOT_STARTED
 - Authority: 低于 [`PROJECT_MASTER_PLAN.md`](PROJECT_MASTER_PLAN.md)，高于领域文档和代码实现
 - Last accepted decision established by task: P1-5E-1 automatic orchestration amendment to ADR-014 — approved
 

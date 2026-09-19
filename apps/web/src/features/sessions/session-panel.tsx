@@ -31,7 +31,9 @@ import {
   mergeConfirmedTranscript,
   type ConfirmedUtterance,
 } from "./discussion-transcript";
-import DiscussionStage from "./discussion-stage";
+import DiscussionStage, {
+  type LiveAiRenderCandidate,
+} from "./discussion-stage";
 import DiscussionWorkspace, {
   type ActiveDiscussionSurface,
 } from "./discussion-workspace";
@@ -44,11 +46,32 @@ import SessionProgressPanel from "./session-progress-panel";
 import TaskBriefPanel, {
   type TaskBriefQuestionState,
 } from "./task-brief-panel";
+import TrainingEntry, {
+  type SelectedQuestionDetailState,
+  type TrainingEntrySurface,
+} from "./training-entry";
 
 type SessionPanelProps = {
   apiClient: ApiClient;
   baseUrl: string;
+  onNavigationStateChange?: (state: SessionNavigationState) => void;
+  openCurrentReportRequest?: OpenCurrentReportRequest;
+  openSetupRequest?: number;
+  returnToLobbyRequest?: number;
 };
+
+export type OpenCurrentReportRequest = {
+  requestId: number;
+  sessionId: string;
+};
+
+export type SessionNavigationState =
+  | { sessionId: null; status: "loading" | "lobby"; reportAvailable: false }
+  | {
+      sessionId: string;
+      status: SessionSnapshot["status"];
+      reportAvailable: boolean;
+    };
 
 const PHASES = [
   "PREPARATION",
@@ -94,6 +117,16 @@ function putSessionInUrl(sessionId: string) {
   window.history.replaceState({}, "", url);
 }
 
+function removeSessionFromUrl() {
+  const url = new URL(window.location.href);
+  url.searchParams.delete("session_id");
+  window.history.replaceState({}, "", url);
+}
+
+function isTerminalStatus(status: SessionSnapshot["status"]) {
+  return status === "COMPLETED" || status === "ABORTED_USER";
+}
+
 function isActivePhase(status: SessionSnapshot["status"]) {
   return PHASES.some((phase) => phase === status);
 }
@@ -113,11 +146,19 @@ function formatCountdown(milliseconds: number) {
 export default function SessionPanel({
   apiClient,
   baseUrl,
+  onNavigationStateChange,
+  openCurrentReportRequest,
+  openSetupRequest = 0,
+  returnToLobbyRequest = 0,
 }: SessionPanelProps) {
   const router = useRouter();
   const [snapshot, setSnapshot] = useState<SessionSnapshot>();
   const [questions, setQuestions] = useState<QuestionSummary[]>();
+  const [trainingEntrySurface, setTrainingEntrySurface] =
+    useState<TrainingEntrySurface>("lobby");
   const [selectedQuestionId, setSelectedQuestionId] = useState("");
+  const [selectedQuestion, setSelectedQuestion] =
+    useState<SelectedQuestionDetailState>({ kind: "idle" });
   const [hasNewTranscriptBelow, setHasNewTranscriptBelow] = useState(false);
   const [question, setQuestion] = useState<QuestionDetail>();
   const [boundQuestionLoadStatus, setBoundQuestionLoadStatus] =
@@ -136,6 +177,8 @@ export default function SessionPanel({
   const [interruptedAiGrantIds, setInterruptedAiGrantIds] = useState<string[]>(
     [],
   );
+  const [liveAiRenderCandidate, setLiveAiRenderCandidate] =
+    useState<LiveAiRenderCandidate | null>(null);
   const [confirmedTranscript, setConfirmedTranscript] = useState<
     ConfirmedUtterance[]
   >([]);
@@ -154,6 +197,13 @@ export default function SessionPanel({
   const interruptedAiGrantIdsRef = useRef(new Set<string>());
   const realtimeRef = useRef<SessionRealtimeClient | undefined>(undefined);
   const workspaceSessionIdRef = useRef<string | undefined>(undefined);
+  const selectedQuestionRequestRef = useRef(0);
+  const handledOpenSetupRequestRef = useRef(openSetupRequest);
+  const handledReturnToLobbyRequestRef = useRef(returnToLobbyRequest);
+  const handledOpenCurrentReportRequestRef = useRef(
+    openCurrentReportRequest?.requestId ?? 0,
+  );
+  const reportGenerationInFlightRef = useRef(false);
   const scrollTranscriptToLatest = useCallback(() => {
     const container = transcriptContainerRef.current;
     if (container) {
@@ -172,6 +222,12 @@ export default function SessionPanel({
     if (container && isTranscriptNearBottom(container)) {
       setHasNewTranscriptBelow(false);
     }
+  }, []);
+
+  const handleLiveAiRenderMarked = useCallback((utteranceId: string) => {
+    setLiveAiRenderCandidate((candidate) =>
+      candidate?.utteranceId === utteranceId ? null : candidate,
+    );
   }, []);
 
   const updateClockFromSnapshot = useCallback((next: SessionSnapshot) => {
@@ -243,6 +299,7 @@ export default function SessionPanel({
       }
       confirmedTranscriptRef.current = bundle.transcript;
       setConfirmedTranscript(bundle.transcript);
+      setLiveAiRenderCandidate(null);
       applySnapshot(bundle.snapshot);
       setErrorMessage(undefined);
     },
@@ -288,11 +345,11 @@ export default function SessionPanel({
           const result = await listQuestions(apiClient);
           if (!active) return;
           if (!result.data) {
+            setQuestions([]);
             setErrorMessage("无法加载训练题目，请稍后重试。");
             return;
           }
           setQuestions(result.data);
-          setSelectedQuestionId(result.data[0]?.id ?? "");
         } catch {
           if (active) setErrorMessage("无法加载训练题目，请稍后重试。");
         } finally {
@@ -348,6 +405,113 @@ export default function SessionPanel({
   }, [apiClient, applyRecoveryBundle, loadAuthoritativeRecoveryBundle]);
 
   useEffect(() => {
+    const navigationState: SessionNavigationState = checkingUrl
+      ? { sessionId: null, status: "loading", reportAvailable: false }
+      : !snapshot
+        ? { sessionId: null, status: "lobby", reportAvailable: false }
+        : {
+            sessionId: snapshot.id,
+            status: snapshot.status,
+            reportAvailable: snapshot.status === "COMPLETED",
+          };
+    onNavigationStateChange?.(navigationState);
+  }, [checkingUrl, onNavigationStateChange, snapshot]);
+
+  useEffect(() => {
+    if (openSetupRequest === handledOpenSetupRequestRef.current) return;
+    handledOpenSetupRequestRef.current = openSetupRequest;
+    if (!snapshotRef.current) setTrainingEntrySurface("setup");
+  }, [openSetupRequest]);
+
+  useEffect(() => {
+    if (returnToLobbyRequest === handledReturnToLobbyRequestRef.current) return;
+    handledReturnToLobbyRequestRef.current = returnToLobbyRequest;
+    const current = snapshotRef.current;
+    if (!current || !isTerminalStatus(current.status)) return;
+
+    let active = true;
+    removeSessionFromUrl();
+    workspaceSessionIdRef.current = undefined;
+    snapshotRef.current = undefined;
+    confirmedTranscriptRef.current = [];
+    shouldFollowTranscriptRef.current = false;
+    interruptedAiGrantIdsRef.current.clear();
+    selectedQuestionRequestRef.current += 1;
+    setConnectionSeed(undefined);
+    setSnapshot(undefined);
+    setQuestions(undefined);
+    setTrainingEntrySurface("lobby");
+    setSelectedQuestionId("");
+    setSelectedQuestion({ kind: "idle" });
+    setHasNewTranscriptBelow(false);
+    setQuestion(undefined);
+    setBoundQuestionLoadStatus(undefined);
+    setNotes("");
+    setActiveSurface("discussion");
+    setCreating(false);
+    setPendingAction(false);
+    setGeneratingReport(false);
+    setHumanPending(undefined);
+    setRejectedDraft(undefined);
+    setDraft("");
+    setInterruptedAiGrantIds([]);
+    setLiveAiRenderCandidate(null);
+    setConfirmedTranscript([]);
+    setConnection("disconnected");
+    setErrorMessage(undefined);
+    setClockAnchor({ localNowMs: 0, serverNowMs: 0 });
+    setDisplayNowMs(0);
+
+    async function discover() {
+      try {
+        const result = await listQuestions(apiClient);
+        if (!active) return;
+        if (!result.data) {
+          setQuestions([]);
+          setErrorMessage("无法加载训练题目，请稍后重试。");
+          return;
+        }
+        setQuestions(result.data);
+      } catch {
+        if (active) {
+          setQuestions([]);
+          setErrorMessage("无法加载训练题目，请稍后重试。");
+        }
+      }
+    }
+
+    void discover();
+    return () => {
+      active = false;
+    };
+  }, [apiClient, returnToLobbyRequest]);
+
+  async function selectQuestion(questionId: string) {
+    const requestId = selectedQuestionRequestRef.current + 1;
+    selectedQuestionRequestRef.current = requestId;
+    setSelectedQuestionId(questionId);
+    setSelectedQuestion({ kind: "loading", questionId });
+    setErrorMessage(undefined);
+    try {
+      const result = await getQuestion(apiClient, questionId);
+      if (selectedQuestionRequestRef.current !== requestId) return;
+      if (result.data?.id === questionId) {
+        setSelectedQuestion({
+          kind: "available",
+          questionId,
+          question: result.data,
+        });
+      } else {
+        setSelectedQuestion({ kind: "unavailable", questionId });
+      }
+    } catch {
+      if (selectedQuestionRequestRef.current === requestId) {
+        setSelectedQuestion({ kind: "unavailable", questionId });
+      }
+    }
+  }
+
+  useEffect(() => {
     if (!connectionSeed) return;
     let active = true;
     const realtime = createSessionRealtimeClient({
@@ -377,6 +541,18 @@ export default function SessionPanel({
           }
           confirmedTranscriptRef.current = merged.items;
           setConfirmedTranscript(merged.items);
+          if (
+            incoming.actor_kind === "AI" &&
+            !previous.some(
+              (item) => item.utterance_id === incoming.utterance_id,
+            )
+          ) {
+            setLiveAiRenderCandidate({
+              utteranceId: incoming.utterance_id,
+              sequence: incoming.sequence,
+              participantId: incoming.participant_id,
+            });
+          }
         }
         if (
           event.type === "floor.released" &&
@@ -453,6 +629,7 @@ export default function SessionPanel({
         return;
       }
       putSessionInUrl(result.data.id);
+      selectedQuestionRequestRef.current += 1;
       applyRecoveryBundle({ snapshot: result.data, transcript: [] });
       setConnectionSeed(result.data);
       const authoritativeQuestionId = result.data.question_version_id;
@@ -485,24 +662,52 @@ export default function SessionPanel({
     }
   }
 
-  async function openReport() {
-    const current = snapshotRef.current;
-    if (!current || current.status !== "COMPLETED" || generatingReport) return;
-    setGeneratingReport(true);
-    setErrorMessage(undefined);
-    try {
-      const result = await generateReport(apiClient, current.id);
-      if (!result.data) {
-        setErrorMessage("无法生成训练报告，请稍后重试。");
+  const openReport = useCallback(
+    async (expectedSessionId: string) => {
+      const current = snapshotRef.current;
+      if (
+        !current ||
+        current.id !== expectedSessionId ||
+        current.status !== "COMPLETED" ||
+        reportGenerationInFlightRef.current
+      ) {
         return;
       }
-      router.push(`/sessions/${current.id}/report`);
-    } catch {
-      setErrorMessage("无法生成训练报告，请稍后重试。");
-    } finally {
-      setGeneratingReport(false);
+      reportGenerationInFlightRef.current = true;
+      setGeneratingReport(true);
+      setErrorMessage(undefined);
+      try {
+        const result = await generateReport(apiClient, expectedSessionId);
+        if (!result.data) {
+          setErrorMessage("无法生成训练报告，请稍后重试。");
+          return;
+        }
+        const latest = snapshotRef.current;
+        if (latest?.id === expectedSessionId && latest.status === "COMPLETED") {
+          router.push(`/sessions/${expectedSessionId}/report`);
+        }
+      } catch {
+        setErrorMessage("无法生成训练报告，请稍后重试。");
+      } finally {
+        reportGenerationInFlightRef.current = false;
+        setGeneratingReport(false);
+      }
+    },
+    [apiClient, router],
+  );
+
+  useEffect(() => {
+    if (
+      !openCurrentReportRequest ||
+      openCurrentReportRequest.requestId ===
+        handledOpenCurrentReportRequestRef.current
+    ) {
+      return;
     }
-  }
+    handledOpenCurrentReportRequestRef.current =
+      openCurrentReportRequest.requestId;
+    void openReport(openCurrentReportRequest.sessionId);
+  }, [openCurrentReportRequest, openReport]);
 
   const estimatedServerNowMs =
     clockAnchor.serverNowMs === 0
@@ -591,7 +796,10 @@ export default function SessionPanel({
 
   if (checkingUrl) {
     return (
-      <section className="mt-8 border-t border-neutral-300 pt-6">
+      <section
+        className="h-full overflow-y-auto overscroll-contain p-6"
+        data-testid="training-lobby-loading-scroll"
+      >
         <p className="text-sm text-neutral-600">正在加载会话…</p>
       </section>
     );
@@ -599,54 +807,17 @@ export default function SessionPanel({
 
   if (!snapshot) {
     return (
-      <section className="mt-8 border-t border-neutral-300 pt-6">
-        <h2 className="text-lg font-medium">讨论会话</h2>
-        <div className="mt-4 space-y-4">
-          {questions?.length ? (
-            <>
-              <label
-                className="grid gap-1 text-sm"
-                htmlFor="question-selection"
-              >
-                选择训练题目
-                <select
-                  className="border border-neutral-300 bg-white px-3 py-2"
-                  id="question-selection"
-                  onChange={(event) =>
-                    setSelectedQuestionId(event.target.value)
-                  }
-                  value={selectedQuestionId}
-                >
-                  {questions.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.title} · {item.question_type} · {item.difficulty}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <button
-                className="bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-                disabled={creating || !selectedQuestionId}
-                onClick={() => void create()}
-                type="button"
-              >
-                {creating ? "正在创建…" : "创建文字会话"}
-              </button>
-            </>
-          ) : questions ? (
-            <p className="text-sm text-neutral-600">
-              当前没有可用于新训练的题目。
-            </p>
-          ) : (
-            <p className="text-sm text-neutral-600">正在加载训练题目…</p>
-          )}
-        </div>
-        {errorMessage ? (
-          <p aria-live="polite" className="mt-3 text-sm text-red-700">
-            {errorMessage}
-          </p>
-        ) : null}
-      </section>
+      <TrainingEntry
+        creating={creating}
+        errorMessage={errorMessage}
+        onBeginSelection={() => setTrainingEntrySurface("setup")}
+        onCreateSession={() => void create()}
+        onSelectQuestion={(questionId) => void selectQuestion(questionId)}
+        questions={questions}
+        selectedQuestion={selectedQuestion}
+        selectedQuestionId={selectedQuestionId}
+        surface={trainingEntrySurface}
+      />
     );
   }
 
@@ -694,6 +865,8 @@ export default function SessionPanel({
             key: grantId,
             message: "这次 AI 发言未完成，讨论将继续。",
           }))}
+          liveAiRenderCandidate={liveAiRenderCandidate}
+          onLiveAiRenderMarked={handleLiveAiRenderMarked}
           onDraftChange={setDraft}
           onReturnToLatest={scrollTranscriptToLatest}
           onTranscriptScroll={handleTranscriptScroll}
@@ -716,7 +889,6 @@ export default function SessionPanel({
         />
       }
       header={{
-        productName: "AI 群面训练场",
         sessionTitle: question?.title ?? "文字群面训练",
         phaseLabel: phaseLabel(snapshot.status),
         countdown: countdown ?? null,
@@ -744,7 +916,7 @@ export default function SessionPanel({
           visible: snapshot.status === "COMPLETED",
           disabled: generatingReport,
           label: generatingReport ? "正在生成报告…" : "生成 / 查看训练报告",
-          onActivate: () => void openReport(),
+          onActivate: () => void openReport(snapshot.id),
         },
       }}
       onActiveSurfaceChange={setActiveSurface}

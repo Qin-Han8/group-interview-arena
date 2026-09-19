@@ -48,10 +48,18 @@ export default function SessionProgressPanel({
 
   return (
     <div
-      className="flex min-h-0 flex-col gap-6"
+      className="flex min-h-0 flex-col gap-5"
       data-progress-model="six-phase"
       data-testid="session-progress-panel"
     >
+      <div className="shrink-0 border-b border-neutral-200 pb-3">
+        <p className="text-[0.625rem] font-semibold tracking-[0.16em] text-neutral-500 uppercase">
+          SESSION STATE
+        </p>
+        <h2 className="mt-0.5 text-base font-semibold text-neutral-950">
+          训练进程
+        </h2>
+      </div>
       <section aria-labelledby="phase-progress-heading">
         <div className="flex items-baseline justify-between gap-3">
           <h2 className="text-sm font-semibold" id="phase-progress-heading">
@@ -61,7 +69,7 @@ export default function SessionProgressPanel({
             {phaseLabel(status)}
           </p>
         </div>
-        <p className="mt-2 text-sm tabular-nums text-neutral-600">
+        <p className="mt-2 text-2xl font-semibold tabular-nums tracking-tight text-neutral-950">
           {countdown ?? "等待服务端提供阶段时间"}
         </p>
         <ol aria-label="讨论阶段" className="mt-4 space-y-1.5">

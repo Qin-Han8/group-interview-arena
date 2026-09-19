@@ -43,7 +43,7 @@ pytestmark = pytest.mark.integration
 NOW = datetime(2026, 9, 12, 8, 0, tzinfo=UTC)
 TRUSTED_ORIGIN = "http://localhost:3000"
 AUTH_HEADERS = {"Origin": TRUSTED_ORIGIN, "X-GIA-CSRF": "1"}
-PASSWORD = "report api integration password"
+PASSWORD = "Report API integration 1!"
 
 
 class TemporaryDatabaseContext(Protocol):
@@ -611,18 +611,19 @@ def test_report_generation_command_enforces_csrf_owner_and_completed_session(
                     "CSRF_REJECTED",
                 )
 
-                async with factory() as session, session.begin():
-                    candidate = await session.get(SimulationSession, session_id)
-                    assert candidate is not None
-                    candidate.status = "CREATED"
+                for ineligible_status in ("CREATED", "ABORTED_USER"):
+                    async with factory() as session, session.begin():
+                        candidate = await session.get(SimulationSession, session_id)
+                        assert candidate is not None
+                        candidate.status = ineligible_status
 
-                _assert_error(
-                    await owner.post(
-                        f"/sessions/{session_id}/report", headers=AUTH_HEADERS
-                    ),
-                    409,
-                    "INVALID_SESSION_STATE",
-                )
+                    _assert_error(
+                        await owner.post(
+                            f"/sessions/{session_id}/report", headers=AUTH_HEADERS
+                        ),
+                        409,
+                        "INVALID_SESSION_STATE",
+                    )
 
             async with AsyncClient(
                 transport=transport, base_url="http://test"

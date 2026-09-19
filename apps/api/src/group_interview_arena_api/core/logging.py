@@ -26,6 +26,9 @@ _OPTIONAL_FIELDS = (
     "connection_id",
     "action_id",
     "sequence",
+    "generation_request_id",
+    "floor_grant_id",
+    "participant_id",
 )
 
 
@@ -104,6 +107,9 @@ def log_event(
     connection_id: str | None = None,
     action_id: str | None = None,
     sequence: int | None = None,
+    generation_request_id: str | None = None,
+    floor_grant_id: str | None = None,
+    participant_id: str | None = None,
 ) -> None:
     extra: dict[str, object] = {"event": event}
     optional_fields: dict[str, object | None] = {
@@ -118,6 +124,9 @@ def log_event(
         "connection_id": _validated_uuid4(connection_id),
         "action_id": _validated_uuid4(action_id),
         "sequence": sequence if isinstance(sequence, int) and sequence > 0 else None,
+        "generation_request_id": _validated_uuid4(generation_request_id),
+        "floor_grant_id": _validated_uuid4(floor_grant_id),
+        "participant_id": _validated_uuid4(participant_id),
     }
     extra.update(
         {field: value for field, value in optional_fields.items() if value is not None}
