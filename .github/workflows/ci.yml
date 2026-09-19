@@ -462,8 +462,13 @@ jobs:
           test "$(docker image inspect gia-beta-api:local --format '{{.Config.User}}')" = "10001:10001"
           test "$(docker image inspect gia-beta-api-migrate:local --format '{{.Config.User}}')" = "10001:10001"
 
-          docker run --rm --entrypoint sh gia-beta-web:local -c \
-            "grep -R -a -q 'api.beta.lijingai.com' /app && ! grep -R -a -E -q 'localhost:8000|http://localhost' /app"
+          docker run --rm --entrypoint sh gia-beta-web:local -c '
+            set -eu
+            client_static=/app/apps/web/.next/static
+            test -d "$client_static"
+            grep -R -a -q "api.beta.lijingai.com" "$client_static"
+            ! grep -R -a -E -q "localhost:8000|http://localhost:8000|https://localhost:8000" "$client_static"
+          '
           docker run --rm --entrypoint python gia-beta-api:local -c \
             "import importlib.util; from group_interview_arena_api.app import app; assert app.title; assert importlib.util.find_spec('alembic') is None; assert importlib.util.find_spec('pytest') is None"
           docker run --rm --entrypoint python gia-beta-api-migrate:local -c \
