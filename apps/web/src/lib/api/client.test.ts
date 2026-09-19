@@ -24,6 +24,10 @@ const CREDENTIALS = {
   username: "web_user",
   password: "Abcd123!",
 };
+const REGISTRATION = {
+  ...CREDENTIALS,
+  invite_code: "unit-only-invite-code",
+};
 const SESSION = {
   id: "00000000-0000-4000-8000-000000000010",
   question_version_id: "21000000-0000-4000-8000-000000000001",
@@ -56,31 +60,39 @@ describe("browser API client", () => {
     vi.unstubAllGlobals();
   });
 
-  it.each([
-    ["register", registerUser, "/auth/register"],
-    ["login", loginUser, "/auth/login"],
-  ] as const)(
-    "sends credentialed %s requests with the CSRF marker",
-    async (_, operation, path) => {
-      const fetchMock = vi.fn<typeof fetch>();
-      fetchMock.mockResolvedValue(
-        jsonResponse(USER, path.endsWith("register") ? 201 : 200),
-      );
-      vi.stubGlobal("fetch", fetchMock);
+  it("sends credentialed registration with invite and CSRF marker", async () => {
+    const fetchMock = vi.fn<typeof fetch>();
+    fetchMock.mockResolvedValue(jsonResponse(USER, 201));
+    vi.stubGlobal("fetch", fetchMock);
 
-      const result = await operation(createApiClient(BASE_URL), CREDENTIALS);
+    const result = await registerUser(createApiClient(BASE_URL), REGISTRATION);
 
-      expect(result.data).toEqual(USER);
-      const request = fetchMock.mock.calls[0]?.[0];
-      expect(request).toBeInstanceOf(Request);
-      if (!(request instanceof Request)) throw new Error("Expected a Request");
-      expect(request.url).toBe(`${BASE_URL}${path}`);
-      expect(request.method).toBe("POST");
-      expect(request.credentials).toBe("include");
-      expect(request.headers.get("X-GIA-CSRF")).toBe("1");
-      expect(await request.clone().json()).toEqual(CREDENTIALS);
-    },
-  );
+    expect(result.data).toEqual(USER);
+    const request = fetchMock.mock.calls[0]?.[0];
+    expect(request).toBeInstanceOf(Request);
+    if (!(request instanceof Request)) throw new Error("Expected a Request");
+    expect(request.url).toBe(`${BASE_URL}/auth/register`);
+    expect(request.method).toBe("POST");
+    expect(request.credentials).toBe("include");
+    expect(request.headers.get("X-GIA-CSRF")).toBe("1");
+    expect(await request.clone().json()).toEqual(REGISTRATION);
+  });
+
+  it("sends credentialed login without invite and with CSRF marker", async () => {
+    const fetchMock = vi.fn<typeof fetch>();
+    fetchMock.mockResolvedValue(jsonResponse(USER, 200));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await loginUser(createApiClient(BASE_URL), CREDENTIALS);
+
+    expect(result.data).toEqual(USER);
+    const request = fetchMock.mock.calls[0]?.[0];
+    if (!(request instanceof Request)) throw new Error("Expected a Request");
+    expect(request.url).toBe(`${BASE_URL}/auth/login`);
+    expect(request.credentials).toBe("include");
+    expect(request.headers.get("X-GIA-CSRF")).toBe("1");
+    expect(await request.clone().json()).toEqual(CREDENTIALS);
+  });
 
   it("does not add the CSRF marker to GET /auth/me", async () => {
     const fetchMock = vi.fn<typeof fetch>();
@@ -124,6 +136,27 @@ describe("browser API client", () => {
     ).toBe(
       "密码需为 8–128 位，并同时包含大写英文字母、小写英文字母、数字和符号。",
     );
+  });
+
+  it("maps enrollment and limiter failures without exposing their details", () => {
+    expect(
+      getSafeAuthErrorMessage({
+        error: {
+          code: "ENROLLMENT_UNAVAILABLE",
+          message: "must not be rendered",
+          request_id: "00000000-0000-4000-8000-000000000099",
+        },
+      }),
+    ).toBe("暂时无法完成注册，请检查信息或联系邀请人。");
+    expect(
+      getSafeAuthErrorMessage({
+        error: {
+          code: "AUTH_RATE_LIMITED",
+          message: "must not be rendered",
+          request_id: "00000000-0000-4000-8000-000000000099",
+        },
+      }),
+    ).toBe("请求过于频繁，请稍后重试。");
   });
 
   it("creates a session with credentials and the CSRF marker", async () => {

@@ -78,6 +78,7 @@ export default function AuthPanel() {
   const [mode, setMode] = useState<AuthMode>("login");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [inviteCode, setInviteCode] = useState("");
   const [pending, setPending] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string>();
   const [sessionNavigationState, setSessionNavigationState] =
@@ -242,10 +243,15 @@ export default function AuthPanel() {
     try {
       const result =
         mode === "register"
-          ? await registerUser(client, { username, password })
+          ? await registerUser(client, {
+              username,
+              password,
+              invite_code: inviteCode,
+            })
           : await loginUser(client, { username, password });
 
       setPassword("");
+      setInviteCode("");
       if (result.data) {
         setSessionNavigationState({
           sessionId: null,
@@ -258,6 +264,7 @@ export default function AuthPanel() {
       }
     } catch {
       setPassword("");
+      setInviteCode("");
       setErrorMessage("无法连接认证服务，请稍后重试。");
     } finally {
       setPending(false);
@@ -283,6 +290,7 @@ export default function AuthPanel() {
       });
       setUsername("");
       setPassword("");
+      setInviteCode("");
     } catch {
       setErrorMessage("无法连接认证服务，请稍后重试。");
     } finally {
@@ -358,6 +366,7 @@ export default function AuthPanel() {
                 setMode(candidate);
                 setErrorMessage(undefined);
                 setPassword("");
+                setInviteCode("");
               }}
               type="button"
             >
@@ -431,6 +440,24 @@ export default function AuthPanel() {
               </small>
             ) : null}
           </label>
+          {mode === "register" ? (
+            <label className="auth-field" htmlFor="auth-invite-code">
+              <span>邀请码</span>
+              <input
+                aria-label="邀请码"
+                autoComplete="off"
+                id="auth-invite-code"
+                maxLength={256}
+                onChange={(event) => setInviteCode(event.target.value)}
+                required
+                type="password"
+                value={inviteCode}
+              />
+              <small className="auth-field-hint">
+                仅限受邀测试用户；邀请码不会保存到本站本地存储，提交后将从表单清除。
+              </small>
+            </label>
+          ) : null}
           <button
             className="auth-submit"
             disabled={pending || !client}

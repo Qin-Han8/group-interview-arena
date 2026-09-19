@@ -24,7 +24,9 @@ from group_interview_arena_api.db import (
 
 EXPECTED_PRODUCT_TABLES = {
     "ai_utterances",
+    "auth_rate_limit_buckets",
     "auth_sessions",
+    "beta_invitations",
     "discussion_events",
     "discussion_memory_revisions",
     "discussion_memory_states",

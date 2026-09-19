@@ -7,6 +7,7 @@ import {
 } from "@playwright/test";
 
 const API_BASE_URL = process.env.GIA_E2E_API_ORIGIN ?? "http://localhost:8000";
+const INVITE_CODE = process.env.GIA_E2E_INVITE_CODE;
 const SESSION_COOKIE_NAME = "gia_session";
 const VISUAL_VIEWPORTS = [
   { height: 900, label: "1440x900", width: 1440 },
@@ -143,6 +144,8 @@ test("browser auth round trip preserves and clears the opaque session", async ({
     ),
   ).toBeVisible();
   await page.getByLabel("用户名").fill(rawUsername);
+  expect(INVITE_CODE).toBeTruthy();
+  await page.getByLabel("邀请码").fill(INVITE_CODE ?? "");
   let invalidRegistrationRequests = 0;
   const countInvalidRegistrationRequest = (request: Request) => {
     if (request.url() === `${API_BASE_URL}/auth/register`) {
@@ -506,6 +509,7 @@ test("short and constrained lobby viewports keep all training controls reachable
   await page.getByRole("button", { name: "注册" }).click();
   await page.getByLabel("用户名").fill("short_viewport_user");
   await page.getByLabel("密码").fill("Short viewport browser 1!");
+  await page.getByLabel("邀请码").fill("mocked-invitation");
   await page.getByRole("button", { name: "创建账户" }).click();
 
   const lobby = page.getByTestId("training-entry");

@@ -359,10 +359,18 @@ def test_session_cookie_security_accepts_safe_environment_combinations(
     environment: Environment,
     session_cookie_secure: bool,
 ) -> None:
-    settings = Settings(
-        environment=environment,
-        session_cookie_secure=session_cookie_secure,
-    )
+    if environment is Environment.PRODUCTION:
+        settings = Settings(
+            environment=environment,
+            session_cookie_secure=session_cookie_secure,
+            auth_trusted_caddy_mode=True,
+            auth_rate_limit_hmac_key=SecretStr("x" * 32),
+        )
+    else:
+        settings = Settings(
+            environment=environment,
+            session_cookie_secure=session_cookie_secure,
+        )
 
     assert settings.session_cookie_secure is session_cookie_secure
 

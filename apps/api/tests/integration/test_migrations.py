@@ -42,6 +42,7 @@ FLOOR_CONTROL_FOUNDATION_REVISION = "f1a14b15c004"
 DISCUSSION_MEMORY_REVISION = "f1a16b16c006"
 METADATA_TYPE_CLOSURE_REVISION = "f1a16e16c007"
 REPORT_PERSISTENCE_REVISION = "f1a17b17c008"
+CLOSED_BETA_ADMISSION_REVISION = "f1a18a18c009"
 P1_2_PRODUCT_TABLES = frozenset(
     {
         "auth_sessions",
@@ -70,6 +71,10 @@ EXPECTED_PRODUCT_TABLES = P1_2_PRODUCT_TABLES | {
     "prompt_versions",
     "session_participants",
     "speaking_opportunities",
+}
+EXPECTED_HEAD_PRODUCT_TABLES = EXPECTED_PRODUCT_TABLES | {
+    "auth_rate_limit_buckets",
+    "beta_invitations",
 }
 
 
@@ -165,7 +170,7 @@ def test_fresh_database_upgrades_repeatedly_without_schema_drift(
         assert first_state == MigrationState(
             revision=head,
             version_table_exists=True,
-            product_tables=EXPECTED_PRODUCT_TABLES,
+            product_tables=EXPECTED_HEAD_PRODUCT_TABLES,
         )
 
         command.upgrade(config, "head")
@@ -201,7 +206,7 @@ def test_database_downgrades_to_identity_and_reupgrades_to_head(
         assert _migration_state(temporary_database) == MigrationState(
             revision=head,
             version_table_exists=True,
-            product_tables=EXPECTED_PRODUCT_TABLES,
+            product_tables=EXPECTED_HEAD_PRODUCT_TABLES,
         )
 
 
@@ -237,7 +242,7 @@ def test_database_downgrades_to_p1_1_and_reupgrades_to_head(
         assert _migration_state(temporary_database) == MigrationState(
             revision=head,
             version_table_exists=True,
-            product_tables=EXPECTED_PRODUCT_TABLES,
+            product_tables=EXPECTED_HEAD_PRODUCT_TABLES,
         )
 
 
@@ -265,7 +270,7 @@ def test_database_downgrades_to_p1_2_and_reupgrades_to_head(
         assert _migration_state(temporary_database) == MigrationState(
             revision=head,
             version_table_exists=True,
-            product_tables=EXPECTED_PRODUCT_TABLES,
+            product_tables=EXPECTED_HEAD_PRODUCT_TABLES,
         )
 
 
@@ -293,7 +298,7 @@ def test_database_downgrades_to_p1_3_and_reupgrades_to_head(
         assert _migration_state(temporary_database) == MigrationState(
             revision=head,
             version_table_exists=True,
-            product_tables=EXPECTED_PRODUCT_TABLES,
+            product_tables=EXPECTED_HEAD_PRODUCT_TABLES,
         )
 
 
@@ -330,7 +335,7 @@ def test_database_downgrades_to_p1_4_and_reupgrades_to_head(
         assert _migration_state(temporary_database) == MigrationState(
             revision=head,
             version_table_exists=True,
-            product_tables=EXPECTED_PRODUCT_TABLES,
+            product_tables=EXPECTED_HEAD_PRODUCT_TABLES,
         )
 
 
@@ -339,7 +344,7 @@ def test_database_downgrades_to_p1_6_memory_and_reupgrades_to_head(
 ) -> None:
     config = _alembic_config()
     head = ScriptDirectory.from_config(config).get_current_head()
-    assert head == REPORT_PERSISTENCE_REVISION
+    assert head == CLOSED_BETA_ADMISSION_REVISION
 
     with _temporary_migration_environment(temporary_database):
         command.upgrade(config, "head")
@@ -357,9 +362,9 @@ def test_database_downgrades_to_p1_6_memory_and_reupgrades_to_head(
         command.check(config)
 
         assert _migration_state(temporary_database) == MigrationState(
-            revision=REPORT_PERSISTENCE_REVISION,
+            revision=CLOSED_BETA_ADMISSION_REVISION,
             version_table_exists=True,
-            product_tables=EXPECTED_PRODUCT_TABLES,
+            product_tables=EXPECTED_HEAD_PRODUCT_TABLES,
         )
 
 
@@ -465,7 +470,7 @@ def test_database_downgrades_to_baseline_and_reupgrades_to_head(
         assert _migration_state(temporary_database) == MigrationState(
             revision=head,
             version_table_exists=True,
-            product_tables=EXPECTED_PRODUCT_TABLES,
+            product_tables=EXPECTED_HEAD_PRODUCT_TABLES,
         )
 
 
@@ -669,9 +674,9 @@ def test_report_migration_preserves_previous_head_and_existing_data(
         command.current(config, check_heads=True)
         command.check(config)
         assert _migration_state(temporary_database) == MigrationState(
-            revision=REPORT_PERSISTENCE_REVISION,
+            revision=CLOSED_BETA_ADMISSION_REVISION,
             version_table_exists=True,
-            product_tables=EXPECTED_PRODUCT_TABLES,
+            product_tables=EXPECTED_HEAD_PRODUCT_TABLES,
         )
 
 

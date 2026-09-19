@@ -14,6 +14,18 @@
 
 P1 is formally `DONE / CLOSED`; this is the completed text-based discussion closed loop, not a public production launch. P1-5A～P1-5F 的历史实现、review、commit/push、CI 和 acceptance 证据不变，P1-5F-4 的 `F4-ACC-001` 仍为 `CLOSED`，且 F4 accepted path 未调用 real provider/model。P1-5R later legitimately completed R1～R3、Final Composition Acceptance and Independent Acceptance，and the committed `PASS / CLOSED` closeout remains historical evidence。A later explicitly authorized post-closeout real-provider smoke exposed P1-5R-POST-001：provider-await cancellation could leave a generation request and AI floor durably stuck。The network-free remediation and review finding passed actual-source review，accepted commit `3b09d20a704c0fd3ff473ccb79311065b7e70408` has exact CI run `33257343273` green，P1-5R-POST-REV-001、P1-5R-POST-001 and P1-5R are `CLOSED`，parent P1-5 is `DONE`，and open findings are `NONE`。Formal R3.8 remains `NOT_EXECUTED / REQUIRES_SEPARATE_EXPLICIT_USER_AUTHORIZATION`；no further real-provider call occurred。
 
+## HK-BETA-2A1 — Closed Beta Admission, Durable Auth Throttling & Trusted Client Source
+
+- ID: `HK-BETA-2A1`
+- Status: `IN_PROGRESS`
+- Goal: 在不改变 P1/P2/P3 路线的前提下，为 Hong Kong Closed Text Beta 增加最小邀请制、PostgreSQL durable auth throttling 与 Caddy trusted-client-source boundary。
+- In scope: 一次性 invitation、原子消费、通用 enrollment failure、register/login durable limits、固定 account shard、trusted Caddy header、Web invitation input、operator CLI、线性 migration、deployment/config/docs/tests。
+- Out of scope: verified recovery、password denylist 扩展、account deletion、quota/token/cost ceiling、payment、Voice、Redis、queue、Admin UI、email/SMS/OAuth、ECS/DNS、backup 与 PostgreSQL least-privilege runtime role。
+- Dependencies: P1 `DONE / CLOSED`；HK-BETA-0/HK-BETA-1 complete；`ADR-015` 与 `ADR-016`。
+- Actual go-live gate: 本任务关闭 admission 与 durable auth throttling gap，但不自行解除 verified recovery、least-privilege DB role、backup/restore、quota/cost 与其他独立 go-live gates。
+- Closeout: implementation 与 risk-matched local acceptance 已通过；actual-source finding remediation 正在进行，finding re-review、commit/push 与任何真实环境操作仍待后续独立步骤，本轮不满足 `DONE` gate。
+- Plan: [`exec-plans/HK-BETA-2A1_closed-beta-admission-auth-hardening.md`](exec-plans/HK-BETA-2A1_closed-beta-admission-auth-hardening.md)
+
 ## P0-1 — 仓库与文档治理
 
 - ID: `P0-1`

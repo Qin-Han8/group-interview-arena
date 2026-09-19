@@ -21,6 +21,7 @@ from group_interview_arena_api.core.config import (
 from group_interview_arena_api.db.dependencies import (
     DATABASE_SESSION_FACTORY_STATE_KEY,
     get_database_session,
+    get_database_session_factory,
 )
 from group_interview_arena_api.identity.cookies import (
     SESSION_COOKIE_MAX_AGE,
@@ -45,6 +46,7 @@ TEST_DATABASE_URL = (
     "not_connected_by_unit_tests"
 )
 PLAINTEXT_PASSWORD = "unit-only password phrase"
+PLAINTEXT_INVITE = "unit-only invitation secret"
 TRUSTED_ORIGIN = "http://localhost:3000"
 AUTH_POST_HEADERS = {"Origin": TRUSTED_ORIGIN, "X-GIA-CSRF": "1"}
 
@@ -90,6 +92,7 @@ def test_auth_request_schema_repr_and_json_redact_password() -> None:
     register = RegisterRequest(
         username="test_user",
         password=SecretStr(PLAINTEXT_PASSWORD),
+        invite_code=SecretStr(PLAINTEXT_INVITE),
     )
     login = LoginRequest(
         username="test_user",
@@ -98,8 +101,15 @@ def test_auth_request_schema_repr_and_json_redact_password() -> None:
 
     assert PLAINTEXT_PASSWORD not in repr(register)
     assert PLAINTEXT_PASSWORD not in register.model_dump_json()
+    assert PLAINTEXT_INVITE not in repr(register)
+    assert PLAINTEXT_INVITE not in register.model_dump_json()
     assert PLAINTEXT_PASSWORD not in repr(login)
     assert PLAINTEXT_PASSWORD not in login.model_dump_json()
+
+
+def test_login_schema_rejects_passwords_over_128_unicode_code_points() -> None:
+    with pytest.raises(ValidationError):
+        LoginRequest(username="test_user", password=SecretStr("界" * 129))
 
 
 def test_validation_error_response_does_not_echo_password() -> None:
@@ -114,6 +124,7 @@ def test_validation_error_response_does_not_echo_password() -> None:
         yield object()
 
     application.dependency_overrides[get_database_session] = unused_session
+    application.dependency_overrides[get_database_session_factory] = lambda: object()
 
     response = asyncio.run(
         _request(
@@ -152,7 +163,12 @@ def test_session_cookie_helpers_apply_local_and_production_flags() -> None:
     set_session_cookie(
         production_response,
         "unit-only-raw-token",
-        Settings(environment=Environment.PRODUCTION, session_cookie_secure=True),
+        Settings(
+            environment=Environment.PRODUCTION,
+            session_cookie_secure=True,
+            auth_trusted_caddy_mode=True,
+            auth_rate_limit_hmac_key=SecretStr("x" * 32),
+        ),
     )
     assert "secure" in production_response.headers["set-cookie"].lower()
 
@@ -161,7 +177,12 @@ def test_session_cookie_clear_matches_cookie_identity_and_security() -> None:
     response = Response()
     clear_session_cookie(
         response,
-        Settings(environment=Environment.PRODUCTION, session_cookie_secure=True),
+        Settings(
+            environment=Environment.PRODUCTION,
+            session_cookie_secure=True,
+            auth_trusted_caddy_mode=True,
+            auth_rate_limit_hmac_key=SecretStr("x" * 32),
+        ),
     )
     header = response.headers["set-cookie"].lower()
 

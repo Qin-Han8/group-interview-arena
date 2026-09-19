@@ -21,6 +21,7 @@ AI_RUNTIME_PERSISTENCE_REVISION = "f1a15b15c005"
 DISCUSSION_MEMORY_REVISION = "f1a16b16c006"
 METADATA_TYPE_CLOSURE_REVISION = "f1a16e16c007"
 REPORT_PERSISTENCE_REVISION = "f1a17b17c008"
+CLOSED_BETA_ADMISSION_REVISION = "f1a18a18c009"
 
 
 def _alembic_config() -> Config:
@@ -41,7 +42,7 @@ def _normalize_sql(value: str) -> str:
     return " ".join(value.split())
 
 
-def test_migration_history_is_linear_with_single_report_persistence_head() -> None:
+def test_migration_history_is_linear_with_single_closed_beta_admission_head() -> None:
     script = ScriptDirectory.from_config(_alembic_config())
     baseline = script.get_revision(BASELINE_REVISION)
     identity = script.get_revision(IDENTITY_REVISION)
@@ -52,10 +53,12 @@ def test_migration_history_is_linear_with_single_report_persistence_head() -> No
     ai_runtime = script.get_revision(AI_RUNTIME_PERSISTENCE_REVISION)
     discussion_memory = script.get_revision(DISCUSSION_MEMORY_REVISION)
 
-    assert script.get_heads() == [REPORT_PERSISTENCE_REVISION]
+    assert script.get_heads() == [CLOSED_BETA_ADMISSION_REVISION]
     metadata_type_closure = script.get_revision(METADATA_TYPE_CLOSURE_REVISION)
     report_persistence = script.get_revision(REPORT_PERSISTENCE_REVISION)
+    closed_beta_admission = script.get_revision(CLOSED_BETA_ADMISSION_REVISION)
     assert [revision.revision for revision in script.walk_revisions()] == [
+        CLOSED_BETA_ADMISSION_REVISION,
         REPORT_PERSISTENCE_REVISION,
         METADATA_TYPE_CLOSURE_REVISION,
         DISCUSSION_MEMORY_REVISION,
@@ -107,6 +110,10 @@ def test_migration_history_is_linear_with_single_report_persistence_head() -> No
     assert report_persistence.down_revision == METADATA_TYPE_CLOSURE_REVISION
     assert report_persistence.branch_labels == set()
     assert report_persistence.dependencies is None
+    assert closed_beta_admission.revision == CLOSED_BETA_ADMISSION_REVISION
+    assert closed_beta_admission.down_revision == REPORT_PERSISTENCE_REVISION
+    assert closed_beta_admission.branch_labels == set()
+    assert closed_beta_admission.dependencies is None
 
     strict_migration_sql = getattr(
         metadata_type_closure.module,
@@ -149,7 +156,9 @@ def test_baseline_upgrade_and_downgrade_are_zero_op() -> None:
 def test_migration_target_metadata_has_exact_product_tables() -> None:
     assert set(Base.metadata.tables) == {
         "ai_utterances",
+        "auth_rate_limit_buckets",
         "auth_sessions",
+        "beta_invitations",
         "discussion_events",
         "discussion_memory_revisions",
         "discussion_memory_states",

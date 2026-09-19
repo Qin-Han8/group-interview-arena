@@ -109,6 +109,15 @@ Password、password hash 与 raw session token 永不进入 JSON response。P0-5
 
 Cookie session 在 OpenAPI 中使用名为 `SessionCookie` 的 `apiKey`/Cookie security scheme，不引入 JWT bearer scheme。FastAPI OpenAPI 继续是 REST contract Source of Truth；P0-5C 已重新生成并验证 Web TypeScript derivative，未添加手写平行 auth DTO。
 
+### HK-BETA-2A1 current closed-beta auth contract
+
+- `POST /auth/register` 现在必须接收 `username`、`password` 与 secret `invite_code`；成功仍原子签发 opaque session，返回 `201`。
+- Unknown、expired、revoked、used invitation 与 duplicate canonical username 统一返回 `409 ENROLLMENT_UNAVAILABLE`，不向未认证调用者区分 invitation/username 状态。
+- Register 与 login 在业务验证前执行 PostgreSQL-backed durable throttling；拒绝统一为 `429 AUTH_RATE_LIMITED` 与 generic `Retry-After: 900`，不披露触发的具体 bucket。
+- Login request password 在 transport schema 上最多 128 Unicode code points；unknown-user dummy Argon2 与 wrong-password generic `401 INVALID_CREDENTIALS` 不变。
+- Trusted Beta ingress 要求 Caddy 覆盖单值 `X-GIA-Client-IP`；该 header 是 Caddy→API internal contract，不加入 browser CORS allow headers，也不是 public caller-controlled identity。
+- Password、raw invitation、raw IP、HMAC bucket material 与 raw session token 永不进入 response；FastAPI OpenAPI 仍是前端 types/client 的唯一 REST Source of Truth。
+
 ## P0-5 browser security boundary — P0-5D implemented
 
 - Raw session token 只存在于 host-only HttpOnly Cookie；database 只保存 digest；

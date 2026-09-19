@@ -70,6 +70,8 @@ services:
       GIA_API_DATABASE_URL: ${GIA_API_DATABASE_URL:?set GIA_API_DATABASE_URL in deploy/beta/.env}
       GIA_API_CORS_ORIGINS: ${GIA_API_CORS_ORIGINS:?set GIA_API_CORS_ORIGINS in deploy/beta/.env}
       GIA_API_SESSION_COOKIE_SECURE: "true"
+      GIA_API_AUTH_TRUSTED_CADDY_MODE: "true"
+      GIA_API_AUTH_RATE_LIMIT_HMAC_KEY: ${GIA_API_AUTH_RATE_LIMIT_HMAC_KEY:?set GIA_API_AUTH_RATE_LIMIT_HMAC_KEY in deploy/beta/.env}
       GIA_API_ZHIPU_API_KEY: ${GIA_API_ZHIPU_API_KEY:?set GIA_API_ZHIPU_API_KEY in deploy/beta/.env}
       GIA_API_ZHIPU_MODEL: ${GIA_API_ZHIPU_MODEL:?set GIA_API_ZHIPU_MODEL in deploy/beta/.env}
       GIA_API_OTEL_TRACING_ENABLED: "false"
@@ -77,8 +79,9 @@ services:
       postgres:
         condition: service_healthy
     networks:
-      - edge
+      - api-edge
       - data
+      - api-egress
     restart: unless-stopped
     <<: *app-security
     logging: *default-logging
@@ -97,7 +100,7 @@ services:
       api:
         condition: service_healthy
     networks:
-      - edge
+      - web-edge
     restart: unless-stopped
     <<: *app-security
     logging: *default-logging
@@ -123,7 +126,8 @@ services:
       web:
         condition: service_healthy
     networks:
-      - edge
+      - web-edge
+      - api-edge
     restart: unless-stopped
     user: "1000:1000"
     security_opt:
@@ -138,7 +142,11 @@ services:
     logging: *default-logging
 
 networks:
-  edge:
+  web-edge:
+    internal: false
+  api-edge:
+    internal: true
+  api-egress:
     internal: false
   data:
     internal: true
@@ -147,4 +155,3 @@ volumes:
   postgres_data:
   caddy_data:
   caddy_config:
-

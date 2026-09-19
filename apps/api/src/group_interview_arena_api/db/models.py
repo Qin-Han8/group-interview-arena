@@ -73,6 +73,113 @@ class AuthSession(Base):
     )
 
 
+class BetaInvitation(Base):
+    __tablename__ = "beta_invitations"
+    __table_args__ = (
+        CheckConstraint(
+            "octet_length(code_digest) = 32",
+            name="code_digest_sha256",
+        ),
+        CheckConstraint(
+            "expires_at > created_at",
+            name="expires_after_creation",
+        ),
+        CheckConstraint(
+            "(consumed_at IS NULL) = (consumed_by_user_id IS NULL)",
+            name="consumption_pair_consistent",
+        ),
+        CheckConstraint(
+            "NOT (consumed_at IS NOT NULL AND revoked_at IS NOT NULL)",
+            name="single_terminal_state",
+        ),
+        CheckConstraint(
+            "consumed_at IS NULL OR consumed_at >= created_at",
+            name="consumed_after_creation",
+        ),
+        CheckConstraint(
+            "revoked_at IS NULL OR revoked_at >= created_at",
+            name="revoked_after_creation",
+        ),
+        CheckConstraint(
+            "length(btrim(operator_label)) BETWEEN 1 AND 64",
+            name="operator_label_non_empty",
+        ),
+        Index(None, "expires_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    code_digest: Mapped[bytes] = mapped_column(
+        LargeBinary(32),
+        unique=True,
+        nullable=False,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=_utc_now,
+        nullable=False,
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+    )
+    consumed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    consumed_by_user_id: Mapped[UUID | None] = mapped_column(
+        Uuid,
+        ForeignKey("users.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
+    revoked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    operator_label: Mapped[str] = mapped_column(String(64), nullable=False)
+
+
+class AuthRateLimitBucket(Base):
+    __tablename__ = "auth_rate_limit_buckets"
+    __table_args__ = (
+        CheckConstraint(
+            "scope IN ('REGISTER_GLOBAL', 'REGISTER_SOURCE', "
+            "'REGISTER_INVITE', 'LOGIN_GLOBAL', 'LOGIN_SOURCE', "
+            "'LOGIN_ACCOUNT_SHARD')",
+            name="scope_allowed",
+        ),
+        CheckConstraint(
+            "octet_length(key_digest) = 32",
+            name="key_digest_hmac_sha256",
+        ),
+        CheckConstraint("attempt_count >= 0", name="attempt_count_non_negative"),
+        CheckConstraint(
+            "updated_at >= window_started_at",
+            name="updated_after_window_start",
+        ),
+        CheckConstraint(
+            "blocked_until IS NULL OR blocked_until >= window_started_at",
+            name="blocked_after_window_start",
+        ),
+        Index(None, "updated_at"),
+    )
+
+    scope: Mapped[str] = mapped_column(String(32), primary_key=True)
+    key_digest: Mapped[bytes] = mapped_column(LargeBinary(32), primary_key=True)
+    window_started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+    )
+    attempt_count: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    blocked_until: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+    )
+
+
 class SimulationSession(Base):
     __tablename__ = "simulation_sessions"
     __table_args__ = (

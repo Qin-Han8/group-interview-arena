@@ -468,6 +468,15 @@ P1-7C adds no migration or table. Its coordinator claims generation with the dat
 - Implemented in P1-7B/P1-7C：Evaluation Report and Evidence Item physical persistence, generation lifecycle/version/watermark identity, same-session relational provenance, idempotent COMPLETED-only allocation, public-source extraction, deterministic evidence validation and lease/CAS atomic generation；
 - TBD：未来 phone/WeChat identity mapping 的具体 Schema；
 - TBD：verified recovery identity、account recovery 与账号删除的完整数据语义；
+
+## HK-BETA-2A1 admission and auth limiter persistence
+
+- Linear Alembic head `f1a18a18c009` adds exactly `beta_invitations` and `auth_rate_limit_buckets`; prior revisions remain immutable and API startup still never runs Alembic or `Base.metadata.create_all()`.
+- `beta_invitations` persists only SHA-256 `code_digest`, creation/expiry, optional consumed/revoked timestamps, consuming user id and a bounded operator label. Raw invitation never enters PostgreSQL.
+- One successful registration locks the exact invitation row and atomically inserts `users`/`auth_sessions` plus invitation consumption. Concurrent replay converges to one success.
+- `auth_rate_limit_buckets` uses `(scope, key_digest)` as its bounded identity, count/window/block timestamps and row locking. Key digests are server-keyed HMAC values; the table contains no raw IP, username or invitation secret.
+- Random/unknown invitation attempts use only global/source buckets. Per-invite buckets require an existing invitation row; login account buckets are exactly 16,384 shards.
+- No startup cleanup, Redis, queue or scheduled retention job is introduced. At the intended 20～100-user Beta scale, expired rows remain safe historical/operational data pending a separately reviewed retention task.
 - TBD：原始音频是否默认完全不保存（总纲第 37 节）；
 - TBD：各类数据的精确保留期限；
 - TBD：删除、匿名化和审计的具体规则；
@@ -478,7 +487,7 @@ P1-7C adds no migration or table. Its coordinator claims generation with the dat
 
 - P0-5C：FastAPI lifespan/request dependency 已成为现有 async DB runtime 的第一个 application caller；真实 PostgreSQL auth integration 只使用迁移到 head 的隔离临时数据库，development DB 保持 head `4fe43b42641b` 且两张表均为 0 rows；
 - P0-5D：completed；browser closure 已实现，existing Cookie/CORS/CSRF/shared trusted-origin boundary 已生效；P1 不得创建第二套 trusted-origin config；
-- P1：`DONE / CLOSED`；current migration head remains `f1a17b17c008` with exactly twenty-three product tables；P1-1～P1-8 mandatory scope and approved acceptance chain are complete；
+- P1：`DONE / CLOSED`；its closeout head was `f1a17b17c008` with twenty-three product tables；the separately approved HK-BETA-2A1 hardening now advances the current head to `f1a18a18c009` with exactly twenty-five product tables，without changing P1 scope；
 - P2～P4：仅随获批范围增加音频、评分训练和商业化数据。
 
 ## 与其他文档关系

@@ -199,6 +199,10 @@ P0-4F 已从 clean `main` HEAD 独立复核 Git、总纲 hash、Docker/PostgreSQ
 
 P0-5B 已建立 `users`、`auth_sessions`、identity migration 与 password/session security primitives，metadata 以 `db` package 的显式 model registration 精确包含两张 product table。P0-5C 已把现有 DB factory 接入 FastAPI lifespan/app state/request-scoped `AsyncSession`，并实现最小 register/login/logout/me、server-side session validation 与 `gia_session` Cookie issue/clear。P0-5D 已完成 shared-origin credentialed CORS/CSRF、最小 Web auth UI、raw/canonical username browser/backend closure 与真实 Chromium browser closure；P0-5E initial independent review verdict 为 `BLOCKED`，两个 findings 已完成 remediation，并通过 findings-only independent recheck；P0-5E final outcome 为 `PASS`，P0-5 已转为 `DONE`。
 
+HK-BETA-2A1 在该身份边界上增加两项最小 hardening：一次性 invitation admission 与 PostgreSQL durable auth limiter。Invitation consumption 与 user/session creation 使用同一 row-locked transaction；limiter 使用独立短 transaction，不依赖 API process memory。随机 invitation 不创建 per-invite bucket，username 只映射到固定 16,384 个 HMAC shards。
+
+Beta ingress 分为 `web-edge`（Caddy/Web）、internal `api-edge`（Caddy/API）、internal `data`（API/migrate/PostgreSQL）与仅 API 加入且不发布端口的 `api-egress`（既有 LLM provider outbound）。Caddy 是 API 唯一 ingress，并覆盖 `X-GIA-Client-IP={remote_host}`；API trusted mode 对缺失/重复/非法值 fail closed。Web container 不加入 `api-edge`，因此不能绕过 public API/CORS/CSRF boundary 直接连接 API。
+
 已实现的 DB application lifecycle 为：
 
 ```text

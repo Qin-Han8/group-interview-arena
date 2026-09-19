@@ -3,7 +3,9 @@
 from group_interview_arena_api.db.base import Base
 from group_interview_arena_api.db.models import (
     AiUtterance,
+    AuthRateLimitBucket,
     AuthSession,
+    BetaInvitation,
     DiscussionEvent,
     DiscussionMemoryRevision,
     DiscussionMemoryState,
@@ -29,8 +31,10 @@ from group_interview_arena_api.db.models import (
 
 __all__ = [
     "AiUtterance",
+    "AuthRateLimitBucket",
     "AuthSession",
     "Base",
+    "BetaInvitation",
     "DiscussionEvent",
     "DiscussionMemoryRevision",
     "DiscussionMemoryState",

@@ -363,6 +363,17 @@ P0-2 已 Accepted PostgreSQL、SQLAlchemy 2.x 和 Alembic，P0-4 实施基线为
 - TBD：migration、跨应用及后续阶段的具体检查命令；
 - TBD：性能、可靠性和成本阈值的正式基线；
 - TBD：公开发布的合规、备案和邀请测试路径；
+
+## HK-BETA-2A1 Closed Beta admission/auth hardening
+
+- [x] 一次性 256-bit invitation，默认 14 天、SHA-256-at-rest、operator stdout-only raw secret；
+- [x] invitation row lock 与 user/session/consume 单 transaction，并发 replay 只有一个成功；
+- [x] invalid/expired/revoked/used invitation 与 duplicate username 对外统一；
+- [x] PostgreSQL durable register/login limiter，跨 API restart 保持，不使用 in-memory correctness 或 Redis；
+- [x] random invitation bounded cardinality 与固定 16,384 account shards；
+- [x] Caddy 覆盖 trusted client source，API trusted mode fail closed，Web/API private networks 分离；
+- [x] Web invitation secret input 不持久化并在响应后清空，OpenAPI derivative 已更新；
+- [ ] verified recovery、least-privilege PostgreSQL runtime role、backup/restore drill、quota/cost gates 等独立 actual-go-live blockers 尚未关闭。
 - TBD：版本回滚、数据迁移和事故响应流程。
 
 这些是派生 TBD，不是总纲原始 D-xxx。

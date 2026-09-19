@@ -19,6 +19,8 @@ class ErrorCode(StrEnum):
     INVALID_USERNAME = "INVALID_USERNAME"
     INVALID_PASSWORD = "INVALID_PASSWORD"
     USERNAME_UNAVAILABLE = "USERNAME_UNAVAILABLE"
+    ENROLLMENT_UNAVAILABLE = "ENROLLMENT_UNAVAILABLE"
+    AUTH_RATE_LIMITED = "AUTH_RATE_LIMITED"
     INVALID_CREDENTIALS = "INVALID_CREDENTIALS"
     AUTHENTICATION_REQUIRED = "AUTHENTICATION_REQUIRED"
     CSRF_REJECTED = "CSRF_REJECTED"
@@ -30,11 +32,19 @@ class ErrorCode(StrEnum):
 
 
 class ApiError(Exception):
-    def __init__(self, *, status_code: int, code: ErrorCode, message: str) -> None:
+    def __init__(
+        self,
+        *,
+        status_code: int,
+        code: ErrorCode,
+        message: str,
+        headers: dict[str, str] | None = None,
+    ) -> None:
         super().__init__(message)
         self.status_code = status_code
         self.code = code
         self.message = message
+        self.headers = headers
 
 
 class ErrorDetail(BaseModel):
@@ -51,7 +61,13 @@ def _current_or_new_request_id() -> str:
     return get_request_id() or create_request_id()
 
 
-def error_response(*, status_code: int, code: ErrorCode, message: str) -> JSONResponse:
+def error_response(
+    *,
+    status_code: int,
+    code: ErrorCode,
+    message: str,
+    headers: dict[str, str] | None = None,
+) -> JSONResponse:
     body = ErrorResponse(
         error=ErrorDetail(
             code=code,
@@ -59,7 +75,11 @@ def error_response(*, status_code: int, code: ErrorCode, message: str) -> JSONRe
             request_id=_current_or_new_request_id(),
         )
     )
-    return JSONResponse(status_code=status_code, content=body.model_dump(mode="json"))
+    return JSONResponse(
+        status_code=status_code,
+        content=body.model_dump(mode="json"),
+        headers=headers,
+    )
 
 
 async def http_exception_handler(
@@ -97,6 +117,7 @@ async def api_error_handler(_request: Request, exception: Exception) -> JSONResp
         status_code=exception.status_code,
         code=exception.code,
         message=exception.message,
+        headers=exception.headers,
     )
 
 

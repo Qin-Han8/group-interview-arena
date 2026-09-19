@@ -28,6 +28,8 @@ const API_RESTART_REQUEST = process.env.GIA_E2E_API_RESTART_REQUEST;
 const API_RESTART_READY = process.env.GIA_E2E_API_RESTART_READY;
 const PROVIDER_BLOCKED = process.env.GIA_E2E_PROVIDER_BLOCKED;
 const PROVIDER_CANCELLED = process.env.GIA_E2E_PROVIDER_CANCELLED;
+const SESSION_INVITE_CODE = process.env.GIA_E2E_SESSION_INVITE_CODE;
+const VISUAL_INVITE_CODE = process.env.GIA_E2E_VISUAL_INVITE_CODE;
 
 test.setTimeout(150_000);
 
@@ -302,6 +304,8 @@ test("browser session recovers durable phases across API restart and reload", as
   await page.getByRole("button", { name: "注册" }).click();
   await page.getByLabel("用户名").fill(username);
   await page.getByLabel("密码").fill(password);
+  expect(SESSION_INVITE_CODE).toBeTruthy();
+  await page.getByLabel("邀请码").fill(SESSION_INVITE_CODE ?? "");
   await page.getByRole("button", { name: "创建账户" }).click();
   await expect(
     page.getByRole("heading", {
@@ -1370,6 +1374,8 @@ test("F010 Task 4-7 focused workspace visual and resize gates", async ({
   await page.getByRole("button", { name: "注册" }).click();
   await page.getByLabel("用户名").fill(username);
   await page.getByLabel("密码").fill(password);
+  expect(VISUAL_INVITE_CODE).toBeTruthy();
+  await page.getByLabel("邀请码").fill(VISUAL_INVITE_CODE ?? "");
   await page.getByRole("button", { name: "创建账户" }).click();
   await expect(
     page.getByRole("heading", { name: "下一场完整模拟" }),

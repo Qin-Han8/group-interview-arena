@@ -11,12 +11,13 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from group_interview_arena_api.core.logging import log_event
-from group_interview_arena_api.db.models import AuthSession, User
+from group_interview_arena_api.db.models import AuthSession, BetaInvitation, User
 from group_interview_arena_api.identity.credentials import (
     hash_password,
     normalize_username,
     verify_password_and_update,
 )
+from group_interview_arena_api.identity.invitations import digest_invitation_code
 from group_interview_arena_api.identity.sessions import (
     digest_session_token,
     generate_session_token,
@@ -43,6 +44,10 @@ class InvalidPasswordError(ValueError):
 
 
 class UsernameUnavailableError(Exception):
+    pass
+
+
+class EnrollmentUnavailableError(Exception):
     pass
 
 
@@ -90,6 +95,8 @@ async def register_user(
     *,
     username: str,
     password: str,
+    invite_code: str,
+    reference_time: datetime | None = None,
 ) -> AuthenticationResult:
     try:
         canonical_username = normalize_username(username)
@@ -101,6 +108,7 @@ async def register_user(
     except ValueError:
         raise InvalidPasswordError from None
 
+    now = reference_time or datetime.now(UTC)
     try:
         user = User(
             username=canonical_username,
@@ -108,6 +116,21 @@ async def register_user(
         )
         raw_token = ""
         async with session.begin():
+            invitation = await session.scalar(
+                select(BetaInvitation)
+                .where(
+                    BetaInvitation.code_digest == digest_invitation_code(invite_code)
+                )
+                .with_for_update()
+            )
+            if (
+                invitation is None
+                or invitation.expires_at <= now
+                or invitation.consumed_at is not None
+                or invitation.revoked_at is not None
+            ):
+                raise EnrollmentUnavailableError
+
             session.add(user)
             await session.flush()
 
@@ -119,9 +142,11 @@ async def register_user(
                     expires_at=session_expires_at(),
                 )
             )
+            invitation.consumed_at = now
+            invitation.consumed_by_user_id = user.id
     except IntegrityError as exception:
         if _is_username_unique_violation(exception):
-            raise UsernameUnavailableError from None
+            raise EnrollmentUnavailableError from None
         _raise_persistence_error("register")
     except SQLAlchemyError:
         _raise_persistence_error("register")

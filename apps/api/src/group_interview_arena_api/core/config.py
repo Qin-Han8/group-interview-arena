@@ -90,6 +90,14 @@ class Settings(BaseSettings):
     log_level: LogLevel = LogLevel.INFO
     cors_origins: tuple[str, ...] = ()
     session_cookie_secure: bool = False
+    auth_trusted_caddy_mode: bool = False
+    auth_rate_limit_hmac_key: SecretStr | None = None
+    auth_register_global_limit: int = Field(default=200, gt=0, strict=True)
+    auth_register_source_limit: int = Field(default=20, gt=0, strict=True)
+    auth_register_invite_limit: int = Field(default=5, gt=0, strict=True)
+    auth_login_global_limit: int = Field(default=1200, gt=0, strict=True)
+    auth_login_source_limit: int = Field(default=60, gt=0, strict=True)
+    auth_login_account_shard_limit: int = Field(default=10, gt=0, strict=True)
     otel_tracing_enabled: bool = False
     otel_service_name: str = "group-interview-arena-api"
     otel_otlp_http_endpoint: AnyHttpUrl | None = None
@@ -105,6 +113,30 @@ class Settings(BaseSettings):
         ):
             raise ValueError("Production sessions require secure cookies")
         return self
+
+    @model_validator(mode="after")
+    def require_production_auth_boundary(self) -> Self:
+        if self.environment is not Environment.PRODUCTION:
+            return self
+        if not self.auth_trusted_caddy_mode:
+            raise ValueError(
+                "Production auth requires trusted Caddy client source mode"
+            )
+        if self.auth_rate_limit_hmac_key is None:
+            raise ValueError("Production auth requires a rate-limit HMAC key")
+        return self
+
+    @field_validator("auth_rate_limit_hmac_key")
+    @classmethod
+    def validate_auth_rate_limit_hmac_key(
+        cls,
+        key: SecretStr | None,
+    ) -> SecretStr | None:
+        if key is None:
+            return None
+        if len(key.get_secret_value().encode("utf-8")) < 32:
+            raise ValueError("Auth rate-limit HMAC key must contain at least 32 bytes")
+        return key
 
     @model_validator(mode="after")
     def require_tracing_endpoint_when_enabled(self) -> Self:

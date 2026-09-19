@@ -30,6 +30,7 @@ from group_interview_arena_api.modules.question_personas.seed import (
     INTERNAL_VALIDATION_BUNDLE,
     seed_question_persona_foundation,
 )
+from tests.auth_test_helpers import create_test_invitation
 
 pytestmark = pytest.mark.integration
 
@@ -71,11 +72,19 @@ async def _application(
         yield application
 
 
-async def _register(client: AsyncClient, username: str) -> UUID:
+async def _register(
+    application: FastAPI,
+    client: AsyncClient,
+    username: str,
+) -> UUID:
     response = await client.post(
         "/auth/register",
         headers=AUTH_HEADERS,
-        json={"username": username, "password": VALID_PASSWORD},
+        json={
+            "username": username,
+            "password": VALID_PASSWORD,
+            "invite_code": await create_test_invitation(_factory(application)),
+        },
     )
     assert response.status_code == 201
     return UUID(response.json()["id"])
@@ -119,7 +128,7 @@ async def _verify_rest_contract(
             transport=transport,
             base_url="http://testserver",
         ) as owner:
-            owner_id = await _register(owner, "session_owner")
+            owner_id = await _register(application, owner, "session_owner")
             missing_csrf = await owner.post(
                 "/sessions",
                 json={
@@ -324,7 +333,7 @@ async def _verify_rest_contract(
                 transport=transport,
                 base_url="http://testserver",
             ) as non_owner:
-                await _register(non_owner, "session_non_owner")
+                await _register(application, non_owner, "session_non_owner")
                 hidden = await non_owner.get(f"/sessions/{session_id}")
                 _assert_safe_error(hidden, 404, "SESSION_NOT_FOUND")
                 assert (

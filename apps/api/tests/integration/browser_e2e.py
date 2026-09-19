@@ -36,6 +36,7 @@ from group_interview_arena_api.db.runtime import (
     create_database_session_factory,
     dispose_database_engine,
 )
+from group_interview_arena_api.identity.invitations import generate_invitations
 from group_interview_arena_api.modules.ai_runtime.domain import PromptVersionDefinition
 from group_interview_arena_api.modules.ai_runtime.service import publish_prompt_version
 from group_interview_arena_api.modules.question_personas.seed import (
@@ -236,7 +237,10 @@ def _run_playwright(*, environment_overrides: dict[str, str]) -> None:
         )
 
 
-def _run_browser_flow(temporary_database: TemporaryDatabase) -> tuple[UUID, UUID]:
+def _run_browser_flow(
+    temporary_database: TemporaryDatabase,
+    invite_codes: tuple[str, str, str],
+) -> tuple[UUID, UUID]:
     _require_available_port(WEB_PORT)
     _require_available_port(API_PORT)
 
@@ -493,6 +497,9 @@ def _run_browser_flow(temporary_database: TemporaryDatabase) -> tuple[UUID, UUID
                     _run_playwright(
                         environment_overrides={
                             "GIA_E2E_API_ORIGIN": API_ORIGIN,
+                            "GIA_E2E_INVITE_CODE": invite_codes[0],
+                            "GIA_E2E_SESSION_INVITE_CODE": invite_codes[1],
+                            "GIA_E2E_VISUAL_INVITE_CODE": invite_codes[2],
                             "GIA_E2E_API_RESTART_REQUEST": str(restart_request),
                             "GIA_E2E_API_RESTART_READY": str(restart_ready),
                             "GIA_E2E_AI_CONTENT": AI_CONTRIBUTION,
@@ -848,6 +855,36 @@ def _seed_browser_question(temporary_database: TemporaryDatabase) -> None:
     )
 
 
+async def _generate_browser_invitations_async(
+    temporary_database: TemporaryDatabase,
+    *,
+    count: int,
+) -> list[str]:
+    engine = create_database_engine(temporary_database.database_settings())
+    session_factory = create_database_session_factory(engine)
+    try:
+        async with session_factory() as session:
+            invitations = await generate_invitations(
+                session,
+                count=count,
+                label="browser-e2e",
+            )
+        return [invitation.raw_code for invitation in invitations]
+    finally:
+        await dispose_database_engine(engine)
+
+
+def _generate_browser_invitations(
+    temporary_database: TemporaryDatabase,
+    *,
+    count: int,
+) -> list[str]:
+    return asyncio.run(
+        _generate_browser_invitations_async(temporary_database, count=count),
+        loop_factory=asyncio.SelectorEventLoop,
+    )
+
+
 def main() -> int:
     database_settings = IntegrationDatabaseSettings()  # pyright: ignore[reportCallIssue]
     with temporary_database_context(
@@ -856,7 +893,12 @@ def main() -> int:
     ) as temporary_database:
         migrate_database(temporary_database)
         _seed_browser_question(temporary_database)
-        recovery_session_id, cancelled_grant_id = _run_browser_flow(temporary_database)
+        invite_codes = tuple(_generate_browser_invitations(temporary_database, count=3))
+        assert len(invite_codes) == 3
+        recovery_session_id, cancelled_grant_id = _run_browser_flow(
+            temporary_database,
+            invite_codes,
+        )
         _verify_session_persistence(
             temporary_database,
             recovery_session_id,

@@ -321,6 +321,28 @@ ADR-007 在 P0-2 建立时将具体 OpenAPI generator package 保持 Deferred；
 - Re-evaluation: JWT 不是永久禁止。出现 mobile client、third-party API、distributed service trust boundary 或其他 server-side session 无法满足的真实需求时，通过新的 ADR 重新评估。
 - Related documents: [`ARCHITECTURE.md`](ARCHITECTURE.md)、[`DATABASE.md`](DATABASE.md)、[`API.md`](API.md)、[`PRIVACY_AND_SAFETY.md`](PRIVACY_AND_SAFETY.md)、[`exec-plans/P0-5_identity-boundary.md`](exec-plans/P0-5_identity-boundary.md)
 
+### ADR-016 — Hong Kong Closed Beta admission and durable auth throttling
+
+- ID: `ADR-016`
+- Title: Hong Kong Closed Beta admission and durable auth throttling
+- Date: 2026-09-19
+- Status: Accepted
+- Type: Security
+- Source: 用户明确批准的 HK-BETA-2A1 实施范围与参数
+- Context: HK-BETA-1 已具备单机 Beta deployment package，但原始 `POST /auth/register` 允许任意互联网用户自助注册，且没有跨进程、跨重启的 authentication throttling；Beta 约束为个人维护、20～100 名邀请用户、无 Admin 后台。
+- Decision:
+  1. Closed Beta 使用一次性、非 username-bound 邀请码；默认 14 天过期，原始值至少 256-bit entropy，只向人工操作者 stdout 显示一次，数据库只保存 SHA-256 digest。
+  2. 邀请消费与 user/session 创建在同一 PostgreSQL transaction 中，并对 invitation row 加锁；unknown、expired、revoked、used invite 与 duplicate username 对未认证调用者统一为 `ENROLLMENT_UNAVAILABLE`。
+  3. Durable register/login throttling 使用 PostgreSQL，不引入 Redis。Register 固定为 global `200/hour`、client source `20/hour`、已存在 invite `5/hour`；随机/未知 invite 不创建 per-invite bucket。Login 固定为 global `1200/10 minutes`、client source `60/10 minutes`、account shard `10/15 minutes` 后 block 15 minutes。
+  4. Username 先 canonicalize，再经 server-only HMAC 映射到精确 `16384` 个固定 account shards；client source 与其他 bucket key 同样只保存 HMAC digest，raw IP、username、invite secret 不进入 limiter table 或普通日志。
+  5. Beta trusted-client-source 只接受 Caddy 覆盖写入的单值 `X-GIA-Client-IP`；API 在 trusted mode 对缺失、重复或非法 IPv4/IPv6 fail closed。Caddy/API 使用私有网络，Web 不加入 API 网络；API 另有仅供既有 LLM provider 出站的非发布 egress network。
+  6. Login request password 最大 128 Unicode code points；既有 dummy Argon2、generic credential failure、opaque PostgreSQL session、Cookie/CORS/CSRF/WebSocket contract 保持不变。
+  7. Verified recovery、stronger compromised-password controls、account deletion、quota/cost ceiling、PostgreSQL least-privilege role 与其他 go-live gates 不在本 ADR 中实现，仍按既有 Source of Truth 保持 blocker/deferred 状态。
+- Rationale: 该方案用当前 PostgreSQL 与单机 Caddy topology 提供最小、可恢复、低运维成本的邀请制与认证滥用防护，并通过固定 shard/仅已知 invitation bucket 避免攻击者制造无界数据库基数。
+- Consequences: 新增 `beta_invitations` 与 `auth_rate_limit_buckets` 的线性 Alembic migration；production startup 必须具有独立 HMAC key 与 trusted Caddy mode；API startup 不执行 migration 或 cleanup；没有 Admin UI、Redis、queue 或后台 cleanup job。`beta_invitations.consumed_by_user_id` 当前 `ON DELETE RESTRICT` 且消费字段成对约束依赖已消费用户存在，后续 account/data deletion 阶段必须显式处理该 schema dependency。只有数据库中实际存在的 invitation 才建立 `REGISTER_INVITE` bucket，因此 repeated attempts 仍有低风险的 invitation-existence timing/rate-limit side channel；至少 256-bit 高熵 raw invitation 使线上枚举不可行，但本 ADR 不宣称 invitation existence 对未授权调用者具有严格不可区分性，也不在本轮改变已批准的 per-existing-invite limiter。
+- Alternatives: allowlist、预创建账号、Redis limiter、Admin dashboard、username-bound invitation；这些方案对当前 20～100 人个人维护 Beta 增加不必要的操作或基础设施复杂度。
+- Related documents: [`API.md`](API.md)、[`DATABASE.md`](DATABASE.md)、[`ARCHITECTURE.md`](ARCHITECTURE.md)、[`PRIVACY_AND_SAFETY.md`](PRIVACY_AND_SAFETY.md)、[`exec-plans/HK-BETA-2A1_closed-beta-admission-auth-hardening.md`](exec-plans/HK-BETA-2A1_closed-beta-admission-auth-hardening.md)
+
 ## 4. 仍保持 TBD 的技术事项
 
 以下都是派生 TBD，不是总纲原始 D-xxx：

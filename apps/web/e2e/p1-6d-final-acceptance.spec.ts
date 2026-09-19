@@ -3,6 +3,8 @@ import { access, readFile, writeFile } from "node:fs/promises";
 
 const API_BASE_URL =
   process.env.GIA_P16D_FINAL_API_ORIGIN ?? "http://localhost:8000";
+const OWNER_INVITE_CODE = process.env.GIA_P16D_FINAL_INVITE_CODE;
+const OTHER_INVITE_CODE = process.env.GIA_P17E_OTHER_INVITE_CODE;
 const API_LOG = process.env.GIA_P16D_FINAL_API_LOG;
 const API_RESTART_REQUEST = process.env.GIA_P16D_FINAL_API_RESTART_REQUEST;
 const API_RESTART_READY = process.env.GIA_P16D_FINAL_API_RESTART_READY;
@@ -155,6 +157,8 @@ test.describe.serial("P1-6D final integrated acceptance", () => {
     await page
       .getByLabel("密码")
       .fill(`P1-6D final ${crypto.randomUUID()} phrase`);
+    expect(OWNER_INVITE_CODE).toBeTruthy();
+    await page.getByLabel("邀请码").fill(OWNER_INVITE_CODE ?? "");
     await page.getByRole("button", { name: "创建账户" }).click();
     await expect(
       page.getByRole("heading", { name: "下一场完整模拟" }),
@@ -727,6 +731,8 @@ test.describe.serial("P1-6D final integrated acceptance", () => {
         await otherPage
           .getByLabel("密码")
           .fill(`P1-7E Other ${crypto.randomUUID()}!`);
+        expect(OTHER_INVITE_CODE).toBeTruthy();
+        await otherPage.getByLabel("邀请码").fill(OTHER_INVITE_CODE ?? "");
         await otherPage.getByRole("button", { name: "创建账户" }).click();
         await expect(
           otherPage.getByRole("heading", { name: "下一场完整模拟" }),

@@ -157,7 +157,10 @@ export function getSafeAuthErrorMessage(error: unknown) {
     case "INVALID_PASSWORD":
       return "密码需为 8–128 位，并同时包含大写英文字母、小写英文字母、数字和符号。";
     case "USERNAME_UNAVAILABLE":
-      return "该用户名不可用。";
+    case "ENROLLMENT_UNAVAILABLE":
+      return "暂时无法完成注册，请检查信息或联系邀请人。";
+    case "AUTH_RATE_LIMITED":
+      return "请求过于频繁，请稍后重试。";
     case "INVALID_CREDENTIALS":
       return "用户名或密码不正确。";
     case "CSRF_REJECTED":

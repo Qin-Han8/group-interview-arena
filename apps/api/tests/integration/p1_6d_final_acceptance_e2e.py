@@ -19,6 +19,7 @@ from browser_e2e import (
     WEB_ORIGIN,
     WEB_PORT,
     WEB_ROOT,
+    _generate_browser_invitations,  # pyright: ignore[reportPrivateUsage]
     _log_tail,  # pyright: ignore[reportPrivateUsage]
     _require_available_port,  # pyright: ignore[reportPrivateUsage]
     _start_server_process,  # pyright: ignore[reportPrivateUsage]
@@ -458,7 +459,10 @@ def _run_playwright(environment: dict[str, str]) -> None:
         )
 
 
-def _run_final_flow(temporary_database: TemporaryDatabase) -> None:
+def _run_final_flow(
+    temporary_database: TemporaryDatabase,
+    invite_codes: tuple[str, str],
+) -> None:
     _require_available_port(WEB_PORT)
     _require_available_port(API_PORT)
     node = shutil.which("node.exe" if os.name == "nt" else "node")
@@ -581,6 +585,8 @@ def _run_final_flow(temporary_database: TemporaryDatabase) -> None:
                     _run_playwright(
                         {
                             "GIA_P16D_FINAL_API_LOG": str(api_log),
+                            "GIA_P16D_FINAL_INVITE_CODE": invite_codes[0],
+                            "GIA_P17E_OTHER_INVITE_CODE": invite_codes[1],
                             "GIA_P16D_FINAL_API_ORIGIN": API_ORIGIN,
                             "GIA_P16D_FINAL_API_RESTART_REQUEST": str(restart_request),
                             "GIA_P16D_FINAL_API_RESTART_READY": str(restart_ready),
@@ -636,7 +642,10 @@ def main() -> int:
     ) as temporary_database:
         migrate_database(temporary_database)
         _seed_question(temporary_database)
-        _run_final_flow(temporary_database)
+        generated = _generate_browser_invitations(temporary_database, count=2)
+        if len(generated) != 2:
+            raise RuntimeError("Expected two final-acceptance invitations.")
+        _run_final_flow(temporary_database, (generated[0], generated[1]))
     print(
         "P1-6D D2-D4 passed: Human plus exactly three AI, durable Memory/V4/V2, "
         "Browser reload, API restart, cancellation recovery, privacy/exact-once "

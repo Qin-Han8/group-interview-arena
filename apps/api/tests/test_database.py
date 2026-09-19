@@ -43,7 +43,9 @@ def test_metadata_naming_convention_matches_baseline() -> None:
 def test_base_metadata_has_exact_product_tables() -> None:
     assert set(Base.metadata.tables) == {
         "ai_utterances",
+        "auth_rate_limit_buckets",
         "auth_sessions",
+        "beta_invitations",
         "discussion_events",
         "discussion_memory_revisions",
         "discussion_memory_states",

@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from collections.abc import AsyncGenerator, Callable, Coroutine
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
@@ -9,7 +10,8 @@ from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient, Response
 from pwdlib import PasswordHash
 from pwdlib.hashers.argon2 import Argon2Hasher
-from sqlalchemy import URL, func, select
+from pydantic import SecretStr
+from sqlalchemy import URL, event, func, select
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from group_interview_arena_api import app as app_module
@@ -22,7 +24,12 @@ from group_interview_arena_api.core.config import (
 from group_interview_arena_api.db.dependencies import (
     DATABASE_SESSION_FACTORY_STATE_KEY,
 )
-from group_interview_arena_api.db.models import AuthSession, User
+from group_interview_arena_api.db.models import (
+    AuthRateLimitBucket,
+    AuthSession,
+    BetaInvitation,
+    User,
+)
 from group_interview_arena_api.db.runtime import dispose_database_engine
 from group_interview_arena_api.identity import service as auth_service
 from group_interview_arena_api.identity.cookies import (
@@ -34,12 +41,17 @@ from group_interview_arena_api.identity.credentials import (
     ARGON2_SALT_LENGTH,
     verify_password,
 )
+from group_interview_arena_api.identity.invitations import (
+    digest_invitation_code,
+    generate_invitations,
+)
 from group_interview_arena_api.identity.service import DUMMY_PASSWORD_HASH
 from group_interview_arena_api.identity.sessions import (
     SESSION_DURATION,
     digest_session_token,
     session_expires_at,
 )
+from tests.auth_test_helpers import create_test_invitation
 
 pytestmark = pytest.mark.integration
 
@@ -113,6 +125,19 @@ async def _identity_counts(application: FastAPI) -> tuple[int, int]:
     return int(users or 0), int(auth_sessions or 0)
 
 
+async def _registration_payload(
+    application: FastAPI,
+    *,
+    username: str,
+    password: str,
+) -> dict[str, str]:
+    return {
+        "username": username,
+        "password": password,
+        "invite_code": await create_test_invitation(_session_factory(application)),
+    }
+
+
 async def _register_persists_session_and_resolves_me(
     temporary_database: TemporaryDatabaseContext,
     disposed_engines: list[AsyncEngine],
@@ -122,7 +147,11 @@ async def _register_persists_session_and_resolves_me(
 
         response = await client.post(
             "/auth/register",
-            json={"username": "Register_User", "password": VALID_PASSWORD},
+            json=await _registration_payload(
+                application,
+                username="Register_User",
+                password=VALID_PASSWORD,
+            ),
         )
         assert response.status_code == 201
         assert response.json()["username"] == "register_user"
@@ -204,31 +233,56 @@ async def _exercise_registration_failures(
     async with _auth_client(temporary_database) as (application, client):
         invalid_username = await client.post(
             "/auth/register",
-            json={"username": "not valid", "password": VALID_PASSWORD},
+            json=await _registration_payload(
+                application,
+                username="not valid",
+                password=VALID_PASSWORD,
+            ),
         )
         _assert_safe_error(invalid_username, 422, "INVALID_USERNAME")
 
         invalid_password_value = "too short"
         invalid_password = await client.post(
             "/auth/register",
-            json={"username": "valid_user", "password": invalid_password_value},
+            json=await _registration_payload(
+                application,
+                username="valid_user",
+                password=invalid_password_value,
+            ),
         )
         _assert_safe_error(invalid_password, 422, "INVALID_PASSWORD")
         assert invalid_password_value not in invalid_password.text
 
         first = await client.post(
             "/auth/register",
-            json={"username": "Duplicate_User", "password": VALID_PASSWORD},
+            json={
+                "username": "Duplicate_User",
+                "password": VALID_PASSWORD,
+                "invite_code": await create_test_invitation(
+                    _session_factory(application)
+                ),
+            },
         )
         assert first.status_code == 201
+        duplicate_invite = await create_test_invitation(_session_factory(application))
         duplicate = await client.post(
             "/auth/register",
             json={
                 "username": "duplicate_user",
                 "password": "Another integration password 2!",
+                "invite_code": duplicate_invite,
             },
         )
-        _assert_safe_error(duplicate, 409, "USERNAME_UNAVAILABLE")
+        _assert_safe_error(duplicate, 409, "ENROLLMENT_UNAVAILABLE")
+        async with _session_factory(application)() as session:
+            preserved_duplicate_invite = await session.scalar(
+                select(BetaInvitation).where(
+                    BetaInvitation.code_digest
+                    == digest_invitation_code(duplicate_invite)
+                )
+            )
+        assert preserved_duplicate_invite is not None
+        assert preserved_duplicate_invite.consumed_at is None
 
         collision_token = "integration-only-collision-token"
         monkeypatch.setattr(
@@ -238,16 +292,22 @@ async def _exercise_registration_failures(
         )
         seed = await client.post(
             "/auth/register",
-            json={"username": "collision_seed", "password": VALID_PASSWORD},
+            json=await _registration_payload(
+                application,
+                username="collision_seed",
+                password=VALID_PASSWORD,
+            ),
         )
         assert seed.status_code == 201
         counts_before = await _identity_counts(application)
+        rollback_invite = await create_test_invitation(_session_factory(application))
 
         rollback = await client.post(
             "/auth/register",
             json={
                 "username": "rollback_user",
                 "password": "Rollback integration password 3!",
+                "invite_code": rollback_invite,
             },
         )
         _assert_safe_error(rollback, 500, "INTERNAL_ERROR")
@@ -260,6 +320,14 @@ async def _exercise_registration_failures(
                 )
                 is None
             )
+            preserved_rollback_invite = await session.scalar(
+                select(BetaInvitation).where(
+                    BetaInvitation.code_digest
+                    == digest_invitation_code(rollback_invite)
+                )
+            )
+            assert preserved_rollback_invite is not None
+            assert preserved_rollback_invite.consumed_at is None
 
 
 def test_register_validation_duplicate_and_atomic_rollback(
@@ -269,6 +337,712 @@ def test_register_validation_duplicate_and_atomic_rollback(
     run_async(lambda: _exercise_registration_failures(migrated_database, monkeypatch))
 
 
+async def _exercise_invitation_lifecycle_and_concurrency(
+    temporary_database: TemporaryDatabaseContext,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    async with _auth_client(temporary_database) as (application, client):
+        factory = _session_factory(application)
+        now = datetime.now(UTC)
+        invalid_code = "invalid-invitation-secret"
+        invalid = await client.post(
+            "/auth/register",
+            json={
+                "username": "invalid_invite",
+                "password": VALID_PASSWORD,
+                "invite_code": invalid_code,
+            },
+        )
+
+        async with factory() as session:
+            expired = await generate_invitations(
+                session,
+                count=1,
+                expires_in_days=1,
+                label="expired-test",
+                reference_time=now - timedelta(days=2),
+            )
+        expired_code = expired[0].raw_code
+        expired_response = await client.post(
+            "/auth/register",
+            json={
+                "username": "expired_invite",
+                "password": VALID_PASSWORD,
+                "invite_code": expired_code,
+            },
+        )
+
+        async with factory() as session:
+            revoked_generated = await generate_invitations(
+                session,
+                count=1,
+                label="revoked-test",
+            )
+            revoked_code = revoked_generated[0].raw_code
+        async with factory() as session, session.begin():
+            revoked_invitation = await session.scalar(
+                select(BetaInvitation).where(
+                    BetaInvitation.code_digest == digest_invitation_code(revoked_code)
+                )
+            )
+            assert revoked_invitation is not None
+            revoked_invitation.revoked_at = datetime.now(UTC)
+        revoked_response = await client.post(
+            "/auth/register",
+            json={
+                "username": "revoked_invite",
+                "password": VALID_PASSWORD,
+                "invite_code": revoked_code,
+            },
+        )
+
+        reused_code = await create_test_invitation(factory)
+        accepted = await client.post(
+            "/auth/register",
+            json={
+                "username": "accepted_invite",
+                "password": VALID_PASSWORD,
+                "invite_code": reused_code,
+            },
+        )
+        assert accepted.status_code == 201
+        reused = await client.post(
+            "/auth/register",
+            json={
+                "username": "reused_invite",
+                "password": VALID_PASSWORD,
+                "invite_code": reused_code,
+            },
+        )
+
+        for response in (invalid, expired_response, revoked_response, reused):
+            _assert_safe_error(response, 409, "ENROLLMENT_UNAVAILABLE")
+            assert response.json()["error"]["message"] == "Enrollment is unavailable."
+
+        concurrent_code = await create_test_invitation(factory)
+        transport = ASGITransport(app=application)
+        async with (
+            AsyncClient(
+                transport=transport,
+                base_url="http://testserver",
+                headers=AUTH_POST_HEADERS,
+            ) as first_client,
+            AsyncClient(
+                transport=transport,
+                base_url="http://testserver",
+                headers=AUTH_POST_HEADERS,
+            ) as second_client,
+        ):
+            first_response, second_response = await asyncio.gather(
+                first_client.post(
+                    "/auth/register",
+                    json={
+                        "username": "concurrent_first",
+                        "password": VALID_PASSWORD,
+                        "invite_code": concurrent_code,
+                    },
+                ),
+                second_client.post(
+                    "/auth/register",
+                    json={
+                        "username": "concurrent_second",
+                        "password": VALID_PASSWORD,
+                        "invite_code": concurrent_code,
+                    },
+                ),
+            )
+        assert sorted((first_response.status_code, second_response.status_code)) == [
+            201,
+            409,
+        ]
+        failed = (
+            first_response if first_response.status_code == 409 else second_response
+        )
+        _assert_safe_error(failed, 409, "ENROLLMENT_UNAVAILABLE")
+
+        async with factory() as session:
+            invitation = await session.scalar(
+                select(BetaInvitation).where(BetaInvitation.consumed_at.is_not(None))
+            )
+            concurrent_users = await session.scalar(
+                select(func.count())
+                .select_from(User)
+                .where(User.username.in_(("concurrent_first", "concurrent_second")))
+            )
+        assert invitation is not None
+        assert concurrent_users == 1
+
+    for secret in (
+        invalid_code,
+        expired_code,
+        revoked_code,
+        reused_code,
+        concurrent_code,
+    ):
+        assert secret not in caplog.text
+
+
+def test_invitation_failures_are_generic_and_consumption_is_atomic(
+    migrated_database: TemporaryDatabaseContext,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.INFO)
+    run_async(
+        lambda: _exercise_invitation_lifecycle_and_concurrency(
+            migrated_database,
+            caplog,
+        )
+    )
+
+
+async def _exercise_durable_rate_limits(
+    temporary_database: TemporaryDatabaseContext,
+) -> None:
+    limiter_settings = Settings(
+        environment=Environment.TEST,
+        cors_origins=(TRUSTED_ORIGIN,),
+        auth_rate_limit_hmac_key=SecretStr("unit-only-rate-limit-key-32-bytes"),
+        auth_login_source_limit=1,
+    )
+    async with _auth_client(
+        temporary_database,
+        settings=limiter_settings,
+    ) as (application, client):
+        registered = await client.post(
+            "/auth/register",
+            json=await _registration_payload(
+                application,
+                username="limited_login",
+                password=VALID_PASSWORD,
+            ),
+        )
+        assert registered.status_code == 201
+        client.cookies.clear()
+        first = await client.post(
+            "/auth/login",
+            json={"username": "limited_login", "password": "wrong-password"},
+        )
+        _assert_safe_error(first, 401, "INVALID_CREDENTIALS")
+        blocked = await client.post(
+            "/auth/login",
+            json={"username": "limited_login", "password": VALID_PASSWORD},
+        )
+        _assert_safe_error(blocked, 429, "AUTH_RATE_LIMITED")
+        assert blocked.headers["retry-after"] == "900"
+        async with _session_factory(application)() as session:
+            source_bucket = await session.scalar(
+                select(AuthRateLimitBucket).where(
+                    AuthRateLimitBucket.scope == "LOGIN_SOURCE"
+                )
+            )
+        assert source_bucket is not None
+        assert source_bucket.attempt_count == 2
+        assert source_bucket.blocked_until is not None
+
+    async with _auth_client(
+        temporary_database,
+        settings=limiter_settings,
+    ) as (restarted_application, restarted_client):
+        still_blocked = await restarted_client.post(
+            "/auth/login",
+            json={"username": "limited_login", "password": VALID_PASSWORD},
+        )
+        _assert_safe_error(still_blocked, 429, "AUTH_RATE_LIMITED")
+        async with _session_factory(restarted_application)() as session:
+            persisted_source_bucket = await session.scalar(
+                select(AuthRateLimitBucket).where(
+                    AuthRateLimitBucket.scope == "LOGIN_SOURCE"
+                )
+            )
+        assert persisted_source_bucket is not None
+        assert persisted_source_bucket.attempt_count == 3
+        assert persisted_source_bucket.blocked_until is not None
+
+
+def test_login_rate_limit_is_durable_across_application_restart(
+    migrated_database: TemporaryDatabaseContext,
+) -> None:
+    run_async(lambda: _exercise_durable_rate_limits(migrated_database))
+
+
+def _limited_settings(
+    key_suffix: str,
+    *,
+    register_global_limit: int = 200,
+    register_source_limit: int = 20,
+    register_invite_limit: int = 5,
+    login_global_limit: int = 1_200,
+    login_source_limit: int = 60,
+    login_account_shard_limit: int = 10,
+) -> Settings:
+    return Settings(
+        environment=Environment.TEST,
+        cors_origins=(TRUSTED_ORIGIN,),
+        auth_trusted_caddy_mode=True,
+        auth_rate_limit_hmac_key=SecretStr(
+            f"integration-rate-limit-key-{key_suffix}-32-bytes"
+        ),
+        auth_register_global_limit=register_global_limit,
+        auth_register_source_limit=register_source_limit,
+        auth_register_invite_limit=register_invite_limit,
+        auth_login_global_limit=login_global_limit,
+        auth_login_source_limit=login_source_limit,
+        auth_login_account_shard_limit=login_account_shard_limit,
+    )
+
+
+def _source_headers(source: str) -> dict[str, str]:
+    return {**AUTH_POST_HEADERS, "X-GIA-Client-IP": source}
+
+
+def _assert_generic_rate_limit(response: Response) -> None:
+    _assert_safe_error(response, 429, "AUTH_RATE_LIMITED")
+    assert response.headers["retry-after"] == "900"
+    assert response.json()["error"]["message"] == (
+        "Authentication request rate limit exceeded."
+    )
+
+
+async def _rate_limit_scope_count(application: FastAPI, scope: str) -> int:
+    async with _session_factory(application)() as session:
+        count = await session.scalar(
+            select(func.count())
+            .select_from(AuthRateLimitBucket)
+            .where(AuthRateLimitBucket.scope == scope)
+        )
+    assert count is not None
+    return count
+
+
+async def _exercise_register_global_denial_stops_source_bookkeeping(
+    temporary_database: TemporaryDatabaseContext,
+) -> None:
+    settings = _limited_settings(
+        "register-global-short-circuit",
+        register_global_limit=1,
+    )
+    async with _auth_client(temporary_database, settings=settings) as (
+        application,
+        client,
+    ):
+        first = await client.post(
+            "/auth/register",
+            headers=_source_headers("192.0.2.70"),
+            json={
+                "username": "register_global_first",
+                "password": VALID_PASSWORD,
+                "invite_code": "unknown-register-global-first",
+            },
+        )
+        _assert_safe_error(first, 409, "ENROLLMENT_UNAVAILABLE")
+
+        for suffix in range(5):
+            blocked = await client.post(
+                "/auth/register",
+                headers=_source_headers(f"198.51.100.{suffix + 1}"),
+                json={
+                    "username": f"register_global_blocked_{suffix}",
+                    "password": VALID_PASSWORD,
+                    "invite_code": f"unknown-register-global-{suffix}",
+                },
+            )
+            _assert_generic_rate_limit(blocked)
+
+        assert await _rate_limit_scope_count(application, "REGISTER_SOURCE") == 1
+
+
+def test_register_global_denial_does_not_create_source_buckets(
+    migrated_database: TemporaryDatabaseContext,
+) -> None:
+    run_async(
+        lambda: _exercise_register_global_denial_stops_source_bookkeeping(
+            migrated_database
+        )
+    )
+
+
+async def _exercise_login_global_denial_stops_lower_priority_bookkeeping(
+    temporary_database: TemporaryDatabaseContext,
+) -> None:
+    settings = _limited_settings(
+        "login-global-short-circuit",
+        login_global_limit=1,
+        login_source_limit=200,
+        login_account_shard_limit=200,
+    )
+    async with _auth_client(temporary_database, settings=settings) as (
+        application,
+        client,
+    ):
+        first = await client.post(
+            "/auth/login",
+            headers=_source_headers("192.0.2.80"),
+            json={"username": "login_global_first", "password": "wrong-password"},
+        )
+        _assert_safe_error(first, 401, "INVALID_CREDENTIALS")
+
+        for suffix in range(5):
+            blocked = await client.post(
+                "/auth/login",
+                headers=_source_headers(f"203.0.113.{suffix + 1}"),
+                json={
+                    "username": f"login_global_blocked_{suffix}",
+                    "password": "wrong-password",
+                },
+            )
+            _assert_generic_rate_limit(blocked)
+
+        assert await _rate_limit_scope_count(application, "LOGIN_SOURCE") == 1
+        assert (
+            await _rate_limit_scope_count(application, "LOGIN_ACCOUNT_SHARD") == 1
+        )
+
+
+def test_login_global_denial_does_not_create_lower_priority_buckets(
+    migrated_database: TemporaryDatabaseContext,
+) -> None:
+    run_async(
+        lambda: _exercise_login_global_denial_stops_lower_priority_bookkeeping(
+            migrated_database
+        )
+    )
+
+
+async def _exercise_login_source_denial_stops_account_shard_bookkeeping(
+    temporary_database: TemporaryDatabaseContext,
+) -> None:
+    settings = _limited_settings(
+        "login-source-short-circuit",
+        login_global_limit=200,
+        login_source_limit=1,
+        login_account_shard_limit=200,
+    )
+    source_headers = _source_headers("192.0.2.90")
+    async with _auth_client(temporary_database, settings=settings) as (
+        application,
+        client,
+    ):
+        first = await client.post(
+            "/auth/login",
+            headers=source_headers,
+            json={"username": "login_source_first", "password": "wrong-password"},
+        )
+        _assert_safe_error(first, 401, "INVALID_CREDENTIALS")
+
+        for suffix in range(20):
+            blocked = await client.post(
+                "/auth/login",
+                headers=source_headers,
+                json={
+                    "username": f"login_source_blocked_{suffix}",
+                    "password": "wrong-password",
+                },
+            )
+            _assert_generic_rate_limit(blocked)
+
+        assert (
+            await _rate_limit_scope_count(application, "LOGIN_ACCOUNT_SHARD") == 1
+        )
+
+
+def test_login_source_denial_does_not_create_account_shard_buckets(
+    migrated_database: TemporaryDatabaseContext,
+) -> None:
+    run_async(
+        lambda: _exercise_login_source_denial_stops_account_shard_bookkeeping(
+            migrated_database
+        )
+    )
+
+
+async def _exercise_each_rate_limit_scope(
+    temporary_database: TemporaryDatabaseContext,
+) -> None:
+    register_cases = (
+        (
+            _limited_settings("register-global", register_global_limit=1),
+            _source_headers("192.0.2.10"),
+            _source_headers("192.0.2.11"),
+        ),
+        (
+            _limited_settings("register-source", register_source_limit=1),
+            _source_headers("192.0.2.20"),
+            _source_headers("192.0.2.20"),
+        ),
+    )
+    for index, (settings, first_headers, second_headers) in enumerate(register_cases):
+        async with _auth_client(temporary_database, settings=settings) as (
+            _application,
+            client,
+        ):
+            first = await client.post(
+                "/auth/register",
+                headers=first_headers,
+                json={
+                    "username": f"register_scope_{index}_first",
+                    "password": VALID_PASSWORD,
+                    "invite_code": f"unknown-invite-{index}-first",
+                },
+            )
+            _assert_safe_error(first, 409, "ENROLLMENT_UNAVAILABLE")
+            blocked = await client.post(
+                "/auth/register",
+                headers=second_headers,
+                json={
+                    "username": f"register_scope_{index}_second",
+                    "password": VALID_PASSWORD,
+                    "invite_code": f"unknown-invite-{index}-second",
+                },
+            )
+            _assert_generic_rate_limit(blocked)
+
+    invite_settings = _limited_settings(
+        "register-invite",
+        register_invite_limit=1,
+    )
+    async with _auth_client(temporary_database, settings=invite_settings) as (
+        application,
+        client,
+    ):
+        invite_code = await create_test_invitation(_session_factory(application))
+        first = await client.post(
+            "/auth/register",
+            headers=_source_headers("192.0.2.30"),
+            json={
+                "username": "register_invite_first",
+                "password": "too short",
+                "invite_code": invite_code,
+            },
+        )
+        _assert_safe_error(first, 422, "INVALID_PASSWORD")
+        blocked = await client.post(
+            "/auth/register",
+            headers=_source_headers("192.0.2.31"),
+            json={
+                "username": "register_invite_second",
+                "password": VALID_PASSWORD,
+                "invite_code": invite_code,
+            },
+        )
+        _assert_generic_rate_limit(blocked)
+
+    login_cases = (
+        (
+            _limited_settings("login-global", login_global_limit=1),
+            "login_global_first",
+            "login_global_second",
+            _source_headers("192.0.2.40"),
+            _source_headers("192.0.2.41"),
+        ),
+        (
+            _limited_settings("login-source", login_source_limit=1),
+            "login_source_first",
+            "login_source_second",
+            _source_headers("192.0.2.50"),
+            _source_headers("192.0.2.50"),
+        ),
+        (
+            _limited_settings(
+                "login-account-shard",
+                login_account_shard_limit=1,
+            ),
+            "login_shard_user",
+            "LOGIN_SHARD_USER",
+            _source_headers("192.0.2.60"),
+            _source_headers("192.0.2.61"),
+        ),
+    )
+    for (
+        settings,
+        first_username,
+        second_username,
+        first_headers,
+        second_headers,
+    ) in login_cases:
+        async with _auth_client(temporary_database, settings=settings) as (
+            _application,
+            client,
+        ):
+            first = await client.post(
+                "/auth/login",
+                headers=first_headers,
+                json={"username": first_username, "password": "wrong-password"},
+            )
+            _assert_safe_error(first, 401, "INVALID_CREDENTIALS")
+            blocked = await client.post(
+                "/auth/login",
+                headers=second_headers,
+                json={"username": second_username, "password": "wrong-password"},
+            )
+            _assert_generic_rate_limit(blocked)
+
+
+def test_each_register_and_login_rate_limit_scope_is_enforced_generically(
+    migrated_database: TemporaryDatabaseContext,
+) -> None:
+    run_async(lambda: _exercise_each_rate_limit_scope(migrated_database))
+
+
+async def _exercise_random_invite_cardinality(
+    temporary_database: TemporaryDatabaseContext,
+) -> None:
+    settings = Settings(
+        environment=Environment.TEST,
+        cors_origins=(TRUSTED_ORIGIN,),
+        auth_rate_limit_hmac_key=SecretStr("unit-only-rate-limit-key-32-bytes"),
+    )
+    async with _auth_client(temporary_database, settings=settings) as (
+        application,
+        client,
+    ):
+        for suffix in range(3):
+            response = await client.post(
+                "/auth/register",
+                json={
+                    "username": f"random_invite_{suffix}",
+                    "password": VALID_PASSWORD,
+                    "invite_code": f"random-secret-{suffix}",
+                },
+            )
+            _assert_safe_error(response, 409, "ENROLLMENT_UNAVAILABLE")
+        async with _session_factory(application)() as session:
+            scopes = list(
+                (
+                    await session.scalars(
+                        select(AuthRateLimitBucket.scope).where(
+                            AuthRateLimitBucket.scope.like("REGISTER_%")
+                        )
+                    )
+                ).all()
+            )
+            digests = list(
+                (
+                    await session.scalars(
+                        select(AuthRateLimitBucket.key_digest).where(
+                            AuthRateLimitBucket.scope.like("REGISTER_%")
+                        )
+                    )
+                ).all()
+            )
+        assert sorted(scopes) == ["REGISTER_GLOBAL", "REGISTER_SOURCE"]
+        assert all(len(value) == 32 for value in digests)
+        assert all(b"127.0.0.1" not in value for value in digests)
+
+
+def test_random_invites_do_not_create_unbounded_rate_limit_buckets(
+    migrated_database: TemporaryDatabaseContext,
+) -> None:
+    run_async(lambda: _exercise_random_invite_cardinality(migrated_database))
+
+
+async def _exercise_client_source_privacy(
+    temporary_database: TemporaryDatabaseContext,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    raw_source = "2001:db8::10"
+    raw_hmac_key = "privacy-only-rate-limit-key-32-bytes"
+    settings = Settings(
+        environment=Environment.TEST,
+        cors_origins=(TRUSTED_ORIGIN,),
+        auth_trusted_caddy_mode=True,
+        auth_rate_limit_hmac_key=SecretStr(raw_hmac_key),
+    )
+    async with _auth_client(temporary_database, settings=settings) as (
+        application,
+        client,
+    ):
+        response = await client.post(
+            "/auth/login",
+            headers=_source_headers(raw_source),
+            json={"username": "privacy_probe", "password": "wrong-password"},
+        )
+        _assert_safe_error(response, 401, "INVALID_CREDENTIALS")
+        async with _session_factory(application)() as session:
+            digests = list(
+                (await session.scalars(select(AuthRateLimitBucket.key_digest))).all()
+            )
+
+    assert digests
+    assert all(raw_source.encode() not in digest for digest in digests)
+    assert raw_source not in caplog.text
+    assert raw_hmac_key not in caplog.text
+    assert raw_source not in response.text
+    assert raw_hmac_key not in response.text
+
+
+def test_raw_client_source_and_hmac_key_are_absent_from_logs_database_and_response(
+    migrated_database: TemporaryDatabaseContext,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.INFO)
+    run_async(lambda: _exercise_client_source_privacy(migrated_database, caplog))
+
+
+async def _exercise_register_limiter_precedes_invitation_lookup(
+    temporary_database: TemporaryDatabaseContext,
+) -> None:
+    settings = Settings(
+        environment=Environment.TEST,
+        cors_origins=(TRUSTED_ORIGIN,),
+        auth_rate_limit_hmac_key=SecretStr("unit-only-rate-limit-key-32-bytes"),
+    )
+    async with _auth_client(temporary_database, settings=settings) as (
+        application,
+        client,
+    ):
+        statements: list[str] = []
+        engine = application.state.database_engine
+        assert isinstance(engine, AsyncEngine)
+
+        def record_statement(
+            _connection: object,
+            _cursor: object,
+            statement: str,
+            _parameters: object,
+            _context: object,
+            _executemany: bool,
+        ) -> None:
+            statements.append(statement.lower())
+
+        event.listen(engine.sync_engine, "before_cursor_execute", record_statement)
+        try:
+            response = await client.post(
+                "/auth/register",
+                json={
+                    "username": "ordering_probe",
+                    "password": VALID_PASSWORD,
+                    "invite_code": "unknown-ordering-probe",
+                },
+            )
+        finally:
+            event.remove(
+                engine.sync_engine,
+                "before_cursor_execute",
+                record_statement,
+            )
+
+        _assert_safe_error(response, 409, "ENROLLMENT_UNAVAILABLE")
+        limiter_write_index = next(
+            index
+            for index, statement in enumerate(statements)
+            if "insert into auth_rate_limit_buckets" in statement
+        )
+        invitation_lookup_index = next(
+            index
+            for index, statement in enumerate(statements)
+            if "from beta_invitations" in statement
+        )
+        assert limiter_write_index < invitation_lookup_index
+
+
+def test_register_global_and_source_limits_precede_invitation_lookup(
+    migrated_database: TemporaryDatabaseContext,
+) -> None:
+    run_async(
+        lambda: _exercise_register_limiter_precedes_invitation_lookup(migrated_database)
+    )
+
+
 async def _exercise_login_contract(
     temporary_database: TemporaryDatabaseContext,
     monkeypatch: pytest.MonkeyPatch,
@@ -276,7 +1050,11 @@ async def _exercise_login_contract(
     async with _auth_client(temporary_database) as (application, client):
         registered = await client.post(
             "/auth/register",
-            json={"username": "Login_User", "password": VALID_PASSWORD},
+            json=await _registration_payload(
+                application,
+                username="Login_User",
+                password=VALID_PASSWORD,
+            ),
         )
         assert registered.status_code == 201
         prelogin_token = _cookie_value(registered)
@@ -512,7 +1290,11 @@ async def _exercise_logout_contract(
     async with _auth_client(temporary_database) as (application, client):
         registered = await client.post(
             "/auth/register",
-            json={"username": "logout_user", "password": VALID_PASSWORD},
+            json=await _registration_payload(
+                application,
+                username="logout_user",
+                password=VALID_PASSWORD,
+            ),
         )
         old_token = _cookie_value(registered)
         login = await client.post(

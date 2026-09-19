@@ -14,5 +14,7 @@
 	{$BETA_CADDY_TLS}
 
 	encode zstd gzip
-	reverse_proxy api:8000
+	reverse_proxy api:8000 {
+		header_up X-GIA-Client-IP {remote_host}
+	}
 }

@@ -483,11 +483,19 @@ describe("AuthPanel", () => {
     render(<AuthPanel />);
     await screen.findByRole("heading", { name: "登录或注册" });
     fireEvent.click(screen.getByRole("button", { name: "注册" }));
+    expect(
+      screen.getByText("邀请码不会保存到本站本地存储，提交后将从表单清除。", {
+        exact: false,
+      }),
+    ).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("用户名"), {
       target: { value: "Web_User" },
     });
     fireEvent.change(screen.getByLabelText("密码"), {
       target: { value: "Abcd123!" },
+    });
+    fireEvent.change(screen.getByLabelText("邀请码"), {
+      target: { value: "unit-only-invite-code" },
     });
     fireEvent.click(screen.getByRole("button", { name: "创建账户" }));
 
@@ -525,8 +533,45 @@ describe("AuthPanel", () => {
     expect(mockedRegisterUser).toHaveBeenCalledWith(expect.anything(), {
       username: "Web_User",
       password: "Abcd123!",
+      invite_code: "unit-only-invite-code",
     });
     expect(screen.queryByLabelText("密码")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("邀请码")).not.toBeInTheDocument();
+  });
+
+  it("clears the invitation secret after a generic enrollment failure", async () => {
+    vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "http://localhost:8000");
+    mockedGetCurrentUser.mockResolvedValue(unauthenticatedResponse());
+    mockedRegisterUser.mockResolvedValue({
+      error: {
+        error: {
+          code: "ENROLLMENT_UNAVAILABLE",
+          message: "must not be rendered",
+          request_id: "00000000-0000-4000-8000-000000000004",
+        },
+      },
+      response: new Response(null, { status: 409 }),
+    });
+
+    render(<AuthPanel />);
+    await screen.findByRole("heading", { name: "登录或注册" });
+    fireEvent.click(screen.getByRole("button", { name: "注册" }));
+    fireEvent.change(screen.getByLabelText("用户名"), {
+      target: { value: "Web_User" },
+    });
+    fireEvent.change(screen.getByLabelText("密码"), {
+      target: { value: "Abcd123!" },
+    });
+    fireEvent.change(screen.getByLabelText("邀请码"), {
+      target: { value: "unit-only-invite-code" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "创建账户" }));
+
+    expect(await screen.findByText("安全错误提示")).toBeVisible();
+    expect(screen.getByLabelText("邀请码")).toHaveValue("");
+    expect(window.localStorage).toHaveLength(0);
+    expect(window.sessionStorage).toHaveLength(0);
+    expect(screen.queryByText("must not be rendered")).toBeNull();
   });
 
   it("shows a safe login error category and clears password state", async () => {

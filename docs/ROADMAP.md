@@ -23,6 +23,8 @@
 
 ## 2. 开发阶段
 
+HK-BETA-2A1 是 P1 完成后的 deployment hardening workstream，不是 P2/P3 提前启动，也不是新的产品版本。它只为 Hong Kong Closed Text Beta 补齐邀请制、durable auth throttling 与 trusted-client-source boundary；actual go-live 仍受 recovery、数据库最小权限、backup/restore、quota/cost 等独立 gates 约束。
+
 | 阶段 | 目标摘要 | 当前状态 |
 |---|---|---|
 | P0 项目基础 | 仓库、规范、环境、认证、数据库基础、监控日志和决策记录 | DONE |

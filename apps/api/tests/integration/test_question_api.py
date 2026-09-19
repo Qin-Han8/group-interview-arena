@@ -33,6 +33,7 @@ from group_interview_arena_api.modules.question_personas.seed import (
     persist_published_question_bundle,
     seed_question_persona_foundation,
 )
+from tests.auth_test_helpers import create_test_invitation
 
 pytestmark = pytest.mark.integration
 
@@ -70,11 +71,19 @@ async def _application(temporary_database: TemporaryDatabaseContext):
         yield application
 
 
-async def _register(client: AsyncClient, username: str) -> UUID:
+async def _register(
+    application: FastAPI,
+    client: AsyncClient,
+    username: str,
+) -> UUID:
     response = await client.post(
         "/auth/register",
         headers=AUTH_HEADERS,
-        json={"username": username, "password": VALID_PASSWORD},
+        json={
+            "username": username,
+            "password": VALID_PASSWORD,
+            "invite_code": await create_test_invitation(_factory(application)),
+        },
     )
     assert response.status_code == 201
     return UUID(response.json()["id"])
@@ -215,7 +224,7 @@ async def _verify_discovery_detail_and_nondisclosure(
         async with AsyncClient(
             transport=transport, base_url="http://testserver"
         ) as client:
-            await _register(client, "question_reader")
+            await _register(application, client, "question_reader")
             discovered = await client.get("/questions")
             assert discovered.status_code == 200
             assert len(discovered.json()) == 12
@@ -325,7 +334,7 @@ async def _verify_retired_persona_blocks_new_selection(
         async with AsyncClient(
             transport=transport, base_url="http://testserver"
         ) as client:
-            await _register(client, "retired_persona_reader")
+            await _register(application, client, "retired_persona_reader")
             discovered = await client.get("/questions")
             assert discovered.status_code == 200
             retired_persona_id = INTERNAL_VALIDATION_BUNDLE.assignments[
@@ -369,7 +378,7 @@ async def _verify_immutable_historical_binding(
         async with AsyncClient(
             transport=transport, base_url="http://testserver"
         ) as client:
-            owner_id = await _register(client, "history_owner")
+            owner_id = await _register(application, client, "history_owner")
             created = await client.post(
                 "/sessions",
                 headers=AUTH_HEADERS,

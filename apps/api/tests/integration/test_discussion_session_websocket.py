@@ -66,6 +66,7 @@ from group_interview_arena_api.modules.question_personas.seed import (
     INTERNAL_VALIDATION_BUNDLE,
     seed_question_persona_foundation,
 )
+from tests.auth_test_helpers import create_test_invitation
 
 pytestmark = pytest.mark.integration
 
@@ -134,15 +135,34 @@ def _client(application: FastAPI) -> Generator[SyncTestClient]:
     with TestClient(
         application,
         backend_options={"loop_factory": asyncio.SelectorEventLoop},
+        client=("127.0.0.1", 50000),
     ) as raw_client:
         yield raw_client  # pyright: ignore[reportUnknownVariableType]
 
 
-def _register(client: SyncTestClient, username: str) -> str:
+def _register(
+    temporary_database: TemporaryDatabaseContext,
+    client: SyncTestClient,
+    username: str,
+) -> str:
+    async def invitation_code() -> str:
+        engine = create_database_engine(temporary_database.database_settings())
+        try:
+            return await create_test_invitation(create_database_session_factory(engine))
+        finally:
+            await dispose_database_engine(engine)
+
     response = client.post(
         "/auth/register",
         headers=AUTH_HEADERS,
-        json={"username": username, "password": VALID_PASSWORD},
+        json={
+            "username": username,
+            "password": VALID_PASSWORD,
+            "invite_code": asyncio.run(
+                invitation_code(),
+                loop_factory=asyncio.SelectorEventLoop,
+            ),
+        },
     )
     assert response.status_code == 201
     token = client.cookies.get(SESSION_COOKIE_NAME)
@@ -393,7 +413,7 @@ def test_websocket_denies_invalid_origin_auth_and_non_owner_before_accept(
 ) -> None:
     application = _application(migrated_database)
     with _client(application) as client:
-        owner_token = _register(client, "ws_owner")
+        owner_token = _register(migrated_database, client, "ws_owner")
         snapshot = _create_session(client)
         session_id = str(snapshot["id"])
 
@@ -421,7 +441,7 @@ def test_websocket_denies_invalid_origin_auth_and_non_owner_before_accept(
                     pass
 
         _set_token(client, None)
-        non_owner_token = _register(client, "ws_non_owner")
+        non_owner_token = _register(migrated_database, client, "ws_non_owner")
         _set_token(client, non_owner_token)
         with pytest.raises(DeniedConnection):
             with client.websocket_connect(
@@ -459,7 +479,7 @@ def test_websocket_abort_duplicate_invalid_state_and_ordered_catchup(
 ) -> None:
     application = _application(migrated_database)
     with _client(application) as client:
-        _register(client, "ws_command_owner")
+        _register(migrated_database, client, "ws_command_owner")
         snapshot = _create_session(client)
         session_id = str(snapshot["id"])
         action_id = uuid4()
@@ -534,7 +554,7 @@ def test_websocket_replays_session_command_result_behind_connection_cursor(
 ) -> None:
     application = _application(migrated_database)
     with _client(application) as client:
-        _register(client, "ws_session_replay_behind_cursor")
+        _register(migrated_database, client, "ws_session_replay_behind_cursor")
         snapshot = _create_session(client)
         session_id = str(snapshot["id"])
         start_action_id = uuid4()
@@ -632,7 +652,7 @@ def test_websocket_fresh_command_drains_reconciliation_before_command_result(
         ),
     )
     with _client(application) as client:
-        _register(client, "ws_fresh_reconciliation_order")
+        _register(migrated_database, client, "ws_fresh_reconciliation_order")
         snapshot = _create_session(client)
         session_id = str(snapshot["id"])
 
@@ -719,7 +739,7 @@ def test_websocket_protocol_error_is_safe_and_closes_1008(
 ) -> None:
     application = _application(migrated_database)
     with _client(application) as client:
-        _register(client, f"ws_protocol_{uuid4().hex[:8]}")
+        _register(migrated_database, client, f"ws_protocol_{uuid4().hex[:8]}")
         snapshot = _create_session(client)
         session_id = str(snapshot["id"])
 
@@ -754,7 +774,7 @@ def test_websocket_ahead_watermark_and_lost_send_reconnect_are_durable(
 ) -> None:
     application = _application(migrated_database)
     with _client(application) as client:
-        _register(client, "ws_reconnect_owner")
+        _register(migrated_database, client, "ws_reconnect_owner")
         snapshot = _create_session(client)
         session_id = str(snapshot["id"])
 
@@ -846,7 +866,7 @@ def test_periodic_catchup_failure_closes_safely_without_raw_error(
         raise PublicEventProjectionError("periodic-projection-private-sentinel")
 
     with _client(application) as client:
-        _register(client, "ws_periodic_send_failure_owner")
+        _register(migrated_database, client, "ws_periodic_send_failure_owner")
         snapshot = _create_session(client)
         session_id = str(snapshot["id"])
 
@@ -910,7 +930,7 @@ def test_websocket_delivers_committed_phase_deadline_event(
         ),
     )
     with _client(application) as client:
-        _register(client, "ws_phase_owner")
+        _register(migrated_database, client, "ws_phase_owner")
         snapshot = _create_session(client)
         session_id = str(snapshot["id"])
         action_id = uuid4()
@@ -996,7 +1016,7 @@ def test_websocket_projects_floor_grant_and_recovers_it_from_snapshot_and_catchu
         ),
     )
     with _client(application) as client:
-        _register(client, "ws_floor_owner")
+        _register(migrated_database, client, "ws_floor_owner")
         created = _create_session(client)
         session_id = str(created["id"])
 
@@ -1101,7 +1121,7 @@ def test_websocket_human_submit_is_ordered_recoverable_and_preserves_content(
         ),
     )
     with _client(application) as client:
-        _register(client, "ws_human_utterance_owner")
+        _register(migrated_database, client, "ws_human_utterance_owner")
         created = _create_session(client)
         session_id = str(created["id"])
         content = "  preserve me exactly  "
@@ -1246,7 +1266,7 @@ def test_websocket_replays_human_utterance_result_behind_connection_cursor(
         ),
     )
     with _client(application) as client:
-        _register(client, "ws_human_replay_behind_cursor")
+        _register(migrated_database, client, "ws_human_replay_behind_cursor")
         created = _create_session(client)
         session_id = str(created["id"])
         action_id = uuid4()
@@ -1410,7 +1430,7 @@ def test_websocket_external_reconciliation_drains_state_change_before_floor_kick
         ),
     )
     with _client(application) as client:
-        _register(client, "ws_external_deadline_recovery")
+        _register(migrated_database, client, "ws_external_deadline_recovery")
         snapshot = _create_session(client)
         session_id = str(snapshot["id"])
 
@@ -1569,7 +1589,7 @@ def test_websocket_coalesces_multiple_lifecycle_kicks_while_progression_runs(
     )
     application = _application(migrated_database)
     with _client(application) as client:
-        _register(client, "ws_coalesced_progression_kicks")
+        _register(migrated_database, client, "ws_coalesced_progression_kicks")
         created = _create_session(client)
         session_id = str(created["id"])
 
@@ -1622,7 +1642,7 @@ def test_websocket_catchup_without_reconciliation_does_not_kick_progression(
     )
     application = _application(migrated_database)
     with _client(application) as client:
-        _register(client, "ws_no_reconciliation_kick")
+        _register(migrated_database, client, "ws_no_reconciliation_kick")
         created = _create_session(client)
         session_id = str(created["id"])
 

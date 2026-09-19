@@ -257,7 +257,7 @@ export interface components {
          * ErrorCode
          * @enum {string}
          */
-        ErrorCode: "NOT_FOUND" | "VALIDATION_ERROR" | "INTERNAL_ERROR" | "INVALID_USERNAME" | "INVALID_PASSWORD" | "USERNAME_UNAVAILABLE" | "INVALID_CREDENTIALS" | "AUTHENTICATION_REQUIRED" | "CSRF_REJECTED" | "SESSION_NOT_FOUND" | "REPORT_NOT_FOUND" | "QUESTION_NOT_FOUND" | "INVALID_SESSION_STATE" | "ACTION_ID_CONFLICT";
+        ErrorCode: "NOT_FOUND" | "VALIDATION_ERROR" | "INTERNAL_ERROR" | "INVALID_USERNAME" | "INVALID_PASSWORD" | "USERNAME_UNAVAILABLE" | "ENROLLMENT_UNAVAILABLE" | "AUTH_RATE_LIMITED" | "INVALID_CREDENTIALS" | "AUTHENTICATION_REQUIRED" | "CSRF_REJECTED" | "SESSION_NOT_FOUND" | "REPORT_NOT_FOUND" | "QUESTION_NOT_FOUND" | "INVALID_SESSION_STATE" | "ACTION_ID_CONFLICT";
         /** ErrorDetail */
         ErrorDetail: {
             code: components["schemas"]["ErrorCode"];
@@ -480,6 +480,11 @@ export interface components {
              * Format: password
              */
             password: string;
+            /**
+             * Invite Code
+             * Format: password
+             */
+            invite_code: string;
         };
         /**
          * ReportGenerationStatus
@@ -716,6 +721,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
         };
     };
     login_auth_login_post: {
@@ -763,6 +777,15 @@ export interface operations {
             };
             /** @description Unprocessable Content */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };

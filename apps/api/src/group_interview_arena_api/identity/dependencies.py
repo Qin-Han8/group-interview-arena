@@ -2,10 +2,13 @@ from typing import Annotated
 
 from fastapi import Depends, Security, status
 from fastapi.security import APIKeyCookie
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from group_interview_arena_api.core.errors import ApiError, ErrorCode
-from group_interview_arena_api.db.dependencies import get_database_session
+from group_interview_arena_api.db.dependencies import (
+    get_database_session,
+    get_database_session_factory,
+)
 from group_interview_arena_api.identity.cookies import SESSION_COOKIE_NAME
 from group_interview_arena_api.identity.service import (
     AuthenticationPersistenceError,
@@ -21,6 +24,10 @@ _session_cookie = APIKeyCookie(
 )
 
 DatabaseSession = Annotated[AsyncSession, Depends(get_database_session)]
+DatabaseSessionFactory = Annotated[
+    async_sessionmaker[AsyncSession],
+    Depends(get_database_session_factory),
+]
 SessionToken = Annotated[str | None, Security(_session_cookie)]
 
 

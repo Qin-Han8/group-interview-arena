@@ -87,6 +87,8 @@ P0-5B 已实现显式参数的 Argon2id hash/verify/verify-and-update、username
 
 当前新注册密码基线为 8～128 个字符，并必须分别包含 ASCII 大写字母、小写字母、数字和 ASCII 标点；空白字符和 Unicode 标点不能替代 ASCII 标点。NFC 行为、full-password blocklist、Argon2id 与历史账号登录兼容性保持不变；该新规则不用于拒绝按历史策略创建且密码仍可验证的既有账号。
 
+HK-BETA-2A1 已实现 closed-beta invitation 与 durable authentication throttling：raw invitation 只由 operator CLI 向 stdout 显示一次，数据库只保存 SHA-256 digest，Web 不写 local/session storage 且在注册响应后清空字段；limiter 只保存 HMAC bucket identifiers，不保存 raw IP/username/invite。Unknown/expired/revoked/used invitation 与 duplicate username 使用同一 public enrollment failure，普通 structured logging 继续不记录 body、Cookie、password、invitation 或 raw client source。Verified recovery、stronger compromised-password controls、account deletion 与数据处置仍未因此获得豁免，actual go-live 继续受既有 Source of Truth 约束。
+
 ## P0-6C application logging safety boundary — completed
 
 - application logs 只从显式安全字段构造，不先收集 body/header/query/path/exception 再依赖通用 redaction；

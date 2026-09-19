@@ -415,9 +415,9 @@ jobs:
               raise SystemExit(f"Unexpected Caddy ports: {sorted(caddy_ports)}")
 
           expected_networks = {
-              "caddy": {"edge"},
-              "web": {"edge"},
-              "api": {"edge", "data"},
+              "caddy": {"web-edge", "api-edge"},
+              "web": {"web-edge"},
+              "api": {"api-edge", "data", "api-egress"},
               "migrate": {"data"},
               "postgres": {"data"},
           }
@@ -426,8 +426,15 @@ jobs:
               if actual != expected:
                   raise SystemExit(f"{name} networks {actual} != {expected}")
 
+          if set(services["web"]["networks"]) & set(services["api"]["networks"]):
+              raise SystemExit("web and api must not share a Docker network")
+
           if not config["networks"]["data"].get("internal"):
               raise SystemExit("data network must be internal")
+          if not config["networks"]["api-edge"].get("internal"):
+              raise SystemExit("api-edge network must be internal")
+          if config["networks"]["api-egress"].get("internal"):
+              raise SystemExit("api-egress must permit provider egress")
           if services["migrate"].get("restart") not in ("no", ""):
               raise SystemExit("migrate must be one-shot")
           if "postgres_data" not in config.get("volumes", {}):
@@ -437,6 +444,11 @@ jobs:
       - name: Validate Caddy configuration
         shell: bash
         run: |
+          grep -Fq 'header_up X-GIA-Client-IP {remote_host}' deploy/beta/Caddyfile
+          if grep -Eq '^[[:space:]]*log([[:space:]]*\{|[[:space:]]*$)' deploy/beta/Caddyfile; then
+            echo "Caddy HTTP access logging must remain disabled."
+            exit 1
+          fi
           docker run --rm \
             -e BETA_WEB_SITE=beta.lijingai.com \
             -e BETA_API_SITE=api.beta.lijingai.com \
@@ -453,6 +465,96 @@ jobs:
             --env-file deploy/beta/.env.example \
             -f deploy/beta/compose.yaml \
             build migrate api web
+
+      - name: Accept trusted client source through real Caddy path
+        shell: bash
+        run: |
+          set -euo pipefail
+          network="gia-caddy-header-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          backend="${network}-api"
+          proxy="${network}-proxy"
+
+          cleanup() {
+            docker rm -f "$backend" "$proxy" >/dev/null 2>&1 || true
+            docker network rm "$network" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          docker network create "$network" >/dev/null
+          docker run -d --name "$backend" \
+            --network "$network" \
+            --network-alias api \
+            --entrypoint python \
+            gia-beta-api:local -c '
+          import json
+          from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+          class Handler(BaseHTTPRequestHandler):
+              def do_GET(self):
+                  body = json.dumps(
+                      {"values": self.headers.get_all("X-GIA-Client-IP", [])}
+                  ).encode()
+                  self.send_response(200)
+                  self.send_header("Content-Type", "application/json")
+                  self.send_header("Content-Length", str(len(body)))
+                  self.end_headers()
+                  self.wfile.write(body)
+
+              def log_message(self, format, *args):
+                  return
+
+          ThreadingHTTPServer(("0.0.0.0", 8000), Handler).serve_forever()
+          ' >/dev/null
+
+          docker run -d --name "$proxy" \
+            --network "$network" \
+            --network-alias caddy \
+            -e BETA_WEB_SITE=http://:8081 \
+            -e BETA_API_SITE=http://:8080 \
+            -e BETA_CADDY_TLS= \
+            -e CADDY_ACME_EMAIL=ci@example.invalid \
+            -v "${PWD}/deploy/beta/Caddyfile:/etc/caddy/Caddyfile:ro" \
+            caddy:2.10.2-alpine \
+            caddy run --config /etc/caddy/Caddyfile >/dev/null
+
+          docker run --rm \
+            --network "$network" \
+            --entrypoint python \
+            gia-beta-api:local -c '
+          import http.client
+          import json
+          import time
+
+          spoofed = "203.0.113.123"
+
+          def assert_overwritten(header_count):
+              last_error = None
+              for _ in range(30):
+                  connection = http.client.HTTPConnection("caddy", 8080, timeout=2)
+                  try:
+                      connection.connect()
+                      peer_host = connection.sock.getsockname()[0]
+                      connection.putrequest("GET", "/")
+                      for _ in range(header_count):
+                          connection.putheader("X-GIA-Client-IP", spoofed)
+                      connection.endheaders()
+                      response = connection.getresponse()
+                      if response.status != 200:
+                          raise ConnectionError("proxy path is not ready")
+                      values = json.loads(response.read())["values"]
+                      if values != [peer_host] or spoofed in values:
+                          raise AssertionError("Caddy did not replace spoofed headers")
+                      return
+                  except OSError as error:
+                      last_error = error
+                      time.sleep(0.2)
+                  finally:
+                      connection.close()
+              raise RuntimeError("Caddy proxy path did not become ready") from last_error
+
+          assert_overwritten(1)
+          assert_overwritten(2)
+          '
 
       - name: Audit image users and browser bundle
         shell: bash

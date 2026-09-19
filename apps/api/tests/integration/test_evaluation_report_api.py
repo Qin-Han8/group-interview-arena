@@ -37,6 +37,7 @@ from group_interview_arena_api.modules.question_personas.seed import (
     INTERNAL_VALIDATION_BUNDLE,
     seed_question_persona_foundation,
 )
+from tests.auth_test_helpers import create_test_invitation
 
 pytestmark = pytest.mark.integration
 
@@ -74,11 +75,19 @@ async def _application(temporary_database: TemporaryDatabaseContext):
         yield application
 
 
-async def _register(client: AsyncClient, username: str) -> UUID:
+async def _register(
+    application: FastAPI,
+    client: AsyncClient,
+    username: str,
+) -> UUID:
     response = await client.post(
         "/auth/register",
         headers=AUTH_HEADERS,
-        json={"username": username, "password": PASSWORD},
+        json={
+            "username": username,
+            "password": PASSWORD,
+            "invite_code": await create_test_invitation(_factory(application)),
+        },
     )
     assert response.status_code == 201
     return UUID(response.json()["id"])
@@ -278,7 +287,9 @@ def test_non_completed_report_returns_metadata_without_content(
             async with AsyncClient(
                 transport=transport, base_url="http://test"
             ) as client:
-                owner_id = await _register(client, f"report_{report_status.lower()}")
+                owner_id = await _register(
+                    application, client, f"report_{report_status.lower()}"
+                )
                 session_id, _, _ = await _seed_completed_session(
                     factory, owner_id, with_source=False
                 )
@@ -310,7 +321,7 @@ def test_latest_report_is_selected_without_completed_fallback(
             async with AsyncClient(
                 transport=transport, base_url="http://test"
             ) as client:
-                owner_id = await _register(client, "report_latest")
+                owner_id = await _register(application, client, "report_latest")
                 session_id, _, _ = await _seed_completed_session(
                     factory, owner_id, with_source=False
                 )
@@ -350,7 +361,7 @@ def test_completed_report_projects_exact_public_source_and_ordered_evidence(
             async with AsyncClient(
                 transport=transport, base_url="http://test"
             ) as client:
-                owner_id = await _register(client, "report_completed")
+                owner_id = await _register(application, client, "report_completed")
                 session_id, human_id, utterance_ids = await _seed_completed_session(
                     factory, owner_id, with_source=True
                 )
@@ -480,7 +491,7 @@ def test_report_read_is_owner_only_not_found_and_mutation_free(
             async with AsyncClient(
                 transport=transport, base_url="http://test"
             ) as owner:
-                owner_id = await _register(owner, "report_owner")
+                owner_id = await _register(application, owner, "report_owner")
                 session_id, _, _ = await _seed_completed_session(
                     factory, owner_id, with_source=False
                 )
@@ -494,7 +505,7 @@ def test_report_read_is_owner_only_not_found_and_mutation_free(
             async with AsyncClient(
                 transport=transport, base_url="http://test"
             ) as other:
-                await _register(other, "report_other")
+                await _register(application, other, "report_other")
                 _assert_error(
                     await other.get(f"/sessions/{session_id}/report"),
                     404,
@@ -533,7 +544,7 @@ def test_report_read_maps_internal_failure_to_safe_error(
             async with AsyncClient(
                 transport=transport, base_url="http://test"
             ) as client:
-                await _register(client, "report_safe_error")
+                await _register(application, client, "report_safe_error")
                 response = await client.get(f"/sessions/{uuid4()}/report")
         _assert_error(response, 500, "INTERNAL_ERROR")
         assert private_sentinel not in response.text
@@ -551,7 +562,7 @@ def test_report_generation_command_uses_server_identity_and_is_idempotent(
             async with AsyncClient(
                 transport=transport, base_url="http://test"
             ) as client:
-                owner_id = await _register(client, "report_generate")
+                owner_id = await _register(application, client, "report_generate")
                 session_id, _, _ = await _seed_completed_session(
                     factory, owner_id, with_source=True
                 )
@@ -601,7 +612,7 @@ def test_report_generation_command_enforces_csrf_owner_and_completed_session(
             async with AsyncClient(
                 transport=transport, base_url="http://test"
             ) as owner:
-                owner_id = await _register(owner, "report_generate_owner")
+                owner_id = await _register(application, owner, "report_generate_owner")
                 session_id, _, _ = await _seed_completed_session(
                     factory, owner_id, with_source=False
                 )
@@ -628,7 +639,7 @@ def test_report_generation_command_enforces_csrf_owner_and_completed_session(
             async with AsyncClient(
                 transport=transport, base_url="http://test"
             ) as other:
-                await _register(other, "report_generate_other")
+                await _register(application, other, "report_generate_other")
                 _assert_error(
                     await other.post(
                         f"/sessions/{session_id}/report", headers=AUTH_HEADERS
