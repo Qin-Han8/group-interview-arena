@@ -693,9 +693,7 @@ async def _exercise_login_global_denial_stops_lower_priority_bookkeeping(
             _assert_generic_rate_limit(blocked)
 
         assert await _rate_limit_scope_count(application, "LOGIN_SOURCE") == 1
-        assert (
-            await _rate_limit_scope_count(application, "LOGIN_ACCOUNT_SHARD") == 1
-        )
+        assert await _rate_limit_scope_count(application, "LOGIN_ACCOUNT_SHARD") == 1
 
 
 def test_login_global_denial_does_not_create_lower_priority_buckets(
@@ -740,9 +738,7 @@ async def _exercise_login_source_denial_stops_account_shard_bookkeeping(
             )
             _assert_generic_rate_limit(blocked)
 
-        assert (
-            await _rate_limit_scope_count(application, "LOGIN_ACCOUNT_SHARD") == 1
-        )
+        assert await _rate_limit_scope_count(application, "LOGIN_ACCOUNT_SHARD") == 1
 
 
 def test_login_source_denial_does_not_create_account_shard_buckets(
